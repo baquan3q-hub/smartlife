@@ -11,6 +11,7 @@ import Login from './components/Login';
 // Context và Service
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { supabase } from './services/supabase';
+import { checkAndNotify, requestNotificationPermission } from './services/notificationService';
 
 // Types và Constants (Khớp với file đã sửa)
 import { AppState, Transaction, TaskPriority } from './types';
@@ -112,7 +113,24 @@ const AuthenticatedApp: React.FC = () => {
         };
 
         fetchData();
+
+
     }, [user]);
+
+    // --- NOTIFICATION LOGIC ---
+    useEffect(() => {
+        if (!appState.timetable.length) return;
+
+        // Check every minute
+        const interval = setInterval(() => {
+            checkAndNotify(appState.timetable);
+        }, 60000);
+
+        // Initial check
+        checkAndNotify(appState.timetable);
+
+        return () => clearInterval(interval);
+    }, [appState.timetable]);
 
     // --- CÁC HÀM XỬ LÝ (HANDLERS) ---
     const handleAddTransaction = async (newTx: Omit<Transaction, 'id'>) => {
@@ -352,6 +370,11 @@ const AuthenticatedApp: React.FC = () => {
                     <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}>
                         <CalendarDays size={20} /> Lịch trình & Mục tiêu
                     </button>
+
+                    {/* Notification Button Desktop */}
+                    <button onClick={requestNotificationPermission} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-amber-50 hover:text-amber-700">
+                        <span>🔔</span> Bật thông báo
+                    </button>
                 </nav>
 
                 <div className="p-4 border-t border-gray-100 space-y-2">
@@ -375,6 +398,7 @@ const AuthenticatedApp: React.FC = () => {
                             <span className="font-bold text-gray-800 text-lg tracking-tight">SmartLife</span>
                         </div>
                         <div className="flex gap-1">
+                            <button onClick={requestNotificationPermission} className="p-2 text-indigo-500 hover:bg-indigo-50 rounded-full transition-colors" title="Bật thông báo"><span className="text-xs font-bold">🔔</span></button>
                             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"><Settings size={20} /></button>
                             <button onClick={signOut} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"><LogOut size={20} /></button>
                         </div>
@@ -424,7 +448,7 @@ const AuthenticatedApp: React.FC = () => {
 
 
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userId={user?.id || ''} />
-        </div>
+        </div >
     );
 };
 
