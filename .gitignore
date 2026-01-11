@@ -7,12 +7,22 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies (Thư viện - Nặng, không up)
 node_modules
+
+# Build output (File chạy - Máy chủ tự build, không up)
 dist
 dist-ssr
+
+# Environment Variables (QUAN TRỌNG NHẤT - Chứa mật khẩu)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 *.local
 
-# Editor directories and files
+# Editor directories and files (Cấu hình máy cá nhân)
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -23,4 +33,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# System Files (File rác của Windows)
+Thumbs.db
+Desktop.ini
+
+# Vercel (File cache của Vercel)
 .vercel

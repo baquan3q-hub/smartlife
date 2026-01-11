@@ -39,10 +39,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const signInWithGoogle = async () => {
         try {
+            const redirectUrl = window.location.origin;
+            console.log('Starting Google Sign-in with redirect to:', redirectUrl);
+
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin,
+                    redirectTo: redirectUrl,
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',
@@ -50,9 +53,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 },
             });
             if (error) throw error;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error signing in with Google:', error);
-            alert('Lỗi đăng nhập Google. Vui lòng kiểm tra lại cấu hình Provider trên Supabase.');
+            alert(`Lỗi đăng nhập Google: ${error.message || JSON.stringify(error)}. \nVui lòng kiểm tra lại cấu hình Redirect URL trên Supabase dashboard.`);
         }
     };
 

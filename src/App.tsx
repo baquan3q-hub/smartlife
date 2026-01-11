@@ -7,6 +7,7 @@ import FinanceDashboard from './components/FinanceDashboard';
 import ScheduleDashboard from './components/ScheduleDashboard';
 import SettingsModal from './components/SettingsModal';
 import Login from './components/Login';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 
 // Context và Service
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -448,10 +449,23 @@ const AuthenticatedApp: React.FC = () => {
 
 
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userId={user?.id || ''} />
+            <PWAInstallPrompt />
         </div >
     );
 };
-
+// Đây là đoạn code JS (JavaScript) em cần tìm sửa
+const handleLogin = async () => {
+    // ...
+    const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            // ==> CUN SỬA DÒNG NÀY Ở ĐÂY <==
+            // Thay vì để cứng http://localhost:3000, hãy sửa thành dòng dưới:
+            redirectTo: window.location.origin
+        },
+    })
+    // ...
+}
 const AppWrapper: React.FC = () => {
     const { user, loading } = useAuth();
     if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-600 animate-spin" /></div>;

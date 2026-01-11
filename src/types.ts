@@ -90,13 +90,7 @@ export interface AppState {
   profile: Profile | null;
 }
 
-// 4. Interface cho Chat AI
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'model' | 'system';
-  content: string;
-  timestamp?: number;
-}
+
 
 // 5. Interface cho Profile User
 export interface Profile {

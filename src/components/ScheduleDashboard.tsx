@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppState, TimetableEvent, Goal, Todo, TaskPriority } from '../types';
-import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Sparkles, Bot, Loader2, Star } from 'lucide-react';
-import { analyzeSchedule } from '../services/geminiService';
+import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Star } from 'lucide-react';
 
 interface ScheduleDashboardProps {
   state: AppState;
@@ -72,24 +71,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // AI Analysis State
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [aiAnalysisResult, setAiAnalysisResult] = useState<string | null>(null);
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
-  // AI Handler
-  const handleAnalyzeSchedule = async () => {
-    setIsAnalyzing(true);
-    setIsAiModalOpen(true);
-    try {
-      const result = await analyzeSchedule(timetable, todos);
-      setAiAnalysisResult(result);
-    } catch (error) {
-      setAiAnalysisResult("Có lỗi xảy ra khi phân tích lịch trình.");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
 
   // -- HELPERS --
   const getTimeRemaining = (deadline: string) => {
@@ -190,14 +172,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             <p className="text-sm text-gray-500 pl-8">Quản lý lịch học và làm việc cố định</p>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={handleAnalyzeSchedule}
-              className="px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all font-bold flex items-center gap-1.5"
-            >
-              <Sparkles size={16} className={`md:w-5 md:h-5 ${isAnalyzing ? "animate-spin" : ""}`} />
-              <span className="hidden md:inline">AI Sắp Xếp</span>
-              <span className="md:hidden">AI Xếp</span>
-            </button>
+
             <button onClick={() => { setEditingEvent(null); setIsTimeModalOpen(true); }} className="px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition font-bold flex items-center gap-1.5">
               <Plus size={16} className="md:w-5 md:h-5" />
               <span className="hidden md:inline">Thêm lịch</span>
@@ -593,60 +568,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         </div>
       )}
 
-      {/* AI Analysis Modal */}
-      {isAiModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl relative overflow-hidden">
 
-            {/* Header */}
-            <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="bg-white p-2.5 rounded-xl shadow-sm text-indigo-600">
-                  <Bot size={28} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Trợ lý AI SmartLife</h3>
-                  <p className="text-sm text-gray-500 font-medium">Tối ưu hóa lịch trình và công việc của bạn</p>
-                </div>
-              </div>
-              <button onClick={() => setIsAiModalOpen(false)} className="p-2 hover:bg-white rounded-full transition-colors text-gray-400 hover:text-red-500"><X size={24} /></button>
-            </div>
-
-            {/* Content */}
-            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-white">
-              {isAnalyzing ? (
-                <div className="flex flex-col items-center justify-center h-64 text-center space-y-6">
-                  <div className="relative">
-                    <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-                    <div className="absolute inset-0 flex items-center justify-center text-indigo-600">
-                      <Sparkles size={24} className="animate-pulse" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold text-gray-700">Đang phân tích...</p>
-                    <p className="text-sm text-gray-500">AI đang xem xét lịch trình để tìm khoảng trống tốt nhất cho bạn.</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="prose prose-indigo max-w-none text-gray-700 leading-relaxed">
-                  {aiAnalysisResult ? (
-                    <div className="whitespace-pre-line animate-fade-in" dangerouslySetInnerHTML={{ __html: aiAnalysisResult.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />') }}></div>
-                  ) : (
-                    <div className="text-center text-gray-400 italic">Không có dữ liệu phân tích.</div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
-              <button onClick={() => setIsAiModalOpen(false)} className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-colors">
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

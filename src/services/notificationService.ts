@@ -5,11 +5,23 @@ export const requestNotificationPermission = async () => {
         alert("Trình duyệt này không hỗ trợ thông báo.");
         return false;
     }
-    if (Notification.permission === "granted") return true;
-    if (Notification.permission !== "denied") {
-        const permission = await Notification.requestPermission();
-        return permission === "granted";
+
+    if (Notification.permission === "granted") {
+        alert("Bạn đã bật thông báo rồi!");
+        return true;
     }
+
+    if (Notification.permission === "denied") {
+        alert("Bạn đã chặn thông báo. Vui lòng vào cài đặt trình duyệt (biểu tượng ổ khóa trên thanh địa chỉ) để mở lại quyền thông báo cho trang web này.");
+        return false;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+        alert("Đã bật thông báo thành công!");
+        return true;
+    }
+
     return false;
 };
 

@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
-import { analyzeFinancialData } from '../services/geminiService';
+
 
 interface FinanceDashboardProps {
     state: AppState;
@@ -68,10 +68,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     const [newBalance, setNewBalance] = useState('');
     const [showCalculator, setShowCalculator] = useState(false);
 
-    // AI State
-    const [analysisResult, setAnalysisResult] = useState('');
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [showAnalysis, setShowAnalysis] = useState(false);
+
     const stats = useMemo(() => {
         const totalIncome = transactions.reduce((acc, t) => t.type === TransactionType.INCOME ? acc + t.amount : acc, 0);
         const totalExpense = transactions.reduce((acc, t) => t.type === TransactionType.EXPENSE ? acc + t.amount : acc, 0);
@@ -194,45 +191,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     };
 
 
-    const handleAnalyze = async () => {
-        setIsAnalyzing(true);
-        setShowAnalysis(false);
-        try {
-            // Get Monthly Data
-            const currentData = {
-                income: stats.currentMonthIncome,
-                expense: stats.currentMonthExpense,
-                transactions: stats.currentMonthTransactions
-            };
 
-            // Get Last Month Data (Simple calculation)
-            // Note: In a real app we might want to memoize this or fetch it specifically, 
-            // but here we can just filter from all transactions.
-            let lastM = selectedMonth - 1;
-            let lastY = selectedYear;
-            if (lastM < 0) { lastM = 11; lastY--; }
-
-            const lastMonthTx = transactions.filter(t => {
-                const d = new Date(t.date);
-                return d.getMonth() === lastM && d.getFullYear() === lastY && t.category !== 'Điều chỉnh số dư';
-            });
-
-            const lastMonthData = {
-                income: lastMonthTx.filter(t => t.type === TransactionType.INCOME).reduce((a, b) => a + b.amount, 0),
-                expense: lastMonthTx.filter(t => t.type === TransactionType.EXPENSE).reduce((a, b) => a + b.amount, 0)
-            };
-
-            const result = await analyzeFinancialData(currentData, lastMonthData);
-            setAnalysisResult(result);
-            setShowAnalysis(true);
-        } catch (error) {
-            console.error(error);
-            setAnalysisResult("Có lỗi xảy ra khi kết nối với AI.");
-            setShowAnalysis(true);
-        } finally {
-            setIsAnalyzing(false);
-        }
-    };
 
     const changeMonth = (delta: number) => {
         let m = selectedMonth + delta;
@@ -549,41 +508,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                 </div>
 
                 {/* AI Analysis Section */}
-                <div className="col-span-2 md:col-span-3">
-                    {!showAnalysis ? (
-                        <button
-                            onClick={handleAnalyze}
-                            disabled={isAnalyzing}
-                            className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white py-2 px-3 md:p-4 rounded-xl md:rounded-2xl shadow-lg flex items-center justify-center gap-2 font-bold transition-all transform hover:scale-[1.01] text-xs md:text-base"
-                        >
-                            {isAnalyzing ? (
-                                <><div className="animate-spin rounded-full h-4 w-4 md:h-5 md:w-5 border-b-2 border-white"></div> Đang phân tích...</>
-                            ) : (
-                                <><div className="text-yellow-200 text-base md:text-xl">✨</div> AI Phân tích & Nhận xét Tiêu dùng</>
-                            )}
-                        </button>
-                    ) : (
-                        <div className="bg-white p-3 md:p-6 rounded-xl md:rounded-2xl shadow-lg border border-indigo-100 animate-slide-up relative">
-                            <button onClick={() => setShowAnalysis(false)} className="absolute top-2 right-2 md:top-4 md:right-4 text-gray-400 hover:text-gray-600"><X size={16} className="md:w-5 md:h-5" /></button>
-                            <div className="flex items-start gap-2 md:gap-4">
-                                <div className="bg-violet-100 p-2 md:p-3 rounded-lg md:rounded-xl shrink-0">
-                                    <span className="text-lg md:text-2xl">🤖</span>
-                                </div>
-                                <div className="space-y-1 md:space-y-2 flex-1">
-                                    <h3 className="font-bold text-gray-800 text-sm md:text-lg">Góc nhìn AI</h3>
-                                    <div className="prose prose-sm max-w-none text-gray-600 bg-gray-50 p-2 md:p-4 rounded-lg md:rounded-xl text-xs md:text-sm">
-                                        {analysisResult.split('\n').map((line, i) => (
-                                            <p key={i} className={`mb-0.5 md:mb-1 ${line.startsWith('-') ? 'pl-2 md:pl-4' : ''}`}>{line}</p>
-                                        ))}
-                                    </div>
-                                    <div className="flex justify-end pt-1 md:pt-2">
-                                        <button onClick={handleAnalyze} className="text-[10px] md:text-xs text-indigo-600 hover:underline font-medium">Phân tích lại</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
+
             </div>
 
 
