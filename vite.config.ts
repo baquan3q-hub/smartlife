@@ -15,10 +15,8 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       VitePWA({
-        strategies: 'injectManifest',
-        srcDir: 'src',
-        filename: 'sw.js',
         registerType: 'autoUpdate',
+        injectRegister: null, // Disable auto-registration to avoid conflict with firebase-messaging-sw.js
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         manifest: {
           name: 'SmartLife Assistant',
