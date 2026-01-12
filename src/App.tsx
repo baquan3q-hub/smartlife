@@ -12,10 +12,12 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 // Context và Service
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { supabase } from './services/supabase';
-import { checkAndNotify, requestNotificationPermission } from './services/notificationService';
+import { requestNotificationPermission, checkAndNotify, checkCalendarAndNotify, checkGoalsAndNotify, checkCustomEventsAndNotify } from './services/notificationService';
+import { generateInsights } from './services/smartEngine';
+import InsightCard from './components/InsightCard';
 
 // Types và Constants (Khớp với file đã sửa)
-import { AppState, Transaction, TaskPriority } from './types';
+import { AppState, Transaction, TaskPriority, SmartInsight } from './types';
 import { INITIAL_BUDGET, INITIAL_GOALS, INITIAL_TRANSACTIONS } from './constants';
 
 const RealtimeClock: React.FC = () => {
@@ -54,7 +56,26 @@ const AuthenticatedApp: React.FC = () => {
     const { user, signOut } = useAuth();
     const [activeTab, setActiveTab] = useState<'finance' | 'schedule'>('finance');
     const [isLoadingData, setIsLoadingData] = useState(false);
+
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    // Notification State
+    const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+        return localStorage.getItem('notificationsEnabled') === 'true';
+    });
+
+    const toggleNotifications = async () => {
+        if (notificationsEnabled) {
+            setNotificationsEnabled(false);
+            localStorage.setItem('notificationsEnabled', 'false');
+        } else {
+            const granted = await requestNotificationPermission();
+            if (granted) {
+                setNotificationsEnabled(true);
+                localStorage.setItem('notificationsEnabled', 'true');
+            }
+        }
+    };
 
     // App State - Khởi tạo dữ liệu mặc định
     const [appState, setAppState] = useState<AppState>({
@@ -64,8 +85,21 @@ const AuthenticatedApp: React.FC = () => {
         todos: [],
         goals: INITIAL_GOALS,
         currentBalance: 0,
-        profile: null
+        profile: null,
+        // Optional: Adding calendarEvents to state if needed for global access, 
+        // but for now we just need them for notifications. 
+        // Let's add a "calendarEvents" field to AppState or just fetch locally for simplicity in a separate effect or combined?
+        // Let's add it to state to avoid multiple fetches if CalendarWidget also needs it (Refactor opportunity).
+        // For now, let's keep it simple: Add to AppState to be cleaner.
     });
+
+    // Add separate state for events or extend AppState interface? 
+    // Since AppState is in types.ts, let's just use a local state here for notification purposes 
+    // OR just fetch in the effect.
+    // Smart Insights State 🧠
+    const [insights, setInsights] = useState<SmartInsight[]>([]);
+
+    const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
 
     // Fetch Data từ Supabase khi user đăng nhập
     useEffect(() => {
@@ -74,13 +108,14 @@ const AuthenticatedApp: React.FC = () => {
         const fetchData = async () => {
             setIsLoadingData(true);
             try {
-                // Gọi song song 5 bảng dữ liệu cho nhanh
-                const [txRes, goalRes, timeRes, todoRes, profileRes] = await Promise.all([
+                // Gọi song song 6 bảng dữ liệu (added calendar_events)
+                const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes] = await Promise.all([
                     supabase.from('transactions').select('*').order('date', { ascending: false }),
                     supabase.from('goals').select('*').order('deadline', { ascending: true }),
                     supabase.from('timetable').select('*').order('start_time', { ascending: true }),
                     supabase.from('todos').select('*').order('created_at', { ascending: false }),
-                    supabase.from('profiles').select('*').eq('id', user.id).single()
+                    supabase.from('profiles').select('*').eq('id', user.id).single(),
+                    supabase.from('calendar_events').select('*') // No date filter = get all for now (simpler)
                 ]);
 
                 if (txRes.error) throw txRes.error;
@@ -106,6 +141,10 @@ const AuthenticatedApp: React.FC = () => {
                     profile: profileRes.data || null
                 }));
 
+                if (eventsRes.data) {
+                    setCalendarEvents(eventsRes.data);
+                }
+
             } catch (error) {
                 console.error('Lỗi tải dữ liệu:', error);
             } finally {
@@ -120,18 +159,38 @@ const AuthenticatedApp: React.FC = () => {
 
     // --- NOTIFICATION LOGIC ---
     useEffect(() => {
-        if (!appState.timetable.length) return;
+        if (!notificationsEnabled) return;
 
-        // Check every minute
+        // Run checks every minute
         const interval = setInterval(() => {
-            checkAndNotify(appState.timetable);
+            if (appState.timetable.length) checkAndNotify(appState.timetable);
+            checkCalendarAndNotify();
+            if (appState.goals.length) checkGoalsAndNotify(appState.goals);
+            if (calendarEvents.length) checkCustomEventsAndNotify(calendarEvents);
         }, 60000);
 
-        // Initial check
-        checkAndNotify(appState.timetable);
+        // Initial check on load (after data is ready)
+        if (notificationsEnabled && (appState.timetable.length || calendarEvents.length)) {
+            checkAndNotify(appState.timetable);
+            checkCalendarAndNotify();
+            if (appState.goals.length) checkGoalsAndNotify(appState.goals);
+            if (calendarEvents.length) checkCustomEventsAndNotify(calendarEvents);
+        }
 
         return () => clearInterval(interval);
-    }, [appState.timetable]);
+        return () => clearInterval(interval);
+    }, [appState.timetable, appState.goals, calendarEvents]);
+
+    // --- SMART ENGINE LOGIC 🧠 ---
+    useEffect(() => {
+        // Run analysis when key data changes
+        const generated = generateInsights(appState);
+        setInsights(generated);
+    }, [appState.budget, appState.transactions, appState.timetable]);
+
+    const handleDismissInsight = (id: string) => {
+        setInsights(prev => prev.filter(i => i.id !== id));
+    };
 
     // --- CÁC HÀM XỬ LÝ (HANDLERS) ---
     const handleAddTransaction = async (newTx: Omit<Transaction, 'id'>) => {
@@ -372,10 +431,16 @@ const AuthenticatedApp: React.FC = () => {
                         <CalendarDays size={20} /> Lịch trình & Mục tiêu
                     </button>
 
-                    {/* Notification Button Desktop */}
-                    <button onClick={requestNotificationPermission} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-amber-50 hover:text-amber-700">
-                        <span>🔔</span> Bật thông báo
-                    </button>
+                    {/* Notification Toggle Desktop */}
+                    <div className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-gray-50 cursor-pointer" onClick={toggleNotifications}>
+                        <div className="flex items-center gap-3">
+                            <span>🔔</span>
+                            <span>Thông báo</span>
+                        </div>
+                        <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${notificationsEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                            <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </div>
+                    </div>
                 </nav>
 
                 <div className="p-4 border-t border-gray-100 space-y-2">
@@ -398,8 +463,10 @@ const AuthenticatedApp: React.FC = () => {
                             </div>
                             <span className="font-bold text-gray-800 text-lg tracking-tight">SmartLife</span>
                         </div>
-                        <div className="flex gap-1">
-                            <button onClick={requestNotificationPermission} className="p-2 text-indigo-500 hover:bg-indigo-50 rounded-full transition-colors" title="Bật thông báo"><span className="text-xs font-bold">🔔</span></button>
+                        <div className="flex gap-2 items-center">
+                            <button onClick={toggleNotifications} className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${notificationsEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`} title="Bật/Tắt thông báo">
+                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </button>
                             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"><Settings size={20} /></button>
                             <button onClick={signOut} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"><LogOut size={20} /></button>
                         </div>
@@ -421,6 +488,20 @@ const AuthenticatedApp: React.FC = () => {
                 </header>
 
                 <div className="max-w-7xl mx-auto">
+                    {/* Insights Section */}
+                    {insights.length > 0 && (
+                        <div className="mb-6">
+                            {insights.map(insight => (
+                                <InsightCard
+                                    key={insight.id}
+                                    insight={insight}
+                                    onDismiss={handleDismissInsight}
+                                    onAction={(link) => setActiveTab(link as 'finance' | 'schedule')}
+                                />
+                            ))}
+                        </div>
+                    )}
+
                     {activeTab === 'finance' && (
                         <FinanceDashboard
                             state={appState}

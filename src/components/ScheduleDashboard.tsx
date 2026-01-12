@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { AppState, TimetableEvent, Goal, Todo, TaskPriority } from '../types';
-import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Star } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Star, Download, Image as ImageIcon } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import CalendarWidget from './CalendarWidget';
+import FocusTimer from './FocusTimer';
 
 interface ScheduleDashboardProps {
   state: AppState;
@@ -53,6 +56,10 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const [isTimeModalOpen, setIsTimeModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<TimetableEvent | null>(null);
 
+  // Export State
+  const timetableRef = React.useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
   // Todo Input
   const [newTodoContent, setNewTodoContent] = useState('');
   const [newTodoPriority, setNewTodoPriority] = useState<TaskPriority>(TaskPriority.FOCUS);
@@ -91,6 +98,33 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
       color: days < 3 ? 'text-orange-700 bg-orange-100 border border-orange-200' : 'text-emerald-700 bg-emerald-100 border border-emerald-200'
     };
     return { text: `${hours}h${minutes}p`, isUrgent: true, color: 'text-red-700 bg-red-100 border border-red-200' };
+  };
+
+  const handleExportTimetable = async () => {
+    if (!timetableRef.current) return;
+    setIsExporting(true);
+    // Wait for render
+    setTimeout(async () => {
+      try {
+        if (!timetableRef.current) return;
+        const canvas = await html2canvas(timetableRef.current, {
+          scale: 2, // High resolution
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          allowTaint: true,
+        });
+
+        const link = document.createElement('a');
+        link.download = `ThoiKhoaBieu_SmartLife_${new Date().toLocaleDateString('vi-VN').replace(/\//g, '-')}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch (err) {
+        console.error("Export failed:", err);
+        alert("Có lỗi khi tải ảnh. Vui lòng thử lại.");
+      } finally {
+        setIsExporting(false);
+      }
+    }, 100);
   };
 
   // -- HANDLERS --
@@ -172,7 +206,14 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             <p className="text-sm text-gray-500 pl-8">Quản lý lịch học và làm việc cố định</p>
           </div>
           <div className="flex gap-2">
-
+            <button
+              onClick={handleExportTimetable}
+              className="px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition font-bold flex items-center gap-1.5"
+              title="Tải ảnh lịch về máy"
+            >
+              <Download size={16} className="md:w-5 md:h-5" />
+              <span className="hidden md:inline">Tải ảnh</span>
+            </button>
             <button onClick={() => { setEditingEvent(null); setIsTimeModalOpen(true); }} className="px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition font-bold flex items-center gap-1.5">
               <Plus size={16} className="md:w-5 md:h-5" />
               <span className="hidden md:inline">Thêm lịch</span>
@@ -182,7 +223,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         </div>
 
         <div className="flex-1 overflow-x-auto custom-scrollbar">
-          <div className="grid grid-cols-7 h-full min-h-[600px] min-w-[1000px] divide-x divide-gray-100">
+          <div className="grid grid-cols-7 h-full min-h-[600px] min-w-[1000px] divide-x divide-gray-100 bg-white" ref={timetableRef}>
             {DISPLAY_DAYS.map((day, index) => {
               const dayEvents = timetable.filter(e => e.day_of_week === day.value).sort((a, b) => a.start_time.localeCompare(b.start_time));
               const isToday = new Date().getDay() === day.value;
@@ -211,7 +252,12 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                           </div>
                         )}
                         <button
-                          onClick={(event) => { event.stopPropagation(); onDeleteTimetable(e.id); }}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (window.confirm('Bạn có chắc chắn muốn xóa lịch này không?')) {
+                              onDeleteTimetable(e.id);
+                            }
+                          }}
                           className="absolute top-2 right-2 p-1.5 bg-white/80 rounded-lg text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-sm"
                           title="Xóa lịch"
                         >
@@ -225,7 +271,30 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             })}
           </div>
         </div>
+
+        {/* Watermark for Export (Hidden normally) */}
+        {isExporting && (
+          <div className="flex justify-between items-center p-6 border-t border-gray-100 bg-white">
+            <div className="flex items-center gap-3">
+              {state.profile?.avatar_url ? (
+                <img src={state.profile.avatar_url} alt="Owner" className="w-12 h-12 rounded-full border-2 border-indigo-100 object-cover" />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                  {state.profile?.full_name?.charAt(0) || 'U'}
+                </div>
+              )}
+              <div>
+                <h4 className="text-xl font-bold text-indigo-800">SmartLife <span className="text-base font-medium text-gray-500">by BaQuan</span></h4>
+                <p className="text-sm text-gray-400">Được tạo tự động từ SmartLife App</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-bold text-gray-600">{new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+          </div>
+        )}
       </div>
+
     );
   };
 
@@ -392,184 +461,211 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     );
   };
 
-  return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 animate-fade-in pb-20">
+  // Mobile Tabs
+  const [mobileTab, setMobileTab] = useState<'SCHEDULE' | 'GOALS'>('SCHEDULE');
 
-      {/* LEFT: Timetable (8 cols) */}
-      <div className="xl:col-span-8 h-full flex flex-col gap-6">
-        {renderTimetable()}
-        {renderRoadmap()}
+  return (
+    <div className="animate-fade-in pb-20">
+
+      {/* Mobile Tab Navigation (Visible < xl) */}
+      <div className="xl:hidden flex p-1 bg-gray-200/50 rounded-xl mb-6 mx-auto max-w-md">
+        <button
+          onClick={() => setMobileTab('SCHEDULE')}
+          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mobileTab === 'SCHEDULE' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Lịch trình
+        </button>
+        <button
+          onClick={() => setMobileTab('GOALS')}
+          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mobileTab === 'GOALS' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Mục tiêu
+        </button>
       </div>
 
-      {/* RIGHT: Goals & Todos (4 cols) */}
-      <div className="xl:col-span-4 space-y-8">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
 
-        {/* Goals */}
-        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 flex flex-col">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Target size={24} className="text-amber-500" /> Mục tiêu</h3>
-            <button onClick={() => { setEditingGoal(null); setIsGoalModalOpen(true); }} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition">Thêm mới</button>
-          </div>
+        {/* LEFT: Timetable (8 cols) - Show if Desktop OR (Mobile & Tab=SCHEDULE) */}
+        <div className={`xl:col-span-8 h-full flex flex-col gap-6 ${mobileTab !== 'SCHEDULE' ? 'hidden xl:flex' : 'flex'}`}>
+          {renderTimetable()}
+          {renderRoadmap()}
+          <CalendarWidget />
+        </div>
 
-          {/* Goal Filters */}
-          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar mb-4">
-            {['ALL', 'PRIORITY', 'SHORT_TERM', 'MEDIUM_TERM', 'LONG_TERM'].map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setGoalFilter(filter as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all border
+        {/* RIGHT: Goals & Todos (4 cols) - Show if Desktop OR (Mobile & Tab=GOALS) */}
+        <div className={`xl:col-span-4 space-y-8 ${mobileTab !== 'GOALS' ? 'hidden xl:block' : 'block'}`}>
+
+          {/* NEW: Focus Timer */}
+          <FocusTimer />
+
+
+          {/* Goals */}
+          <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Target size={24} className="text-amber-500" /> Mục tiêu</h3>
+              <button onClick={() => { setEditingGoal(null); setIsGoalModalOpen(true); }} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition">Thêm mới</button>
+            </div>
+
+            {/* Goal Filters */}
+            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar mb-4">
+              {['ALL', 'PRIORITY', 'SHORT_TERM', 'MEDIUM_TERM', 'LONG_TERM'].map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setGoalFilter(filter as any)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all border
                     ${goalFilter === filter
-                    ? 'bg-amber-100 text-amber-700 border-amber-200'
-                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}
+                      ? 'bg-amber-100 text-amber-700 border-amber-200'
+                      : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}
                   `}
-              >
-                {filter === 'ALL' ? 'Tất cả' :
-                  filter === 'PRIORITY' ? 'Ưu tiên' :
-                    filter === 'SHORT_TERM' ? 'Ngắn hạn' :
-                      filter === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
-              </button>
-            ))}
-          </div>
+                >
+                  {filter === 'ALL' ? 'Tất cả' :
+                    filter === 'PRIORITY' ? 'Ưu tiên' :
+                      filter === 'SHORT_TERM' ? 'Ngắn hạn' :
+                        filter === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
+                </button>
+              ))}
+            </div>
 
-          <div className="space-y-4">
-            {filteredGoals.length === 0 ? (
-              <p className="text-center text-gray-400 text-sm py-4 italic">Không có mục tiêu nào trong danh mục này.</p>
-            ) : (
-              filteredGoals.map(g => {
-                const timeLeft = getTimeRemaining(g.deadline);
-                return (
-                  <div key={g.id} className={`relative group p-4 rounded-2xl border transition-all ${g.is_priority ? 'bg-amber-50 border-amber-200 shadow-sm' : 'bg-gray-50 border-gray-100 hover:border-indigo-200'}`}>
-                    {/* Outer Border Deadline for High Visibility */}
-                    <div className={`absolute -right-2 top-4 px-3 py-1 rounded-l-lg text-[10px] font-bold shadow-sm z-10 ${timeLeft.color}`}>
-                      {timeLeft.text}
-                    </div>
+            <div className="space-y-4">
+              {filteredGoals.length === 0 ? (
+                <p className="text-center text-gray-400 text-sm py-4 italic">Không có mục tiêu nào trong danh mục này.</p>
+              ) : (
+                filteredGoals.map(g => {
+                  const timeLeft = getTimeRemaining(g.deadline);
+                  return (
+                    <div key={g.id} className={`relative group p-4 rounded-2xl border transition-all ${g.is_priority ? 'bg-amber-50 border-amber-200 shadow-sm' : 'bg-gray-50 border-gray-100 hover:border-indigo-200'}`}>
+                      {/* Outer Border Deadline for High Visibility */}
+                      <div className={`absolute -right-2 top-4 px-3 py-1 rounded-l-lg text-[10px] font-bold shadow-sm z-10 ${timeLeft.color}`}>
+                        {timeLeft.text}
+                      </div>
 
-                    <div className="flex justify-between items-start mb-2 pr-12">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          {g.is_priority && <Star size={14} className="text-amber-500 fill-amber-500" />}
-                          <h4 className="font-bold text-gray-800 text-sm">{g.title}</h4>
-                        </div>
-
-                        <div className="flex flex-col gap-1 mt-2">
-                          <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-                            <Calendar size={12} className="text-indigo-400" />
-                            Hạn chót: <span className="text-gray-700">{new Date(g.deadline).toLocaleDateString('vi-VN')}</span>
+                      <div className="flex justify-between items-start mb-2 pr-12">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            {g.is_priority && <Star size={14} className="text-amber-500 fill-amber-500" />}
+                            <h4 className="font-bold text-gray-800 text-sm">{g.title}</h4>
                           </div>
-                          {g.type && g.type !== 'PERSONAL' && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-500 font-bold w-fit">
-                              {g.type === 'SHORT_TERM' ? 'Ngắn hạn' : g.type === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
-                            </span>
-                          )}
-                        </div>
 
+                          <div className="flex flex-col gap-1 mt-2">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                              <Calendar size={12} className="text-indigo-400" />
+                              Hạn chót: <span className="text-gray-700">{new Date(g.deadline).toLocaleDateString('vi-VN')}</span>
+                            </div>
+                            {g.type && g.type !== 'PERSONAL' && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-500 font-bold w-fit">
+                                {g.type === 'SHORT_TERM' ? 'Ngắn hạn' : g.type === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
+                              </span>
+                            )}
+                          </div>
+
+                        </div>
+                      </div>
+
+                      <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                        <button onClick={() => { setEditingGoal(g); setIsGoalModalOpen(true); }} className="p-1.5 bg-white rounded-lg text-gray-400 hover:text-indigo-600 shadow-sm transition-colors border border-gray-100"><Edit2 size={14} /></button>
+                        <button onClick={() => onDeleteGoal(g.id)} className="p-1.5 bg-white rounded-lg text-gray-400 hover:text-red-600 shadow-sm transition-colors border border-gray-100"><Trash2 size={14} /></button>
                       </div>
                     </div>
-
-                    <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                      <button onClick={() => { setEditingGoal(g); setIsGoalModalOpen(true); }} className="p-1.5 bg-white rounded-lg text-gray-400 hover:text-indigo-600 shadow-sm transition-colors border border-gray-100"><Edit2 size={14} /></button>
-                      <button onClick={() => onDeleteGoal(g.id)} className="p-1.5 bg-white rounded-lg text-gray-400 hover:text-red-600 shadow-sm transition-colors border border-gray-100"><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
+
+          {renderTodos()}
+
         </div>
 
-        {renderTodos()}
+        {/* --- MODALS --- */}
+
+        {/* Goal Modal */}
+        {isGoalModalOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg text-gray-800">{editingGoal ? 'Sửa mục tiêu' : 'Mục tiêu mới'}</h3>
+                <button onClick={() => setIsGoalModalOpen(false)}><X size={20} className="text-gray-400" /></button>
+              </div>
+              <form onSubmit={handleGoalSubmit} className="space-y-4">
+                <input name="title" required defaultValue={editingGoal?.title} placeholder="Tên mục tiêu" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium" />
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Hạn chót</label>
+                  <input type="date" name="deadline" required defaultValue={editingGoal?.deadline} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Loại thời hạn</label>
+                  <select name="type" defaultValue={editingGoal?.type || 'SHORT_TERM'} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm">
+                    <option value="SHORT_TERM">Ngắn hạn</option>
+                    <option value="MEDIUM_TERM">Trung hạn</option>
+                    <option value="LONG_TERM">Dài hạn</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2 p-1">
+                  <input type="checkbox" name="is_priority" id="is_priority" defaultChecked={editingGoal?.is_priority} className="w-5 h-5 accent-indigo-600 rounded cursor-pointer" />
+                  <label htmlFor="is_priority" className="text-sm font-bold text-gray-700 cursor-pointer">Đánh dấu quan trọng/ưu tiên</label>
+                </div>
+
+                <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 mt-2">Lưu Mục Tiêu</button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Time Modal */}
+        {isTimeModalOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg text-gray-800">{editingEvent ? 'Sửa lịch' : 'Thêm lịch mới'}</h3>
+                <button onClick={() => setIsTimeModalOpen(false)}><X size={20} className="text-gray-400" /></button>
+              </div>
+              <form onSubmit={handleTimeSubmit} className="space-y-4">
+                <input name="title" required defaultValue={editingEvent?.title} placeholder="Tên sự kiện" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium" />
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Thứ trong tuần</label>
+                  <select name="day_of_week" defaultValue={editingEvent?.day_of_week ?? 1} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm">
+                    {DISPLAY_DAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Bắt đầu</label>
+                    <input type="time" name="start_time" required defaultValue={editingEvent?.start_time} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Kết thúc</label>
+                    <input type="time" name="end_time" defaultValue={editingEvent?.end_time} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" />
+                  </div>
+                </div>
+                <input name="location" defaultValue={editingEvent?.location} placeholder="Địa điểm (Tùy chọn)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" />
+
+                <div className="flex gap-3 mt-2">
+                  {editingEvent && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm('Bạn có chắc chắn muốn xóa lịch này không?')) {
+                          onDeleteTimetable(editingEvent.id);
+                          setIsTimeModalOpen(false);
+                        }
+                      }}
+                      className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors"
+                    >
+                      Xóa
+                    </button>
+                  )}
+                  <button type="submit" className="flex-[2] py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700">
+                    {editingEvent ? 'Cập nhật' : 'Lưu mới'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+
 
       </div>
-
-      {/* --- MODALS --- */}
-
-      {/* Goal Modal */}
-      {isGoalModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg text-gray-800">{editingGoal ? 'Sửa mục tiêu' : 'Mục tiêu mới'}</h3>
-              <button onClick={() => setIsGoalModalOpen(false)}><X size={20} className="text-gray-400" /></button>
-            </div>
-            <form onSubmit={handleGoalSubmit} className="space-y-4">
-              <input name="title" required defaultValue={editingGoal?.title} placeholder="Tên mục tiêu" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium" />
-              <div>
-                <label className="text-xs text-gray-500 uppercase font-bold ml-1">Hạn chót</label>
-                <input type="date" name="deadline" required defaultValue={editingGoal?.deadline} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 uppercase font-bold ml-1">Loại thời hạn</label>
-                <select name="type" defaultValue={editingGoal?.type || 'SHORT_TERM'} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm">
-                  <option value="SHORT_TERM">Ngắn hạn</option>
-                  <option value="MEDIUM_TERM">Trung hạn</option>
-                  <option value="LONG_TERM">Dài hạn</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2 p-1">
-                <input type="checkbox" name="is_priority" id="is_priority" defaultChecked={editingGoal?.is_priority} className="w-5 h-5 accent-indigo-600 rounded cursor-pointer" />
-                <label htmlFor="is_priority" className="text-sm font-bold text-gray-700 cursor-pointer">Đánh dấu quan trọng/ưu tiên</label>
-              </div>
-
-              <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 mt-2">Lưu Mục Tiêu</button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Time Modal */}
-      {isTimeModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg text-gray-800">{editingEvent ? 'Sửa lịch' : 'Thêm lịch mới'}</h3>
-              <button onClick={() => setIsTimeModalOpen(false)}><X size={20} className="text-gray-400" /></button>
-            </div>
-            <form onSubmit={handleTimeSubmit} className="space-y-4">
-              <input name="title" required defaultValue={editingEvent?.title} placeholder="Tên sự kiện" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium" />
-              <div>
-                <label className="text-xs text-gray-500 uppercase font-bold ml-1">Thứ trong tuần</label>
-                <select name="day_of_week" defaultValue={editingEvent?.day_of_week ?? 1} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm">
-                  {DISPLAY_DAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Bắt đầu</label>
-                  <input type="time" name="start_time" required defaultValue={editingEvent?.start_time} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Kết thúc</label>
-                  <input type="time" name="end_time" defaultValue={editingEvent?.end_time} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" />
-                </div>
-              </div>
-              <input name="location" defaultValue={editingEvent?.location} placeholder="Địa điểm (Tùy chọn)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" />
-
-              <div className="flex gap-3 mt-2">
-                {editingEvent && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm('Bạn có chắc chắn muốn xóa lịch này không?')) {
-                        onDeleteTimetable(editingEvent.id);
-                        setIsTimeModalOpen(false);
-                      }
-                    }}
-                    className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors"
-                  >
-                    Xóa
-                  </button>
-                )}
-                <button type="submit" className="flex-[2] py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700">
-                  {editingEvent ? 'Cập nhật' : 'Lưu mới'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-
-
     </div>
   );
 };

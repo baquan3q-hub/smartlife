@@ -105,3 +105,34 @@ export interface Profile {
   avatar_url?: string;
   updated_at?: string;
 }
+
+// Interface cho Smart Backend
+export interface BehaviorLog {
+  id: string;
+  user_id: string;
+  action_type: 'FOCUS_SESSION' | 'EARLY_WAKEUP' | 'IMPULSE_BUY' | 'TASK_COMPLETION' | 'STRESS_SPIKE';
+  value?: number;
+  context?: Record<string, any>;
+  created_at?: string;
+}
+
+export interface DailySnapshot {
+  id: string;
+  user_id: string;
+  date: string;
+  total_spent: number;
+  total_focus_minutes: number;
+  mood_score?: number;
+  energy_level?: number;
+  compliance_score?: number;
+}
+
+export interface SmartInsight {
+  id: string;
+  user_id: string;
+  type: 'FINANCE_WARNING' | 'HABIT_KUDOS' | 'SCHEDULE_OPTIMIZATION' | 'NUDGE';
+  message: string;
+  action_link?: string;
+  is_read: boolean;
+  created_at?: string;
+}

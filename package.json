@@ -17,8 +17,10 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "html2canvas": "^1.4.1",
     "install": "^0.13.0",
     "lucide-react": "^0.562.0",
+    "lunar-javascript": "^1.7.7",
     "npm": "^11.7.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -26,7 +28,8 @@
     "recharts": "^3.6.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
+    "@types/html2canvas": "^0.5.35",
+    "@types/node": "^22.19.5",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
