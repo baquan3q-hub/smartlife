@@ -15,6 +15,8 @@ import { supabase } from './services/supabase';
 import { requestNotificationPermission, checkAndNotify, checkCalendarAndNotify, checkGoalsAndNotify, checkCustomEventsAndNotify } from './services/notificationService';
 import { generateInsights } from './services/smartEngine';
 import InsightCard from './components/InsightCard';
+import { messaging } from './services/firebase';
+import { getToken, onMessage } from "firebase/messaging";
 
 // Types và Constants (Khớp với file đã sửa)
 import { AppState, Transaction, TaskPriority, SmartInsight } from './types';
@@ -157,6 +159,59 @@ const AuthenticatedApp: React.FC = () => {
 
     }, [user]);
 
+    // --- FIREBASE MESSAGING LOGIC ---
+    useEffect(() => {
+        // Feature detection to prevent crash on unsupported browsers (e.g. some mobile views)
+        const isSupported = typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
+
+        if (!isSupported) {
+            console.log("This browser does not support Notifications or Service Workers.");
+            return;
+        }
+
+        const requestPermission = async () => {
+            try {
+                // 1. Xin quyền
+                const permission = await Notification.requestPermission();
+
+                if (permission === "granted") {
+                    // 2. Đăng ký Service Worker thủ công để đảm bảo nó chạy
+                    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+                    console.log("Service Worker đã sẵn sàng:", registration);
+
+                    // 3. Lấy Token và gắn kèm registration vừa tạo
+                    const token = await getToken(messaging, {
+                        vapidKey: "BNaKU7cMSXUBoTEpfqQ87cwaLYkqZgJZ4nWJQSD10gsl64Qj0XQiKmXbeGz3_PesfzY-pZ4bWalRKuMpGxN7Hi0",
+                        serviceWorkerRegistration: registration // Thêm dòng này để fix lỗi timeout
+                    });
+
+                    if (token) {
+                        console.log("Token của Cun nè:", token);
+                    }
+                }
+            } catch (error) {
+                console.error("Lỗi khi lấy token:", error);
+            }
+        };
+
+        requestPermission();
+
+        // Handle foreground messages safely
+        let unsubscribe = () => { };
+        try {
+            unsubscribe = onMessage(messaging, (payload) => {
+                console.log("Nhận tin nhắn khi đang mở app:", payload);
+                alert(`Thông báo mới: ${payload.notification?.title}`);
+            });
+        } catch (err) {
+            console.error("Firebase Messaging not supported in this context:", err);
+        }
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, []);
+
     // --- NOTIFICATION LOGIC ---
     useEffect(() => {
         if (!notificationsEnabled) return;
@@ -181,12 +236,7 @@ const AuthenticatedApp: React.FC = () => {
         return () => clearInterval(interval);
     }, [appState.timetable, appState.goals, calendarEvents]);
 
-    // --- SMART ENGINE LOGIC 🧠 ---
-    useEffect(() => {
-        // Run analysis when key data changes
-        const generated = generateInsights(appState);
-        setInsights(generated);
-    }, [appState.budget, appState.transactions, appState.timetable]);
+
 
     const handleDismissInsight = (id: string) => {
         setInsights(prev => prev.filter(i => i.id !== id));
@@ -488,19 +538,7 @@ const AuthenticatedApp: React.FC = () => {
                 </header>
 
                 <div className="max-w-7xl mx-auto">
-                    {/* Insights Section */}
-                    {insights.length > 0 && (
-                        <div className="mb-6">
-                            {insights.map(insight => (
-                                <InsightCard
-                                    key={insight.id}
-                                    insight={insight}
-                                    onDismiss={handleDismissInsight}
-                                    onAction={(link) => setActiveTab(link as 'finance' | 'schedule')}
-                                />
-                            ))}
-                        </div>
-                    )}
+
 
                     {activeTab === 'finance' && (
                         <FinanceDashboard
@@ -534,19 +572,7 @@ const AuthenticatedApp: React.FC = () => {
         </div >
     );
 };
-// Đây là đoạn code JS (JavaScript) em cần tìm sửa
-const handleLogin = async () => {
-    // ...
-    const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-            // ==> CUN SỬA DÒNG NÀY Ở ĐÂY <==
-            // Thay vì để cứng http://localhost:3000, hãy sửa thành dòng dưới:
-            redirectTo: window.location.origin
-        },
-    })
-    // ...
-}
+
 const AppWrapper: React.FC = () => {
     const { user, loading } = useAuth();
     if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-600 animate-spin" /></div>;
