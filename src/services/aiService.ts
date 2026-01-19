@@ -1,7 +1,7 @@
 // src/services/aiService.ts
 import { Transaction } from '../types';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = '/api';
 
 export const analyzeFinance = async (transactions: Transaction[]) => {
     try {
