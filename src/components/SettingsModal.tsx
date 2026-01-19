@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Save, Loader2, Bell, Calendar, Clock, Target, Moon, Zap, Sparkles } from 'lucide-react';
+import { X, User, Save, Loader2, Bell, Calendar, Clock, Target, Moon, Zap, Sparkles, LogOut } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { Profile } from '../types';
 
@@ -7,6 +7,7 @@ interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     userId: string;
+    onSignOut: () => void;
 }
 
 const DEFAULT_NOTI_SETTINGS = {
@@ -18,7 +19,7 @@ const DEFAULT_NOTI_SETTINGS = {
     goals_remind: true
 };
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId, onSignOut }) => {
     const [activeTab, setActiveTab] = useState<'profile' | 'notifications'>('profile');
     const [profile, setProfile] = useState<Profile | null>(null);
     const [notiSettings, setNotiSettings] = useState(DEFAULT_NOTI_SETTINGS);
@@ -277,21 +278,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId }
                 </div>
 
                 {/* Footer */}
-                <div className="p-5 border-t border-gray-100 bg-white flex justify-end gap-3 z-10">
+                <div className="p-5 border-t border-gray-100 bg-white flex justify-between gap-3 z-10">
                     <button
-                        onClick={onClose}
-                        className="px-5 py-2.5 rounded-xl text-gray-500 font-bold hover:bg-gray-50 transition-colors"
+                        onClick={onSignOut}
+                        className="px-5 py-2.5 rounded-xl text-red-500 font-bold hover:bg-red-50 transition-colors flex items-center gap-2"
                     >
-                        Đóng
+                        <LogOut size={18} />
+                        Đăng xuất
                     </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={saving || loading}
-                        className="px-6 py-2.5 rounded-xl bg-gray-900 text-white font-bold hover:bg-black transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-95"
-                    >
-                        {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                        Lưu cài đặt
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={onClose}
+                            className="px-5 py-2.5 rounded-xl text-gray-500 font-bold hover:bg-gray-50 transition-colors"
+                        >
+                            Đóng
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={saving || loading}
+                            className="px-6 py-2.5 rounded-xl bg-gray-900 text-white font-bold hover:bg-black transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-95"
+                        >
+                            {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                            Lưu cài đặt
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

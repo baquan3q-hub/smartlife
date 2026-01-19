@@ -25,12 +25,15 @@
     "npm": "^11.7.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-markdown": "^10.1.0",
     "react-number-format": "^5.4.4",
     "recharts": "^3.6.0"
   },
   "devDependencies": {
     "@types/html2canvas": "^0.5.35",
     "@types/node": "^22.19.5",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",

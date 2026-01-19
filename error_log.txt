@@ -1,0 +1,3 @@
+{
+  "response": "Xin chào! 👋 Tôi là SmartLife Finance Advisor.\n\nBạn đang có thắc mắc gì về tài chính cá nhân, tiết kiệm, hay đầu tư không? Hãy chia sẻ nhé! 💰"
+}

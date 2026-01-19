@@ -4,6 +4,8 @@ import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, 
 import html2canvas from 'html2canvas';
 import CalendarWidget from './CalendarWidget';
 import FocusTimer from './FocusTimer';
+import { parseScheduleCommand } from '../services/aiService';
+import { Bot, Sparkles, Loader2, Send } from 'lucide-react';
 
 interface ScheduleDashboardProps {
   state: AppState;
@@ -64,6 +66,47 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const [newTodoContent, setNewTodoContent] = useState('');
   const [newTodoPriority, setNewTodoPriority] = useState<TaskPriority>(TaskPriority.FOCUS);
 
+  // Motivational Feedback State
+  const [showMotivation, setShowMotivation] = useState(false);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    audioRef.current = new Audio('/sounds/clapping.mp3');
+    audioRef.current = new Audio('/sounds/clapping.mp3');
+  }, []);
+
+  // AI Command State
+  const [command, setCommand] = useState('');
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
+
+  const handleAICommand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!command.trim()) return;
+
+    setIsProcessingAI(true);
+    try {
+      const result = await parseScheduleCommand(command);
+      if (result && !result.error && result.title) {
+        // Add to timetable
+        onAddTimetable({
+          title: result.title,
+          start_time: result.start_time,
+          end_time: result.end_time,
+          day_of_week: result.day_of_week,
+          location: result.location
+        });
+        alert(`Đã thêm lịch: ${result.title} vào Thứ ${result.day_of_week === 0 ? 'CN' : result.day_of_week + 1}`);
+        setCommand('');
+      } else {
+        alert(result.error || "AI không hiểu được lệnh này. Thử lại nhé!");
+      }
+    } catch (err) {
+      alert("Lỗi kết nối tới AI Master.");
+    } finally {
+      setIsProcessingAI(false);
+    }
+  };
+
   // Filter Goals Logic
   const filteredGoals = goals.filter(g => {
     if (goalFilter === 'ALL') return true;
@@ -112,7 +155,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
           useCORS: true,
           backgroundColor: '#ffffff',
           allowTaint: true,
-        });
+        } as any);
 
         const link = document.createElement('a');
         link.download = `ThoiKhoaBieu_SmartLife_${new Date().toLocaleDateString('vi-VN').replace(/\//g, '-')}.png`;
@@ -141,6 +184,22 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     if (editingGoal) onUpdateGoal({ ...editingGoal, ...data });
     else onAddGoal(data);
     setIsGoalModalOpen(false);
+  };
+
+  const handleToggleTodo = (todo: Todo) => {
+    const isNowCompleted = !todo.is_completed;
+    onUpdateTodo({ ...todo, is_completed: isNowCompleted });
+
+    if (isNowCompleted) {
+      // Play Sound
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(e => console.log('Audio play failed (user interaction needed first?)', e));
+      }
+      // Show Motivation
+      setShowMotivation(true);
+      setTimeout(() => setShowMotivation(false), 3000);
+    }
   };
 
   const handleTimeSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -217,9 +276,34 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             <button onClick={() => { setEditingEvent(null); setIsTimeModalOpen(true); }} className="px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition font-bold flex items-center gap-1.5">
               <Plus size={16} className="md:w-5 md:h-5" />
               <span className="hidden md:inline">Thêm lịch</span>
+              <span className="hidden md:inline">mới</span>
               <span className="md:hidden">Thêm</span>
             </button>
           </div>
+        </div>
+
+        {/* AI Command Bar */}
+        <div className="bg-indigo-50/50 p-4 border-b border-indigo-100">
+          <form onSubmit={handleAICommand} className="relative flex items-center gap-2 max-w-2xl mx-auto">
+            <div className="absolute left-3 text-indigo-500 animate-pulse">
+              <Bot size={20} />
+            </div>
+            <input
+              type="text"
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              disabled={isProcessingAI}
+              placeholder="Gõ lệnh, ví dụ: 'Họp team sáng thứ 2 lúc 9h', 'Đi bơi chiều nay 5h'..."
+              className="w-full pl-10 pr-12 py-3 rounded-xl border border-indigo-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none shadow-sm text-sm"
+            />
+            <button
+              type="submit"
+              disabled={isProcessingAI || !command.trim()}
+              className="absolute right-2 p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            >
+              {isProcessingAI ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            </button>
+          </form>
         </div>
 
         <div className="flex-1 overflow-x-auto custom-scrollbar">
@@ -394,11 +478,28 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
       return scoreA - scoreB;
     });
 
+    const totalTodos = todos.length;
+    const completedTodos = todos.filter(t => t.is_completed).length;
+    const progressPercentage = totalTodos === 0 ? 0 : Math.round((completedTodos / totalTodos) * 100);
+
     return (
       <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 flex flex-col">
-        <div className="mb-6">
-          <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-1"><CheckCircle2 size={24} className="text-emerald-500" /> Việc cần làm</h3>
-          <p className="text-sm text-gray-400">Đã xong {todos.filter(t => t.is_completed).length}/{todos.length} việc</p>
+        <div className="mb-4">
+          <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-1"><CheckCircle2 size={24} className="text-emerald-500" />Todo list</h3>
+
+          {/* Progress Bar */}
+          <div className="mt-2">
+            <div className="flex justify-between text-xs font-bold text-gray-500 mb-1">
+              <span>Đã xong {completedTodos}/{totalTodos} việc</span>
+              <span>{progressPercentage}%</span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progressPercentage}%` }}
+              ></div>
+            </div>
+          </div>
         </div>
 
         <form onSubmit={handleTodoSubmit} className="space-y-3 mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
@@ -438,7 +539,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             const config = PRIORITY_CONFIG[t.priority as TaskPriority] || PRIORITY_CONFIG[TaskPriority.FOCUS];
             return (
               <div key={t.id} className={`group flex items-start gap-3 p-3.5 rounded-2xl border transition-all ${t.is_completed ? 'bg-gray-50 border-transparent opacity-60' : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-md'}`}>
-                <button onClick={() => onUpdateTodo({ ...t, is_completed: !t.is_completed })} className={`mt-0.5 transition-colors ${t.is_completed ? 'text-emerald-500' : 'text-gray-300 hover:text-emerald-500'}`}>
+                <button onClick={() => handleToggleTodo(t)} className={`mt-0.5 transition-colors ${t.is_completed ? 'text-emerald-500' : 'text-gray-300 hover:text-emerald-500'}`}>
                   {t.is_completed ? <CheckCircle2 size={22} /> : <Circle size={22} />}
                 </button>
 
@@ -465,7 +566,17 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const [mobileTab, setMobileTab] = useState<'SCHEDULE' | 'GOALS'>('SCHEDULE');
 
   return (
-    <div className="animate-fade-in pb-20">
+    <div className="animate-fade-in pb-20 relative">
+
+      {/* Motivational Toast */}
+      {showMotivation && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-bounce-in">
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-4 border-white/30 backdrop-blur-md">
+            <span className="text-2xl">👏</span>
+            <span className="font-bold text-lg">Cố lên nào, hoàn thành công việc tiếp theo thôi!</span>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Tab Navigation (Visible < xl) */}
       <div className="xl:hidden flex p-1 bg-gray-200/50 rounded-xl mb-6 mx-auto max-w-md">
@@ -495,11 +606,14 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         {/* RIGHT: Goals & Todos (4 cols) - Show if Desktop OR (Mobile & Tab=GOALS) */}
         <div className={`xl:col-span-4 space-y-8 ${mobileTab !== 'GOALS' ? 'hidden xl:block' : 'block'}`}>
 
-          {/* NEW: Focus Timer */}
+          {/* 1. Todos - Moved to Top */}
+          {renderTodos()}
+
+          {/* 2. Focus Timer */}
           <FocusTimer />
 
 
-          {/* Goals */}
+          {/* 3. Goals */}
           <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Target size={24} className="text-amber-500" /> Mục tiêu</h3>
@@ -571,8 +685,6 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
               )}
             </div>
           </div>
-
-          {renderTodos()}
 
         </div>
 

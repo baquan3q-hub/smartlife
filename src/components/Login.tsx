@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, AlertTriangle, FileText, Key, CheckCircle, Mail, Lock, User as UserIcon, ArrowRight } from 'lucide-react';
+import { Loader2, AlertTriangle, FileText, Key, CheckCircle, Mail, Lock, User as UserIcon, ArrowRight, ArrowLeft } from 'lucide-react';
 import { isSupabaseConfigured } from '../services/supabase';
 
-const Login: React.FC = () => {
+interface LoginProps {
+    onBack?: () => void;
+}
+
+const Login: React.FC<LoginProps> = ({ onBack }) => {
     const { signInWithGoogle, signInWithEmail, signUpWithEmail, loading } = useAuth();
 
     const [isLoginMode, setIsLoginMode] = useState(true);
@@ -93,7 +97,16 @@ const Login: React.FC = () => {
             <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md transform transition-all">
 
                 {/* Header */}
-                <div className="text-center mb-8">
+                <div className="text-center mb-8 relative">
+                    {onBack && (
+                        <button
+                            onClick={onBack}
+                            className="absolute left-0 top-0 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                            title="Quay lại"
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
+                    )}
                     <div className="bg-indigo-600 w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-200">
                         <div className="text-white font-bold text-xl">S</div>
                     </div>

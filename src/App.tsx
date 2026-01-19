@@ -5,6 +5,7 @@ import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings } from
 // Import các Components (Đảm bảo bạn đã tạo file trong thư mục components)
 import FinanceDashboard from './components/FinanceDashboard';
 import ScheduleDashboard from './components/ScheduleDashboard';
+import VisualBoard from './components/VisualBoard';
 import SettingsModal from './components/SettingsModal';
 import Login from './components/Login';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
@@ -54,9 +55,14 @@ const RealtimeClock: React.FC = () => {
     );
 };
 
-const AuthenticatedApp: React.FC = () => {
+interface AuthenticatedAppProps {
+    lang: 'vi' | 'en';
+    setLang: (lang: 'vi' | 'en') => void;
+}
+
+const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) => {
     const { user, signOut } = useAuth();
-    const [activeTab, setActiveTab] = useState<'finance' | 'schedule'>('finance');
+    const [activeTab, setActiveTab] = useState<'finance' | 'schedule' | 'visual'>('finance');
     const [isLoadingData, setIsLoadingData] = useState(false);
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -124,7 +130,7 @@ const AuthenticatedApp: React.FC = () => {
                 // Profile might be empty if new user, so don't throw error immediately or handle gracefully
 
                 // Cập nhật State
-                setAppState(prev => ({
+                setAppState((prev: AppState) => ({
                     ...prev,
                     transactions: txRes.data.map(t => ({
                         // Chuyển đổi dữ liệu cho khớp kiểu (đề phòng số lưu dạng chuỗi)
@@ -236,10 +242,20 @@ const AuthenticatedApp: React.FC = () => {
         return () => clearInterval(interval);
     }, [appState.timetable, appState.goals, calendarEvents]);
 
+    // Confirm close app
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = ''; // Legacy support
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, []);
+
 
 
     const handleDismissInsight = (id: string) => {
-        setInsights(prev => prev.filter(i => i.id !== id));
+        setInsights((prev: SmartInsight[]) => prev.filter(i => i.id !== id));
     };
 
     // --- CÁC HÀM XỬ LÝ (HANDLERS) ---
@@ -249,7 +265,7 @@ const AuthenticatedApp: React.FC = () => {
         // Optimistic UI: Hiển thị ngay lập tức trước khi lưu server
         const optimisticTx: Transaction = { ...newTx, id: tempId, user_id: user.id };
 
-        setAppState(prev => ({ ...prev, transactions: [optimisticTx, ...prev.transactions] }));
+        setAppState((prev: AppState) => ({ ...prev, transactions: [optimisticTx, ...prev.transactions] }));
 
         try {
             const { data, error } = await supabase.from('transactions').insert([{
@@ -259,7 +275,7 @@ const AuthenticatedApp: React.FC = () => {
             if (error) throw error;
             if (data) {
                 // Cập nhật lại ID thật từ server
-                setAppState(prev => ({
+                setAppState((prev: AppState) => ({
                     ...prev,
                     transactions: prev.transactions.map(t => t.id === tempId ? { ...data, amount: Number(data.amount) } : t)
                 }));
@@ -268,13 +284,13 @@ const AuthenticatedApp: React.FC = () => {
             console.error('Lỗi thêm giao dịch:', error);
             alert(`Lỗi: ${error.message}`);
             // Rollback (hoàn tác) nếu lỗi
-            setAppState(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== tempId) }));
+            setAppState((prev: AppState) => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== tempId) }));
         }
     };
 
     const handleUpdateTransaction = async (updatedTx: Transaction) => {
         const previousTransactions = [...appState.transactions];
-        setAppState(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === updatedTx.id ? updatedTx : t) }));
+        setAppState((prev: AppState) => ({ ...prev, transactions: prev.transactions.map(t => t.id === updatedTx.id ? updatedTx : t) }));
 
         try {
             const { error } = await supabase.from('transactions').update({
@@ -283,21 +299,21 @@ const AuthenticatedApp: React.FC = () => {
             if (error) throw error;
         } catch (error: any) {
             alert(`Lỗi cập nhật: ${error.message}`);
-            setAppState(prev => ({ ...prev, transactions: previousTransactions }));
+            setAppState((prev: AppState) => ({ ...prev, transactions: previousTransactions }));
         }
     };
 
     const handleDeleteTransaction = async (id: string) => {
         if (!window.confirm('Bạn có chắc chắn muốn xóa?')) return;
         const previousTransactions = [...appState.transactions];
-        setAppState(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
+        setAppState((prev: AppState) => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
 
         try {
             const { error } = await supabase.from('transactions').delete().eq('id', id);
             if (error) throw error;
         } catch (error) {
             alert('Lỗi xóa giao dịch.');
-            setAppState(prev => ({ ...prev, transactions: previousTransactions }));
+            setAppState((prev: AppState) => ({ ...prev, transactions: previousTransactions }));
         }
     };
 
@@ -307,21 +323,21 @@ const AuthenticatedApp: React.FC = () => {
         if (!user) return;
         const tempId = Date.now().toString();
         const optimisticGoal = { ...newGoal, id: tempId, user_id: user.id };
-        setAppState(prev => ({ ...prev, goals: [...prev.goals, optimisticGoal] }));
+        setAppState((prev: AppState) => ({ ...prev, goals: [...prev.goals, optimisticGoal] }));
         try {
             const { data, error } = await supabase.from('goals').insert([{ user_id: user.id, ...newGoal }]).select().single();
             if (error) throw error;
-            if (data) setAppState(prev => ({ ...prev, goals: prev.goals.map(g => g.id === tempId ? data : g) }));
+            if (data) setAppState((prev: AppState) => ({ ...prev, goals: prev.goals.map(g => g.id === tempId ? data : g) }));
         } catch (error: any) {
             console.error(error);
             alert(`Lỗi thêm mục tiêu: ${error.message}`);
-            setAppState(prev => ({ ...prev, goals: prev.goals.filter(g => g.id !== tempId) }));
+            setAppState((prev: AppState) => ({ ...prev, goals: prev.goals.filter(g => g.id !== tempId) }));
         }
     };
 
     const handleUpdateGoal = async (updatedGoal: any) => {
         const prevGoals = [...appState.goals];
-        setAppState(prev => ({ ...prev, goals: prev.goals.map(g => g.id === updatedGoal.id ? updatedGoal : g) }));
+        setAppState((prev: AppState) => ({ ...prev, goals: prev.goals.map(g => g.id === updatedGoal.id ? updatedGoal : g) }));
         try {
             const { error } = await supabase.from('goals').update({
                 title: updatedGoal.title, target_amount: updatedGoal.target_amount, current_amount: updatedGoal.current_amount,
@@ -331,21 +347,21 @@ const AuthenticatedApp: React.FC = () => {
         } catch (error: any) {
             console.error(error);
             alert(`Lỗi cập nhật mục tiêu: ${error.message}`);
-            setAppState(prev => ({ ...prev, goals: prevGoals }));
+            setAppState((prev: AppState) => ({ ...prev, goals: prevGoals }));
         }
     };
 
     const handleDeleteGoal = async (id: string) => {
         if (!window.confirm('Bạn có chắc chắn muốn xóa mục tiêu này?')) return;
         const prevGoals = [...appState.goals];
-        setAppState(prev => ({ ...prev, goals: prev.goals.filter(g => g.id !== id) }));
+        setAppState((prev: AppState) => ({ ...prev, goals: prev.goals.filter(g => g.id !== id) }));
         try {
             const { error } = await supabase.from('goals').delete().eq('id', id);
             if (error) throw error;
         } catch (error: any) {
             console.error(error);
             alert(`Lỗi xóa mục tiêu: ${error.message}`);
-            setAppState(prev => ({ ...prev, goals: prevGoals }));
+            setAppState((prev: AppState) => ({ ...prev, goals: prevGoals }));
         }
     };
 
@@ -353,39 +369,39 @@ const AuthenticatedApp: React.FC = () => {
         if (!user) return;
         const tempId = Date.now().toString();
         const optimisticItem = { ...item, id: tempId, user_id: user.id };
-        setAppState(prev => ({ ...prev, timetable: [...prev.timetable, optimisticItem] }));
+        setAppState((prev: AppState) => ({ ...prev, timetable: [...prev.timetable, optimisticItem] }));
 
         try {
             const { data, error } = await supabase.from('timetable').insert([{ user_id: user.id, ...item }]).select().single();
             if (error) throw error;
-            if (data) setAppState(prev => ({ ...prev, timetable: prev.timetable.map(t => t.id === tempId ? data : t) }));
+            if (data) setAppState((prev: AppState) => ({ ...prev, timetable: prev.timetable.map(t => t.id === tempId ? data : t) }));
         } catch (error: any) {
             console.error(error);
-            setAppState(prev => ({ ...prev, timetable: prev.timetable.filter(t => t.id !== tempId) }));
+            setAppState((prev: AppState) => ({ ...prev, timetable: prev.timetable.filter(t => t.id !== tempId) }));
         }
     };
 
     const handleUpdateTimetable = async (item: any) => {
         const prevTimetable = [...appState.timetable];
-        setAppState(prev => ({ ...prev, timetable: prev.timetable.map(t => t.id === item.id ? item : t) }));
+        setAppState((prev: AppState) => ({ ...prev, timetable: prev.timetable.map(t => t.id === item.id ? item : t) }));
         try {
             const { error } = await supabase.from('timetable').update(item).eq('id', item.id);
             if (error) throw error;
         } catch (error) {
             console.error(error);
-            setAppState(prev => ({ ...prev, timetable: prevTimetable }));
+            setAppState((prev: AppState) => ({ ...prev, timetable: prevTimetable }));
         }
     };
 
     const handleDeleteTimetable = async (id: string) => {
         const prevTimetable = [...appState.timetable];
-        setAppState(prev => ({ ...prev, timetable: prev.timetable.filter(t => t.id !== id) }));
+        setAppState((prev: AppState) => ({ ...prev, timetable: prev.timetable.filter(t => t.id !== id) }));
         try {
             const { error } = await supabase.from('timetable').delete().eq('id', id);
             if (error) throw error;
         } catch (error) {
             console.error(error);
-            setAppState(prev => ({ ...prev, timetable: prevTimetable }));
+            setAppState((prev: AppState) => ({ ...prev, timetable: prevTimetable }));
         }
     };
     const handleAddTodo = async (content: string, priority: any) => {
@@ -394,7 +410,7 @@ const AuthenticatedApp: React.FC = () => {
         const newItem = { id: tempId, content, priority, is_completed: false, user_id: user.id };
 
         // Optimistic UI: Update local state immediately
-        setAppState(prev => ({ ...prev, todos: [newItem, ...prev.todos] }));
+        setAppState((prev: AppState) => ({ ...prev, todos: [newItem, ...prev.todos] }));
 
         // Map UI priority to DB priority if needed
         let dbPriority = 'medium'; // Default fallback
@@ -417,7 +433,7 @@ const AuthenticatedApp: React.FC = () => {
             if (error) throw error;
 
             if (data) {
-                setAppState(prev => ({
+                setAppState((prev: AppState) => ({
                     ...prev,
                     todos: prev.todos.map(t => t.id === tempId ? data : t)
                 }));
@@ -425,13 +441,13 @@ const AuthenticatedApp: React.FC = () => {
         } catch (error: any) {
             console.error(error);
             alert("Lỗi thêm việc: " + error.message);
-            setAppState(prev => ({ ...prev, todos: prev.todos.filter(t => t.id !== tempId) }));
+            setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.filter(t => t.id !== tempId) }));
         }
     };
 
     const handleUpdateTodo = async (item: any) => {
         const prevTodos = [...appState.todos];
-        setAppState(prev => ({ ...prev, todos: prev.todos.map(t => t.id === item.id ? item : t) }));
+        setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.map(t => t.id === item.id ? item : t) }));
 
         try {
             const { error } = await supabase.from('todos').update(item).eq('id', item.id);
@@ -439,13 +455,13 @@ const AuthenticatedApp: React.FC = () => {
         } catch (error: any) {
             console.error(error);
             alert("Lỗi cập nhật việc: " + error.message);
-            setAppState(prev => ({ ...prev, todos: prevTodos }));
+            setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
         }
     };
 
     const handleDeleteTodo = async (id: string) => {
         const prevTodos = [...appState.todos];
-        setAppState(prev => ({ ...prev, todos: prev.todos.filter(t => t.id !== id) }));
+        setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.filter(t => t.id !== id) }));
 
         try {
             const { error } = await supabase.from('todos').delete().eq('id', id);
@@ -453,7 +469,7 @@ const AuthenticatedApp: React.FC = () => {
         } catch (error: any) {
             console.error(error);
             alert("Lỗi xóa việc: " + error.message);
-            setAppState(prev => ({ ...prev, todos: prevTodos }));
+            setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
         }
     };
 
@@ -474,6 +490,17 @@ const AuthenticatedApp: React.FC = () => {
                 </div>
 
                 <nav className="flex-1 px-4 space-y-2 mt-2">
+                    {/* Language Toggle Desktop */}
+                    <button onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')} className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-gray-50 cursor-pointer border border-dashed border-gray-200 mb-2">
+                        <div className="flex items-center gap-3">
+                            <span>🌐</span>
+                            <span>{lang === 'vi' ? 'Ngôn ngữ' : 'Language'}</span>
+                        </div>
+                        <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs">{lang.toUpperCase()}</span>
+                    </button>
+                    <button onClick={() => setActiveTab('visual')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'visual' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}>
+                        <LayoutDashboard size={20} /> {lang === 'vi' ? 'Tổng quan' : 'Visual Board'}
+                    </button>
                     <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'finance' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}>
                         <Wallet size={20} /> Tài chính
                     </button>
@@ -504,42 +531,29 @@ const AuthenticatedApp: React.FC = () => {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 md:ml-64 p-4 md:p-8 min-h-screen relative pt-[130px] md:pt-8 bg-[#F8F9FC]">
-                <header className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 z-30 transition-all">
-                    <div className="flex items-center justify-between p-4 pb-2">
+            <main className="flex-1 md:ml-64 min-h-screen relative bg-[#F8F9FC] pb-24 md:pb-8"> {/* Added safe bottom padding for mobile */}
+                <header className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 z-30 transition-all h-16">
+                    <div className="flex items-center justify-between px-4 h-full">
                         <div className="flex items-center gap-2">
                             <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-1.5 rounded-lg">
                                 <LayoutDashboard className="text-white" size={18} />
                             </div>
-                            <span className="font-bold text-gray-800 text-lg tracking-tight">SmartLife</span>
+                            <span className="font-bold text-gray-800 text-lg tracking-tight hidden sm:block">SmartLife</span>
                         </div>
-                        <div className="flex gap-2 items-center">
+                        <div className="flex gap-3 items-center">
+                            <button onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')} className="px-2.5 py-1 bg-gray-100 text-xs font-bold rounded-lg text-gray-600 uppercase hover:bg-gray-200 transition-colors">
+                                {lang}
+                            </button>
                             <button onClick={toggleNotifications} className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${notificationsEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`} title="Bật/Tắt thông báo">
                                 <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
                             </button>
                             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"><Settings size={20} /></button>
-                            <button onClick={signOut} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"><LogOut size={20} /></button>
                         </div>
-                    </div>
-                    <div className="flex px-4 pb-3 gap-2">
-                        <button
-                            onClick={() => setActiveTab('finance')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'finance' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                        >
-                            <Wallet size={16} /> Tài chính
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('schedule')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'schedule' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                        >
-                            <CalendarDays size={16} /> Lịch trình
-                        </button>
                     </div>
                 </header>
 
-                <div className="max-w-7xl mx-auto">
-
-
+                <div className="max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative h-full"> {/* Ensure relative for absolute positioning if needed */}
+                    {activeTab === 'visual' && <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} onNavigate={setActiveTab} />}
                     {activeTab === 'finance' && (
                         <FinanceDashboard
                             state={appState}
@@ -550,6 +564,7 @@ const AuthenticatedApp: React.FC = () => {
                             onUpdateGoal={handleUpdateGoal}
                             onDeleteGoal={handleDeleteGoal}
                             isLoading={isLoadingData}
+                            lang={lang}
                         />
                     )}
                     {activeTab === 'schedule' && (
@@ -564,19 +579,60 @@ const AuthenticatedApp: React.FC = () => {
             </main>
 
 
-            {/* Mobile Nav */}
+            {/* Mobile Bottom Nav */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center z-40 pb-safe pt-1 h-[70px] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                <button
+                    onClick={() => setActiveTab('visual')}
+                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'visual' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <div className={`p-1.5 rounded-xl transition-all ${activeTab === 'visual' ? 'bg-indigo-50' : 'bg-transparent'}`}>
+                        <LayoutDashboard size={24} strokeWidth={activeTab === 'visual' ? 2.5 : 2} />
+                    </div>
+                    <span className="text-[10px] font-bold">{lang === 'vi' ? 'Tổng quan' : 'Overview'}</span>
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('finance')}
+                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'finance' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <div className={`p-1.5 rounded-xl transition-all ${activeTab === 'finance' ? 'bg-indigo-50' : 'bg-transparent'}`}>
+                        <Wallet size={24} strokeWidth={activeTab === 'finance' ? 2.5 : 2} />
+                    </div>
+                    <span className="text-[10px] font-bold">{lang === 'vi' ? 'Tài chính' : 'Finance'}</span>
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('schedule')}
+                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'schedule' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <div className={`p-1.5 rounded-xl transition-all ${activeTab === 'schedule' ? 'bg-indigo-50' : 'bg-transparent'}`}>
+                        <CalendarDays size={24} strokeWidth={activeTab === 'schedule' ? 2.5 : 2} />
+                    </div>
+                    <span className="text-[10px] font-bold">{lang === 'vi' ? 'Lịch trình' : 'Schedule'}</span>
+                </button>
+            </nav>
 
 
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userId={user?.id || ''} />
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userId={user?.id || ''} onSignOut={signOut} />
             <PWAInstallPrompt />
         </div >
     );
 };
 
+import LandingPage from './components/LandingPage';
+
 const AppWrapper: React.FC = () => {
     const { user, loading } = useAuth();
+    const [showLogin, setShowLogin] = useState(false);
+    const [lang, setLang] = useState<'vi' | 'en'>('vi');
+
     if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-600 animate-spin" /></div>;
-    return user ? <AuthenticatedApp /> : <Login />;
+
+    if (user) return <AuthenticatedApp lang={lang} setLang={setLang} />;
+
+    if (showLogin) return <Login onBack={() => setShowLogin(false)} />;
+
+    return <LandingPage onLogin={() => setShowLogin(true)} lang={lang} setLang={setLang} />;
 };
 
 const App: React.FC = () => (

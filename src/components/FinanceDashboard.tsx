@@ -1,33 +1,112 @@
 import React, { useMemo, useState } from 'react';
 import { AppState, TransactionType, Transaction, Goal } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
+import { analyzeFinance } from '../services/aiService';
+import FinanceAI from './FinanceAI';
+
+
 
 
 interface FinanceDashboardProps {
     state: AppState;
     onAddTransaction: (t: Omit<Transaction, 'id'>) => void;
-    onUpdateTransaction: (t: Transaction) => void; // Added for Edit
+    onUpdateTransaction: (t: Transaction) => void;
     onDeleteTransaction: (id: string) => void;
     onAddGoal: (g: any) => void;
     onUpdateGoal: (g: any) => void;
     onDeleteGoal: (id: string) => void;
     isLoading?: boolean;
+    lang: 'vi' | 'en';
 }
 
 const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#14B8A6', '#F97316', '#64748B'];
 
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+const translations = {
+    vi: {
+        financeOverview: 'Tổng quan Tài chính',
+        income: 'Thu nhập',
+        expense: 'Chi tiêu',
+        balance: 'Số dư hiện tại',
+        addTransaction: 'Thêm giao dịch',
+        analysis: 'Phân tích',
+        recentTransactions: 'Giao dịch gần đây',
+        noTransactions: 'Chưa có giao dịch nào.',
+        goals: 'Mục tiêu Tài chính',
+        addGoal: 'Thêm mục tiêu',
+        savings: 'Tiết kiệm',
+        date: 'Ngày',
+        category: 'Danh mục',
+        amount: 'Số tiền',
+        description: 'Mô tả',
+        actions: 'Hành động',
+        edit: 'Sửa',
+        delete: 'Xóa',
+        save: 'Lưu',
+        cancel: 'Hủy',
+        income_salary: 'Lương',
+        income_bonus: 'Thưởng',
+        income_other: 'Khác',
+        expense_food: 'Ăn uống',
+        expense_transport: 'Di chuyển',
+        expense_shopping: 'Mua sắm',
+        expense_bills: 'Hóa đơn',
+        expense_entertainment: 'Giải trí',
+        expense_health: 'Sức khỏe',
+        expense_education: 'Giáo dục',
+        expense_other: 'Khác',
+        month: 'Tháng',
+        year: 'Năm'
+    },
+    en: {
+        financeOverview: 'Finance Overview',
+        income: 'Income',
+        expense: 'Expense',
+        balance: 'Current Balance',
+        addTransaction: 'Add Transaction',
+        analysis: 'Analysis',
+        recentTransactions: 'Recent Transactions',
+        noTransactions: 'No transactions yet.',
+        goals: 'Financial Goals',
+        addGoal: 'Add Goal',
+        savings: 'Savings',
+        date: 'Date',
+        category: 'Category',
+        amount: 'Amount',
+        description: 'Description',
+        actions: 'Actions',
+        edit: 'Edit',
+        delete: 'Delete',
+        save: 'Save',
+        cancel: 'Cancel',
+        income_salary: 'Salary',
+        income_bonus: 'Bonus',
+        income_other: 'Other',
+        expense_food: 'Food',
+        expense_transport: 'Transport',
+        expense_shopping: 'Shopping',
+        expense_bills: 'Bills',
+        expense_entertainment: 'Entertainment',
+        expense_health: 'Health',
+        expense_education: 'Education',
+        expense_other: 'Other',
+        month: 'Month',
+        year: 'Year'
+    }
+};
+
+const formatCurrency = (amount: number, lang: 'vi' | 'en') => {
+    return new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US', { style: 'currency', currency: lang === 'vi' ? 'VND' : 'USD' }).format(lang === 'vi' ? amount : amount / 25000);
 };
 
 // --- Helper for Calendar ---
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay(); // 0 = Sunday
 
-const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, isLoading }) => {
+const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, isLoading, lang }) => {
+    const t = translations[lang];
     const { transactions } = state;
 
     // UI State
@@ -67,6 +146,10 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     // Balance Form State
     const [newBalance, setNewBalance] = useState('');
     const [showCalculator, setShowCalculator] = useState(false);
+
+    // AI State
+    const [aiInsight, setAiInsight] = useState<{ insight: string; actions: string[] } | null>(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
 
     const stats = useMemo(() => {
@@ -123,6 +206,13 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             currentMonthTransactions
         };
     }, [transactions, selectedMonth, selectedYear]);
+
+    const financeContext = useMemo(() => {
+        return `Số dư khả dụng: ${formatCurrency(stats.totalBalance, lang)}. 
+        Thu nhập tháng này: ${formatCurrency(stats.currentMonthIncome, lang)}. 
+        Chi tiêu tháng này: ${formatCurrency(stats.currentMonthExpense, lang)}.
+        Danh mục chi tiêu hàng đầu: ${stats.categoryData.slice(0, 3).map(c => `${c.name} (${Math.round(c.percent)}%)`).join(', ')}`;
+    }, [stats, lang]);
 
 
     // --- Handlers ---
@@ -253,6 +343,13 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         setSelectedGoalForDeposit(null);
     };
 
+    const handleAnalyzeFinance = async () => {
+        setIsAnalyzing(true);
+        const result = await analyzeFinance(transactions);
+        setAiInsight(result);
+        setIsAnalyzing(false);
+    };
+
     // --- Render Components ---
 
     const renderCalendar = () => {
@@ -288,8 +385,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         {day}
                     </div>
                     <div className="space-y-0.5 px-0.5">
-                        {dayIncome > 0 && <div className="text-[9px] md:text-[10px] bg-green-100/80 text-green-700 px-1 rounded truncate leading-tight tracking-tighter">+{formatCurrency(dayIncome)}</div>}
-                        {dayExpense > 0 && <div className="text-[9px] md:text-[10px] bg-red-100/80 text-red-700 px-1 rounded truncate leading-tight tracking-tighter">-{formatCurrency(dayExpense)}</div>}
+                        {dayIncome > 0 && <div className="text-[9px] md:text-[10px] bg-green-100/80 text-green-700 px-1 rounded truncate leading-tight tracking-tighter">+{formatCurrency(dayIncome, lang)}</div>}
+                        {dayExpense > 0 && <div className="text-[9px] md:text-[10px] bg-red-100/80 text-red-700 px-1 rounded truncate leading-tight tracking-tighter">-{formatCurrency(dayExpense, lang)}</div>}
                     </div>
                 </div>
             );
@@ -333,10 +430,10 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             </h3>
                             <div className="flex gap-2">
                                 <span className="text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg">
-                                    Thu: {formatCurrency(selectedDayTransactions.filter(t => t.type === TransactionType.INCOME).reduce((a, b) => a + b.amount, 0))}
+                                    Thu: {formatCurrency(selectedDayTransactions.filter(t => t.type === TransactionType.INCOME).reduce((a, b) => a + b.amount, 0), lang)}
                                 </span>
                                 <span className="text-sm font-medium text-red-600 bg-red-50 px-3 py-1 rounded-lg">
-                                    Chi: {formatCurrency(selectedDayTransactions.filter(t => t.type === TransactionType.EXPENSE).reduce((a, b) => a + b.amount, 0))}
+                                    Chi: {formatCurrency(selectedDayTransactions.filter(t => t.type === TransactionType.EXPENSE).reduce((a, b) => a + b.amount, 0), lang)}
                                 </span>
                             </div>
                         </div>
@@ -364,7 +461,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                     {t.description || <i className="text-gray-400">Không có ghi chú</i>}
                                                 </td>
                                                 <td className={`px-4 py-3 text-right font-bold text-sm ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-gray-900'}`}>
-                                                    {t.type === TransactionType.INCOME ? '+' : '-'}{formatCurrency(t.amount)}
+                                                    {t.type === TransactionType.INCOME ? '+' : '-'}{formatCurrency(t.amount, lang)}
                                                 </td>
                                                 <td className="px-4 py-3 text-center flex justify-center gap-2">
                                                     <button onClick={() => openEditModal(t)} className="p-1.5 text-gray-400 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 rounded-lg transition-colors" title="Sửa">
@@ -417,7 +514,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     {t.description}
                                 </td>
                                 <td className={`px-6 py-4 text-right font-bold text-sm ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-gray-900'}`}>
-                                    {t.type === TransactionType.INCOME ? '+' : '-'}{formatCurrency(t.amount)}
+                                    {t.type === TransactionType.INCOME ? '+' : '-'}{formatCurrency(t.amount, lang)}
                                 </td>
                                 <td className="px-6 py-4 text-center flex justify-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                                     <button onClick={() => openEditModal(t)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all" title="Sửa">
@@ -461,56 +558,122 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         <button onClick={() => setViewMode('history')} className={`p-2 rounded-lg transition-all ${viewMode === 'history' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Danh sách"><List size={20} /></button>
                     </div>
 
-                    <button
-                        onClick={() => {
-                            setEditingTransaction(null);
-                            setIsModalOpen(true);
-                            setType(TransactionType.EXPENSE);
-                            setAmount('');
-                            setDesc('');
-                            setCategory(EXPENSE_CATEGORIES[0]);
-                        }}
-                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
-                    >
-                        <Plus size={20} />
-                        <span className="hidden sm:inline">Thêm Giao dịch</span>
-                    </button>
+                    {/* AI Analysis Button (Header) */}
+                    {/* Buttons Group */}
+                    <div className="flex flex-1 w-full md:w-auto gap-2">
+                        {/* AI Analysis Button (Distinct Purple/Pink) */}
+                        <button
+                            onClick={handleAnalyzeFinance}
+                            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-[1.02] transition-all whitespace-nowrap"
+                        >
+                            <Sparkles size={18} className="text-yellow-300" />
+                            <span className="text-sm">Phân tích</span>
+                        </button>
+
+                        {/* Add Transaction Button (Distinct Blue) */}
+                        <button
+                            onClick={() => {
+                                setEditingTransaction(null);
+                                setIsModalOpen(true);
+                                setType(TransactionType.EXPENSE);
+                                setAmount('');
+                                setDesc('');
+                                setCategory(EXPENSE_CATEGORIES[0]);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-[1.02] transition-all whitespace-nowrap"
+                        >
+                            <Plus size={20} />
+                            <span className="text-sm">Thêm Mới</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* Main Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
-                <div className="col-span-2 md:col-span-1 bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:border-indigo-200 transition-colors">
+                <div className="col-span-2 md:col-span-1 bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:border-indigo-200 transition-colors">
                     <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                     <div className="flex justify-between items-start relative z-10">
-                        <p className="text-gray-500 font-medium mb-1 text-sm md:text-base">Số dư khả dụng</p>
-                        <button onClick={() => setIsBalanceModalOpen(true)} className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors" title="Sửa số dư">
-                            <Edit2 size={14} />
+                        <p className="text-gray-500 font-medium mb-1 text-xs md:text-base">Số dư khả dụng</p>
+                        <button onClick={() => setIsBalanceModalOpen(true)} className="p-1 px-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors" title="Sửa số dư">
+                            <Edit2 size={12} />
                         </button>
                     </div>
-                    <h3 className="text-2xl md:text-3xl font-bold text-gray-800 relative z-10">{formatCurrency(stats.totalBalance)}</h3>
-                    <div className="mt-4 flex items-center text-indigo-600 text-sm font-medium relative z-10">
-                        <DollarSign size={16} className="mr-1" />
+                    <h3 className="text-xl md:text-3xl font-bold text-gray-800 relative z-10">{formatCurrency(stats.totalBalance, lang)}</h3>
+                    <div className="mt-2 md:mt-4 flex items-center text-indigo-600 text-xs md:text-sm font-medium relative z-10">
+                        <DollarSign size={14} className="mr-1" />
                         Hiện có
                     </div>
                 </div>
 
-                <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
+                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
                     <div className="flex justify-between items-center mb-1">
-                        <p className="text-gray-500 font-medium text-xs md:text-base">Thu nhập tháng {selectedMonth + 1}</p>
+                        <p className="text-gray-500 font-medium text-[10px] md:text-base">Thu nhập tháng {selectedMonth + 1}</p>
                     </div>
-                    <h3 className="text-lg md:text-3xl font-bold text-emerald-600 truncate">{formatCurrency(stats.currentMonthIncome)}</h3>
+                    <h3 className="text-base md:text-3xl font-bold text-emerald-600 truncate">{formatCurrency(stats.currentMonthIncome, lang)}</h3>
                 </div>
 
-                <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
-                    <p className="text-gray-500 font-medium mb-1 text-xs md:text-base">Chi tiêu tháng {selectedMonth + 1}</p>
-                    <h3 className="text-lg md:text-3xl font-bold text-red-500 truncate">{formatCurrency(stats.currentMonthExpense)}</h3>
+                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
+                    <p className="text-gray-500 font-medium mb-1 text-[10px] md:text-base">Chi tiêu tháng {selectedMonth + 1}</p>
+                    <h3 className="text-base md:text-3xl font-bold text-red-500 truncate">{formatCurrency(stats.currentMonthExpense, lang)}</h3>
                 </div>
 
-                {/* AI Analysis Section */}
-
+                {/* AI Analysis Button */}
             </div>
 
+            {/* AI Analysis Modal */}
+            {
+                (isAnalyzing || aiInsight) && (
+                    <div className="fixed inset-0 bg-black/50 z-[80] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                        <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl relative overflow-hidden">
+                            {/* Decoration */}
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                    <Bot size={24} className="text-indigo-600" />
+                                    Trợ lý Tài chính AI
+                                </h3>
+                                <button onClick={() => { setAiInsight(null); setIsAnalyzing(false); }} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={24} /></button>
+                            </div>
+
+                            {isAnalyzing ? (
+                                <div className="py-10 flex flex-col items-center justify-center text-center gap-4">
+                                    <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                                    <p className="text-gray-500 font-medium animate-pulse">Đang phân tích dữ liệu chi tiêu của bạn...</p>
+                                </div>
+                            ) : aiInsight ? (
+                                <div className="space-y-6">
+                                    <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                                        <p className="text-gray-700 leading-relaxed font-medium">"{aiInsight.insight}"</p>
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                            <Sparkles size={14} className="text-amber-500" /> Đề xuất hành động
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {aiInsight.actions.map((action, idx) => (
+                                                <div key={idx} className="flex items-start gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-indigo-200 transition-colors">
+                                                    <div className="mt-1 w-5 h-5 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</div>
+                                                    <p className="text-sm text-gray-700">{action}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => { setAiInsight(null); }}
+                                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-200"
+                                    >
+                                        Đã hiểu, cảm ơn AI!
+                                    </button>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                )
+            }
 
             {
                 isLoading && (
@@ -529,13 +692,13 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                             <h3 className="text-lg font-bold text-gray-800 mb-6">Biểu đồ Thu - Chi 6 tháng gần nhất</h3>
-                            <div className="h-80">
+                            <div className="h-64 md:h-80">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={stats.monthlyChartData} barGap={8}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} dy={10} />
                                         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} tickFormatter={(value) => `${value / 1000000}M`} />
-                                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number) => formatCurrency(value)} />
+                                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => formatCurrency(value || 0, lang)} />
                                         <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                         <Bar dataKey="income" name="Thu nhập" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={50} />
                                         <Bar dataKey="expense" name="Chi tiêu" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={50} />
@@ -556,7 +719,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                     ))}
                                                 </Pie>
-                                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                                <Tooltip formatter={(value: number | undefined) => formatCurrency(value || 0, lang)} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     ) : (
@@ -608,7 +771,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} dy={10} />
                                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} tickFormatter={(value) => `${value / 1000000}M`} />
-                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number) => formatCurrency(value)} />
+                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => formatCurrency(value || 0, lang)} />
                                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                 <Area type="monotone" dataKey="income" name="Thu nhập" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorIncome)" />
                                 <Area type="monotone" dataKey="expense" name="Chi tiêu" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorExpense)" />
@@ -651,7 +814,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                 <button
                                     onClick={() => {
                                         setEditingGoal(goal);
-                                        setGoalTarget(goal.target_amount.toString());
+                                        setGoalTarget((goal.target_amount || 0).toString());
                                         setGoalCurrent(goal.current_amount?.toString() || '');
                                         setIsGoalModalOpen(true);
                                     }}
@@ -666,8 +829,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                 </p>
 
                                 <div className="flex justify-between items-end text-sm mb-1">
-                                    <span className="text-indigo-600 font-bold">{formatCurrency(goal.current_amount || 0)}</span>
-                                    <span className="text-gray-400 font-medium">/ {formatCurrency(goal.target_amount || 0)}</span>
+                                    <span className="text-indigo-600 font-bold">{formatCurrency(goal.current_amount || 0, lang)}</span>
+                                    <span className="text-gray-400 font-medium">/ {formatCurrency(goal.target_amount || 0, lang)}</span>
                                 </div>
 
                                 <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
@@ -727,7 +890,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium mt-1"
                                     />
                                     <div className="flex justify-end mt-1 text-xs text-indigo-600 font-bold">
-                                        {goalTarget && !isNaN(Number(goalTarget)) && formatCurrency(Number(goalTarget))}
+                                        {goalTarget && !isNaN(Number(goalTarget)) && formatCurrency(Number(goalTarget), lang)}
                                     </div>
                                 </div>
                                 <div>
@@ -741,7 +904,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium mt-1"
                                     />
                                     <div className="flex justify-end mt-1 text-xs text-indigo-600 font-bold">
-                                        {goalCurrent && !isNaN(Number(goalCurrent)) && formatCurrency(Number(goalCurrent))}
+                                        {goalCurrent && !isNaN(Number(goalCurrent)) && formatCurrency(Number(goalCurrent), lang)}
                                     </div>
                                 </div>
                                 <div>
@@ -780,7 +943,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         className="w-full p-4 bg-indigo-50 rounded-xl border-2 border-indigo-100 text-indigo-700 text-lg font-bold outline-none focus:border-indigo-500 transition-colors mt-2"
                                     />
                                     <div className="flex justify-end mt-1 text-xs text-gray-400">
-                                        {depositAmount && !isNaN(Number(depositAmount)) && formatCurrency(Number(depositAmount))}
+                                        {depositAmount && !isNaN(Number(depositAmount)) && formatCurrency(Number(depositAmount), lang)}
                                     </div>
                                 </div>
 
@@ -851,20 +1014,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                 />
                                             </div>
                                         )}
-                                        {showCalculator && (
-                                            <div className="mt-2 text-sm">
-                                                <Calculator
-                                                    initialValue={amount}
-                                                    onComplete={(val) => {
-                                                        setAmount(val);
-                                                        setShowCalculator(false);
-                                                    }}
-                                                    onClose={() => setShowCalculator(false)}
-                                                />
-                                            </div>
-                                        )}
                                         <div className="flex justify-end mt-1 text-xs text-indigo-600 font-bold">
-                                            {amount && !isNaN(Number(amount)) && formatCurrency(Number(amount))}
+                                            {amount && !isNaN(Number(amount)) && formatCurrency(Number(amount), lang)}
                                         </div>
                                     </div>
                                     <div>
@@ -914,7 +1065,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             placeholder={stats.totalBalance.toString()}
                                         />
                                         <div className="flex justify-center mt-2 text-sm text-indigo-600 font-bold">
-                                            {newBalance && !isNaN(Number(newBalance)) && formatCurrency(Number(newBalance))}
+                                            {newBalance && !isNaN(Number(newBalance)) && formatCurrency(Number(newBalance), lang)}
                                         </div>
                                     </div>
                                     <div className="flex gap-3">
@@ -928,6 +1079,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                 )
             }
 
+            <FinanceAI context={financeContext} />
         </div >
     );
 };

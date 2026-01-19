@@ -40,6 +40,7 @@ export interface Goal {
   type?: 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM' | 'FINANCIAL' | 'PERSONAL';
   is_priority?: boolean;
   progress?: number;
+  created_at?: string;
 }
 
 export interface BudgetSummary {
@@ -83,7 +84,7 @@ export interface Todo {
 export interface AppState {
   transactions: Transaction[];
   budget: BudgetSummary;
-  timetable: Task[]; // Dùng chung Task cho timetable
+  timetable: TimetableEvent[]; // Dùng chung Task cho timetable
   todos: Todo[];
   goals: Goal[];
   currentBalance: number;
