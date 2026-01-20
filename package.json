@@ -15,6 +15,7 @@
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
+    "@capacitor/preferences": "^8.0.0",
     "@supabase/supabase-js": "^2.90.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -29,7 +30,8 @@
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",
     "react-number-format": "^5.4.4",
-    "recharts": "^3.6.0"
+    "recharts": "^3.6.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@types/html2canvas": "^0.5.35",

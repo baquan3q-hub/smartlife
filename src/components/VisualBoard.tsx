@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AppState, Goal, Todo, TimetableEvent } from '../types';
-import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star } from 'lucide-react';
 
 interface VisualBoardProps {
     appState: AppState;
@@ -72,6 +72,25 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
         const totalDays = Math.floor(totalDuration / (1000 * 60 * 60 * 24));
 
         return { percent, text: `${daysPassed}/${totalDays} ngày` };
+    };
+
+    const getTimeRemaining = (deadline: string) => {
+        const end = new Date(deadline).getTime();
+        const now = new Date().getTime();
+        const diff = end - now;
+
+        if (diff <= 0) return { text: 'Đã hết hạn', isUrgent: true, color: 'text-red-700 bg-red-100 border border-red-200' };
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (days > 0) return {
+            text: `${days} ngày`,
+            isUrgent: days < 3,
+            color: days < 3 ? 'text-orange-700 bg-orange-100 border border-orange-200' : 'text-emerald-700 bg-emerald-100 border border-emerald-200'
+        };
+        return { text: `${hours}h${minutes}p`, isUrgent: true, color: 'text-red-700 bg-red-100 border border-red-200' };
     };
 
     // NEW: Vietnamese Holidays Logic
@@ -275,22 +294,37 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
                         </div>
                         <div className="space-y-5">
                             {scheduleGoals.map(goal => {
-                                const { percent, text } = calculateTimeProgress(goal.created_at, goal.deadline);
+                                const { percent } = calculateTimeProgress(goal.created_at, goal.deadline);
+                                const timeLeft = getTimeRemaining(goal.deadline);
                                 return (
                                     <div key={goal.id} className="group border-b border-gray-50 last:border-0 pb-3 last:pb-0">
-                                        <div className="flex justify-between text-sm mb-1">
-                                            <span className="font-bold text-gray-700">{goal.title}</span>
-                                            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{Math.round(percent)}%</span>
+                                        <div className="flex justify-between items-start mb-1">
+                                            <div className="flex items-center gap-1.5">
+                                                {goal.is_priority && <Star size={14} className="text-amber-500 fill-amber-500" />}
+                                                <span className="font-bold text-gray-700 leading-tight">{goal.title}</span>
+                                            </div>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${timeLeft.color}`}>
+                                                {timeLeft.text}
+                                            </span>
                                         </div>
-                                        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden mb-1">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full transition-all duration-500"
-                                                style={{ width: `${percent}%` }}
-                                            />
+
+                                        <div className="flex items-center gap-2 mb-2">
+                                            {goal.type && goal.type !== 'PERSONAL' && (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">
+                                                    {goal.type === 'SHORT_TERM' ? 'Ngắn hạn' : goal.type === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
+                                                </span>
+                                            )}
+                                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full transition-all duration-500"
+                                                    style={{ width: `${percent}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-indigo-600">{Math.round(percent)}%</span>
                                         </div>
+
                                         <div className="flex justify-between items-center text-[10px] text-gray-400">
                                             <span>Deadline: {new Date(goal.deadline).toLocaleDateString('vi-VN')}</span>
-                                            <span>{text}</span>
                                         </div>
                                     </div>
                                 );

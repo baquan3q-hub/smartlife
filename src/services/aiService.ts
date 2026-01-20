@@ -60,11 +60,20 @@ export const chatWithFinanceAdvisor = async (message: string, history: any[], co
         if (!response.ok) {
             const text = await response.text();
             console.error(`Chat Error ${response.status}:`, text);
+            // Handle 429 specifically or generic 500
+            if (response.status === 429 || text.includes('ResourceExhausted')) {
+                return { response: "⚠️ Hệ thống đang quá tải (Hết hạn mức API miễn phí). Vui lòng thử lại sau 1 phút. ⏳" };
+            }
             throw new Error(`Server error: ${response.status}`);
         }
-        return await response.json();
+
+        // Safe JSON parse
+        const data = await response.json().catch(() => null);
+        if (!data) throw new Error("Invalid JSON response from server");
+
+        return data;
     } catch (error) {
         console.error("AI Chat Failed:", error);
-        return { response: "Xin lỗi, tôi không thể kết nối tới máy chủ AI (Kiểm tra terminal: python main.py). 😓" };
+        return { response: "Xin lỗi, tôi không thể kết nối tới máy chủ AI. 😓 (Kiểm tra kết nối hoặc hạn mức API)" };
     }
 };

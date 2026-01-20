@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Send, Minimize2, MessageCircle, Loader2 } from 'lucide-react';
 import { chatWithFinanceAdvisor } from '../services/aiService';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Message {
     role: 'user' | 'model';
@@ -247,8 +248,15 @@ const FinanceAI: React.FC<FinanceAIProps> = ({ context }) => {
                                         strong: ({ node, ...props }) => <span className="font-bold text-indigo-600" {...props} />,
                                         ul: ({ node, ...props }) => <ul className="list-disc pl-4 my-1 space-y-1" {...props} />,
                                         li: ({ node, ...props }) => <li className="marker:text-indigo-600" {...props} />,
-                                        p: ({ node, ...props }) => <p className="mb-1 last:mb-0" {...props} />
+                                        p: ({ node, ...props }) => <p className="mb-1 last:mb-0" {...props} />,
+                                        table: ({ node, ...props }) => <div className="overflow-x-auto my-2"><table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg" {...props} /></div>,
+                                        thead: ({ node, ...props }) => <thead className="bg-gray-50" {...props} />,
+                                        tbody: ({ node, ...props }) => <tbody className="bg-white divide-y divide-gray-200" {...props} />,
+                                        tr: ({ node, ...props }) => <tr className="" {...props} />,
+                                        th: ({ node, ...props }) => <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200" {...props} />,
+                                        td: ({ node, ...props }) => <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 border-b border-gray-100" {...props} />
                                     }}
+                                    remarkPlugins={[remarkGfm]}
                                 >
                                     {msg.content}
                                 </ReactMarkdown>

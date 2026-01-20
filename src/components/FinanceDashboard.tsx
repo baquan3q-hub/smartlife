@@ -208,11 +208,24 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     }, [transactions, selectedMonth, selectedYear]);
 
     const financeContext = useMemo(() => {
-        return `Số dư khả dụng: ${formatCurrency(stats.totalBalance, lang)}. 
-        Thu nhập tháng này: ${formatCurrency(stats.currentMonthIncome, lang)}. 
-        Chi tiêu tháng này: ${formatCurrency(stats.currentMonthExpense, lang)}.
-        Danh mục chi tiêu hàng đầu: ${stats.categoryData.slice(0, 3).map(c => `${c.name} (${Math.round(c.percent)}%)`).join(', ')}`;
-    }, [stats, lang]);
+        const recentTx = transactions.slice(0, 50).map(t => ({
+            d: t.date,
+            c: t.category,
+            a: t.amount,
+            t: t.type === TransactionType.INCOME ? 'Thu' : 'Chi',
+            n: t.description
+        }));
+
+        return JSON.stringify({
+            summary: {
+                balance: stats.totalBalance,
+                income: stats.currentMonthIncome,
+                expense: stats.currentMonthExpense,
+                top_cats: stats.categoryData.slice(0, 3).map(c => c.name)
+            },
+            recent_transactions: recentTx
+        });
+    }, [stats, transactions]);
 
 
     // --- Handlers ---

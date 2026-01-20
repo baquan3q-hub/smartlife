@@ -32,6 +32,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+__pycache__/
+*.pyc
 
 # System Files (File rác của Windows)
 Thumbs.db

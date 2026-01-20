@@ -67,7 +67,13 @@ def chat_with_advisor(message: str, history: list = [], context: str = ""):
         Phong cách trả lời:
         - Ngắn gọn, súc tích, đi thẳng vào vấn đề.
         - Dùng emoji 💰 phù hợp để tạo cảm giác thân thiện.
-        - Nếu có dữ liệu chi tiêu (context), hãy dùng nó để tư vấn cụ thể.
+        - Dữ liệu ngữ cảnh sẽ được cung cấp dưới dạng JSON chứa 'summary' và 'recent_transactions'.
+        - 'recent_transactions' là danh sách rút gọn: d=ngày, c=danh mục, a=số tiền, t=loại (Thu/Chi), n=ghi chú.
+        - Nếu người dùng hỏi chi tiết (ví dụ: "liệt kê chi tiêu cho ăn uống"), hãy DÙNG dữ liệu trong 'recent_transactions' để liệt kê cụ thể.
+        - **Định dạng trả lời:**
+          + Sử dụng **Bảng Markdown** (Table) để liệt kê các giao dịch hoặc so sánh số liệu (Cột: Ngày | Số tiền | Ghi chú).
+          + Sử dụng **Gạch đầu dòng** (Bullet points) cho các lời khuyên, nhận xét hoặc các ý chính.
+          + Không viết thành đoạn văn dài dòng khó đọc.
         - Luôn khích lệ người dùng.
         """
 
@@ -83,9 +89,9 @@ def chat_with_advisor(message: str, history: list = [], context: str = ""):
         user_message = message
         if context:
             user_message = f"""
-            [Thông tin ngữ cảnh hiện tại của tôi: {context}]
+            [Dữ liệu tài chính hiện tại (JSON): {context}]
             
-            Câu hỏi: {message}
+            Câu hỏi của người dùng: {message}
             """
             
         response = chat.send_message(user_message)
@@ -93,4 +99,7 @@ def chat_with_advisor(message: str, history: list = [], context: str = ""):
         
     except Exception as e:
         print(f"Chat Error: {e}")
+        error_str = str(e)
+        if "429" in error_str or "ResourceExhausted" in error_str:
+             return "⚠️ Hết hạn mức AI hôm nay (Quota Exceeded). Google Gemini Free Tier có giới hạn số lần hỏi. Vui lòng thử lại sau hoặc ngày mai! ⏳"
         return "Xin lỗi, tôi đang gặp chút trục trặc khi kết nối với máy chủ AI. Bạn hãy thử lại sau nhé! 😓"
