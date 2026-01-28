@@ -80,10 +80,21 @@ export interface Todo {
   priority: 'low' | 'medium' | 'high' | 'urgent' | 'focus' | 'chill' | 'temp';
 }
 
+// Interface cho Ngân sách (Budget)
+export interface BudgetConfig {
+  id: string;
+  user_id?: string;
+  category: string;
+  amount: number;
+  month: string; // Format 'YYYY-MM'
+  created_at?: string;
+}
+
 // 3. State tổng của App
 export interface AppState {
   transactions: Transaction[];
-  budget: BudgetSummary;
+  budget: BudgetSummary; // Keep for legacy or summary view
+  budgets: BudgetConfig[]; // New detailed category budgets
   timetable: TimetableEvent[]; // Dùng chung Task cho timetable
   todos: Todo[];
   goals: Goal[];

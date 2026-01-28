@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { AppState, TransactionType, Transaction, Goal } from '../types';
+import { AppState, TransactionType, Transaction, Goal, BudgetConfig } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
@@ -24,6 +24,9 @@ interface FinanceDashboardProps {
     incomeCategories: string[];
     onAddCategory: (type: 'expense' | 'income', name: string) => void;
     onDeleteCategory: (type: 'expense' | 'income', name: string) => void;
+    onAddBudget: (budget: Omit<BudgetConfig, 'id'>) => void;
+    onUpdateBudget: (budget: BudgetConfig) => void;
+    onDeleteBudget: (id: string) => void;
 }
 
 const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#14B8A6', '#F97316', '#64748B'];
@@ -109,7 +112,7 @@ const formatCurrency = (amount: number, lang: 'vi' | 'en') => {
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay(); // 0 = Sunday
 
-const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, isLoading, lang, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory }) => {
+const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, isLoading, lang, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onAddBudget, onUpdateBudget, onDeleteBudget }) => {
     const t = translations[lang];
     const { transactions } = state;
 
@@ -134,6 +137,14 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
     // Calendar Detail State
     const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
+
+    // Budget Modal State
+    const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+    const [selectedBudgetCategory, setSelectedBudgetCategory] = useState(expenseCategories[0]);
+    const [budgetLimit, setBudgetLimit] = useState('');
+    const [editingBudget, setEditingBudget] = useState<BudgetConfig | null>(null);
+    const [selectedBudgetForDetails, setSelectedBudgetForDetails] = useState<BudgetConfig | null>(null);
+    const [detailViewMonth, setDetailViewMonth] = useState<string>('');
 
     // Filter State (Month)
     const today = new Date();
@@ -421,7 +432,135 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         setIsAnalyzing(false);
     };
 
+    // --- Budget Handlers ---
+    const handleBudgetSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const limit = Number(budgetLimit);
+        if (!limit || limit <= 0) {
+            alert("Vui lòng nhập ngân sách hợp lệ!");
+            return;
+        }
+
+        const monthStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+
+        if (editingBudget) {
+            onUpdateBudget({ ...editingBudget, amount: limit });
+        } else {
+            // Check if already exists?
+            // Ideally we check before submitting or upsert. Setup for now is basic insert.
+            onAddBudget({
+                category: selectedBudgetCategory,
+                amount: limit,
+                month: monthStr
+            });
+        }
+        setIsBudgetModalOpen(false);
+        setBudgetLimit('');
+        setEditingBudget(null);
+    };
+
+    const getBudgetProgress = (category: string) => {
+        const monthStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+        // Find budget for this category and month
+        const budget = state.budgets?.find(b => b.category === category && b.month === monthStr);
+        if (!budget) return null;
+
+        const spent = stats.currentMonthTransactions
+            .filter(t => t.type === TransactionType.EXPENSE && t.category === category)
+            .reduce((acc, t) => acc + t.amount, 0);
+
+        return {
+            budget,
+            spent,
+            percent: Math.min((spent / budget.amount) * 100, 100),
+            isOver: spent > budget.amount
+        };
+    };
+
     // --- Render Components ---
+
+    const renderBudgets = () => {
+        return (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6 animate-fade-in">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-gray-800">Ngân sách Tháng {selectedMonth + 1}</h3>
+                    <button
+                        onClick={() => {
+                            setEditingBudget(null);
+                            setBudgetLimit('');
+                            // Default to first category if possible, or reset
+                            setSelectedBudgetCategory(expenseCategories[0]);
+                            setIsBudgetModalOpen(true);
+                        }}
+                        className="text-sm text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition-colors"
+                    >
+                        + Thiết lập
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {state.budgets
+                        ?.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`)
+                        .map(budget => {
+                            const progress = getBudgetProgress(budget.category);
+                            if (!progress) return null;
+                            const { spent, percent, isOver } = progress;
+
+                            return (
+                                <div
+                                    key={budget.id}
+                                    onClick={() => {
+                                        setSelectedBudgetForDetails(budget);
+                                        setDetailViewMonth(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`);
+                                    }}
+                                    className="bg-gray-50 rounded-xl p-4 border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
+                                >
+                                    <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">{budget.category}</span>
+                                            {isOver && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">Vượt</span>}
+                                        </div>
+                                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                            <button onClick={() => { setEditingBudget(budget); setBudgetLimit(budget.amount.toString()); setSelectedBudgetCategory(budget.category); setIsBudgetModalOpen(true); }} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded"><Edit2 size={14} /></button>
+                                            <button
+                                                onClick={() => {
+                                                    if (window.confirm("Bạn có chắc chắn muốn xóa ngân sách này?")) {
+                                                        onDeleteBudget(budget.id);
+                                                    }
+                                                }}
+                                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-white rounded"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                        <span>Đã chi: <span className={isOver ? 'text-red-600 font-bold' : 'text-gray-700'}>{formatCurrency(spent, lang)}</span></span>
+                                        <span>/ {formatCurrency(budget.amount, lang)}</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-500' : percent > 80 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                            style={{ width: `${Math.min(percent, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                    {(!state.budgets || state.budgets.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`).length === 0) && (
+                        <div className="col-span-1 md:col-span-2 text-center py-6 border-2 border-dashed border-gray-100 rounded-xl">
+                            <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-2 text-indigo-400">
+                                <DollarSign size={20} />
+                            </div>
+                            <p className="text-gray-400 text-sm">Chưa thiết lập ngân sách</p>
+                            <button onClick={() => setIsBudgetModalOpen(true)} className="mt-2 text-indigo-600 text-xs font-bold hover:underline">Thêm ngay</button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     const renderCalendar = () => {
         const daysInMonth = getDaysInMonth(selectedYear, selectedMonth);
@@ -429,7 +568,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         const days = [];
 
         for (let i = 0; i < firstDay; i++) {
-            days.push(<div key={`empty-${i}`} className="h-28 md:h-32 bg-gray-50/50 border border-gray-100"></div>);
+            days.push(<div key={`empty-${i}`} className="h-20 md:h-32 bg-gray-50/50 border border-gray-100"></div>);
         }
 
         // Prepare date string for filtering
@@ -448,7 +587,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                 <div
                     key={day}
                     onClick={() => setSelectedCalendarDate(dayString)}
-                    className={`h-28 md:h-32 border p-1 md:p-2 cursor-pointer transition-all relative group overflow-hidden
+                    className={`h-20 md:h-32 border p-1 md:p-2 cursor-pointer transition-all relative group overflow-hidden
                     ${isSelected ? 'border-2 border-indigo-500 bg-indigo-50' : 'border-gray-100 bg-white hover:bg-gray-50'}
                 `}
                 >
@@ -706,41 +845,40 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     )
 
     return (
-        <div className="space-y-6 animate-fade-in pb-20">
+        <div className="space-y-4 md:space-y-6 animate-fade-in pb-20">
             {/* Top Header & Actions */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-800">Tổng quan Tài chính</h2>
                     <p className="text-gray-500 text-sm">Quản lý dòng tiền thông minh</p>
                 </div>
 
-                <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex flex-wrap gap-2 md:gap-3 items-center">
                     {/* Global Month Filter */}
-                    <div className="flex items-center bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+                    <div className="flex items-center bg-white border border-gray-200 rounded-xl px-2 py-1.5 md:px-3 md:py-2 shadow-sm">
                         <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-indigo-600 transition-colors">❮</button>
-                        <span className="mx-3 font-semibold text-gray-700 min-w-[100px] text-center">Tháng {selectedMonth + 1}/{selectedYear}</span>
+                        <span className="mx-2 md:mx-3 font-semibold text-gray-700 min-w-[90px] md:min-w-[100px] text-center text-sm md:text-base">Tháng {selectedMonth + 1}/{selectedYear}</span>
                         <button onClick={() => changeMonth(1)} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-indigo-600 transition-colors">❯</button>
                     </div>
 
-                    <div className="flex gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
-                        <button onClick={() => setViewMode('overview')} className={`p-2 rounded-lg transition-all ${viewMode === 'overview' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Tổng quan"><LayoutDashboard size={20} /></button>
-                        <button onClick={() => setViewMode('calendar')} className={`p-2 rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Lịch"><CalendarDays size={20} /></button>
-                        <button onClick={() => setViewMode('history')} className={`p-2 rounded-lg transition-all ${viewMode === 'history' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Danh sách"><List size={20} /></button>
+                    <div className="flex gap-1 md:gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+                        <button onClick={() => setViewMode('overview')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'overview' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Tổng quan"><LayoutDashboard size={18} /></button>
+                        <button onClick={() => setViewMode('calendar')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Lịch"><CalendarDays size={18} /></button>
+                        <button onClick={() => setViewMode('history')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'history' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Danh sách"><List size={18} /></button>
                     </div>
 
-                    {/* AI Analysis Button (Header) */}
                     {/* Buttons Group */}
                     <div className="flex flex-1 w-full md:w-auto gap-2">
-                        {/* AI Analysis Button (Distinct Purple/Pink) */}
+                        {/* AI Analysis Button */}
                         <button
                             onClick={handleAnalyzeFinance}
-                            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-[1.02] transition-all whitespace-nowrap"
+                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all whitespace-nowrap"
                         >
-                            <Sparkles size={18} className="text-yellow-300" />
-                            <span className="text-sm">Phân tích</span>
+                            <Sparkles size={16} className="text-yellow-300" />
+                            <span className="text-xs md:text-sm">Phân tích</span>
                         </button>
 
-                        {/* Add Transaction Button (Distinct Blue) */}
+                        {/* Add Transaction Button */}
                         <button
                             onClick={() => {
                                 setEditingTransaction(null);
@@ -750,17 +888,17 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                 setDesc('');
                                 setCategory(EXPENSE_CATEGORIES[0]);
                             }}
-                            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-[1.02] transition-all whitespace-nowrap"
+                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all whitespace-nowrap"
                         >
-                            <Plus size={20} />
-                            <span className="text-sm">Thêm Mới</span>
+                            <Plus size={18} />
+                            <span className="text-xs md:text-sm">Thêm Mới</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             {/* Main Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-6">
                 <div className="col-span-2 md:col-span-1 bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:border-indigo-200 transition-colors">
                     <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                     <div className="flex justify-between items-start relative z-10">
@@ -791,9 +929,10 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     </div>
                     <h3 className="text-base md:text-3xl font-bold text-red-500 truncate">{formatCurrency(stats.currentMonthExpense, lang)}</h3>
                 </div>
-
-                {/* AI Analysis Button */}
             </div>
+
+            {/* Budget Section */}
+            {renderBudgets()}
 
             {/* AI Analysis Modal */}
             {
@@ -1272,6 +1411,187 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         <button type="submit" className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg">Cập nhật</button>
                                     </div>
                                 </form>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Budget Modal */}
+            {
+                isBudgetModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                        <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="font-bold text-lg text-gray-800">{editingBudget ? 'Sửa Ngân sách' : 'Thiết lập Ngân sách'}</h3>
+                                    <p className="text-xs text-gray-500">Tháng {selectedMonth + 1}/{selectedYear}</p>
+                                </div>
+                                <button onClick={() => { setIsBudgetModalOpen(false); setEditingBudget(null); }}><X size={20} className="text-gray-400" /></button>
+                            </div>
+
+                            <form onSubmit={handleBudgetSubmit} className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-500 uppercase ml-1">Danh mục</label>
+                                    <select
+                                        value={selectedBudgetCategory}
+                                        onChange={(e) => setSelectedBudgetCategory(e.target.value)}
+                                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none mt-1 font-medium text-gray-700"
+                                        disabled={!!editingBudget} // Disable category change if editing
+                                    >
+                                        {expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-500 uppercase ml-1">Giới hạn chi tiêu</label>
+                                    <input
+                                        type="number"
+                                        autoFocus
+                                        value={budgetLimit}
+                                        onChange={(e) => setBudgetLimit(e.target.value)}
+                                        placeholder="0"
+                                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-lg font-bold mt-1"
+                                    />
+                                    <div className="flex justify-end mt-1 text-xs text-indigo-600 font-bold">
+                                        {budgetLimit && !isNaN(Number(budgetLimit)) && formatCurrency(Number(budgetLimit), lang)}
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsBudgetModalOpen(false); setEditingBudget(null); }}
+                                        className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition"
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition"
+                                    >
+                                        Lưu
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Budget Details Modal */}
+            {
+                selectedBudgetForDetails && (
+                    <div className="fixed inset-0 bg-black/50 z-[65] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                        <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl flex flex-col max-h-[90vh]">
+                            <div className="flex justify-between items-center mb-4 flex-shrink-0">
+                                <div>
+                                    <h3 className="font-bold text-lg text-gray-800">Chi tiết: {selectedBudgetForDetails.category}</h3>
+                                    <p className="text-xs text-gray-500">
+                                        {detailViewMonth ? `Tháng ${detailViewMonth.split('-')[1]}/${detailViewMonth.split('-')[0]}` : 'Lịch sử chi tiêu'}
+                                    </p>
+                                </div>
+                                <button onClick={() => { setSelectedBudgetForDetails(null); setDetailViewMonth(null); }}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+                            </div>
+
+                            {/* Chart Section */}
+                            <div className="h-48 mb-4 w-full flex-shrink-0">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={(() => {
+                                            const data = [];
+                                            // Show 6 months: 5 previous + current
+                                            for (let i = 5; i >= 0; i--) {
+                                                const d = new Date(selectedYear, selectedMonth - i, 1);
+                                                const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                                                const spent = transactions
+                                                    .filter(t => t.type === TransactionType.EXPENSE && t.category === selectedBudgetForDetails.category && t.date.startsWith(monthStr))
+                                                    .reduce((acc, t) => acc + t.amount, 0);
+                                                data.push({
+                                                    name: `T${d.getMonth() + 1}`,
+                                                    fullDate: monthStr,
+                                                    amount: spent
+                                                });
+                                            }
+                                            return data;
+                                        })()}
+                                        margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6B7280' }} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6B7280' }} tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : `${(val / 1000).toFixed(0)}k`} />
+                                        <Tooltip
+                                            formatter={(value) => formatCurrency(Number(value), lang)}
+                                            labelStyle={{ color: '#374151', fontWeight: 'bold' }}
+                                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                            cursor={{ fill: 'transparent' }}
+                                        />
+                                        <Bar
+                                            dataKey="amount"
+                                            radius={[4, 4, 0, 0]}
+                                            onClick={(data) => setDetailViewMonth(data.fullDate)}
+                                            cursor="pointer"
+                                        >
+                                            {
+                                                (() => {
+                                                    const data = [];
+                                                    for (let i = 5; i >= 0; i--) {
+                                                        const d = new Date(selectedYear, selectedMonth - i, 1);
+                                                        data.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+                                                    }
+                                                    return data;
+                                                })().map((entry, index) => (
+                                                    <Cell
+                                                        key={`cell-${index}`}
+                                                        fill={entry === detailViewMonth ? '#4F46E5' : '#E5E7EB'}
+                                                    />
+                                                ))
+                                            }
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            <div className="overflow-y-auto flex-1 pr-1 custom-scrollbar">
+                                {(() => {
+                                    const viewMonth = detailViewMonth || `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+                                    const details = transactions.filter(t =>
+                                        t.type === TransactionType.EXPENSE &&
+                                        t.category === selectedBudgetForDetails.category &&
+                                        t.date.startsWith(viewMonth)
+                                    ).sort((a, b) => b.date.localeCompare(a.date));
+
+                                    if (details.length === 0) {
+                                        return <p className="text-center text-gray-400 py-8">Không có giao dịch trong tháng {viewMonth.split('-')[1]}.</p>;
+                                    }
+
+                                    return (
+                                        <div className="space-y-3">
+                                            {details.map(t => (
+                                                <div key={t.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-gray-700">{t.description || 'Không có mô tả'}</div>
+                                                        <div className="text-xs text-gray-500">{t.date.split('-').reverse().join('/')}</div>
+                                                    </div>
+                                                    <span className="font-bold text-red-500 text-sm">
+                                                        -{formatCurrency(t.amount, lang)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center flex-shrink-0">
+                                <span className="text-sm font-medium text-gray-500">Tổng tháng {detailViewMonth ? detailViewMonth.split('-')[1] : String(selectedMonth + 1).padStart(2, '0')}</span>
+                                <span className="text-lg font-bold text-red-600">
+                                    {formatCurrency(
+                                        transactions
+                                            .filter(t => t.type === TransactionType.EXPENSE && t.category === selectedBudgetForDetails.category && t.date.startsWith(detailViewMonth || `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`))
+                                            .reduce((acc, t) => acc + t.amount, 0),
+                                        lang
+                                    )}
+                                </span>
                             </div>
                         </div>
                     </div>

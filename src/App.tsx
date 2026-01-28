@@ -89,6 +89,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     const [appState, setAppState] = useState<AppState>({
         transactions: INITIAL_TRANSACTIONS,
         budget: INITIAL_BUDGET,
+        budgets: [], // New Budget Configs
         timetable: [], // Khởi tạo rỗng, sẽ fetch từ Supabase
         todos: [],
         goals: INITIAL_GOALS,
@@ -124,13 +125,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             setIsLoadingData(true);
             try {
                 // Gọi song song 6 bảng dữ liệu (added calendar_events)
-                const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes] = await Promise.all([
+                const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes] = await Promise.all([
                     supabase.from('transactions').select('*').order('date', { ascending: false }),
                     supabase.from('goals').select('*').order('deadline', { ascending: true }),
                     supabase.from('timetable').select('*').order('start_time', { ascending: true }),
                     supabase.from('todos').select('*').order('created_at', { ascending: false }),
                     supabase.from('profiles').select('*').eq('id', user.id).single(),
-                    supabase.from('calendar_events').select('*') // No date filter = get all for now (simpler)
+                    supabase.from('calendar_events').select('*'), // No date filter = get all for now (simpler)
+                    supabase.from('budgets').select('*')
                 ]);
 
                 if (txRes.error) throw txRes.error;
@@ -151,6 +153,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         created_at: t.created_at
                     })),
                     goals: goalRes.data || [],
+                    budgets: budgetRes.data || [],
                     timetable: timeRes.data || [],
                     todos: todoRes.data || [],
                     profile: profileRes.data || null
@@ -635,6 +638,19 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             expenseCategories={allExpenseCategories}
                             incomeCategories={allIncomeCategories}
                             onAddCategory={handleAddCategory}
+                            onAddBudget={async (b) => {
+                                if (!user) return;
+                                const { data, error } = await supabase.from('budgets').insert([{ ...b, user_id: user.id }]).select().single();
+                                if (data) setAppState(prev => ({ ...prev, budgets: [...prev.budgets, data] }));
+                            }}
+                            onUpdateBudget={async (b) => {
+                                const { error } = await supabase.from('budgets').update(b).eq('id', b.id);
+                                if (!error) setAppState(prev => ({ ...prev, budgets: prev.budgets.map(item => item.id === b.id ? { ...item, ...b } : item) }));
+                            }}
+                            onDeleteBudget={async (id) => {
+                                const { error } = await supabase.from('budgets').delete().eq('id', id);
+                                if (!error) setAppState(prev => ({ ...prev, budgets: prev.budgets.filter(item => item.id !== id) }));
+                            }}
                         />
                     )}
                     {activeTab === 'schedule' && (
