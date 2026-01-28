@@ -41,3 +41,4 @@ Desktop.ini
 
 # Vercel (File cache của Vercel)
 .vercel
+venv/
