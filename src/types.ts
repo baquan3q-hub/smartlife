@@ -104,6 +104,7 @@ export interface Profile {
   savings_goal?: number;
   currency?: string;
   avatar_url?: string;
+  custom_categories?: { expense: string[]; income: string[] };
   updated_at?: string;
 }
 

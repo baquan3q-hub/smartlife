@@ -21,7 +21,7 @@ import { getToken, onMessage } from "firebase/messaging";
 
 // Types và Constants (Khớp với file đã sửa)
 import { AppState, Transaction, TaskPriority, SmartInsight } from './types';
-import { INITIAL_BUDGET, INITIAL_GOALS, INITIAL_TRANSACTIONS } from './constants';
+import { INITIAL_BUDGET, INITIAL_GOALS, INITIAL_TRANSACTIONS, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './constants';
 
 const RealtimeClock: React.FC = () => {
     const [time, setTime] = useState(new Date());
@@ -101,6 +101,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         // For now, let's keep it simple: Add to AppState to be cleaner.
     });
 
+    // Custom Category Management
+    const [customExpenseCats, setCustomExpenseCats] = useState<string[]>([]);
+    const [customIncomeCats, setCustomIncomeCats] = useState<string[]>([]);
+
+    const allExpenseCategories = [...EXPENSE_CATEGORIES, ...customExpenseCats];
+    const allIncomeCategories = [...INCOME_CATEGORIES, ...customIncomeCats];
+
     // Add separate state for events or extend AppState interface? 
     // Since AppState is in types.ts, let's just use a local state here for notification purposes 
     // OR just fetch in the effect.
@@ -148,6 +155,20 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     todos: todoRes.data || [],
                     profile: profileRes.data || null
                 }));
+
+                // Parse Custom Categories from Profile
+                if (profileRes.data?.custom_categories) {
+                    const customCats = profileRes.data.custom_categories;
+                    if (customCats.expense) setCustomExpenseCats(customCats.expense);
+                    if (customCats.income) setCustomIncomeCats(customCats.income);
+                } else {
+                    // Initialize if empty (migration helper)
+                    if (profileRes.data && !profileRes.data.custom_categories) {
+                        await supabase.from('profiles').update({
+                            custom_categories: { expense: [], income: [] }
+                        }).eq('id', user.id);
+                    }
+                }
 
                 if (eventsRes.data) {
                     setCalendarEvents(eventsRes.data);
@@ -314,6 +335,52 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         } catch (error) {
             alert('Lỗi xóa giao dịch.');
             setAppState((prev: AppState) => ({ ...prev, transactions: previousTransactions }));
+        }
+    };
+
+    // --- CATEGORY HANDLER ---
+    const handleAddCategory = async (type: 'expense' | 'income', newCategory: string) => {
+        if (!user || !newCategory.trim()) return;
+
+        // Anti-duplicate check
+        const currentList = type === 'expense' ? allExpenseCategories : allIncomeCategories;
+        if (currentList.includes(newCategory)) {
+            alert("Danh mục này đã tồn tại!");
+            return;
+        }
+
+        // Update Local State first
+        if (type === 'expense') setCustomExpenseCats(prev => [...prev, newCategory]);
+        else setCustomIncomeCats(prev => [...prev, newCategory]);
+
+        // Update Database
+        try {
+            const currentProfile = appState.profile;
+            const existingCustom = currentProfile?.custom_categories || { expense: [], income: [] };
+
+            const updatedCustom = {
+                ...existingCustom,
+                [type]: [...(existingCustom[type as keyof typeof existingCustom] || []), newCategory]
+            };
+
+            const { error } = await supabase.from('profiles').update({
+                custom_categories: updatedCustom
+            }).eq('id', user.id);
+
+            if (error) throw error;
+
+            // Update Profile in AppState to reflect changes
+            setAppState(prev => ({
+                ...prev,
+                profile: prev.profile ? { ...prev.profile, custom_categories: updatedCustom } : null
+            }));
+
+        } catch (error: any) {
+            console.error("Lỗi thêm danh mục:", error);
+            alert("Không thể lưu danh mục mới. Vui lòng thử lại.");
+            // Rollback local state
+            if (type === 'expense') setCustomExpenseCats(prev => prev.filter(c => c !== newCategory));
+            else setCustomIncomeCats(prev => prev.filter(c => c !== newCategory));
         }
     };
 
@@ -565,6 +632,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             onDeleteGoal={handleDeleteGoal}
                             isLoading={isLoadingData}
                             lang={lang}
+                            expenseCategories={allExpenseCategories}
+                            incomeCategories={allIncomeCategories}
+                            onAddCategory={handleAddCategory}
                         />
                     )}
                     {activeTab === 'schedule' && (

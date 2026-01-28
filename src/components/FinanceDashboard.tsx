@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, TransactionType, Transaction, Goal } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
 import { analyzeFinance } from '../services/aiService';
@@ -20,6 +20,10 @@ interface FinanceDashboardProps {
     onDeleteGoal: (id: string) => void;
     isLoading?: boolean;
     lang: 'vi' | 'en';
+    expenseCategories: string[];
+    incomeCategories: string[];
+    onAddCategory: (type: 'expense' | 'income', name: string) => void;
+    onDeleteCategory: (type: 'expense' | 'income', name: string) => void;
 }
 
 const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#14B8A6', '#F97316', '#64748B'];
@@ -105,7 +109,7 @@ const formatCurrency = (amount: number, lang: 'vi' | 'en') => {
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay(); // 0 = Sunday
 
-const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, isLoading, lang }) => {
+const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, isLoading, lang, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory }) => {
     const t = translations[lang];
     const { transactions } = state;
 
@@ -139,9 +143,26 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     // Form State
     const [amount, setAmount] = useState('');
     const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
-    const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
+    const [category, setCategory] = useState(expenseCategories[0]);
+
+    // Custom Category State
+    const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
     const [desc, setDesc] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
+    useEffect(() => {
+        // Reset category when modal opens or type changes
+        if (isModalOpen && !editingTransaction) {
+            setCategory((type === TransactionType.INCOME ? incomeCategories : expenseCategories)[0]);
+            setIsAddingNewCategory(false);
+            setNewCategoryName('');
+        }
+    }, [isModalOpen, type, editingTransaction, expenseCategories, incomeCategories]);
+
+    // History Filter State
+    const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+    const [showFilterMenu, setShowFilterMenu] = useState(false);
 
     // Balance Form State
     const [newBalance, setNewBalance] = useState('');
@@ -208,7 +229,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     }, [transactions, selectedMonth, selectedYear]);
 
     const financeContext = useMemo(() => {
-        const recentTx = transactions.slice(0, 50).map(t => ({
+        // Prepare Current Month Data for AI
+        const currentMonthTx = stats.currentMonthTransactions.map(t => ({
             d: t.date,
             c: t.category,
             a: t.amount,
@@ -216,16 +238,38 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             n: t.description
         }));
 
+        // Also keep recent global transactions for context if needed, but prioritize current month
+        const recentTx = transactions.slice(0, 20).map(t => ({ // Reduced to 20 to save tokens
+            d: t.date,
+            c: t.category,
+            a: t.amount,
+            t: t.type === TransactionType.INCOME ? 'Thu' : 'Chi',
+            n: t.description
+        }));
+
+        const upcomingEvents = state.timetable
+            ? state.timetable
+                .filter(t => new Date(t.start_time) >= new Date())
+                .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+                .slice(0, 5)
+                .map(e => ({ title: e.title, time: e.start_time, loc: e.location }))
+            : [];
+
         return JSON.stringify({
-            summary: {
+            context_info: {
+                current_view: `Tháng ${selectedMonth + 1}/${selectedYear}`,
                 balance: stats.totalBalance,
+            },
+            current_month_data: {
                 income: stats.currentMonthIncome,
                 expense: stats.currentMonthExpense,
-                top_cats: stats.categoryData.slice(0, 3).map(c => c.name)
+                transactions: currentMonthTx
             },
-            recent_transactions: recentTx
+            recent_transactions: recentTx,
+            goals: state.goals || [],
+            upcoming_schedule: upcomingEvents
         });
-    }, [stats, transactions]);
+    }, [stats, transactions, state.goals, state.timetable, selectedMonth, selectedYear]);
 
 
     // --- Handlers ---
@@ -243,12 +287,24 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         e.preventDefault();
         if (!amount) return;
 
+        let finalCategory = category;
+
+        // Handle Custom Category Creation
+        if (isAddingNewCategory) {
+            if (!newCategoryName.trim()) {
+                alert("Vui lòng nhập tên danh mục mới!");
+                return;
+            }
+            onAddCategory(type === TransactionType.INCOME ? 'income' : 'expense', newCategoryName.trim());
+            finalCategory = newCategoryName.trim();
+        }
+
         if (editingTransaction) {
             // Mode: Update
             onUpdateTransaction({
                 ...editingTransaction,
                 amount: Number(amount),
-                category: category,
+                category: finalCategory,
                 date: date,
                 type: type,
                 description: desc
@@ -257,7 +313,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             // Mode: Create
             onAddTransaction({
                 amount: Number(amount),
-                category: category,
+                category: finalCategory,
                 date: date,
                 type: type,
                 description: desc || (type === TransactionType.INCOME ? 'Thu nhập' : 'Chi tiêu')
@@ -268,6 +324,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         setEditingTransaction(null);
         setAmount('');
         setDesc('');
+        setIsAddingNewCategory(false);
+        setNewCategoryName('');
     };
 
     const handleUpdateBalance = (e: React.FormEvent) => {
@@ -498,55 +556,154 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         );
     };
 
-    const renderHistory = () => (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100">
-                <h3 className="font-bold text-lg text-gray-800">Toàn bộ Lịch sử Giao dịch</h3>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                        <tr>
-                            <th className="px-6 py-4 font-semibold">Ngày</th>
-                            <th className="px-6 py-4 font-semibold">Danh mục</th>
-                            <th className="px-6 py-4 font-semibold">Mô tả (Ghi chú)</th>
-                            <th className="px-6 py-4 font-semibold text-right">Số tiền</th>
-                            <th className="px-6 py-4 font-semibold text-center">Hành động</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {transactions.map(t => (
-                            <tr key={t.id} className="hover:bg-gray-50 transition-colors group">
-                                <td className="px-6 py-4 text-sm text-gray-600 font-medium whitespace-nowrap">{t.date}</td>
-                                <td className="px-6 py-4">
-                                    <span className={`px-2 py-1 rounded text-xs font-medium ${t.type === TransactionType.INCOME ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                        {t.category}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate" title={t.description}>
-                                    {t.description}
-                                </td>
-                                <td className={`px-6 py-4 text-right font-bold text-sm ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-gray-900'}`}>
-                                    {t.type === TransactionType.INCOME ? '+' : '-'}{formatCurrency(t.amount, lang)}
-                                </td>
-                                <td className="px-6 py-4 text-center flex justify-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => openEditModal(t)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all" title="Sửa">
-                                        <Edit2 size={16} />
-                                    </button>
-                                    <button onClick={() => onDeleteTransaction(t.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all" title="Xóa">
-                                        <Trash2 size={16} />
-                                    </button>
-                                </td>
+    const renderHistory = () => {
+        // Filter transactions for history view
+        const filteredTransactions = transactions.filter(t => {
+            // Filter by Month/Year (reuse selectedMonth/Year from global state or allow independent?) 
+            // User requested "Lịch sử chi tiêu" inside "Chi tiết", likely wants to see everything or filter specifically.
+            // Let's use the global selectedMonth/Year for consistency with the rest of the dashboard,
+            // BUT allow "All Time" or specific filtering if needed. 
+            // For now, let's stick to the Global Month Filter for date, and add Category Filter.
+
+            const d = new Date(t.date);
+            const matchMonth = d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+
+            // However, user might want to see ALL history. 
+            // Let's add a toggle or just use the separate filter state if we want robust filtering.
+            // Simplified: Use the global month filter for now, as that's the dashboard's context. 
+            // If user wants "All", they might expect a separate page, but here we are in a dashboard view.
+
+            // UPDATE: Making it strictly based on the requested "Phễu để lọc".
+            // Let's filter by the Global Month FIRST, then apply Category.
+
+            const matchCategory = selectedCategoryFilter === 'all' || t.category === selectedCategoryFilter;
+
+            return matchMonth && matchCategory;
+        });
+
+        const totalFilteredIncome = filteredTransactions.filter(t => t.type === TransactionType.INCOME && t.category !== 'Điều chỉnh số dư').reduce((a, b) => a + b.amount, 0);
+        const totalFilteredExpense = filteredTransactions.filter(t => t.type === TransactionType.EXPENSE && t.category !== 'Điều chỉnh số dư').reduce((a, b) => a + b.amount, 0);
+
+        return (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade-in">
+                <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h3 className="font-bold text-lg text-gray-800">Chi tiết Giao dịch (Tháng {selectedMonth + 1}/{selectedYear})</h3>
+                        <div className="flex gap-3 mt-1 text-sm">
+                            <span className="text-emerald-600 font-medium">Thu: {formatCurrency(totalFilteredIncome, lang)}</span>
+                            <span className="text-gray-300">|</span>
+                            <span className="text-red-500 font-medium">Chi: {formatCurrency(totalFilteredExpense, lang)}</span>
+                        </div>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="flex items-center gap-2 relative">
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowFilterMenu(!showFilterMenu)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${selectedCategoryFilter !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                            >
+                                <Filter size={16} />
+                                <span>
+                                    {selectedCategoryFilter === 'all' ? 'Tất cả danh mục' : selectedCategoryFilter}
+                                </span>
+                                <ChevronDown size={14} />
+                            </button>
+
+                            {showFilterMenu && (
+                                <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setShowFilterMenu(false)}></div>
+                                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-20 max-h-80 overflow-y-auto py-1">
+                                        <button
+                                            onClick={() => { setSelectedCategoryFilter('all'); setShowFilterMenu(false); }}
+                                            className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedCategoryFilter === 'all' ? 'font-bold text-indigo-600 bg-indigo-50' : 'text-gray-700'}`}
+                                        >
+                                            Tất cả danh mục
+                                        </button>
+                                        <div className="my-1 border-t border-gray-100"></div>
+                                        <div className="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider">Chi tiêu</div>
+                                        {expenseCategories.map(cat => (
+                                            <button
+                                                key={cat}
+                                                onClick={() => { setSelectedCategoryFilter(cat); setShowFilterMenu(false); }}
+                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedCategoryFilter === cat ? 'font-bold text-indigo-600 bg-indigo-50' : 'text-gray-700'}`}
+                                            >
+                                                {cat}
+                                            </button>
+                                        ))}
+                                        <div className="my-1 border-t border-gray-100"></div>
+                                        <div className="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider">Thu nhập</div>
+                                        {incomeCategories.map(cat => (
+                                            <button
+                                                key={cat}
+                                                onClick={() => { setSelectedCategoryFilter(cat); setShowFilterMenu(false); }}
+                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedCategoryFilter === cat ? 'font-bold text-indigo-600 bg-indigo-50' : 'text-gray-700'}`}
+                                            >
+                                                {cat}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                            <tr>
+                                <th className="px-6 py-4 font-semibold">Ngày</th>
+                                <th className="px-6 py-4 font-semibold">Danh mục</th>
+                                <th className="px-6 py-4 font-semibold">Mô tả (Ghi chú)</th>
+                                <th className="px-6 py-4 font-semibold text-right">Số tiền</th>
+                                <th className="px-6 py-4 font-semibold text-center">Hành động</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {transactions.length === 0 && (
-                    <div className="p-8 text-center text-gray-500 text-sm">Chưa có giao dịch nào.</div>
-                )}
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {filteredTransactions.map(t => (
+                                <tr key={t.id} className="hover:bg-gray-50 transition-colors group">
+                                    <td className="px-6 py-4 text-sm text-gray-600 font-medium whitespace-nowrap">{t.date}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-1 rounded text-xs font-medium ${t.type === TransactionType.INCOME ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                                            {t.category}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate" title={t.description}>
+                                        {t.description}
+                                    </td>
+                                    <td className={`px-6 py-4 text-right font-bold text-sm ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-gray-900'}`}>
+                                        {t.type === TransactionType.INCOME ? '+' : '-'}{formatCurrency(t.amount, lang)}
+                                    </td>
+                                    <td className="px-6 py-4 text-center flex justify-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => openEditModal(t)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all" title="Sửa">
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button onClick={() => onDeleteTransaction(t.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all" title="Xóa">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {filteredTransactions.length === 0 && (
+                        <div className="p-12 text-center flex flex-col items-center justify-center text-gray-400">
+                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                                <SearchOffIcon />
+                            </div>
+                            <p className="text-sm font-medium">Không tìm thấy giao dịch nào</p>
+                            <p className="text-xs mt-1">Thử thay đổi bộ lọc hoặc tháng hiển thị</p>
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
+
+    // Helper icon for empty state
+    const SearchOffIcon = () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13.5 8.5-5 5" /><path d="m8.5 8.5 5 5" /><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+    )
 
     return (
         <div className="space-y-6 animate-fade-in pb-20">
@@ -619,15 +776,19 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     </div>
                 </div>
 
-                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
+                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group">
                     <div className="flex justify-between items-center mb-1">
                         <p className="text-gray-500 font-medium text-[10px] md:text-base">Thu nhập tháng {selectedMonth + 1}</p>
+                        <button onClick={() => setViewMode('history')} className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition-colors opacity-0 group-hover:opacity-100">Chi tiết</button>
                     </div>
                     <h3 className="text-base md:text-3xl font-bold text-emerald-600 truncate">{formatCurrency(stats.currentMonthIncome, lang)}</h3>
                 </div>
 
-                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
-                    <p className="text-gray-500 font-medium mb-1 text-[10px] md:text-base">Chi tiêu tháng {selectedMonth + 1}</p>
+                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group">
+                    <div className="flex justify-between items-center mb-1">
+                        <p className="text-gray-500 font-medium text-[10px] md:text-base">Chi tiêu tháng {selectedMonth + 1}</p>
+                        <button onClick={() => setViewMode('history')} className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition-colors opacity-0 group-hover:opacity-100">Chi tiết</button>
+                    </div>
                     <h3 className="text-base md:text-3xl font-bold text-red-500 truncate">{formatCurrency(stats.currentMonthExpense, lang)}</h3>
                 </div>
 
@@ -1033,9 +1194,34 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-gray-500 uppercase ml-1">Danh mục</label>
-                                        <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
-                                            {(type === TransactionType.INCOME ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+                                        <select
+                                            value={isAddingNewCategory ? 'NEW_CATEGORY' : category}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val === 'NEW_CATEGORY') {
+                                                    setIsAddingNewCategory(true);
+                                                    setCategory('');
+                                                } else {
+                                                    setIsAddingNewCategory(false);
+                                                    setCategory(val);
+                                                }
+                                            }}
+                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                                        >
+                                            {(type === TransactionType.INCOME ? incomeCategories : expenseCategories).map(c => <option key={c} value={c}>{c}</option>)}
+                                            <option value="NEW_CATEGORY" className="font-bold text-indigo-600">+ Thêm danh mục mới...</option>
                                         </select>
+
+                                        {isAddingNewCategory && (
+                                            <input
+                                                type="text"
+                                                autoFocus
+                                                value={newCategoryName}
+                                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                                className="w-full p-3 mt-2 bg-indigo-50 border-2 border-indigo-200 rounded-xl outline-none text-indigo-700 placeholder-indigo-300 font-medium animate-fade-in"
+                                                placeholder="Nhập tên danh mục mới..."
+                                            />
+                                        )}
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-gray-500 uppercase ml-1">Ngày</label>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Send, Minimize2, MessageCircle, Loader2 } from 'lucide-react';
+import { Bot, Send, Minimize2, MessageCircle, Loader2, Maximize2 } from 'lucide-react';
 import { chatWithFinanceAdvisor } from '../services/aiService';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -23,6 +23,8 @@ const FinanceAI: React.FC<FinanceAIProps> = ({ context }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Draggable Logic
+    const [isExpanded, setIsExpanded] = useState(false);
+
     // Initial position is 0,0 relative to its fixed position (bottom-28 right-6)
     // We want to track position relative to viewport or just keep using offset.
     // Using offset is easier but for bounds checking we need window dims.
@@ -38,6 +40,7 @@ const FinanceAI: React.FC<FinanceAIProps> = ({ context }) => {
     }, []);
 
     const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+        if (isExpanded) return; // Disable drag in fullscreen
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
@@ -47,7 +50,7 @@ const FinanceAI: React.FC<FinanceAIProps> = ({ context }) => {
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent | TouchEvent) => {
-            if (!isDragging) return;
+            if (!isDragging || isExpanded) return;
 
             // Prevent default behavior (scrolling) only when dragging
             if (e.cancelable) e.preventDefault();
@@ -133,7 +136,7 @@ const FinanceAI: React.FC<FinanceAIProps> = ({ context }) => {
             window.removeEventListener('touchmove', handleMouseMove);
             window.removeEventListener('touchend', handleMouseUp);
         };
-    }, [isDragging, windowSize]); // Add windowSize dependency
+    }, [isDragging, windowSize, isExpanded]); // Add windowSize dependency
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -141,7 +144,7 @@ const FinanceAI: React.FC<FinanceAIProps> = ({ context }) => {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, isOpen]);
+    }, [messages, isOpen, isExpanded]);
 
     const handleSend = async (messageText?: string | React.MouseEvent) => {
         const textToSend = (typeof messageText === 'string' ? messageText : input).trim();
@@ -185,76 +188,94 @@ const FinanceAI: React.FC<FinanceAIProps> = ({ context }) => {
         }
     };
 
+    // Container Classes depending on state
+    const containerClasses = isExpanded
+        ? 'fixed inset-0 w-full h-full rounded-none z-[100] m-0 top-0 left-0' // Fullscreen
+        : isOpen
+            ? 'w-[400px] h-[600px] opacity-100 scale-100 mb-4' // Big Default
+            : 'w-0 h-0 opacity-0 scale-90 mb-0'; // Closed
+
     return (
         <div
-            className={`fixed bottom-28 right-6 z-50 flex flex-col items-end pointer-events-none transition-transform duration-300 ease-out`} // Added transition for smooth snap
+            className={`fixed bottom-28 right-6 z-50 flex flex-col items-end pointer-events-none transition-transform duration-300 ease-out ${isExpanded ? 'right-0 bottom-0 !transform-none' : ''}`} // Reset transform in fullscreen
             style={{
-                transform: `translate(${position.x}px, ${position.y}px)`,
+                transform: isExpanded ? 'none' : `translate(${position.x}px, ${position.y}px)`,
                 touchAction: 'none',
-                transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1)' // Disable transition during drag
+                transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1)'
             }}
         >
             {/* Chat Window */}
             <div
                 className={`
-                    bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden 
+                    bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col
                     transition-all duration-300 ease-in-out origin-bottom-right pointer-events-auto
-                    ${isOpen ? 'w-[350px] h-[500px] opacity-100 scale-100 mb-4' : 'w-0 h-0 opacity-0 scale-90 mb-0'}
+                    ${containerClasses}
                 `}
             >
                 {/* Header - Draggable */}
                 <div
                     onMouseDown={handleDragStart}
                     onTouchStart={handleDragStart}
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex justify-between items-center text-white cursor-move select-none"
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex justify-between items-center text-white cursor-move select-none shrink-0"
                     style={{ touchAction: 'none' }}
                 >
-                    <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-white/20 rounded-lg">
-                            <Bot size={20} className="text-white" />
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white/20 rounded-xl">
+                            <Bot size={24} className="text-white" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-sm">Trợ lý Tài chính</h3>
-                            <div className="flex items-center gap-1">
-                                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                                <span className="text-[10px] text-white/80">Online</span>
+                            <h3 className="font-bold text-base">Trợ lý Tài chính</h3>
+                            <div className="flex items-center gap-1.5">
+                                <span className={`w-2.5 h-2.5 rounded-full ${isLoading ? 'bg-yellow-400 animate-bounce' : 'bg-green-400 animate-pulse'}`}></span>
+                                <span className="text-xs text-indigo-50 font-medium">{isLoading ? 'Đang suy nghĩ...' : 'Sẵn sàng hỗ trợ'}</span>
                             </div>
                         </div>
                     </div>
-                    <button
-                        onClick={() => setIsOpen(false)}
-                        className="p-1 hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                    >
-                        <Minimize2 size={18} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="p-2 hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+                            title={isExpanded ? "Thu nhỏ" : "Phóng to"}
+                            onMouseDown={(e) => e.stopPropagation()}
+                        >
+                            {isExpanded ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                        </button>
+                        <button
+                            onClick={() => { setIsOpen(false); setIsExpanded(false); }}
+                            className="p-2 hover:bg-red-500 rounded-lg transition-colors cursor-pointer ml-1"
+                            title="Đóng chat"
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                        >
+                            <Minimize2 size={20} className="rotate-45" /> {/* Use X icon logic or similar */}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 h-[380px] bg-gray-50 scrollbar-thin">
+                <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-gray-50 scrollbar-thin">
                     {messages.map((msg, idx) => (
                         <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                             <div
                                 className={`
-                                    max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed
+                                    max-w-[85%] p-4 rounded-2xl text-[15px] leading-relaxed shadow-sm
                                     ${msg.role === 'user'
                                         ? 'bg-indigo-600 text-white rounded-tr-none'
-                                        : 'bg-white text-gray-700 border border-gray-100 shadow-sm rounded-tl-none'}
+                                        : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'}
                                 `}
                             >
                                 <ReactMarkdown
                                     components={{
-                                        strong: ({ node, ...props }) => <span className="font-bold text-indigo-600" {...props} />,
-                                        ul: ({ node, ...props }) => <ul className="list-disc pl-4 my-1 space-y-1" {...props} />,
-                                        li: ({ node, ...props }) => <li className="marker:text-indigo-600" {...props} />,
-                                        p: ({ node, ...props }) => <p className="mb-1 last:mb-0" {...props} />,
-                                        table: ({ node, ...props }) => <div className="overflow-x-auto my-2"><table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg" {...props} /></div>,
-                                        thead: ({ node, ...props }) => <thead className="bg-gray-50" {...props} />,
-                                        tbody: ({ node, ...props }) => <tbody className="bg-white divide-y divide-gray-200" {...props} />,
+                                        strong: ({ node, ...props }) => <span className={`font-bold ${msg.role === 'user' ? 'text-white' : 'text-indigo-700'}`} {...props} />,
+                                        ul: ({ node, ...props }) => <ul className="list-disc pl-5 my-2 space-y-1" {...props} />,
+                                        li: ({ node, ...props }) => <li className="marker:text-current" {...props} />,
+                                        p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                        table: ({ node, ...props }) => <div className="overflow-x-auto my-3"><table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg bg-gray-50/50" {...props} /></div>,
+                                        thead: ({ node, ...props }) => <thead className="bg-gray-100" {...props} />,
+                                        tbody: ({ node, ...props }) => <tbody className="divide-y divide-gray-200" {...props} />,
                                         tr: ({ node, ...props }) => <tr className="" {...props} />,
-                                        th: ({ node, ...props }) => <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200" {...props} />,
-                                        td: ({ node, ...props }) => <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 border-b border-gray-100" {...props} />
+                                        th: ({ node, ...props }) => <th className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200" {...props} />,
+                                        td: ({ node, ...props }) => <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700" {...props} />
                                     }}
                                     remarkPlugins={[remarkGfm]}
                                 >
@@ -265,14 +286,14 @@ const FinanceAI: React.FC<FinanceAIProps> = ({ context }) => {
                     ))}
 
                     {messages.length === 1 && (
-                        <div className="flex flex-col gap-2 p-2">
-                            <p className="text-xs text-gray-400 font-medium ml-1">Đề xuất câu hỏi:</p>
-                            <div className="flex flex-wrap gap-2">
-                                {["Phân tích chi tiêu 📊", "Tối ưu hóa chi tiêu 💡", "Làm sao để tiết kiệm? 💰"].map((text, i) => (
+                        <div className="mt-4 px-2">
+                            <p className="text-sm text-gray-500 font-medium mb-3 ml-1">Gợi ý câu hỏi:</p>
+                            <div className="flex gap-2 flex-wrap">
+                                {["Phân tích chi tiêu tháng này 📊", "Tôi nên cắt giảm khoản nào? ✂️", "Lập kế hoạch tiết kiệm 💰", "Dự báo tuần tới 🔮"].map((text, i) => (
                                     <button
                                         key={i}
                                         onClick={() => handleSend(text)}
-                                        className="bg-white border border-indigo-100 text-indigo-600 text-xs px-3 py-2 rounded-full hover:bg-indigo-50 transition-colors shadow-sm text-left"
+                                        className="bg-white border border-indigo-100 text-indigo-700 text-sm px-4 py-2.5 rounded-xl hover:bg-indigo-50 hover:border-indigo-200 transition-all shadow-sm active:scale-95"
                                     >
                                         {text}
                                     </button>
@@ -280,11 +301,12 @@ const FinanceAI: React.FC<FinanceAIProps> = ({ context }) => {
                             </div>
                         </div>
                     )}
+
                     {isLoading && (
-                        <div className="flex justify-start">
-                            <div className="bg-white p-3 rounded-2xl rounded-tl-none border border-gray-100 shadow-sm flex items-center gap-2">
-                                <Loader2 size={16} className="animate-spin text-indigo-600" />
-                                <span className="text-xs text-gray-400">Đang trả lời...</span>
+                        <div className="flex justify-start animate-fade-in">
+                            <div className="bg-white p-4 rounded-2xl rounded-tl-none border border-gray-100 shadow-sm flex items-center gap-3">
+                                <Loader2 size={18} className="animate-spin text-indigo-600" />
+                                <span className="text-sm text-gray-500 font-medium">Đang phân tích dữ liệu...</span>
                             </div>
                         </div>
                     )}
@@ -292,59 +314,61 @@ const FinanceAI: React.FC<FinanceAIProps> = ({ context }) => {
                 </div>
 
                 {/* Input Area */}
-                <div className="p-3 border-t border-gray-100 bg-white">
-                    <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                <div className="p-4 border-t border-gray-100 bg-white shrink-0">
+                    <div className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-2xl border border-gray-200 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-50/50 transition-all shadow-sm">
                         <input
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyPress}
-                            placeholder="Hỏi về tài chính..."
-                            className="flex-1 bg-transparent border-none outline-none text-sm text-gray-700 min-w-0"
+                            placeholder="Nhập câu hỏi của bạn..."
+                            className="flex-1 bg-transparent border-none outline-none text-base text-gray-800 min-w-0 px-2 py-1"
                             disabled={isLoading}
                         />
                         <button
-                            onClick={handleSend}
+                            onClick={() => handleSend()}
                             disabled={!input.trim() || isLoading}
-                            className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className={`
+                                p-3 rounded-xl transition-all duration-300 transform active:scale-90
+                                ${input.trim() && !isLoading ? 'bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 hover:shadow-xl' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
+                            `}
                         >
-                            <Send size={16} />
+                            <Send size={20} className={isLoading ? 'opacity-0' : 'opacity-100'} />
+                            {isLoading && <Loader2 size={20} className="animate-spin absolute top-3 left-3" />}
                         </button>
                     </div>
                 </div>
             </div>
 
             {/* Toggle Button - Draggable */}
-            <div
-                className="pointer-events-auto active:cursor-grabbing hover:cursor-grab touch-none"
-                style={{ touchAction: 'none' }}
-                onMouseDown={handleDragStart}
-                onTouchStart={handleDragStart}
-            >
-                <button
-                    onClick={(e) => {
-                        // If we dragged, don't toggle? 
-                        // Actually, if we use a wrapper div for drag events, the button onClick might still trigger.
-                        // Let's use a simple heuristic: if isDragging was true recently...
-                        // But isDragging is false on mouseUp.
-                        if (!isDragging) setIsOpen(!isOpen);
-                    }}
-                    className={`
-                        flex items-center justify-center w-14 h-14 rounded-full shadow-xl 
-                        transition-all duration-300 transform hover:scale-105 active:scale-95
-                        ${isOpen ? 'bg-gray-200 text-gray-600 rotate-90 opacity-0 pointer-events-none' : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'}
-                    `}
-                    style={{ display: isOpen ? 'none' : 'flex' }}
+            {!isExpanded && (
+                <div
+                    className="pointer-events-auto active:cursor-grabbing hover:cursor-grab touch-none"
+                    style={{ touchAction: 'none' }}
+                    onMouseDown={handleDragStart}
+                    onTouchStart={handleDragStart}
                 >
-                    <div className="relative">
-                        <Bot size={28} />
-                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                        </span>
-                    </div>
-                </button>
-            </div>
+                    <button
+                        onClick={(e) => {
+                            if (!isDragging) setIsOpen(!isOpen);
+                        }}
+                        className={`
+                            flex items-center justify-center w-16 h-16 rounded-full shadow-2xl border-4 border-white
+                            transition-all duration-500 transform hover:scale-110 active:scale-95
+                            ${isOpen ? 'bg-gray-100 text-gray-400 rotate-180 opacity-0 pointer-events-none scale-50' : 'bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 text-white'}
+                        `}
+                        style={{ display: isOpen ? 'none' : 'flex' }}
+                    >
+                        <div className="relative">
+                            <Bot size={32} />
+                            <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500 border-2 border-white"></span>
+                            </span>
+                        </div>
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
