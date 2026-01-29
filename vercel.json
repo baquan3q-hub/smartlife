@@ -1,9 +1,4 @@
 {
-    "functions": {
-        "api/**/*.py": {
-            "runtime": "vercel-python@0.8.0"
-        }
-    },
     "rewrites": [
         {
             "source": "/api/(.*)",
