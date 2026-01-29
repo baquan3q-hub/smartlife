@@ -49,6 +49,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   onAddTodo, onUpdateTodo, onDeleteTodo
 }) => {
   const { timetable, goals, todos } = state;
+  const { timer, onOpenMusic } = state as any;
 
   // Modals
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -610,7 +611,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
           {renderTodos()}
 
           {/* 2. Focus Timer */}
-          <FocusTimer />
+          <FocusTimer timer={timer} onOpenMusic={onOpenMusic} />
 
 
           {/* 3. Goals */}

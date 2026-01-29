@@ -4,7 +4,7 @@ echo   KHOI DONG HE THONG SMARTLIFE (AI + WEB)
 echo ===================================================
 
 echo 1. Kich hoat hiep si AI (Backend)...
-start "SmartLife AI Backend" cmd /k "call venv\Scripts\activate && python -m uvicorn smart_backend.main:app --reload --port 8000"
+start "SmartLife AI Backend" cmd /k "call venv\Scripts\activate && python -m uvicorn src.main:app --reload --port 8000"
 
 echo 2. Kich hoat giao dien Web (Frontend)...
 start "SmartLife Web App" cmd /k "npm run dev"

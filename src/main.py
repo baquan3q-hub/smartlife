@@ -54,18 +54,21 @@ class Transaction(BaseModel):
     date: str
     type: str # 'income' or 'expense'
 
-class AnalysisRequest(BaseModel):
-    transactions: List[Transaction]
-    user_goal: Optional[str] = None
 
 class ChatRequest(BaseModel):
     message: str
     history: List[dict] = []
     context: Optional[str] = ""
 
+class AnalysisRequest(BaseModel):
+    transactions: List[Transaction]
+    user_goal: Optional[str] = None
+
 class CommandRequest(BaseModel):
     command: str
     current_date: str
+
+
 
 # --- ROUTES ---
 

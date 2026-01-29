@@ -9,6 +9,7 @@ import VisualBoard from './components/VisualBoard';
 import SettingsModal from './components/SettingsModal';
 import Login from './components/Login';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import MusicSpace from './components/MusicSpace';
 
 // Context và Service
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -18,6 +19,7 @@ import { generateInsights } from './services/smartEngine';
 import InsightCard from './components/InsightCard';
 import { messaging } from './services/firebase';
 import { getToken, onMessage } from "firebase/messaging";
+import { useFocusTimer } from './hooks/useFocusTimer';
 
 // Types và Constants (Khớp với file đã sửa)
 import { AppState, Transaction, TaskPriority, SmartInsight } from './types';
@@ -62,10 +64,12 @@ interface AuthenticatedAppProps {
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) => {
     const { user, signOut } = useAuth();
-    const [activeTab, setActiveTab] = useState<'finance' | 'schedule' | 'visual'>('finance');
+    const [activeTab, setActiveTab] = useState<'finance' | 'schedule' | 'visual' | 'music'>('finance');
     const [isLoadingData, setIsLoadingData] = useState(false);
-
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    // Shared Focus Timer Engine
+    const timer = useFocusTimer();
 
     // Notification State
     const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
@@ -699,10 +703,21 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     )}
                     {activeTab === 'schedule' && (
                         <ScheduleDashboard
-                            state={appState}
+                            state={{ ...appState, timer, onOpenMusic: () => setActiveTab('music') } as any}
                             onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
                             onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
                             onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo}
+                        />
+                    )}
+                    {activeTab === 'music' && (
+                        <MusicSpace
+                            onBack={() => setActiveTab('schedule')}
+                            timer={timer}
+                            formatTime={(s) => {
+                                const m = Math.floor(s / 60);
+                                const sec = s % 60;
+                                return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+                            }}
                         />
                     )}
                 </div>

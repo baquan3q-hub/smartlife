@@ -42,3 +42,6 @@ Desktop.ini
 # Vercel (File cache của Vercel)
 .vercel
 venv/
+
+# Large Media Files (Avoid GitHub 100MB limit)
+public/music/chill-music.mp3

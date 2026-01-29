@@ -1,12 +1,9 @@
 import { Transaction } from '../types';
 
 const getApiUrl = () => {
-    // If VITE_API_URL is set, use it
-    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-
-    // Otherwise, construct based on current window location
-    // This allows it to work on "localhost" OR "192.168.x.x" (Mobile)
-    return `http://${window.location.hostname}:8000`;
+    // For local development with Vite proxy or Vercel production
+    // Using relative path '/api' ensures compatibility across environments
+    return '/api';
 };
 
 const API_URL = getApiUrl();

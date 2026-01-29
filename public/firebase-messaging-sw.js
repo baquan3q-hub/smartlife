@@ -16,9 +16,9 @@ const messaging = firebase.messaging();
 
 // Quan trọng: Hàm này giúp hiện thông báo khi thoát app
 messaging.onBackgroundMessage((payload) => {
-    const notificationTitle = payload.notification.title || "Thông báo mới";
+    const notificationTitle = payload.notification.title || "Alo Cậu ới !!!";
     const notificationOptions = {
-        body: payload.notification.body || "Bạn có tin nhắn từ SmartLifeApp",
+        body: payload.notification.body || "Bùi Quân mới gửi bạn 1 tin nhắn nè",
         icon: '/logo192.png' // Icon này phải có trong thư mục public
     };
 
