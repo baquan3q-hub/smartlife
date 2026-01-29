@@ -240,46 +240,27 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     }, [transactions, selectedMonth, selectedYear]);
 
     const financeContext = useMemo(() => {
-        // Prepare Current Month Data for AI
-        const currentMonthTx = stats.currentMonthTransactions.map(t => ({
-            d: t.date,
-            c: t.category,
-            a: t.amount,
-            t: t.type === TransactionType.INCOME ? 'Thu' : 'Chi',
-            n: t.description
-        }));
-
-        // Also keep recent global transactions for context if needed, but prioritize current month
-        const recentTx = transactions.slice(0, 20).map(t => ({ // Reduced to 20 to save tokens
-            d: t.date,
-            c: t.category,
-            a: t.amount,
-            t: t.type === TransactionType.INCOME ? 'Thu' : 'Chi',
-            n: t.description
-        }));
-
-        const upcomingEvents = state.timetable
-            ? state.timetable
-                .filter(t => new Date(t.start_time) >= new Date())
-                .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
-                .slice(0, 5)
-                .map(e => ({ title: e.title, time: e.start_time, loc: e.location }))
-            : [];
+        // Prepare ALL Data for AI (We send ALL history for "Expert" analysis)
+        const allTx = transactions
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Newest first
+            .map(t => ({
+                d: t.date,
+                c: t.category,
+                a: t.amount,
+                t: t.type === TransactionType.INCOME ? 'Thu' : 'Chi',
+                n: t.description
+            }));
 
         return JSON.stringify({
-            context_info: {
-                current_view: `Tháng ${selectedMonth + 1}/${selectedYear}`,
+            summary: {
                 balance: stats.totalBalance,
+                this_month_income: stats.currentMonthIncome,
+                this_month_expense: stats.currentMonthExpense
             },
-            current_month_data: {
-                income: stats.currentMonthIncome,
-                expense: stats.currentMonthExpense,
-                transactions: currentMonthTx
-            },
-            recent_transactions: recentTx,
-            goals: state.goals || [],
-            upcoming_schedule: upcomingEvents
+            recent_transactions: allTx // AI instructions expect this key
         });
+
+
     }, [stats, transactions, state.goals, state.timetable, selectedMonth, selectedYear]);
 
 
@@ -752,7 +733,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             {showFilterMenu && (
                                 <>
                                     <div className="fixed inset-0 z-10" onClick={() => setShowFilterMenu(false)}></div>
-                                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-20 max-h-80 overflow-y-auto py-1">
+                                    <div className="absolute left-0 md:left-auto md:right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-20 max-h-80 overflow-y-auto py-1">
                                         <button
                                             onClick={() => { setSelectedCategoryFilter('all'); setShowFilterMenu(false); }}
                                             className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedCategoryFilter === 'all' ? 'font-bold text-indigo-600 bg-indigo-50' : 'text-gray-700'}`}
@@ -1005,8 +986,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                             <h3 className="text-lg font-bold text-gray-800 mb-6">Biểu đồ Thu - Chi 6 tháng gần nhất</h3>
-                            <div className="h-64 md:h-80">
-                                <ResponsiveContainer width="100%" height="100%">
+                            <div className="h-64 md:h-80 w-full" style={{ minHeight: '300px' }}>
+                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                     <BarChart data={stats.monthlyChartData} barGap={8}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} dy={10} />
@@ -1023,9 +1004,9 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         <div className="space-y-6">
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                 <h3 className="text-lg font-bold text-gray-800 mb-2">Cơ cấu chi tiêu tháng {selectedMonth + 1}</h3>
-                                <div className="h-48 relative">
+                                <div className="h-48 relative w-full" style={{ minHeight: '200px' }}>
                                     {stats.categoryData.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                             <PieChart>
                                                 <Pie data={stats.categoryData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="value">
                                                     {stats.categoryData.map((entry, index) => (
@@ -1068,8 +1049,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <TrendingUp className="text-indigo-600" /> Xu hướng Thu nhập & Chi tiêu
                     </h3>
-                    <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-80 w-full" style={{ minHeight: '320px' }}>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <AreaChart data={stats.monthlyChartData}>
                                 <defs>
                                     <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
@@ -1494,8 +1475,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             </div>
 
                             {/* Chart Section */}
-                            <div className="h-48 mb-4 w-full flex-shrink-0">
-                                <ResponsiveContainer width="100%" height="100%">
+                            <div className="h-48 mb-4 w-full flex-shrink-0" style={{ minHeight: '200px' }}>
+                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                     <BarChart
                                         data={(() => {
                                             const data = [];
@@ -1528,7 +1509,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         <Bar
                                             dataKey="amount"
                                             radius={[4, 4, 0, 0]}
-                                            onClick={(data) => setDetailViewMonth(data.fullDate)}
+                                            onClick={(data: any) => setDetailViewMonth(data?.fullDate)}
                                             cursor="pointer"
                                         >
                                             {

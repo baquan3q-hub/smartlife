@@ -387,6 +387,49 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     };
 
+    const handleDeleteCategory = async (type: 'expense' | 'income', categoryToDelete: string) => {
+        if (!user || !categoryToDelete) return;
+
+        if (!window.confirm(`Bạn có chắc muốn xóa danh mục "${categoryToDelete}"?`)) return;
+
+        // Update Local State
+        if (type === 'expense') setCustomExpenseCats(prev => prev.filter(c => c !== categoryToDelete));
+        else setCustomIncomeCats(prev => prev.filter(c => c !== categoryToDelete));
+
+        // Update Database
+        try {
+            const currentProfile = appState.profile;
+            const existingCustom = currentProfile?.custom_categories || { expense: [], income: [] };
+
+            // Filter out the category
+            const updatedList = (existingCustom[type as keyof typeof existingCustom] || []).filter((c: string) => c !== categoryToDelete);
+
+            const updatedCustom = {
+                ...existingCustom,
+                [type]: updatedList
+            };
+
+            const { error } = await supabase.from('profiles').update({
+                custom_categories: updatedCustom
+            }).eq('id', user.id);
+
+            if (error) throw error;
+
+            // Update Profile in AppState
+            setAppState(prev => ({
+                ...prev,
+                profile: prev.profile ? { ...prev.profile, custom_categories: updatedCustom } : null
+            }));
+
+        } catch (error: any) {
+            console.error("Lỗi xóa danh mục:", error);
+            alert("Không thể xóa danh mục. Vui lòng thử lại.");
+            // Rollback local state
+            if (type === 'expense') setCustomExpenseCats(prev => [...prev, categoryToDelete]);
+            else setCustomIncomeCats(prev => [...prev, categoryToDelete]);
+        }
+    };
+
     // Các hàm giữ chỗ (Placeholder) cho Lịch trình - Bạn có thể copy logic tương tự Transaction
     // --- GOALS HANDLERS ---
     const handleAddGoal = async (newGoal: any) => {
@@ -638,6 +681,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             expenseCategories={allExpenseCategories}
                             incomeCategories={allIncomeCategories}
                             onAddCategory={handleAddCategory}
+                            onDeleteCategory={handleDeleteCategory}
                             onAddBudget={async (b) => {
                                 if (!user) return;
                                 const { data, error } = await supabase.from('budgets').insert([{ ...b, user_id: user.id }]).select().single();
