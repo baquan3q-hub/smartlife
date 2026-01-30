@@ -34,15 +34,36 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime }) =>
     const videoRef = useRef<HTMLVideoElement | null>(null);
 
     useEffect(() => {
-        const audio = new Audio('/music/chill-music.mp3');
+        const audio = new Audio();
         audio.loop = true;
         audio.volume = 0.5;
 
+        // Ưu tiên file local, nếu lỗi (do file nặng ko up lên github được) thì dùng link online
+        const LOCAL_SRC = '/music/chill-music.mp3';
+        const ONLINE_SRC = 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3'; // Lofi Study (Free)
+
+        const playAudio = () => {
+            if (isPlaying) {
+                audio.play().catch(e => {
+                    console.log("Autoplay blocked", e);
+                    setIsPlaying(false);
+                });
+            }
+        };
+
+        // Xử lý khi file local lỗi (404)
+        audio.onerror = () => {
+            console.warn("Local music failed, switching to Online Backup...");
+            if (audio.src.includes(LOCAL_SRC)) {
+                audio.src = ONLINE_SRC;
+                playAudio();
+            }
+        };
+
+        audio.src = LOCAL_SRC;
+
         audio.addEventListener('canplaythrough', () => {
-            if (isPlaying) audio.play().catch(e => {
-                console.log("Autoplay blocked", e);
-                setIsPlaying(false);
-            });
+            playAudio();
         });
 
         audioRef.current = audio;
@@ -77,7 +98,7 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime }) =>
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
                 {bgType === 'video' && (
                     <div className="absolute inset-0 transition-opacity duration-700">
-                        <video ref={videoRef} autoPlay loop muted className="w-full h-full object-cover opacity-60">
+                        <video ref={videoRef} autoPlay loop muted playsInline className="w-full h-full object-cover opacity-60">
                             <source src="/music/background-video.mp4" type="video/mp4" />
                         </video>
                         <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" />
@@ -200,7 +221,7 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime }) =>
                                 onClick={toggleTimer}
                                 className={`w-20 h-20 md:w-28 md:h-28 rounded-full flex items-center justify-center transition-all shadow-[0_10px_40px_rgba(0,0,0,0.5)] hover:scale-110 active:scale-95 ${status === 'RUNNING' ? 'bg-amber-500 hover:bg-amber-400' : 'bg-indigo-600 hover:bg-indigo-500'}`}
                             >
-                                {status === 'RUNNING' ? <Pause size={36} className="md:w-[48px] md:h-[48px]" fill="currentColor" /> : <Play size={36} className="md:w-[48px] md:h-[48px]" fill="currentColor" className="ml-1" />}
+                                {status === 'RUNNING' ? <Pause size={36} className="md:w-[48px] md:h-[48px]" fill="currentColor" /> : <Play size={36} className="md:w-[48px] md:h-[48px] ml-1" fill="currentColor" />}
                             </button>
                         </div>
 
@@ -212,7 +233,7 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime }) =>
                             </div>
                             <div className="flex items-center gap-3 md:gap-5">
                                 <button onClick={toggleMute} className="p-3 md:p-4 rounded-full bg-white/5 hover:bg-white/15 transition-colors text-white/60">{isMuted ? <VolumeX size={20} className="md:w-7 md:h-7" /> : <Volume2 size={20} className="md:w-7 md:h-7" />}</button>
-                                <button onClick={toggleMusicPlay} className="p-3 md:p-4 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white border border-white/20 shadow-lg">{isPlaying ? <Pause size={20} className="md:w-7 md:h-7" fill="currentColor" /> : <Play size={20} className="md:w-7 md:h-7" fill="currentColor" className="ml-1" />}</button>
+                                <button onClick={toggleMusicPlay} className="p-3 md:p-4 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white border border-white/20 shadow-lg">{isPlaying ? <Pause size={20} className="md:w-7 md:h-7" fill="currentColor" /> : <Play size={20} className="md:w-7 md:h-7 ml-1" fill="currentColor" />}</button>
                             </div>
                         </div>
                     </div>

@@ -73,7 +73,6 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
   useEffect(() => {
     audioRef.current = new Audio('/sounds/clapping.mp3');
-    audioRef.current = new Audio('/sounds/clapping.mp3');
   }, []);
 
   // AI Command State
