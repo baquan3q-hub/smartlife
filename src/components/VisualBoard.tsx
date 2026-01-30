@@ -41,14 +41,29 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
             .slice(0, 3);
     }, [appState.todos]);
 
-    // Next 2 Upcoming Events (Same logic)
-    const upcomingEvents = useMemo(() => {
-        const todayDay = new Date().getDay();
-        const jsDayToTimetableDay = todayDay === 0 ? 8 : todayDay + 1;
-        return appState.timetable
-            .filter(e => e.day_of_week === jsDayToTimetableDay)
-            .sort((a, b) => a.start_time.localeCompare(b.start_time))
-            .slice(0, 3);
+    // Next 2 Upcoming Events Logic REPLACED with Today & Tomorrow Logic
+    const scheduleData = useMemo(() => {
+        const today = new Date();
+        const currentDay = today.getDay(); // 0-6 (0=Sun, 1=Mon, ..., 6=Sat)
+
+        // Use standard JS Day to match Database (ScheduleDashboard saves as 0-6)
+        const todayTimetableDay = currentDay;
+        const tomorrowTimetableDay = (currentDay + 1) % 7;
+
+        const getEventsForDay = (dayIndex: number) => {
+            return appState.timetable
+                .filter(e => e.day_of_week === dayIndex)
+                .sort((a, b) => a.start_time.localeCompare(b.start_time));
+        };
+
+        const getDayLabel = (d: number) => d === 0 ? "Chủ Nhật" : `Thứ ${d + 1}`;
+
+        return {
+            today: getEventsForDay(todayTimetableDay),
+            tomorrow: getEventsForDay(tomorrowTimetableDay),
+            todayLabel: getDayLabel(todayTimetableDay),
+            tomorrowLabel: getDayLabel(tomorrowTimetableDay)
+        };
     }, [appState.timetable]);
 
     const formatCurrency = (val: number) => {
@@ -111,15 +126,13 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
             { name: 'Giáng sinh', day: 25, month: 12, icon: <Gift size={16} className="text-emerald-600" /> },
         ];
 
-        // Dynamic Lunar/Variable Holidays (Hardcoded for 2026/2027 based on current context if possible, or simpler logic)
-        // Since we don't have a lunar library, we'll map specific known dates for the near future.
-        // 2026 Dates:
+        // Dynamic Lunar/Variable Holidays
         const dynamicHolidays2026 = [
             { name: 'Tết Nguyên Đán', date: '2026-02-17', icon: <Gift size={16} className="text-red-500" /> }, // Mùng 1 Tết 2026
             { name: 'Giỗ tổ Hùng Vương', date: '2026-04-26', icon: <Flag size={16} className="text-yellow-600" /> }, // 10/3 AL
         ];
 
-        // 2025 Dates (Just in case user time is earlier, though meta says 2026)
+        // 2025 Dates
         const dynamicHolidays2025 = [
             { name: 'Tết Nguyên Đán', date: '2025-01-29', icon: <Gift size={16} className="text-red-500" /> },
             { name: 'Giỗ tổ Hùng Vương', date: '2025-04-07', icon: <Flag size={16} className="text-yellow-600" /> },
@@ -168,16 +181,100 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
     return (
         <div className="w-full h-full p-4 md:p-8 overflow-y-auto pb-32">
             {/* 1. Welcome Header */}
-            <header className="mb-10">
+            <header className="mb-6">
                 <div className="text-sm text-gray-500 font-medium uppercase tracking-wider mb-1">
                     {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-800">
-                    Chào {userName || 'bạn'}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-600">tập trung nhé! ✨</span>
+                <h1 className="text-3xl md:text-3xl font-bold text-gray-800">
+                    Hello {userName || 'bạn'}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-600">chúc một ngày tốt lành! ✨</span>
                 </h1>
             </header>
 
-            {/* 2. Masonry / Grid Layout */}
+            {/* 2. MAIN SCHEDULE SECTION (TOP) */}
+            <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <CalendarIcon className="text-indigo-600" />
+                        Lịch trình Hôm nay & Ngày mai
+                    </h2>
+                    <button onClick={() => onNavigate?.('schedule')} className="text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1">
+                        Chi tiết <ArrowUpRight size={14} />
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* TODAY CARD */}
+                    <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-100 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110 pointer-events-none"></div>
+                        <div className="relative z-10">
+                            <h3 className="text-indigo-900 font-bold mb-4 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                                Hôm nay ({scheduleData.todayLabel})
+                            </h3>
+
+                            <div className="space-y-3">
+                                {scheduleData.today.length > 0 ? scheduleData.today.map((ev, idx) => (
+                                    <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100/50 hover:bg-indigo-50 transition-colors">
+                                        <div className="flex flex-col items-center justify-center min-w-[60px] border-r border-indigo-100 pr-3">
+                                            <span className="text-lg font-black text-indigo-600 leading-none">{ev.start_time}</span>
+                                            <span className="text-[10px] text-gray-400 font-medium uppercase">{ev.end_time || '...'}</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-bold text-gray-800 text-base truncate">{ev.title}</div>
+                                            {ev.location && (
+                                                <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-300"></div>
+                                                    {ev.location}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="text-center py-8 text-indigo-300 italic">
+                                        Không có lịch trình hôm nay. Enjoy! 🎉
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* TOMORROW CARD */}
+                    <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 relative overflow-hidden group">
+                        <div className="relative z-10">
+                            <h3 className="text-gray-600 font-bold mb-4 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-gray-300"></span>
+                                Ngày mai ({scheduleData.tomorrowLabel})
+                            </h3>
+
+                            <div className="space-y-3">
+                                {scheduleData.tomorrow.length > 0 ? scheduleData.tomorrow.map((ev, idx) => (
+                                    <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-gray-50 border border-transparent hover:border-gray-200 transition-colors opacity-80 hover:opacity-100">
+                                        <div className="flex flex-col items-center justify-center min-w-[60px] border-r border-gray-200/50 pr-3">
+                                            <span className="text-lg font-black text-gray-500 leading-none">{ev.start_time}</span>
+                                            <span className="text-[10px] text-gray-400 font-medium uppercase">{ev.end_time || '...'}</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-bold text-gray-700 text-base truncate">{ev.title}</div>
+                                            {ev.location && (
+                                                <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-1">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
+                                                    {ev.location}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="text-center py-8 text-gray-300 italic">
+                                        Ngày mai rảnh rỗi.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 3. Masonry / Grid Layout (Remaining Items) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
 
                 {/* COL 1: FINANCE SNAPSHOT & GOALS */}
@@ -244,40 +341,6 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
                                 );
                             })}
                             {financeGoals.length === 0 && <div className="text-center text-gray-400 text-sm py-4">Chưa có mục tiêu tài chính.</div>}
-                        </div>
-                    </div>
-
-                    {/* NEW: Holidays Countdown (Moved here) */}
-                    <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-6 shadow-sm border border-pink-100 h-auto transition-all duration-500">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                <Gift size={18} className="text-rose-500" /> Ngày lễ sắp tới
-                            </h3>
-                            <button
-                                onClick={() => setShowAllHolidays(!showAllHolidays)}
-                                className="text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors"
-                            >
-                                {showAllHolidays ? 'Thu gọn' : 'Xem thêm'}
-                            </button>
-                        </div>
-                        <div className="space-y-3">
-                            {visibleHolidays.map((h: any, idx: number) => (
-                                <div key={idx} className="bg-white/80 p-3 rounded-2xl flex items-center justify-between shadow-sm border border-white/50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-white rounded-full shadow-sm">
-                                            {h.icon}
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-sm text-gray-700">{h.name}</div>
-                                            <div className="text-xs text-gray-500 font-medium">{h.day}/{h.month}</div>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="font-bold text-lg text-indigo-600 leading-none">{h.daysLeft}</div>
-                                        <div className="text-[10px] text-gray-400 font-bold uppercase">Ngày</div>
-                                    </div>
-                                </div>
-                            ))}
                         </div>
                     </div>
                 </div>
@@ -357,14 +420,16 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
                             {scheduleGoals.length === 0 && <div className="text-center text-gray-400 text-sm py-4">Chưa có mục tiêu lịch trình.</div>}
                         </div>
                     </div>
+                </div>
 
-                    <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden min-h-[300px] flex flex-col">
+                {/* COL 3: TASKS & HOLIDAYS (Was Upcoming) */}
+                <div className="space-y-8">
+                    <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden min-h-[300px] flex flex-col">
                         {/* Decorative Background */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                        <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/20 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none"></div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
 
                         <div className="relative z-10 flex-1 flex flex-col">
-                            <h3 className="flex items-center gap-2 font-bold text-lg mb-6 opacity-90">
+                            <h3 className="flex items-center gap-2 font-bold text-lg mb-6 text-white/90">
                                 <Zap className="text-yellow-400 fill-yellow-400" size={20} />
                                 Nhiệm vụ hôm nay
                             </h3>
@@ -388,40 +453,44 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
                                 )) : (
                                     <div className="flex flex-col items-center justify-center h-full text-white/50 gap-2">
                                         <div className="p-3 bg-white/10 rounded-full"><Zap size={24} /></div>
-                                        <p className="text-sm">Trống trơn! Thời gian để thư giãn? ☕</p>
+                                        <p className="text-sm">Hết việc rồi! Chill thôi! ☕</p>
                                     </div>
                                 )}
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* COL 3: TIME & UPCOMING */}
-                <div className="space-y-8">
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 h-full">
-                        <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-6">
-                            <Clock size={18} className="text-teal-500" /> Sắp diễn ra
-                        </h3>
-
-                        <div className="relative pl-4 border-l-2 border-gray-100 space-y-8">
-                            {upcomingEvents.length > 0 ? upcomingEvents.map((ev, idx) => (
-                                <div key={ev.id} className="relative">
-                                    <div className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 border-white ${idx === 0 ? 'bg-teal-500 ring-4 ring-teal-50' : 'bg-gray-300'}`}></div>
-                                    <div>
-                                        <span className="text-xs font-bold text-gray-400 block mb-0.5 bg-gray-50 inline-block px-2 py-0.5 rounded">{ev.start_time} - {ev.end_time || '...'}</span>
-                                        <div className="text-gray-800 font-bold text-sm">{ev.title}</div>
-                                        {ev.location && <div className="text-xs text-gray-400 mt-1 flex items-center gap-1"><div className="w-1 h-1 bg-gray-300 rounded-full"></div> {ev.location}</div>}
+                    {/* NEW: Holidays Countdown (Moved here) */}
+                    <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-6 shadow-sm border border-pink-100 h-auto transition-all duration-500">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                <Gift size={18} className="text-rose-500" /> Lễ hội
+                            </h3>
+                            <button
+                                onClick={() => setShowAllHolidays(!showAllHolidays)}
+                                className="text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors"
+                            >
+                                {showAllHolidays ? 'Thu gọn' : 'Xem thêm'}
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                            {visibleHolidays.map((h: any, idx: number) => (
+                                <div key={idx} className="bg-white/80 p-3 rounded-2xl flex items-center justify-between shadow-sm border border-white/50">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white rounded-full shadow-sm">
+                                            {h.icon}
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-sm text-gray-700">{h.name}</div>
+                                            <div className="text-xs text-gray-500 font-medium">{h.day}/{h.month}</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="font-bold text-lg text-indigo-600 leading-none">{h.daysLeft}</div>
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase">Ngày</div>
                                     </div>
                                 </div>
-                            )) : (
-                                <div className="text-gray-400 text-sm italic">Hôm nay rảnh rỗi! 🎉</div>
-                            )}
-
-                            {/* Add a button to add event */}
-                            <div className="relative pt-2">
-                                <div className="absolute -left-[21px] top-1/2 w-3 h-3 rounded-full bg-gray-200 border-2 border-white"></div>
-                                <button onClick={() => onNavigate?.('schedule')} className="text-xs font-bold text-indigo-600 hover:text-indigo-700">+ Thêm sự kiện</button>
-                            </div>
+                            ))}
                         </div>
                     </div>
                 </div>

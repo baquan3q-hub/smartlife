@@ -3,7 +3,7 @@ import {
     ChevronLeft, Volume2, VolumeX, Music, Play, Pause, Sparkles,
     RotateCcw, Image as ImageIcon, Video as VideoIcon, Timer as TimerIcon,
     Activity, ChevronRight, List, X, Maximize2, Minimize2,
-    Mic2, CloudRain, Film, Headphones, ExternalLink
+    Mic2, CloudRain, Film, Headphones, ExternalLink, Upload
 } from 'lucide-react';
 import { useFocusTimer, PRESETS, Preset } from '../hooks/useFocusTimer';
 import ReactPlayer from 'react-player';
@@ -25,6 +25,12 @@ type CategoryType = typeof CATEGORIES[number]['id'];
 
 const PLAYLISTS_DATA: Record<CategoryType, { title: string; src: string; type: 'youtube' | 'local' }[]> = {
     'Chill Study': [
+        // --- HƯỚNG DẪN THÊM NHẠC TỪ MÁY TÍNH (M4A, MP3) ---
+        // 1. Copy file nhạc vào thư mục: public/music (nếu chưa có thì tạo thư mục 'music' trong 'public')
+        // 2. Sửa đường dẫn 'src' thành: "/music/ten-bai-hat.m4a"
+        // 3. Đổi 'type' thành: "local"
+        // Ví dụ: { title: "Bài hát của tôi", src: "/music/my-song.m4a", type: "local" },
+
         { title: "Lofi Study Beats", src: "https://www.youtube.com/watch?v=sUwD3GRPJos", type: "youtube" },
         { title: "Brain Wave Alpha Music", src: "https://www.youtube.com/watch?v=ihZYtrWTbkY", type: "youtube" },
         { title: "Coffee Shop Ambience", src: "https://www.youtube.com/watch?v=lE6RYpe9IT0", type: "youtube" },
@@ -75,6 +81,9 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
     const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
     const [playlist, setPlaylist] = useState(PLAYLISTS_DATA['Chill Study']);
 
+    // Custom Link State
+    const [customLink, setCustomLink] = useState('');
+
     // UI Mode State
     const [showPlaylist, setShowPlaylist] = useState(false);
     // const [viewMode, setViewMode] = useState<'TIMER' | 'CINEMA'>('TIMER'); // Removed
@@ -82,12 +91,40 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
 
     // Player Ref
     const playerRef = useRef<any>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const ReactPlayerComponent = ReactPlayer as any;
 
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
 
     // --- HANDLERS ---
+
+    const handleAddCustomLink = () => {
+        if (!customLink.trim()) return;
+        const newTrack = { title: "Custom Track", src: customLink.trim(), type: "youtube" as const };
+        setPlaylist(prev => [newTrack, ...prev]);
+        setCurrentTrackIndex(0);
+        setIsPlaying(true);
+        setCustomLink('');
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const objectUrl = URL.createObjectURL(file);
+            const newTrack = {
+                title: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
+                src: objectUrl,
+                type: 'local' as const
+            };
+            setPlaylist(prev => [newTrack, ...prev]);
+            setCurrentTrackIndex(0);
+            setIsPlaying(true);
+
+            // Clear input so same file can be selected again if needed
+            e.target.value = '';
+        }
+    };
 
     const selectCategory = async (cat: CategoryType) => {
         setActiveCategory(cat);
@@ -205,6 +242,11 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
                                     setPlayerError("Video bị hạn chế hoặc lỗi kết nối.");
                                 }}
                                 config={{
+                                    file: {
+                                        attributes: {
+                                            controlsList: 'nodownload'
+                                        }
+                                    },
                                     youtube: {
                                         playerVars: {
                                             playsinline: 1,
@@ -269,7 +311,7 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
 
                 {/* --- TIMER OVERLAY (FULL SCREEN FOCUS MODE) --- */}
                 {showTimer && timer && (
-                    <div className="flex flex-col items-center justify-center animate-fade-in w-full max-w-7xl mx-auto z-20">
+                    <div className="flex flex-col items-center justify-center animate-fade-in w-full max-w-none px-4 mx-auto z-20">
                         {/* Mode Switcher (Timer vs Stopwatch) */}
                         <div className="flex bg-white/10 backdrop-blur-md p-1 rounded-full mb-8">
                             <button
@@ -287,16 +329,18 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
                         </div>
 
                         {/* Timer Display */}
-                        <div className="relative group">
-                            <div className="text-[120px] md:text-[200px] font-black tabular-nums tracking-tighter leading-none text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 drop-shadow-2xl select-none transition-transform group-hover:scale-105 duration-500">
+                        <div className="relative group p-4">
+                            <div className="text-[100px] md:text-[160px] font-black tabular-nums tracking-tighter leading-snug text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 drop-shadow-2xl select-none transition-transform group-hover:scale-105 duration-500 py-2">
                                 {formatTime ? formatTime(timer.timeLeft || 0) : "00:00"}
                             </div>
 
-                            <div className="absolute inset-x-0 bottom-4 text-center">
-                                <span className={`inline-block px-4 py-1.5 rounded-full text-sm font-bold tracking-widest uppercase backdrop-blur-md border border-white/10 transition-colors ${timer.status === 'RUNNING' ? 'bg-indigo-500/20 text-indigo-300 animate-pulse' : 'bg-white/10 text-white/60'}`}>
-                                    {timer.status === 'RUNNING' ? (timer.engineMode === 'STOPWATCH' ? "Đang học..." : "Đang tập trung") : "Sẵn sàng"}
-                                </span>
-                            </div>
+                            {timer.status === 'RUNNING' && (
+                                <div className="mt-8 text-center animate-fade-in-up">
+                                    <span className="inline-block px-5 py-2 rounded-full text-sm font-bold tracking-widest uppercase backdrop-blur-md border border-white/10 transition-colors bg-indigo-500/20 text-indigo-300 animate-pulse shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+                                        {timer.engineMode === 'STOPWATCH' ? "Đang học..." : "Đang tập trung"}
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         {/* Controls */}
@@ -317,12 +361,12 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
                                 <>
                                     <button
                                         onClick={timer.toggleTimer}
-                                        className={`px-12 py-5 rounded-full font-bold text-2xl transition-all active:scale-95 shadow-xl hover:shadow-2xl flex items-center gap-3 ${timer.status === 'RUNNING' ? 'bg-white text-black hover:bg-gray-200' : 'bg-indigo-600 text-white hover:bg-indigo-500 hover:ring-4 hover:ring-indigo-500/30'}`}
+                                        className={`px-8 py-4 rounded-full font-bold text-xl transition-all active:scale-95 shadow-xl hover:shadow-2xl flex items-center gap-3 ${timer.status === 'RUNNING' ? 'bg-white text-black hover:bg-gray-200' : 'bg-indigo-600 text-white hover:bg-indigo-500 hover:ring-4 hover:ring-indigo-500/30'}`}
                                     >
                                         {timer.status === 'RUNNING' ? (
-                                            <><Minimize2 className="fill-current" /> Tạm dừng</>
+                                            <><Minimize2 className="fill-current w-5 h-5" /> Tạm dừng</>
                                         ) : (
-                                            <><Play className="fill-current" /> Bắt đầu {timer.engineMode === 'STOPWATCH' ? 'học' : 'Focus'}</>
+                                            <><Play className="fill-current w-5 h-5" /> Bắt đầu {timer.engineMode === 'STOPWATCH' ? 'học' : 'Focus'}</>
                                         )}
                                     </button>
                                     <button
@@ -334,6 +378,41 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
                                     </button>
                                 </>
                             )}
+                        </div>
+
+                        {/* --- UNIFIED MUSIC CONTROLS (COMPACT & NO SEEK) --- */}
+                        <div className="w-full max-w-md mt-6 p-4 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col gap-3 animate-fade-in-up delay-100 shadow-2xl">
+                            {/* Top: Info & Secondary Actions */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="w-10 h-10 rounded-lg bg-indigo-600/20 flex items-center justify-center text-indigo-400">
+                                        <Music size={20} />
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="text-[10px] font-black tracking-widest text-indigo-400 uppercase leading-none mb-1">{activeCategory}</span>
+                                        <h4 className="font-bold text-white text-sm truncate">{currentTrack.title}</h4>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setShowPlaylist(!showPlaylist)} className={`p-2 rounded-full transition-all active:scale-95 ${showPlaylist ? 'bg-indigo-600 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white'}`} title="Danh sách phát">
+                                        <List size={18} />
+                                    </button>
+                                    <button onClick={toggleMute} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white/60 hover:text-white active:scale-95" title="Âm lượng">
+                                        {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* REMOVED SEEK BAR HERE */}
+
+                            {/* Bottom: Main Controls (Compact) */}
+                            <div className="flex items-center justify-center gap-6 pt-2">
+                                <button onClick={handlePrev} className="text-white/40 hover:text-white transition-colors p-2 hover:scale-110 active:scale-95"><ChevronLeft size={24} /></button>
+                                <button onClick={() => setIsPlaying(!isPlaying)} className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center active:scale-95 transition-all shadow-lg hover:bg-indigo-500 hover:scale-105 hover:shadow-indigo-500/40">
+                                    {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
+                                </button>
+                                <button onClick={handleNext} className="text-white/40 hover:text-white transition-colors p-2 hover:scale-110 active:scale-95"><ChevronRight size={24} /></button>
+                            </div>
                         </div>
 
                         {/* Presets (Quick Switch) - Only show in TIMER mode */}
@@ -350,19 +429,12 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
                                 ))}
                             </div>
                         )}
-
-                        {/* Inspirational Quote or Status */}
-                        <div className="mt-12 max-w-lg text-center p-6 bg-white/5 rounded-3xl backdrop-blur-md border border-white/5">
-                            <div className="text-4xl text-indigo-500 mb-2 opacity-50">❝</div>
-                            <p className="text-white/80 font-medium text-lg italic">"Deep Work: Tắt điện thoại và thay đổi cuộc đời."</p>
-                            <div className="text-4xl text-indigo-500 mt-2 opacity-50 text-right">❞</div>
-                        </div>
                     </div>
                 )}
 
                 {/* --- FULLSCREEN PLAYLIST (When showTimer is TRUE) --- */}
                 {showTimer && (
-                    <div className="w-full max-w-7xl mt-12 animate-fade-in-up z-20 pb-32">
+                    <div className="w-full max-w-7xl mt-8 animate-fade-in-up z-20 pb-32">
                         {/* Categories Pills */}
                         <div className="flex items-center justify-center flex-wrap gap-3 mb-6">
                             {CATEGORIES.map(cat => (
@@ -378,6 +450,41 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
 
                         {/* Playlist Container - Glass & Clean */}
                         <div className="bg-black/20 backdrop-blur-md rounded-3xl border border-white/5 p-2 md:p-4 max-h-[35vh] overflow-y-auto custom-scrollbar shadow-2xl">
+                            {/* Custom Link Input INSIDE Playlist Header */}
+                            <div className="flex gap-2 mb-4 px-2">
+                                <input
+                                    type="text"
+                                    value={customLink}
+                                    onChange={(e) => setCustomLink(e.target.value)}
+                                    placeholder="Dán link YouTube (hoặc upload file 👉)"
+                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-indigo-500 focus:bg-white/10 transition-colors"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleAddCustomLink();
+                                        }
+                                    }}
+                                />
+
+                                <input
+                                    type="file"
+                                    accept="audio/*,.m4a"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    onChange={handleFileUpload}
+                                />
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-xl transition-colors"
+                                    title="Tải file M4A/MP3 từ máy"
+                                >
+                                    <Upload size={18} />
+                                </button>
+
+                                <button onClick={handleAddCustomLink} className="px-4 py-2 bg-white/10 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-colors">
+                                    Thêm
+                                </button>
+                            </div>
+
                             {playlist.length === 0 ? (
                                 <div className="text-center py-12 text-white/30">
                                     <CloudRain size={48} className="mx-auto mb-4 opacity-50" />
@@ -417,6 +524,7 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
                         </div>
                     </div>
                 )}
+
 
                 {/* --- EMBEDDED PLAYLIST VIEW (BELOW PLAYER) --- */}
                 {embedded && (
@@ -468,107 +576,7 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
 
             </div>
 
-            {/* --- 5. BOTTOM CONTROL BAR (CLEAN & FLOATING) --- */}
-            <div className={`relative z-30 transition-all duration-500 rounded-t-3xl md:rounded-full md:mx-auto md:mb-6 md:w-max md:px-8 border border-white/10 backdrop-blur-xl flex flex-col md:flex-row items-center gap-4 md:gap-8 pb-safe pt-3 shadow-2xl
-                ${showTimer ? 'bg-black/40' : 'bg-[#0a0a0a]/90 w-full'}
-            `}>
 
-                {/* Progress Bar (Top of controls on Mobile) */}
-                <div className="block md:hidden w-full -mt-3 pt-3">
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-white/30">
-                        <span>{formatTimeAudio(currentTime)}</span>
-                        <input
-                            type="range" min={0} max={duration || 100} value={currentTime} onChange={handleSeek}
-                            className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:bg-indigo-500 [&::-webkit-slider-thumb]:rounded-full active:[&::-webkit-slider-thumb]:scale-150 transition-all touch-none"
-                        />
-                        <span>{formatTimeAudio(duration)}</span>
-                    </div>
-                </div>
-
-                {/* Main Controls Row - Standard 3-Column Layout */}
-                <div className="flex items-center justify-between w-full h-full px-2 md:px-0">
-
-                    {/* Left: Info & Playlist (Fixed Width or Flex-1) */}
-                    <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0" onClick={() => setShowPlaylist(!showPlaylist)}>
-                        <div className="relative group cursor-pointer shrink-0">
-                            <div className="w-10 h-10 md:w-16 md:h-16 rounded-lg md:rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shadow-lg transition-transform group-hover:scale-105">
-                                <Music size={20} className="md:w-8 md:h-8 text-indigo-400" />
-                            </div>
-                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-500 rounded-full flex items-center justify-center border-2 border-black animate-pulse">
-                                <List size={8} />
-                            </div>
-                        </div>
-                        <div className="flex flex-col overflow-hidden justify-center cursor-pointer group">
-                            <span className="text-[9px] md:text-[10px] font-black tracking-widest text-indigo-400 uppercase leading-none mb-1 group-hover:text-indigo-300 transition-colors">{activeCategory}</span>
-                            <h4 className="font-bold text-white text-xs md:text-sm truncate w-full max-w-[120px] md:max-w-[200px] group-hover:text-indigo-200 transition-colors leading-tight">
-                                {currentTrack.title}
-                            </h4>
-                            <p className="hidden md:block text-white/40 text-[10px] truncate">Playing from {activeCategory}</p>
-                        </div>
-                    </div>
-
-                    {/* Center: Controls + Progress (Strictly Centered & Constrained) */}
-                    <div className="flex flex-col items-center justify-center flex-1 z-50">
-                        <div className="w-full max-w-[400px] flex flex-col items-center gap-2">
-
-                            {/* 1. Control Buttons */}
-                            <div className="flex items-center justify-center gap-8">
-                                <button onClick={handlePrev} className="text-white/40 hover:text-white transition-colors cursor-pointer hover:scale-110 active:scale-95 p-2">
-                                    <ChevronLeft size={24} className="md:w-6 md:h-6" />
-                                </button>
-
-                                <button
-                                    onClick={() => setIsPlaying(!isPlaying)}
-                                    className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-white text-black flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.4)] hover:shadow-[0_0_30px_rgba(255,255,255,0.6)] hover:scale-105"
-                                >
-                                    {isPlaying ? <Pause size={24} className="md:w-6 md:h-6" fill="currentColor" /> : <Play size={24} className="md:w-6 md:h-6 ml-1" fill="currentColor" />}
-                                </button>
-
-                                <button onClick={handleNext} className="text-white/40 hover:text-white transition-colors cursor-pointer hover:scale-110 active:scale-95 p-2">
-                                    <ChevronRight size={24} className="md:w-6 md:h-6" />
-                                </button>
-                            </div>
-
-                            {/* 2. Desktop Progress Bar (Visible only on MD+) */}
-                            <div className="hidden md:flex w-full items-center gap-3 text-xs font-medium text-white/50 tabular-nums select-none">
-                                <span className="w-10 text-right">{formatTimeAudio(currentTime)}</span>
-
-                                <div className="flex-1 h-1 bg-white/10 rounded-full relative group cursor-pointer flex items-center">
-                                    {/* Buffered/Track Line */}
-                                    <div
-                                        className="absolute inset-y-0 left-0 bg-indigo-500 rounded-full h-full"
-                                        style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-                                    />
-
-                                    {/* Input Range Overlay */}
-                                    <input
-                                        type="range" min={0} max={duration || 100} value={currentTime} onChange={handleSeek}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                                    />
-
-                                    {/* Visual Thumb */}
-                                    <div
-                                        className="absolute h-3 w-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10"
-                                        style={{ left: `${(currentTime / (duration || 1)) * 100}%`, transform: 'translateX(-50%)' }}
-                                    />
-                                </div>
-
-                                <span className="w-10 text-left">{formatTimeAudio(duration)}</span>
-                            </div>
-
-                        </div>
-                    </div>
-
-                    {/* Right: Actions (Compact & Auto Layout) */}
-                    <div className="flex-1 flex justify-end items-center gap-3 min-w-0 pr-2">
-                        {/* Volume Toggle (Simple) */}
-                        <button onClick={toggleMute} className="p-2 text-white/40 hover:text-white transition-colors">
-                            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                        </button>
-                    </div>
-
-                </div>
-            </div>
 
             {/* --- 6. MUSIC DRAWER (MOBILE FRIENDLY) --- */}
             <div className={`
