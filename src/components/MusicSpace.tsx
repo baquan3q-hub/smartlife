@@ -24,69 +24,128 @@ const LOCAL_BG_IMAGES = [
     '/music/bg-5.jpg',
 ];
 
+const PLAYLIST = [
+    {
+        title: "Nhạc Chill Mặc Định",
+        src: "/music/chill-music.mp3",
+        type: "local"
+    },
+    {
+        title: "Lofi Study Beats",
+        src: "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
+        type: "online"
+    },
+    {
+        title: "Rainy Night Coffee",
+        src: "https://pixabay.com/music/soft-house-background-music-good-vibes-468506/",
+        type: "online"
+    },
+    {
+        title: "Empty Mind",
+        src: "https://cdn.pixabay.com/audio/2022/11/22/audio_febc5085d0.mp3",
+        type: "online"
+    },
+    {
+        title: "Soft Piano & Strings",
+        src: "https://cdn.pixabay.com/audio/2020/09/23/audio_3496bc42a9.mp3",
+        type: "online"
+    }
+];
+
 const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime }) => {
     const { timeLeft, status, mode, toggleTimer, resetTimer, totalTime, engineMode, switchEngineMode } = timer;
     const [isMuted, setIsMuted] = useState(false);
     const [isPlaying, setIsPlaying] = useState(true);
     const [bgType, setBgType] = useState<'video' | 'image'>('video');
     const [imageIndex, setImageIndex] = useState(0);
+    const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
 
+    // Initialize Audio
     useEffect(() => {
         const audio = new Audio();
-        audio.loop = true;
+        audio.loop = false; // Disable loop to auto-play next track (or can enable loop for single track)
+
         audio.volume = 0.5;
-
-        // Ưu tiên file local, nếu lỗi (do file nặng ko up lên github được) thì dùng link online
-        const LOCAL_SRC = '/music/chill-music.mp3';
-        const ONLINE_SRC = 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3'; // Lofi Study (Free)
-
-        const playAudio = () => {
-            if (isPlaying) {
-                audio.play().catch(e => {
-                    console.log("Autoplay blocked", e);
-                    setIsPlaying(false);
-                });
-            }
-        };
-
-        // Xử lý khi file local lỗi (404)
-        audio.onerror = () => {
-            console.warn("Local music failed, switching to Online Backup...");
-            if (audio.src.includes(LOCAL_SRC)) {
-                audio.src = ONLINE_SRC;
-                playAudio();
-            }
-        };
-
-        audio.src = LOCAL_SRC;
-
-        audio.addEventListener('canplaythrough', () => {
-            playAudio();
-        });
-
         audioRef.current = audio;
+
+        // Events
+        audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime));
+        audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
+        audio.addEventListener('ended', handleNextTrack); // Auto play next
 
         return () => {
             audio.pause();
             audio.src = "";
+            audio.removeEventListener('timeupdate', () => { });
+            audio.removeEventListener('loadedmetadata', () => { });
+            audio.removeEventListener('ended', handleNextTrack);
         };
     }, []);
 
-    const toggleMute = () => {
+    // Handle Track Source Change
+    useEffect(() => {
         if (audioRef.current) {
-            audioRef.current.muted = !isMuted;
-            setIsMuted(!isMuted);
+            const track = PLAYLIST[currentTrackIndex];
+            audioRef.current.src = track.src;
+            if (isPlaying) {
+                const playPromise = audioRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.warn("Playback prevented:", error);
+                        setIsPlaying(false);
+                    });
+                }
+            }
+        }
+    }, [currentTrackIndex]);
+
+    // Handle Play/Pause via state
+    useEffect(() => {
+        if (audioRef.current) {
+            if (isPlaying) audioRef.current.play().catch(() => setIsPlaying(false));
+            else audioRef.current.pause();
+        }
+    }, [isPlaying]);
+
+    // Handle Mute
+    useEffect(() => {
+        if (audioRef.current) {
+            audioRef.current.muted = isMuted;
+        }
+    }, [isMuted]);
+
+    const toggleMute = () => setIsMuted(!isMuted);
+
+    const toggleMusicPlay = () => setIsPlaying(!isPlaying);
+
+    const handleNextTrack = () => {
+        setCurrentTrackIndex((prev) => (prev + 1) % PLAYLIST.length);
+        setIsPlaying(true);
+    };
+
+    const handlePrevTrack = () => {
+        setCurrentTrackIndex((prev) => (prev - 1 + PLAYLIST.length) % PLAYLIST.length);
+        setIsPlaying(true);
+    };
+
+    const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const time = Number(e.target.value);
+        if (audioRef.current) {
+            audioRef.current.currentTime = time;
+            setCurrentTime(time);
         }
     };
 
-    const toggleMusicPlay = () => {
-        if (audioRef.current) {
-            if (isPlaying) audioRef.current.pause();
-            else audioRef.current.play();
-            setIsPlaying(!isPlaying);
-        }
+    const formatTimeAudio = (time: number) => {
+        if (!time || isNaN(time)) return "00:00";
+        const m = Math.floor(time / 60);
+        const s = Math.floor(time % 60);
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
     const nextImage = () => setImageIndex((prev) => (prev + 1) % 5);
@@ -226,15 +285,54 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime }) =>
                         </div>
 
                         {/* Music Controls */}
-                        <div className="flex items-center gap-6 md:gap-10 relative z-10 md:pl-6 w-full md:w-auto justify-between md:justify-start">
-                            <div className="flex flex-col items-start text-left">
-                                <div className="flex items-center gap-1.5 md:gap-2 text-indigo-400 font-black uppercase tracking-widest text-[10px] md:text-[12px] mb-1 md:mb-2"><Sparkles size={12} className="md:w-4 md:h-4" /><span>Ambience</span></div>
-                                <div className="text-white font-black text-base md:text-xl tracking-tight leading-tight">Chill Lo-Fi<br className="md:hidden" /> Beats</div>
+                        <div className="flex flex-col items-center gap-4 relative z-10 md:pl-6 w-full md:w-auto">
+
+                            <div className="w-full flex items-center justify-between gap-4">
+                                <div className="flex flex-col items-start text-left min-w-[150px]">
+                                    <div className="flex items-center gap-1.5 md:gap-2 text-indigo-400 font-black uppercase tracking-widest text-[10px] md:text-[12px] mb-1 md:mb-2">
+                                        <Sparkles size={12} className="md:w-4 md:h-4" />
+                                        <span>Now Playing {currentTrackIndex + 1}/{PLAYLIST.length}</span>
+                                    </div>
+                                    <div className="text-white font-black text-sm md:text-lg tracking-tight leading-tight w-full truncate max-w-[200px]">
+                                        {PLAYLIST[currentTrackIndex].title}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={toggleMute} className="p-2 md:p-3 rounded-full bg-white/5 hover:bg-white/15 transition-colors text-white/60">
+                                        {isMuted ? <VolumeX size={16} className="md:w-5 md:h-5" /> : <Volume2 size={16} className="md:w-5 md:h-5" />}
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-3 md:gap-5">
-                                <button onClick={toggleMute} className="p-3 md:p-4 rounded-full bg-white/5 hover:bg-white/15 transition-colors text-white/60">{isMuted ? <VolumeX size={20} className="md:w-7 md:h-7" /> : <Volume2 size={20} className="md:w-7 md:h-7" />}</button>
-                                <button onClick={toggleMusicPlay} className="p-3 md:p-4 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white border border-white/20 shadow-lg">{isPlaying ? <Pause size={20} className="md:w-7 md:h-7" fill="currentColor" /> : <Play size={20} className="md:w-7 md:h-7 ml-1" fill="currentColor" />}</button>
+
+                            {/* Seek Bar */}
+                            <div className="w-full flex items-center gap-3 text-[10px] font-mono text-white/50">
+                                <span>{formatTimeAudio(currentTime)}</span>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max={duration || 100}
+                                    value={currentTime}
+                                    onChange={handleSeek}
+                                    className="flex-1 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-indigo-500 [&::-webkit-slider-thumb]:rounded-full hover:[&::-webkit-slider-thumb]:scale-125 transition-all"
+                                />
+                                <span>{formatTimeAudio(duration)}</span>
                             </div>
+
+                            {/* Playback Controls */}
+                            <div className="flex items-center gap-4 md:gap-6 mt-1">
+                                <button onClick={handlePrevTrack} className="p-2 text-white/60 hover:text-white transition-colors">
+                                    <ChevronLeft size={24} />
+                                </button>
+
+                                <button onClick={toggleMusicPlay} className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white border border-white/20 shadow-lg flex items-center justify-center">
+                                    {isPlaying ? <Pause size={20} className="md:w-6 md:h-6" fill="currentColor" /> : <Play size={20} className="md:w-6 md:h-6 ml-1" fill="currentColor" />}
+                                </button>
+
+                                <button onClick={handleNextTrack} className="p-2 text-white/60 hover:text-white transition-colors">
+                                    <ChevronRight size={24} />
+                                </button>
+                            </div>
+
                         </div>
                     </div>
                 </div>
