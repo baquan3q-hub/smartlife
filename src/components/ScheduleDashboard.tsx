@@ -6,6 +6,7 @@ import CalendarWidget from './CalendarWidget';
 import FocusTimer from './FocusTimer';
 import { parseScheduleCommand } from '../services/aiService';
 import { Bot, Sparkles, Loader2, Send } from 'lucide-react';
+import MusicSpace from './MusicSpace';
 
 interface ScheduleDashboardProps {
   state: AppState;
@@ -18,6 +19,8 @@ interface ScheduleDashboardProps {
   onAddTodo: (content: string, priority: TaskPriority) => void;
   onUpdateTodo: (t: any) => void;
   onDeleteTodo: (id: string) => void;
+  initialFocusMode?: boolean;
+  onResetFocusMode?: () => void;
 }
 
 // Reordered: Mon (1) -> Sat (6) -> Sun (0)
@@ -45,16 +48,30 @@ const PRIORITY_CONFIG = {
 const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   state,
   onAddGoal, onUpdateGoal, onDeleteGoal,
-  onAddTimetable, onUpdateTimetable, onDeleteTimetable,
-  onAddTodo, onUpdateTodo, onDeleteTodo
+  onAddTodo, onUpdateTodo, onDeleteTodo,
+  initialFocusMode = false, onResetFocusMode,
+  onAddTimetable, onUpdateTimetable, onDeleteTimetable, // Kept these as they were removed in instruction but are needed
 }) => {
   const { timetable, goals, todos } = state;
   const { timer, onOpenMusic } = state as any;
+
+  const [activeTab, setActiveTab] = useState<'calendar' | 'goals'>('calendar');
+  const [isFocusMode, setIsFocusMode] = useState(false);
+
+  // Handle initial focus mode triggers (e.g. from Dashboard)
+  useEffect(() => {
+    if (initialFocusMode) {
+      setIsFocusMode(true);
+      onResetFocusMode?.();
+    }
+  }, [initialFocusMode, onResetFocusMode]);
 
   // Modals
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [goalFilter, setGoalFilter] = useState<'ALL' | 'PRIORITY' | 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM'>('ALL');
+
+
 
   const [isTimeModalOpen, setIsTimeModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<TimetableEvent | null>(null);
@@ -610,7 +627,23 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
           {renderTodos()}
 
           {/* 2. Focus Timer */}
-          <FocusTimer timer={timer} onOpenMusic={onOpenMusic} />
+          <FocusTimer timer={timer} onOpenMusic={() => setIsFocusMode(true)} />
+
+          {/* 2.5 Music Player (Embedded or Fullscreen) */}
+          {isFocusMode && (
+            <MusicSpace
+              embedded={false}
+              showTimer={true}
+              timer={timer}
+              onBack={() => setIsFocusMode(false)}
+              formatTime={(s: number) => {
+                const m = Math.floor(s / 60);
+                const sec = s % 60;
+                return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+              }}
+            />
+          )}
+
 
 
           {/* 3. Goals */}

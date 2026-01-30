@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { AppState, Goal, Todo, TimetableEvent } from '../types';
-import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music } from 'lucide-react';
 
 interface VisualBoardProps {
     appState: AppState;
     userName?: string;
-    onNavigate?: (tab: 'finance' | 'schedule') => void;
+    onNavigate?: (tab: 'finance' | 'schedule' | 'music') => void;
 }
 
 const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigate }) => {
@@ -284,6 +284,31 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
 
                 {/* COL 2: FOCUS ZONE & SCHEDULE GOALS */}
                 <div className="space-y-8">
+                    {/* NEW: Music Focus Card */}
+                    <div
+                        onClick={() => onNavigate?.('music')}
+                        className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden group cursor-pointer transition-transform duration-300 hover:scale-[1.02]"
+                    >
+                        <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none group-hover:bg-white/20 transition-colors"></div>
+                        <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/30 rounded-full blur-2xl -ml-6 -mb-6 pointer-events-none"></div>
+
+                        <div className="relative z-10 flex items-center justify-between">
+                            <div>
+                                <h3 className="flex items-center gap-2 font-bold text-xl mb-2">
+                                    <span className="bg-white/20 p-2 rounded-lg"><Headphones size={20} className="text-white" /></span>
+                                    Học bài ngay!
+                                </h3>
+                                <p className="text-indigo-100 text-sm mb-4 max-w-[200px]">Bật chế độ tập trung với âm nhạc và timer.</p>
+                                <button className="bg-white text-indigo-600 px-5 py-2 rounded-full text-xs font-bold shadow-lg group-hover:bg-indigo-50 transition-all flex items-center gap-2">
+                                    <Play size={12} fill="currentColor" /> Bắt đầu Focus
+                                </button>
+                            </div>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-30 group-hover:opacity-50 transition-opacity scale-125">
+                                <Music size={80} />
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Schedule Goals (New) */}
                     <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 max-h-[500px] overflow-y-auto scrollbar-hide">
                         <div className="flex items-center justify-between mb-6 sticky top-0 bg-white z-10 py-1">

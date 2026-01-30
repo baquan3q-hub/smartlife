@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquareText, X, Send, Bot, Sparkles, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { AppState } from '../types';
+import { AppState } from '../src/types';
 
 // --- CẤU HÌNH API KEY TẠI ĐÂY ---
 // Bạn nhớ thay mã API thật của bạn vào đây nhé

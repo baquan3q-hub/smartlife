@@ -1,6 +1,6 @@
 // File: src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music } from 'lucide-react';
 
 // Import các Components (Đảm bảo bạn đã tạo file trong thư mục components)
 import FinanceDashboard from './components/FinanceDashboard';
@@ -9,9 +9,11 @@ import VisualBoard from './components/VisualBoard';
 import SettingsModal from './components/SettingsModal';
 import Login from './components/Login';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+// Import FocusSpace
+import FocusSpace from './components/FocusSpace';
 import MusicSpace from './components/MusicSpace';
 
-// Context và Service
+
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { supabase } from './services/supabase';
 import { requestNotificationPermission, checkAndNotify, checkCalendarAndNotify, checkGoalsAndNotify, checkCustomEventsAndNotify } from './services/notificationService';
@@ -64,7 +66,8 @@ interface AuthenticatedAppProps {
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) => {
     const { user, signOut } = useAuth();
-    const [activeTab, setActiveTab] = useState<'finance' | 'schedule' | 'visual' | 'music'>('finance');
+    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music'>('visual');
+    const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -670,7 +673,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 </header>
 
                 <div className="max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative h-full"> {/* Ensure relative for absolute positioning if needed */}
-                    {activeTab === 'visual' && <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} onNavigate={setActiveTab} />}
+                    {activeTab === 'visual' && <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} onNavigate={(tab) => {
+                        if (tab === 'music') {
+                            setStartInFocusMode(true);
+                            setActiveTab('schedule');
+                        } else {
+                            setActiveTab(tab);
+                        }
+                    }} />}
                     {activeTab === 'finance' && (
                         <FinanceDashboard
                             state={appState}
@@ -707,17 +717,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
                             onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
                             onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo}
-                        />
-                    )}
-                    {activeTab === 'music' && (
-                        <MusicSpace
-                            onBack={() => setActiveTab('schedule')}
-                            timer={timer}
-                            formatTime={(s) => {
-                                const m = Math.floor(s / 60);
-                                const sec = s % 60;
-                                return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-                            }}
+                            initialFocusMode={startInFocusMode}
+                            onResetFocusMode={() => setStartInFocusMode(false)}
                         />
                     )}
                 </div>
@@ -735,6 +736,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     </div>
                     <span className="text-[10px] font-bold">{lang === 'vi' ? 'Tổng quan' : 'Overview'}</span>
                 </button>
+
 
                 <button
                     onClick={() => setActiveTab('finance')}

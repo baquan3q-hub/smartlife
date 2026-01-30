@@ -31,6 +31,7 @@
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",
     "react-number-format": "^5.4.4",
+    "react-player": "^3.4.0",
     "recharts": "^3.6.0",
     "remark-gfm": "^4.0.1"
   },
