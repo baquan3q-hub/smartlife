@@ -188,7 +188,7 @@ const MusicSpace: React.FC<MusicSpaceProps> = ({ onBack, timer, formatTime, embe
             <div className={`relative z-50 flex-1 flex flex-col items-center justify-center p-4 ${showTimer ? 'hidden' : 'flex'}`}>
 
                 {hasTrack ? (
-                    <div className="w-full max-w-5xl aspect-video bg-black rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border border-white/10 relative group">
+                    <div className="w-full h-full md:h-[85vh] md:max-w-[95vw] bg-black rounded-none md:rounded-3xl overflow-hidden shadow-2xl border-0 md:border border-white/10 relative group flex flex-col justify-center">
 
                         {/* Loading / Error States */}
                         {isLoading && !playerError && (

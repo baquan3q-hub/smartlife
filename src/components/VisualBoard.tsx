@@ -195,7 +195,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                         <CalendarIcon className="text-indigo-600" />
-                        Lịch trình Hôm nay & Ngày mai
+                        Lịch trình nay - mai
                     </h2>
                     <button onClick={() => onNavigate?.('schedule')} className="text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1">
                         Chi tiết <ArrowUpRight size={14} />
@@ -277,70 +277,81 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
             {/* 3. Masonry / Grid Layout (Remaining Items) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
 
-                {/* COL 1: FINANCE SNAPSHOT & GOALS */}
+                {/* COL 1: TASKS & HOLIDAYS (Was Col 3) */}
                 <div className="space-y-8">
-                    {/* Net Worth Card */}
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+                    <div
+                        onClick={() => onNavigate?.('schedule')}
+                        className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden min-h-[300px] flex flex-col cursor-pointer hover:shadow-2xl transition-all group"
+                    >
+                        {/* Decorative Background */}
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none group-hover:bg-white/10 transition-colors"></div>
 
-                        <div className="relative">
-                            <div className="flex items-center gap-3 mb-4 text-gray-500">
-                                <div className="p-2 bg-indigo-100/50 rounded-xl text-indigo-600">
-                                    <Wallet size={20} />
-                                </div>
-                                <span className="font-bold text-sm uppercase tracking-wide">Tài chính tổng quan</span>
+                        <div className="relative z-10 flex-1 flex flex-col">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="flex items-center gap-2 font-bold text-lg text-white/90">
+                                    <Zap className="text-yellow-400 fill-yellow-400" size={20} />
+                                    Nhiệm vụ hôm nay
+                                </h3>
+                                <ArrowUpRight size={18} className="text-white/30 group-hover:text-white transition-colors" />
                             </div>
-                            <div className="text-3xl font-bold text-gray-800 mb-2">
-                                {formatCurrency(financeStats.balance)}
-                            </div>
-                            <div className="flex gap-4 mt-6">
-                                <div>
-                                    <div className="text-xs text-gray-400 font-bold uppercase mb-1">Tổng thu</div>
-                                    <div className="flex items-center text-emerald-500 font-bold text-sm">
-                                        <ArrowUpRight size={16} className="mr-1" />
-                                        {formatCurrency(financeStats.income)}
+
+                            <div className="space-y-3 flex-1">
+                                {priorityTodos.length > 0 ? priorityTodos.map((todo, idx) => (
+                                    <div key={todo.id} className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 flex items-start gap-3 hover:bg-white/20 transition-colors cursor-pointer group/item">
+                                        <div className={`mt-1 w-5 h-5 rounded-full border-2 border-white/30 flex items-center justify-center transition-colors ${idx === 0 ? 'group-hover/item:border-yellow-400' : ''}`}>
+                                            {/* Check icon placeholder */}
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-medium leading-snug">{todo.content}</div>
+                                            <span className={`text-[10px] uppercase font-bold tracking-wider opacity-60 mt-1 inline-block px-1.5 py-0.5 rounded
+                                                ${todo.priority === 'urgent' ? 'bg-red-500/20 text-red-200' :
+                                                    todo.priority === 'focus' ? 'bg-indigo-400/20 text-indigo-200' : 'bg-gray-500/20'}
+                                            `}>
+                                                {todo.priority}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="w-px bg-gray-100"></div>
-                                <div>
-                                    <div className="text-xs text-gray-400 font-bold uppercase mb-1">Tổng chi</div>
-                                    <div className="flex items-center text-red-500 font-bold text-sm">
-                                        <ArrowDownRight size={16} className="mr-1" />
-                                        {formatCurrency(financeStats.expense)}
+                                )) : (
+                                    <div className="flex flex-col items-center justify-center h-full text-white/50 gap-2">
+                                        <div className="p-3 bg-white/10 rounded-full"><Zap size={24} /></div>
+                                        <p className="text-sm">Hết việc rồi! Chill thôi! ☕</p>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Finance Goals */}
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-                        <div className="flex items-center justify-between mb-6">
+                    {/* Holidays Countdown */}
+                    <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-6 shadow-sm border border-pink-100 h-auto transition-all duration-500">
+                        <div className="flex items-center justify-between mb-4">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                <Target size={18} className="text-pink-500" /> Mục tiêu Tài chính
+                                <Gift size={18} className="text-rose-500" /> Lễ hội
                             </h3>
-                            <button onClick={() => onNavigate?.('finance')} className="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors">Xem thêm</button>
+                            <button
+                                onClick={() => setShowAllHolidays(!showAllHolidays)}
+                                className="text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors"
+                            >
+                                {showAllHolidays ? 'Thu gọn' : 'Xem thêm'}
+                            </button>
                         </div>
-                        <div className="space-y-4">
-                            {financeGoals.slice(0, 3).map(goal => {
-                                const percent = goal.target_amount ? Math.min(100, Math.round(((goal.current_amount || 0) / goal.target_amount) * 100)) : 0;
-                                return (
-                                    <div key={goal.id} className="group">
-                                        <div className="flex justify-between text-sm mb-1">
-                                            <span className="font-bold text-gray-700">{goal.title}</span>
-                                            <span className="text-gray-400 font-medium text-xs">{percent}%</span>
+                        <div className="space-y-3">
+                            {visibleHolidays.map((h: any, idx: number) => (
+                                <div key={idx} className="bg-white/80 p-3 rounded-2xl flex items-center justify-between shadow-sm border border-white/50">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white rounded-full shadow-sm">
+                                            {h.icon}
                                         </div>
-                                        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-500 group-hover:shadow-[0_0_10px_rgba(236,72,153,0.4)]"
-                                                style={{ width: `${percent}%` }}
-                                            />
+                                        <div>
+                                            <div className="font-bold text-sm text-gray-700">{h.name}</div>
+                                            <div className="text-xs text-gray-500 font-medium">{h.day}/{h.month}</div>
                                         </div>
-                                        <div className="text-[10px] text-gray-400 mt-1 text-right">{formatCurrency(goal.current_amount || 0)} / {formatCurrency(goal.target_amount || 0)}</div>
                                     </div>
-                                );
-                            })}
-                            {financeGoals.length === 0 && <div className="text-center text-gray-400 text-sm py-4">Chưa có mục tiêu tài chính.</div>}
+                                    <div className="text-right">
+                                        <div className="font-bold text-lg text-indigo-600 leading-none">{h.daysLeft}</div>
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase">Ngày</div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -422,75 +433,70 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
                     </div>
                 </div>
 
-                {/* COL 3: TASKS & HOLIDAYS (Was Upcoming) */}
+                {/* COL 3: FINANCE SNAPSHOT & GOALS (Was Col 1) */}
                 <div className="space-y-8">
-                    <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden min-h-[300px] flex flex-col">
-                        {/* Decorative Background */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                    {/* Net Worth Card */}
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
 
-                        <div className="relative z-10 flex-1 flex flex-col">
-                            <h3 className="flex items-center gap-2 font-bold text-lg mb-6 text-white/90">
-                                <Zap className="text-yellow-400 fill-yellow-400" size={20} />
-                                Nhiệm vụ hôm nay
-                            </h3>
-
-                            <div className="space-y-3 flex-1">
-                                {priorityTodos.length > 0 ? priorityTodos.map((todo, idx) => (
-                                    <div key={todo.id} className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 flex items-start gap-3 hover:bg-white/20 transition-colors cursor-pointer group">
-                                        <div className={`mt-1 w-5 h-5 rounded-full border-2 border-white/30 flex items-center justify-center transition-colors ${idx === 0 ? 'group-hover:border-yellow-400' : ''}`}>
-                                            {/* Check icon placeholder */}
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-medium leading-snug">{todo.content}</div>
-                                            <span className={`text-[10px] uppercase font-bold tracking-wider opacity-60 mt-1 inline-block px-1.5 py-0.5 rounded
-                                                ${todo.priority === 'urgent' ? 'bg-red-500/20 text-red-200' :
-                                                    todo.priority === 'focus' ? 'bg-indigo-400/20 text-indigo-200' : 'bg-gray-500/20'}
-                                            `}>
-                                                {todo.priority}
-                                            </span>
-                                        </div>
+                        <div className="relative">
+                            <div className="flex items-center gap-3 mb-4 text-gray-500">
+                                <div className="p-2 bg-indigo-100/50 rounded-xl text-indigo-600">
+                                    <Wallet size={20} />
+                                </div>
+                                <span className="font-bold text-sm uppercase tracking-wide">Tài chính tổng quan</span>
+                            </div>
+                            <div className="text-3xl font-bold text-gray-800 mb-2">
+                                {formatCurrency(financeStats.balance)}
+                            </div>
+                            <div className="flex gap-4 mt-6">
+                                <div>
+                                    <div className="text-xs text-gray-400 font-bold uppercase mb-1">Tổng thu</div>
+                                    <div className="flex items-center text-emerald-500 font-bold text-sm">
+                                        <ArrowUpRight size={16} className="mr-1" />
+                                        {formatCurrency(financeStats.income)}
                                     </div>
-                                )) : (
-                                    <div className="flex flex-col items-center justify-center h-full text-white/50 gap-2">
-                                        <div className="p-3 bg-white/10 rounded-full"><Zap size={24} /></div>
-                                        <p className="text-sm">Hết việc rồi! Chill thôi! ☕</p>
+                                </div>
+                                <div className="w-px bg-gray-100"></div>
+                                <div>
+                                    <div className="text-xs text-gray-400 font-bold uppercase mb-1">Tổng chi</div>
+                                    <div className="flex items-center text-red-500 font-bold text-sm">
+                                        <ArrowDownRight size={16} className="mr-1" />
+                                        {formatCurrency(financeStats.expense)}
                                     </div>
-                                )}
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* NEW: Holidays Countdown (Moved here) */}
-                    <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-6 shadow-sm border border-pink-100 h-auto transition-all duration-500">
-                        <div className="flex items-center justify-between mb-4">
+                    {/* Finance Goals */}
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                        <div className="flex items-center justify-between mb-6">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                <Gift size={18} className="text-rose-500" /> Lễ hội
+                                <Target size={18} className="text-pink-500" /> Mục tiêu Tài chính
                             </h3>
-                            <button
-                                onClick={() => setShowAllHolidays(!showAllHolidays)}
-                                className="text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors"
-                            >
-                                {showAllHolidays ? 'Thu gọn' : 'Xem thêm'}
-                            </button>
+                            <button onClick={() => onNavigate?.('finance')} className="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors">Xem thêm</button>
                         </div>
-                        <div className="space-y-3">
-                            {visibleHolidays.map((h: any, idx: number) => (
-                                <div key={idx} className="bg-white/80 p-3 rounded-2xl flex items-center justify-between shadow-sm border border-white/50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-white rounded-full shadow-sm">
-                                            {h.icon}
+                        <div className="space-y-4">
+                            {financeGoals.slice(0, 3).map(goal => {
+                                const percent = goal.target_amount ? Math.min(100, Math.round(((goal.current_amount || 0) / goal.target_amount) * 100)) : 0;
+                                return (
+                                    <div key={goal.id} className="group">
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span className="font-bold text-gray-700">{goal.title}</span>
+                                            <span className="text-gray-400 font-medium text-xs">{percent}%</span>
                                         </div>
-                                        <div>
-                                            <div className="font-bold text-sm text-gray-700">{h.name}</div>
-                                            <div className="text-xs text-gray-500 font-medium">{h.day}/{h.month}</div>
+                                        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-500 group-hover:shadow-[0_0_10px_rgba(236,72,153,0.4)]"
+                                                style={{ width: `${percent}%` }}
+                                            />
                                         </div>
+                                        <div className="text-[10px] text-gray-400 mt-1 text-right">{formatCurrency(goal.current_amount || 0)} / {formatCurrency(goal.target_amount || 0)}</div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="font-bold text-lg text-indigo-600 leading-none">{h.daysLeft}</div>
-                                        <div className="text-[10px] text-gray-400 font-bold uppercase">Ngày</div>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
+                            {financeGoals.length === 0 && <div className="text-center text-gray-400 text-sm py-4">Chưa có mục tiêu tài chính.</div>}
                         </div>
                     </div>
                 </div>

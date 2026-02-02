@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, TransactionType, Transaction, Goal, BudgetConfig } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, Maximize2, Minimize2, ExternalLink } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
 import { analyzeFinance } from '../services/aiService';
@@ -144,7 +144,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     const [budgetLimit, setBudgetLimit] = useState('');
     const [editingBudget, setEditingBudget] = useState<BudgetConfig | null>(null);
     const [selectedBudgetForDetails, setSelectedBudgetForDetails] = useState<BudgetConfig | null>(null);
-    const [detailViewMonth, setDetailViewMonth] = useState<string>('');
+    const [detailViewMonth, setDetailViewMonth] = useState<string | null>(null);
 
     // Filter State (Month)
     const today = new Date();
@@ -173,6 +173,9 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
     // History Filter State
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+    const [activeStatsCard, setActiveStatsCard] = useState<'income' | 'expense' | null>(null);
+
+    // --- Derived State ---
     const [showFilterMenu, setShowFilterMenu] = useState(false);
 
     // Balance Form State
@@ -462,82 +465,96 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
     const renderBudgets = () => {
         return (
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6 animate-fade-in">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-gray-800">Ngân sách Tháng {selectedMonth + 1}</h3>
-                    <button
-                        onClick={() => {
-                            setEditingBudget(null);
-                            setBudgetLimit('');
-                            // Default to first category if possible, or reset
-                            setSelectedBudgetCategory(expenseCategories[0]);
-                            setIsBudgetModalOpen(true);
-                        }}
-                        className="text-sm text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition-colors"
-                    >
-                        + Thiết lập
-                    </button>
-                </div>
+            <div className="relative mb-6 rounded-2xl p-[2px] overflow-hidden group shadow-lg animate-fade-in">
+                {/* Gold Running Border Effect */}
+                <div className="absolute inset-[-200%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#E2E8F0_0%,#FFD700_25%,#FDB931_50%,#FFD700_75%,#E2E8F0_100%)]"></div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {state.budgets
-                        ?.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`)
-                        .map(budget => {
-                            const progress = getBudgetProgress(budget.category);
-                            if (!progress) return null;
-                            const { spent, percent, isOver } = progress;
+                <div className="relative bg-white rounded-2xl p-6 h-full">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-gray-800">Ngân sách Tháng {selectedMonth + 1}</h3>
+                        <button
+                            onClick={() => {
+                                setEditingBudget(null);
+                                setBudgetLimit('');
+                                // Default to first category if possible, or reset
+                                setSelectedBudgetCategory(expenseCategories[0]);
+                                setIsBudgetModalOpen(true);
+                            }}
+                            className="text-sm text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition-colors"
+                        >
+                            + Thiết lập
+                        </button>
+                    </div>
 
-                            return (
-                                <div
-                                    key={budget.id}
-                                    onClick={() => {
-                                        setSelectedBudgetForDetails(budget);
-                                        setDetailViewMonth(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`);
-                                    }}
-                                    className="bg-gray-50 rounded-xl p-4 border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
-                                >
-                                    <div className="flex justify-between items-center mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">{budget.category}</span>
-                                            {isOver && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">Vượt</span>}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {state.budgets
+                            ?.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`)
+                            .map(budget => {
+                                const progress = getBudgetProgress(budget.category);
+                                if (!progress) return null;
+                                const { spent, percent, isOver } = progress;
+
+                                return (
+                                    <div
+                                        key={budget.id}
+                                        onClick={() => {
+                                            setSelectedBudgetForDetails(budget);
+                                            setDetailViewMonth(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`);
+                                        }}
+                                        className="bg-white rounded-2xl p-5 border border-gray-100 hover:shadow-lg hover:border-indigo-100 transition-all cursor-pointer group relative overflow-hidden"
+                                    >
+                                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-50 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
+
+                                        <div className="flex justify-between items-center mb-3 relative z-10">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                                    <Wallet size={20} />
+                                                </div>
+                                                <div>
+                                                    <span className="font-bold text-gray-800 text-sm md:text-base block">{budget.category}</span>
+                                                    {isOver && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold inline-block">Vượt ngân sách</span>}
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                                <button onClick={() => { setEditingBudget(budget); setBudgetLimit(budget.amount.toString()); setSelectedBudgetCategory(budget.category); setIsBudgetModalOpen(true); }} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm("Bạn có chắc chắn muốn xóa ngân sách này?")) {
+                                                            onDeleteBudget(budget.id);
+                                                        }
+                                                    }}
+                                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                                            <button onClick={() => { setEditingBudget(budget); setBudgetLimit(budget.amount.toString()); setSelectedBudgetCategory(budget.category); setIsBudgetModalOpen(true); }} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded"><Edit2 size={14} /></button>
-                                            <button
-                                                onClick={() => {
-                                                    if (window.confirm("Bạn có chắc chắn muốn xóa ngân sách này?")) {
-                                                        onDeleteBudget(budget.id);
-                                                    }
-                                                }}
-                                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-white rounded"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
+
+                                        <div className="flex justify-between text-xs font-medium text-gray-500 mb-2">
+                                            <span>Đã chi: <span className={isOver ? 'text-red-600 font-bold' : 'text-gray-900 font-bold'}>{formatCurrency(spent, lang)}</span></span>
+                                            <span className="text-gray-400">/ {formatCurrency(budget.amount, lang)}</span>
+                                        </div>
+
+                                        <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden shadow-inner">
+                                            <div
+                                                className={`h-full rounded-full transition-all duration-700 ease-out shadow-sm ${isOver ? 'bg-gradient-to-r from-red-500 to-rose-600' : percent > 80 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}
+                                                style={{ width: `${Math.min(percent, 100)}%` }}
+                                            />
                                         </div>
                                     </div>
-                                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                        <span>Đã chi: <span className={isOver ? 'text-red-600 font-bold' : 'text-gray-700'}>{formatCurrency(spent, lang)}</span></span>
-                                        <span>/ {formatCurrency(budget.amount, lang)}</span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                                        <div
-                                            className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-500' : percent > 80 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                                            style={{ width: `${Math.min(percent, 100)}%` }}
-                                        />
-                                    </div>
+                                );
+                            })}
+
+                        {(!state.budgets || state.budgets.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`).length === 0) && (
+                            <div className="col-span-1 md:col-span-2 text-center py-6 border-2 border-dashed border-gray-100 rounded-xl">
+                                <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-2 text-indigo-400">
+                                    <DollarSign size={20} />
                                 </div>
-                            );
-                        })}
-
-                    {(!state.budgets || state.budgets.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`).length === 0) && (
-                        <div className="col-span-1 md:col-span-2 text-center py-6 border-2 border-dashed border-gray-100 rounded-xl">
-                            <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-2 text-indigo-400">
-                                <DollarSign size={20} />
+                                <p className="text-gray-400 text-sm">Chưa thiết lập ngân sách</p>
+                                <button onClick={() => setIsBudgetModalOpen(true)} className="mt-2 text-indigo-600 text-xs font-bold hover:underline">Thêm ngay</button>
                             </div>
-                            <p className="text-gray-400 text-sm">Chưa thiết lập ngân sách</p>
-                            <button onClick={() => setIsBudgetModalOpen(true)} className="mt-2 text-indigo-600 text-xs font-bold hover:underline">Thêm ngay</button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
         );
@@ -698,8 +715,10 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
             const matchCategory = selectedCategoryFilter === 'all' || t.category === selectedCategoryFilter;
 
+
+
             return matchMonth && matchCategory;
-        });
+        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         const totalFilteredIncome = filteredTransactions.filter(t => t.type === TransactionType.INCOME && t.category !== 'Điều chỉnh số dư').reduce((a, b) => a + b.amount, 0);
         const totalFilteredExpense = filteredTransactions.filter(t => t.type === TransactionType.EXPENSE && t.category !== 'Điều chỉnh số dư').reduce((a, b) => a + b.amount, 0);
@@ -770,42 +789,56 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase sticky top-0 z-10">
                             <tr>
-                                <th className="px-6 py-4 font-semibold">Ngày</th>
-                                <th className="px-6 py-4 font-semibold">Danh mục</th>
-                                <th className="px-6 py-4 font-semibold">Mô tả (Ghi chú)</th>
-                                <th className="px-6 py-4 font-semibold text-right">Số tiền</th>
-                                <th className="px-6 py-4 font-semibold text-center">Hành động</th>
+                                <th className="px-4 py-3 md:px-6 md:py-4 font-semibold whitespace-nowrap">Ngày</th>
+                                <th className="px-4 py-3 md:px-6 md:py-4 font-semibold whitespace-nowrap">Danh mục</th>
+                                <th className="px-4 py-3 md:px-6 md:py-4 font-semibold min-w-[200px]">Mô tả (Ghi chú)</th>
+                                <th className="px-4 py-3 md:px-6 md:py-4 font-semibold text-right whitespace-nowrap">Số tiền</th>
+                                <th className="px-4 py-3 md:px-6 md:py-4 font-semibold text-center whitespace-nowrap">Hành động</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-gray-50">
                             {filteredTransactions.map(t => (
-                                <tr key={t.id} className="hover:bg-gray-50 transition-colors group">
-                                    <td className="px-6 py-4 text-sm text-gray-600 font-medium whitespace-nowrap">{t.date}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-medium ${t.type === TransactionType.INCOME ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                                <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors group border-b border-gray-100">
+                                    <td className="px-4 py-3 md:px-6 md:py-5">
+                                        <div className="flex flex-col">
+                                            <span className="text-gray-700 font-bold text-xs md:text-sm">{t.date.split('-').reverse().join('/')}</span>
+                                            <span className="text-[10px] text-gray-400">{new Date(t.date).toLocaleDateString('vi-VN', { weekday: 'short' })}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 md:px-6 md:py-5">
+                                        <span className={`px-2 py-1 rounded-lg text-xs font-bold border whitespace-nowrap ${t.type === TransactionType.INCOME
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                            : 'bg-rose-50 text-rose-700 border-rose-100'
+                                            }`}>
                                             {t.category}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate" title={t.description}>
-                                        {t.description}
+                                    <td className="px-4 py-3 md:px-6 md:py-5">
+                                        <div className="text-sm font-medium text-gray-700 line-clamp-1" title={t.description}>
+                                            {t.description}
+                                        </div>
+                                        {t.description && <div className="text-[10px] text-gray-400 mt-0.5">Note</div>}
                                     </td>
-                                    <td className={`px-6 py-4 text-right font-bold text-sm ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-gray-900'}`}>
+                                    <td className={`px-4 py-3 md:px-6 md:py-5 text-right font-bold text-sm whitespace-nowrap ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-gray-900'}`}>
                                         {t.type === TransactionType.INCOME ? '+' : '-'}{formatCurrency(t.amount, lang)}
                                     </td>
-                                    <td className="px-6 py-4 text-center flex justify-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => openEditModal(t)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all" title="Sửa">
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button onClick={() => onDeleteTransaction(t.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all" title="Xóa">
-                                            <Trash2 size={16} />
-                                        </button>
+                                    <td className="px-4 py-3 md:px-6 md:py-5 text-center">
+                                        <div className="flex justify-center gap-2">
+                                            <button onClick={() => openEditModal(t)} className="p-1.5 md:p-2 text-gray-400 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-indigo-100 rounded-lg transition-all shadow-sm" title="Sửa">
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button onClick={() => onDeleteTransaction(t.id)} className="p-1.5 md:p-2 text-gray-400 hover:text-red-600 hover:bg-white border border-transparent hover:border-red-100 rounded-lg transition-all shadow-sm" title="Xóa">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+
                     {filteredTransactions.length === 0 && (
                         <div className="p-12 text-center flex flex-col items-center justify-center text-gray-400">
                             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
@@ -816,7 +849,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
         );
     };
 
@@ -830,8 +863,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             {/* Top Header & Actions */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Tổng quan Tài chính</h2>
-                    <p className="text-gray-500 text-sm">Quản lý dòng tiền thông minh</p>
+                    <h2 className="text-2xl font-bold text-gray-800"> Tổng quan tài chính </h2>
+                    <p className="text-gray-400 text-sm">Manage Your Assets Wisely </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2 md:gap-3 items-center">
@@ -879,38 +912,70 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             </div>
 
             {/* Main Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-6">
-                <div className="col-span-2 md:col-span-1 bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:border-indigo-200 transition-colors">
-                    <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                    <div className="flex justify-between items-start relative z-10">
-                        <p className="text-gray-500 font-medium mb-1 text-xs md:text-base">Số dư khả dụng</p>
-                        <button onClick={() => setIsBalanceModalOpen(true)} className="p-1 px-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors" title="Sửa số dư">
-                            <Edit2 size={12} />
-                        </button>
-                    </div>
-                    <h3 className="text-xl md:text-3xl font-bold text-gray-800 relative z-10">{formatCurrency(stats.totalBalance, lang)}</h3>
-                    <div className="mt-2 md:mt-4 flex items-center text-indigo-600 text-xs md:text-sm font-medium relative z-10">
-                        <DollarSign size={14} className="mr-1" />
-                        Hiện có
-                    </div>
+            {/* Main Stats Cards - Compact & Minimal */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                {/* Balance Card - Luxurious Circle */}
+                <div className="col-span-2 md:col-span-1 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center relative overflow-hidden group">
+                    {/* Decorative Circle */}
+                    <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 blur-xl"></div>
+                    <div className="absolute right-2 top-2 w-12 h-12 rounded-full border border-indigo-50/50"></div>
+
+                    <button
+                        onClick={() => setIsBalanceModalOpen(true)}
+                        className="absolute top-2 right-4 text-gray-300 hover:text-indigo-600 transition-colors p-1"
+                    >
+                        <Edit2 size={16} />
+                    </button>
+
+                    <p className="text-gray-400 font-bold text-[10px] uppercase tracking-wider mb-1 relative z-10">Số dư khả dụng</p>
+                    <h3 className="text-2xl font-bold tracking-tight text-gray-900 relative z-10">{formatCurrency(stats.totalBalance, lang)}</h3>
                 </div>
 
-                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group">
-                    <div className="flex justify-between items-center mb-1">
-                        <p className="text-gray-500 font-medium text-[10px] md:text-base">Thu nhập tháng {selectedMonth + 1}</p>
-                        <button onClick={() => setViewMode('history')} className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition-colors opacity-0 group-hover:opacity-100">Chi tiết</button>
+                {/* Income Card - 2-Step Interaction */}
+                <button
+                    onClick={() => setActiveStatsCard(activeStatsCard === 'income' ? null : 'income')}
+                    className={`col-span-1 bg-white p-4 rounded-2xl shadow-sm border flex flex-col justify-center text-left transition-all group relative
+                        ${activeStatsCard === 'income' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-gray-100 hover:border-emerald-100 hover:shadow-md'}
+                    `}
+                >
+                    <div className="flex justify-between w-full">
+                        <p className={`font-bold text-[10px] uppercase tracking-wider mb-1 transition-colors ${activeStatsCard === 'income' ? 'text-emerald-600' : 'text-gray-400 group-hover:text-emerald-500'}`}>Thu nhập T{selectedMonth + 1}</p>
+                        {activeStatsCard === 'income' && (
+                            <div
+                                onClick={(e) => { e.stopPropagation(); setViewMode('history'); }}
+                                className="absolute top-2 right-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full cursor-pointer hover:bg-emerald-100 flex items-center gap-1 animate-in fade-in zoom-in"
+                            >
+                                Chi tiết <ExternalLink size={10} />
+                            </div>
+                        )}
                     </div>
-                    <h3 className="text-base md:text-3xl font-bold text-emerald-600 truncate">{formatCurrency(stats.currentMonthIncome, lang)}</h3>
-                </div>
+                    <h3 className="text-xl md:text-2xl font-bold tracking-tight text-emerald-600">+{formatCurrency(stats.currentMonthIncome, lang)}</h3>
+                </button>
 
-                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group">
-                    <div className="flex justify-between items-center mb-1">
-                        <p className="text-gray-500 font-medium text-[10px] md:text-base">Chi tiêu tháng {selectedMonth + 1}</p>
-                        <button onClick={() => setViewMode('history')} className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition-colors opacity-0 group-hover:opacity-100">Chi tiết</button>
+                {/* Expense Card - 2-Step Interaction */}
+                <button
+                    onClick={() => setActiveStatsCard(activeStatsCard === 'expense' ? null : 'expense')}
+                    className={`col-span-1 bg-white p-4 rounded-2xl shadow-sm border flex flex-col justify-center text-left transition-all group relative
+                        ${activeStatsCard === 'expense' ? 'border-rose-200 ring-2 ring-rose-50' : 'border-gray-100 hover:border-rose-100 hover:shadow-md'}
+                    `}
+                >
+                    <div className="flex justify-between w-full">
+                        <p className={`font-bold text-[10px] uppercase tracking-wider mb-1 transition-colors ${activeStatsCard === 'expense' ? 'text-rose-600' : 'text-gray-400 group-hover:text-rose-500'}`}>Chi tiêu T{selectedMonth + 1}</p>
+                        {activeStatsCard === 'expense' && (
+                            <div
+                                onClick={(e) => { e.stopPropagation(); setViewMode('history'); }}
+                                className="absolute top-2 right-2 text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-full cursor-pointer hover:bg-rose-100 flex items-center gap-1 animate-in fade-in zoom-in"
+                            >
+                                Chi tiết <ExternalLink size={10} />
+                            </div>
+                        )}
                     </div>
-                    <h3 className="text-base md:text-3xl font-bold text-red-500 truncate">{formatCurrency(stats.currentMonthExpense, lang)}</h3>
-                </div>
+                    <h3 className="text-xl md:text-2xl font-bold tracking-tight text-rose-600">-{formatCurrency(stats.currentMonthExpense, lang)}</h3>
+                </button>
             </div>
+
+
+
 
             {/* Budget Section */}
             {renderBudgets()}
@@ -989,13 +1054,28 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             <div className="h-64 md:h-80 w-full" style={{ minHeight: '300px' }}>
                                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                     <BarChart data={stats.monthlyChartData} barGap={8}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} dy={10} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} tickFormatter={(value) => `${value / 1000000}M`} />
-                                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => formatCurrency(value || 0, lang)} />
-                                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                        <Bar dataKey="income" name="Thu nhập" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                                        <Bar dataKey="expense" name="Chi tiêu" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                                        <defs>
+                                            <linearGradient id="colorBarIncome" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#34D399" stopOpacity={1} />
+                                                <stop offset="100%" stopColor="#10B981" stopOpacity={1} />
+                                            </linearGradient>
+                                            <linearGradient id="colorBarExpense" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#F87171" stopOpacity={1} />
+                                                <stop offset="100%" stopColor="#EF4444" stopOpacity={1} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12, fontWeight: 500 }} dy={10} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={(value) => `${value / 1000000}M`} />
+                                        <Tooltip
+                                            cursor={{ fill: '#F9FAFB' }}
+                                            contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', padding: '12px' }}
+                                            formatter={(value: number | undefined) => formatCurrency(value || 0, lang)}
+                                            itemStyle={{ fontWeight: 600, paddingBottom: '4px' }}
+                                        />
+                                        <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
+                                        <Bar dataKey="income" name="Thu nhập" fill="url(#colorBarIncome)" radius={[6, 6, 0, 0]} maxBarSize={50} />
+                                        <Bar dataKey="expense" name="Chi tiêu" fill="url(#colorBarExpense)" radius={[6, 6, 0, 0]} maxBarSize={50} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -1264,40 +1344,74 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
             {
                 isModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-                            <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50 flex-shrink-0">
-                                <h3 className="font-bold text-lg text-gray-800">{editingTransaction ? 'Sửa Giao dịch' : 'Thêm Giao dịch mới'}</h3>
-                                <button onClick={() => { setIsModalOpen(false); setEditingTransaction(null); }}><X size={24} className="text-gray-400" /></button>
+                    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col transform transition-all scale-100">
+
+                            {/* Header - Minimal, No Title */}
+                            <div className="absolute top-4 right-4 z-10">
+                                <button
+                                    onClick={() => { setIsModalOpen(false); setEditingTransaction(null); }}
+                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
                             </div>
-                            <div className="overflow-y-auto p-6 scrollbar-thin">
-                                <form onSubmit={handleAddSubmit} className="space-y-4">
-                                    <div className="flex bg-gray-100 p-1 rounded-xl">
-                                        <button type="button" className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${type === TransactionType.EXPENSE ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`} onClick={() => setType(TransactionType.EXPENSE)}>Chi tiêu</button>
-                                        <button type="button" className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${type === TransactionType.INCOME ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500'}`} onClick={() => setType(TransactionType.INCOME)}>Thu nhập</button>
+
+                            {/* Body */}
+                            <div className="overflow-y-auto px-6 pt-12 pb-6 scrollbar-thin">
+                                <form onSubmit={handleAddSubmit} className="space-y-6">
+
+                                    {/* Type Switcher */}
+                                    <div className="bg-gray-100/80 p-1.5 rounded-2xl flex relative">
+                                        <button
+                                            type="button"
+                                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 relative z-10 flex items-center justify-center gap-2
+                                                ${type === TransactionType.EXPENSE ? 'text-rose-600 shadow-sm bg-white' : 'text-gray-500 hover:text-gray-700'}`}
+                                            onClick={() => setType(TransactionType.EXPENSE)}
+                                        >
+                                            <TrendingDown size={16} /> Chi tiêu
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 relative z-10 flex items-center justify-center gap-2
+                                                ${type === TransactionType.INCOME ? 'text-emerald-600 shadow-sm bg-white' : 'text-gray-500 hover:text-gray-700'}`}
+                                            onClick={() => setType(TransactionType.INCOME)}
+                                        >
+                                            <TrendingUp size={16} /> Thu nhập
+                                        </button>
                                     </div>
+
+                                    {/* Amount Input */}
                                     <div>
-                                        <label className="text-xs font-semibold text-gray-500 uppercase ml-1">Số tiền</label>
-                                        <div className="relative">
+                                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Số tiền</label>
+                                        <div className="relative group">
                                             <input
                                                 type="number"
                                                 required
                                                 value={amount}
                                                 onChange={(e) => setAmount(e.target.value)}
-                                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xl font-bold text-gray-800 pr-12"
+                                                className={`w-full p-4 bg-gray-50/50 border-2 rounded-2xl outline-none text-2xl font-bold pr-12 transition-all
+                                                    ${type === TransactionType.EXPENSE ? 'text-rose-600 border-transparent focus:border-rose-100 focus:bg-white focus:ring-4 focus:ring-rose-50' : 'text-emerald-600 border-transparent focus:border-emerald-100 focus:bg-white focus:ring-4 focus:ring-emerald-50'}
+                                                    placeholder-gray-300
+                                                `}
                                                 placeholder="0"
+                                                autoFocus
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => setShowCalculator(!showCalculator)}
-                                                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors ${showCalculator ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400 hover:text-indigo-600 hover:bg-gray-100'}`}
+                                                className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all
+                                                    ${showCalculator ? 'bg-indigo-100 text-indigo-600 shadow-inner' : 'text-gray-300 hover:text-indigo-500 hover:bg-indigo-50'}
+                                                `}
                                                 title="Máy tính"
                                             >
                                                 <CalculatorIcon size={20} />
                                             </button>
                                         </div>
+
+                                        {/* Calculator Preview */}
                                         {showCalculator && (
-                                            <div className="mt-2 text-sm">
+                                            <div className="mt-3 overflow-hidden rounded-2xl shadow-lg border border-gray-100 animate-in slide-in-from-top-2">
                                                 <Calculator
                                                     initialValue={amount}
                                                     onComplete={(val) => {
@@ -1308,50 +1422,100 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                 />
                                             </div>
                                         )}
-                                        <div className="flex justify-end mt-1 text-xs text-indigo-600 font-bold">
-                                            {amount && !isNaN(Number(amount)) && formatCurrency(Number(amount), lang)}
+
+                                        {/* Currency Helper */}
+                                        <div className={`flex justify-end mt-2 text-xs font-bold transition-opacity ${amount ? 'opacity-100' : 'opacity-0'}`}>
+                                            <span className="bg-gray-100 px-2 py-1 rounded-lg text-gray-500">
+                                                {amount && !isNaN(Number(amount)) && formatCurrency(Number(amount), lang)}
+                                            </span>
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-semibold text-gray-500 uppercase ml-1">Danh mục</label>
-                                        <select
-                                            value={isAddingNewCategory ? 'NEW_CATEGORY' : category}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                if (val === 'NEW_CATEGORY') {
-                                                    setIsAddingNewCategory(true);
-                                                    setCategory('');
-                                                } else {
-                                                    setIsAddingNewCategory(false);
-                                                    setCategory(val);
-                                                }
-                                            }}
-                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-                                        >
-                                            {(type === TransactionType.INCOME ? incomeCategories : expenseCategories).map(c => <option key={c} value={c}>{c}</option>)}
-                                            <option value="NEW_CATEGORY" className="font-bold text-indigo-600">+ Thêm danh mục mới...</option>
-                                        </select>
+
+                                    {/* Category Select */}
+                                    {/* Category Select Grid */}
+                                    <div className="space-y-3">
+                                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Danh mục</label>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
+                                            {(type === TransactionType.INCOME ? incomeCategories : expenseCategories).map(c => (
+                                                <button
+                                                    key={c}
+                                                    type="button"
+                                                    onClick={() => { setCategory(c); setIsAddingNewCategory(false); }}
+                                                    className={`p-3 rounded-2xl text-sm font-bold transition-all border-2 text-left truncate flex items-center gap-2
+                                                        ${category === c
+                                                            ? (type === TransactionType.EXPENSE ? 'bg-rose-50 border-rose-100 text-rose-600 shadow-sm ring-2 ring-rose-50' : 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-sm ring-2 ring-emerald-50')
+                                                            : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50 hover:border-gray-200'
+                                                        }
+                                                    `}
+                                                >
+                                                    <div className={`w-2 h-2 rounded-full ${category === c ? (type === TransactionType.EXPENSE ? 'bg-rose-500' : 'bg-emerald-500') : 'bg-gray-300'}`}></div>
+                                                    {c}
+                                                </button>
+                                            ))}
+                                            <button
+                                                type="button"
+                                                onClick={() => { setCategory(''); setIsAddingNewCategory(true); }}
+                                                className={`p-3 rounded-2xl text-sm font-bold transition-all border-2 border-dashed flex items-center justify-center gap-1
+                                                    ${isAddingNewCategory
+                                                        ? 'border-indigo-300 bg-indigo-50 text-indigo-600'
+                                                        : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-500'
+                                                    }
+                                                `}
+                                            >
+                                                <Plus size={16} /> Khác
+                                            </button>
+                                        </div>
 
                                         {isAddingNewCategory && (
-                                            <input
-                                                type="text"
-                                                autoFocus
-                                                value={newCategoryName}
-                                                onChange={(e) => setNewCategoryName(e.target.value)}
-                                                className="w-full p-3 mt-2 bg-indigo-50 border-2 border-indigo-200 rounded-xl outline-none text-indigo-700 placeholder-indigo-300 font-medium animate-fade-in"
-                                                placeholder="Nhập tên danh mục mới..."
-                                            />
+                                            <div className="animate-in fade-in slide-in-from-top-2 pt-2">
+                                                <input
+                                                    placeholder="Nhập tên danh mục mới..."
+                                                    value={newCategoryName}
+                                                    onChange={(e) => setNewCategoryName(e.target.value)}
+                                                    className="w-full p-4 bg-indigo-50/50 border-2 border-indigo-100 text-indigo-700 rounded-2xl outline-none font-bold placeholder-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50 transition-all"
+                                                    autoFocus
+                                                />
+                                            </div>
                                         )}
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-semibold text-gray-500 uppercase ml-1">Ngày</label>
-                                        <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" />
+
+                                    {/* Date & Desc Grid */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="col-span-2 md:col-span-1">
+                                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Ngày</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="date"
+                                                    required
+                                                    value={date}
+                                                    onChange={(e) => setDate(e.target.value)}
+                                                    className="w-full p-3.5 bg-gray-50/50 border-2 border-transparent rounded-2xl outline-none text-gray-700 font-semibold focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-50 transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="col-span-2 md:col-span-1">
+                                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Note</label>
+                                            <input
+                                                placeholder="Chi tiết..."
+                                                value={desc}
+                                                onChange={(e) => setDesc(e.target.value)}
+                                                className="w-full p-3.5 bg-gray-50/50 border-2 border-transparent rounded-2xl outline-none text-gray-700 font-medium focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-50 transition-all placeholder-gray-400"
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-semibold text-gray-500 uppercase ml-1">Ghi chú (Mô tả)</label>
-                                        <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" placeholder="Chi tiết..." />
-                                    </div>
-                                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg mt-2">{editingTransaction ? 'Cập nhật' : 'Lưu lại'}</button>
+
+                                    {/* Submit Button */}
+                                    <button
+                                        type="submit"
+                                        className={`w-full py-4 rounded-2xl font-bold text-white shadow-xl transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4
+                                            ${type === TransactionType.EXPENSE
+                                                ? 'bg-gradient-to-r from-rose-500 to-red-600 shadow-rose-200 hover:bg-rose-600'
+                                                : 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-200 hover:bg-emerald-600'}
+                                        `}
+                                    >
+                                        {editingTransaction ? <Edit2 size={20} /> : <Plus size={20} />}
+                                        {editingTransaction ? 'Cập nhật' : 'Lưu Giao dịch'}
+                                    </button>
                                 </form>
                             </div>
                         </div>
