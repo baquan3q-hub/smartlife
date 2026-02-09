@@ -4,8 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, Maximize2, Minimize2, ExternalLink } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
-import { analyzeFinance } from '../services/aiService';
-import FinanceAI from './FinanceAI';
+import { analyzeFinance } from '../services/financeService';
 
 
 
@@ -1051,7 +1050,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                             <h3 className="text-lg font-bold text-gray-800 mb-6">Biểu đồ Thu - Chi 6 tháng gần nhất</h3>
-                            <div className="h-64 md:h-80 w-full" style={{ minHeight: '300px' }}>
+                            <div className="h-64 md:h-80 w-full min-h-[300px]" >
                                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                     <BarChart data={stats.monthlyChartData} barGap={8}>
                                         <defs>
@@ -1084,7 +1083,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         <div className="space-y-6">
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                 <h3 className="text-lg font-bold text-gray-800 mb-2">Cơ cấu chi tiêu tháng {selectedMonth + 1}</h3>
-                                <div className="h-48 relative w-full" style={{ minHeight: '200px' }}>
+                                <div className="h-48 relative w-full min-h-[200px]" >
                                     {stats.categoryData.length > 0 ? (
                                         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                             <PieChart>
@@ -1129,7 +1128,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <TrendingUp className="text-indigo-600" /> Xu hướng Thu nhập & Chi tiêu
                     </h3>
-                    <div className="h-80 w-full" style={{ minHeight: '320px' }}>
+                    <div className="h-80 w-full min-h-[320px]" >
                         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <AreaChart data={stats.monthlyChartData}>
                                 <defs>
@@ -1743,7 +1742,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                 )
             }
 
-            <FinanceAI context={financeContext} />
+
         </div >
     );
 };

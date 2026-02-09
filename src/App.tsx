@@ -223,7 +223,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     });
 
                     if (token) {
-                        console.log("Token của Cun nè:", token);
+                        // Token loaded successfully
                     }
                 }
             } catch (error) {
@@ -524,10 +524,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             setAppState((prev: AppState) => ({ ...prev, timetable: prevTimetable }));
         }
     };
-    const handleAddTodo = async (content: string, priority: any) => {
+    const handleAddTodo = async (content: string, priority: any, deadline?: string) => {
         if (!user) return;
         const tempId = crypto.randomUUID();
-        const newItem = { id: tempId, content, priority, is_completed: false, user_id: user.id };
+        const newItem = { id: tempId, content, priority, is_completed: false, user_id: user.id, deadline };
 
         // Optimistic UI: Update local state immediately
         setAppState((prev: AppState) => ({ ...prev, todos: [newItem, ...prev.todos] }));
@@ -547,7 +547,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
         try {
             const { data, error } = await supabase.from('todos').insert([{
-                content, priority: dbPriority, is_completed: false, user_id: user.id
+                content, priority: dbPriority, is_completed: false, user_id: user.id, deadline
             }]).select().single();
 
             if (error) throw error;
@@ -673,7 +673,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 </header>
 
                 <div className="max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative h-full"> {/* Ensure relative for absolute positioning if needed */}
-                    {activeTab === 'visual' && <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} onNavigate={(tab) => {
+                    {activeTab === 'visual' && <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} onNavigate={(tab) => {
                         if (tab === 'music') {
                             setStartInFocusMode(true);
                             setActiveTab('schedule');

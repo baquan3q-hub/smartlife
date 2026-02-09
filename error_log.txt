@@ -1,3 +1,0 @@
-{
-  "response": "Xin lỗi, tôi đang gặp trục trặc kết nối model. Bạn thử lại sau nhé! 😓"
-}

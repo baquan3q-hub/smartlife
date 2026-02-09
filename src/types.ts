@@ -78,6 +78,7 @@ export interface Todo {
   content: string;
   is_completed: boolean;
   priority: 'low' | 'medium' | 'high' | 'urgent' | 'focus' | 'chill' | 'temp';
+  deadline?: string;
 }
 
 // Interface cho Ngân sách (Budget)
@@ -148,4 +149,20 @@ export interface SmartInsight {
   action_link?: string;
   is_read: boolean;
   created_at?: string;
+}
+
+// 6. My Storage
+export interface StorageItem {
+  id: string;
+  user_id?: string;
+  type: 'note' | 'link' | 'file' | 'image' | 'audio' | 'video';
+  title: string;
+  content?: string;
+  file_url?: string;
+  file_name?: string;
+  file_size?: number;
+  metadata?: Record<string, any>;
+  is_pinned?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }

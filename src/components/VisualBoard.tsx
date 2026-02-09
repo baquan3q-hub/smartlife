@@ -1,15 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { AppState, Goal, Todo, TimetableEvent } from '../types';
-import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole } from 'lucide-react';
+import MyStorage from './MyStorage';
 
 interface VisualBoardProps {
     appState: AppState;
     userName?: string;
+    userId?: string;
     onNavigate?: (tab: 'finance' | 'schedule' | 'music') => void;
 }
 
-const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigate }) => {
+const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, onNavigate }) => {
     const [showAllHolidays, setShowAllHolidays] = useState(false);
+    const [showStorage, setShowStorage] = useState(false);
 
     // derived data
     // 1. Finance: All-time stats
@@ -186,9 +189,22 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
                     {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </div>
                 <h1 className="text-3xl md:text-3xl font-bold text-gray-800">
-                    Hello {userName || 'bạn'}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-600">chúc một ngày tốt lành! ✨</span>
+                    Hello {userName || 'ban'}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-600">Have a nice day</span>
                 </h1>
             </header>
+
+            {/* My Storage Toggle - Discreet */}
+            <button
+                onClick={() => setShowStorage(true)}
+                className="fixed bottom-24 right-6 z-50 w-12 h-12 bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 transition-all hover:scale-110 group"
+                title="My Storage"
+            >
+                <Archive size={20} />
+                <span className="absolute right-full mr-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">My Storage</span>
+            </button>
+
+            {/* My Storage Modal */}
+            <MyStorage isOpen={showStorage} onClose={() => setShowStorage(false)} userId={userId || ''} />
 
             {/* 2. MAIN SCHEDULE SECTION (TOP) */}
             <div className="mb-8">
@@ -501,6 +517,55 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, onNavigat
                     </div>
                 </div>
 
+            </div>
+
+            {/* MY STORAGE PROMO SECTION */}
+            <div className="mt-8 mb-4">
+                <div
+                    onClick={() => setShowStorage(true)}
+                    className="relative bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 rounded-3xl p-8 md:p-10 shadow-2xl cursor-pointer group overflow-hidden hover:shadow-[0_20px_60px_rgba(0,0,0,0.3)] transition-all duration-500"
+                >
+                    {/* Decorative elements */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-indigo-500/20 transition-colors duration-500" />
+                    <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl -ml-12 -mb-12 group-hover:bg-purple-500/20 transition-colors duration-500" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-700" />
+
+                    {/* Grid pattern overlay */}
+                    <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} />
+
+                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 md:gap-10">
+                        {/* Icon */}
+                        <div className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shrink-0">
+                            <LockKeyhole size={36} className="text-white" />
+                        </div>
+
+                        {/* Text */}
+                        <div className="text-center md:text-left flex-1">
+                            <h3 className="text-2xl md:text-3xl font-bold text-white mb-2 group-hover:text-indigo-200 transition-colors">
+                                My Storage
+                            </h3>
+                            <p className="text-gray-400 text-sm md:text-base max-w-lg leading-relaxed">
+                                Kho lưu trữ riêng tư — Ghi chú, liên kết, tệp tin, hình ảnh, âm thanh & video.
+                                Mọi thứ quan trọng, tất cả ở một nơi an toàn.
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-4 justify-center md:justify-start">
+                                <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-xs font-semibold">Ghi chú</span>
+                                <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs font-semibold">Liên kết</span>
+                                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs font-semibold">Tệp tin</span>
+                                <span className="px-3 py-1 bg-pink-500/20 text-pink-300 rounded-full text-xs font-semibold">Hình ảnh</span>
+                                <span className="px-3 py-1 bg-violet-500/20 text-violet-300 rounded-full text-xs font-semibold">Âm thanh</span>
+                                <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded-full text-xs font-semibold">Video</span>
+                            </div>
+                        </div>
+
+                        {/* CTA */}
+                        <div className="shrink-0">
+                            <div className="bg-white text-gray-900 px-6 py-3 rounded-2xl font-bold text-sm shadow-lg group-hover:bg-indigo-100 group-hover:scale-105 transition-all duration-300 flex items-center gap-2">
+                                <LockKeyhole size={16} /> Mở kho
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

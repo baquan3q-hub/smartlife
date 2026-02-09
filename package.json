@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite\" \"python -m api.index\"",
+    "dev": "concurrently \"vite\" \"uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload\"",
     "dev:frontend": "vite",
-    "dev:backend": "python -m api.index",
+    "dev:backend": "uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -16,7 +16,7 @@
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "@capacitor/preferences": "^8.0.0",
-    "@google/generative-ai": "^0.24.1",
+    "@google/generative-ai": "^0.21.0",
     "@supabase/supabase-js": "^2.90.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

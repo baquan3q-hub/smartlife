@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, MessageCircle, User } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, MessageCircle, User, Archive, LockKeyhole, Star, Headphones, Coffee } from 'lucide-react';
 import InstallGuideModal from './InstallGuideModal';
 
 interface LandingPageProps {
@@ -31,9 +31,19 @@ const translations = {
         featScheduleDesc: 'Thời khóa biểu trực quan, To-do list ưu tiên thông minh và chế độ Focus mode giúp bạn tập trung hoàn thành mọi công việc.',
         featScheduleItems: ['Thời khóa biểu tuần/ngày', 'Todo list theo mức độ ưu tiên', 'Focus Timer tích hợp'],
 
+        featFocusTitle: 'Tập trung cao độ,\nThư giãn tuyệt đối.',
+        featFocusDesc: 'Chế độ Focus với bộ đếm giờ Pomodoro và kho nhạc Lofi chill giúp bạn duy trì sự tập trung và giảm căng thẳng khi học tập, làm việc.',
+        featFocusItems: ['Bộ đếm giờ Pomodoro tùy chỉnh', 'Kho nhạc Lofi & Background Sounds', 'Thống kê thời gian tập trung'],
+
         featGoalsTitle: 'Đặt mục tiêu,\nHiện thực hóa ước mơ.',
         featGoalsDesc: 'Theo dõi từng bước tiến của bạn với tính năng quản lý mục tiêu dài hạn và ngắn hạn. Đừng chỉ mơ ước, hãy thực hiện.',
         featGoalsItems: ['Theo dõi tiến độ trực quan', 'Nhắc nhở hạn chót', 'Giao diện lịch vạn niên'],
+
+        promoTag: 'Tính năng mới',
+        promoTitle: 'Khám phá My Storage',
+        promoDesc: 'Không gian lưu trữ cá nhân bảo mật. Ghi chú, tệp tin, hình ảnh & đa phương tiện - tất cả trong một nơi duy nhất.',
+        promoBtn: 'Trải nghiệm ngay',
+        featStorageItems: ['Ghi chú đa phương tiện (Rich Text)', 'Lưu trữ & Xem trước Tệp tin/Media', 'Bảo mật tuyệt đối & Riêng tư'],
 
         contactTitle: 'Kết nối với tôi',
         contactDesc: 'Liên hệ để hợp tác hoặc đóng góp ý kiến phát triển ứng dụng.',
@@ -62,9 +72,18 @@ const translations = {
         featScheduleDesc: 'Visual timetable, smart prioritized To-do list, and Focus mode to help you concentrate on getting things done.',
         featScheduleItems: ['Weekly/Daily timetable', 'Priority-based Todo list', 'Integrated Focus Timer'],
 
+        featFocusTitle: 'Deep Focus,\nAbsolute Relaxation.',
+        featFocusDesc: 'Focus mode with Pomodoro timer and chill Lofi music library helps you maintain concentration and reduce stress while studying or working.',
+        featFocusItems: ['Customizable Pomodoro Timer', 'Lofi Music & Background Sounds', 'Focus Time Statistics'],
+
         featGoalsTitle: 'Set Goals,\nRealize Dreams.',
         featGoalsDesc: 'Track your every step with long-term and short-term goal management. Don\'t just dream, make it happen.',
         featGoalsItems: ['Visual progress tracking', 'Deadline reminders', 'Perpetual calendar interface'],
+        promoTag: 'New Feature',
+        promoTitle: 'Discover My Storage',
+        promoDesc: 'Secure personal storage space. Notes, files, images & media - all in one single place.',
+        promoBtn: 'Experience Now',
+        featStorageItems: ['Rich Text Multimedia Notes', 'Store & Preview Files/Media', 'Absolute Security & Privacy'],
 
         contactTitle: 'Connect with Me',
         contactDesc: 'Contact for collaboration or feedback on app development.',
@@ -246,6 +265,44 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     </div>
                 </section>
 
+                {/* Feature 2.5: Focus & Music (NEW) */}
+                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-purple-50/30 py-20 rounded-3xl border border-purple-50">
+                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                        <div className="order-2 md:order-1 relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-purple-200 to-pink-200 rounded-3xl blur-xl opacity-70 group-hover:opacity-100 transition-opacity"></div>
+                            {/* Image Composition */}
+                            <div className="relative">
+                                <img
+                                    src="/assets/focus_feature_2.png"
+                                    alt="Focus Timer"
+                                    className="relative rounded-2xl shadow-2xl border border-gray-100 transform group-hover:scale-105 transition-transform duration-500 z-10"
+                                />
+                                <img
+                                    src="/assets/focus_feature_1.png"
+                                    alt="Music Player"
+                                    className="absolute -bottom-8 -right-4 w-2/5 rounded-2xl shadow-2xl border border-gray-100 transform rotate-3 group-hover:rotate-6 transition-transform duration-500 z-20"
+                                />
+                            </div>
+                        </div>
+                        <div className="order-1 md:order-2 space-y-6">
+                            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                                <Headphones size={28} />
+                            </div>
+                            <h2 className="text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featFocusTitle}</h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {t.featFocusDesc}
+                            </p>
+                            <ul className="space-y-3">
+                                {t.featFocusItems && t.featFocusItems.map((item: string, i: number) => (
+                                    <li key={i} className="flex items-center gap-3 text-gray-700 font-medium">
+                                        <Zap className="text-purple-500" size={20} /> {item}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Feature 3: Goals */}
                 <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -272,6 +329,75 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                     </li>
                                 ))}
                             </ul>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Promo Banner: My Storage */}
+                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+                    <div className="relative rounded-3xl overflow-hidden shadow-2xl group cursor-pointer bg-gradient-to-r from-blue-900 to-indigo-900" onClick={onLogin}>
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-overlay group-hover:scale-105 transition-transform duration-700" />
+
+                        <div className="relative z-10 p-8 md:p-12 grid md:grid-cols-2 gap-12 items-center">
+                            {/* Content */}
+                            <div className="text-center md:text-left">
+                                <div className="inline-block px-4 py-1.5 rounded-full bg-blue-500/30 border border-blue-400/30 text-blue-200 text-xs font-bold uppercase tracking-wider mb-6">
+                                    {t.promoTag}
+                                </div>
+                                <h2 className="text-3xl md:text-4xl font-black text-white mb-6 leading-tight">
+                                    {t.promoTitle}
+                                </h2>
+                                <p className="text-blue-100 text-lg mb-8 leading-relaxed">
+                                    {t.promoDesc}
+                                </p>
+
+                                {/* Feature List */}
+                                <ul className="space-y-3 mb-8 text-left inline-block">
+                                    {t.featStorageItems && t.featStorageItems.map((item: string, i: number) => (
+                                        <li key={i} className="flex items-center gap-3 text-blue-50 font-medium">
+                                            <div className="p-1 rounded-full bg-blue-500/20 text-blue-300">
+                                                <ShieldCheck size={16} />
+                                            </div>
+                                            {item}
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                <div>
+                                    <button className="px-8 py-3 bg-white text-indigo-900 rounded-xl font-bold hover:bg-blue-50 transition-colors shadow-lg hover:shadow-xl flex items-center gap-2 mx-auto md:mx-0 group-hover:scale-105 transform duration-300">
+                                        <Archive size={20} />
+                                        {t.promoBtn}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Images Composition */}
+                            <div className="relative h-full min-h-[300px] flex items-center justify-center">
+                                {/* Back Image (Files/Images) */}
+                                <div className="absolute top-0 right-0 w-3/4 transform translate-x-4 -translate-y-4 rotate-3 group-hover:rotate-6 transition-transform duration-500">
+                                    <img
+                                        src="/assets/storage_feature_2.png"
+                                        alt="My Storage Files"
+                                        className="rounded-xl shadow-2xl border border-white/20 w-full"
+                                    />
+                                </div>
+
+                                {/* Front Image (Notes) */}
+                                <div className="absolute bottom-0 left-0 w-3/4 transform -translate-x-4 translate-y-4 -rotate-3 group-hover:-rotate-6 transition-transform duration-500 z-10">
+                                    <img
+                                        src="/assets/storage_feature_1.png"
+                                        alt="My Storage Notes"
+                                        className="rounded-xl shadow-2xl border border-white/20 w-full"
+                                    />
+                                </div>
+
+                                {/* Floating Decor */}
+                                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20">
+                                    <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-lg animate-bounce">
+                                        <LockKeyhole size={32} className="text-white" />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>

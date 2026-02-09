@@ -1,5 +1,7 @@
 
 import os
+import time
+from dotenv import load_dotenv
 import google.generativeai as genai
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,12 +10,11 @@ from typing import List, Optional
 import json
 
 # --- CONFIGURATION ---
-# Check if running in Vercel (environment variable usually present or we can infer)
-# For Vercel, we might need root_path="/api" if the rewrite handles it that way.
-# However, Vercel Serverless often strips the prefix before handing to WSGI?
-# Actually, vercel.json rewrite "/api/(.*)" -> "/api/index.py"
-# The ASGI app receives the full path including /api prefix usually.
-# Safest bet: handle both or use root_path.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ENV_FILE = os.path.join(PROJECT_ROOT, '.env.local')
+
+load_dotenv(ENV_FILE, override=True)
+load_dotenv(override=True) 
 
 app = FastAPI(
     docs_url="/api/docs", 
@@ -29,20 +30,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API Key Check
-api_key = os.getenv("GEMINI_API_KEY") 
-if api_key:
-    genai.configure(api_key=api_key)
-else:
-    print("Warning: GEMINI_API_KEY not set in environment variables.")
-
 # --- MODELS ---
 class Transaction(BaseModel):
     id: str
     amount: float
     category: str
     date: str
-    type: str # 'income' or 'expense'
+    type: str
 
 class ChatRequest(BaseModel):
     message: str
@@ -57,30 +51,26 @@ class CommandRequest(BaseModel):
     command: str
     current_date: str
 
-# --- HELPER FUNCTIONS ---
-def get_generative_model(system_instruction=None):
-    try:
-        if not api_key:
-            raise Exception("API Key missing")
-            
-        model_name = 'gemini-1.5-flash' # Default fast model
-        
-        # Simple instantiation
-        if system_instruction:
-            return genai.GenerativeModel(model_name, system_instruction=system_instruction)
-        return genai.GenerativeModel(model_name)
-    except Exception as e:
-        print(f"Model Init Error: {e}")
-        # Fallback
-        return genai.GenerativeModel('gemini-pro')
+# --- AI CONFIGURATION ---
+model = None
+try:
+    API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
+    if API_KEY:
+        genai.configure(api_key=API_KEY)
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        print(f"[OK] AI Model configured successfully! (Key: ...{API_KEY[-6:]})")
+    else:
+        print("[WARN] GEMINI_API_KEY not found. AI features disabled.")
+except Exception as e:
+    print(f"[ERROR] Error configuring Gemini AI: {e}")
 
-# --- LOGIC WITHOUT PANDAS (Optimized for Vercel) ---
+# --- LOGIC ---
+
 def analyze_spending_logic(transactions_data):
     try:
         if not transactions_data:
             return {"insight": "Chưa có dữ liệu giao dịch để phân tích.", "actions": []}
 
-        # Native Python Statistics
         expenses = [t for t in transactions_data if t.type == 'expense']
         
         if not expenses:
@@ -88,93 +78,67 @@ def analyze_spending_logic(transactions_data):
 
         total_spent = sum(t.amount for t in expenses)
         
-        # Group by category
         category_map = {}
         for t in expenses:
             category_map[t.category] = category_map.get(t.category, 0) + t.amount
             
-        # Sort desc
         sorted_categories = sorted(category_map.items(), key=lambda item: item[1], reverse=True)
         
         top_category = sorted_categories[0][0]
         top_amount = sorted_categories[0][1]
-        
-        category_summary_str = "\n".join([f"- {cat}: {amt:,.0f}" for cat, amt in sorted_categories])
 
-        # Ask Gemini
-        prompt = f"""
-        Tôi là một trợ lý tài chính cá nhân. Người dùng đã chi tiêu tổng cộng {total_spent:,.0f} VND.
-        Danh mục tốn kém nhất là '{top_category}' với {top_amount:,.0f} VND.
-        Chi tiết:
-        {category_summary_str}
+        insight_msg = (
+            f"Tổng chi tiêu: {total_spent:,.0f} VND.\n"
+            f"Danh mục tốn kém nhất: {top_category} ({top_amount:,.0f} VND).\n"
+        )
         
-        Hãy đưa ra 1 nhận xét ngắn gọn (dưới 50 từ) và 3 hành động tiết kiệm thực tế.
-        Output JSON: {{ "insight": "...", "actions": [...] }}
-        """
-        
-        model = get_generative_model()
-        response = model.generate_content(prompt)
-        text = response.text.replace('```json', '').replace('```', '').strip()
-        return json.loads(text)
+        return {
+            "insight": insight_msg,
+            "actions": ["Xem biểu đồ để biết thêm chi tiết."]
+        }
     except Exception as e:
         print(f"Analysis Logic Error: {e}")
-        return {
-            "insight": "Không thể phân tích vào lúc này (Lỗi Backend/API Key).",
-            "actions": ["Kiểm tra cấu hình API Key trên Vercel"]
-        }
+        return {"insight": "Lỗi xử lý dữ liệu.", "actions": []}
 
 def chat_advisor_logic(message: str, history: list = [], context: str = ""):
+    if not model:
+        return "Xin lỗi, tôi chưa được kết nối với trí tuệ nhân tạo (Thiếu API Key). Hãy kiểm tra cấu hình."
+
     try:
         system_instruction = """
-        Bạn là **SmartLife AI** - Trợ lý ảo siêu thông minh.
-        Nhiệm vụ: Trả lời ngắn gọn, thông minh, hữu ích. Dùng Emoji 🌟.
-        Nếu có ngữ cảnh tài chính, hãy tư vấn sát sườn.
+        BẠN LÀ MỘT NGƯỜI CỐ VẤN TÀI CHÍNH VÀ CUỘC SỐNG THÔNG MINH, TẬN TÂM VÀ CÓ CHỈ SỐ EQ CAO.
+        
+        Mục tiêu của bạn:
+        1. Lắng nghe và thấu hiểu vấn đề của người dùng.
+        2. Phân tích dựa trên dữ liệu thật (được cung cấp trong phần CONTEXT).
+        3. Đưa ra lời khuyên CỤ THỂ, KHẢ THI và TÍCH CỰC.
+        4. Luôn giữ thái độ động viên, khích lệ nhưng không sáo rỗng. Hãy như một người bạn thân thông thái.
+
+        Phong cách giao tiếp:
+        - Dùng ngôn ngữ tự nhiên, gần gũi, ấm áp (Tiếng Việt).
+        - Sử dụng Markdown để trình bày rõ ràng (in đậm ý chính, gạch đầu dòng).
+        - Đặt câu hỏi ngược lại để gợi mở nếu cần thêm thông tin.
+        - KHÔNG BAO GIỜ phán xét cách chi tiêu của người dùng, hãy tìm cách tối ưu hóa nó.
+        
+        Dữ liệu hiện tại của người dùng (CONTEXT):
         """
         
-        model = get_generative_model(system_instruction=system_instruction)
+        full_prompt = f"{system_instruction}\n{context}\n\nNgười dùng hỏi: {message}"
         
-        # Simple history mapping
-        gemini_history = []
-        for msg in history[-5:]: # Keep context small
-            role = "user" if msg.get("role") == "user" else "model"
-            content = msg.get("content", "")
-            if content:
-                gemini_history.append({"role": role, "parts": [content]})
-
-        chat = model.start_chat(history=gemini_history)
-        
-        user_message = message
-        if context:
-            user_message = f"[CONTEXT]: {context}\n\n[QUESTION]: {message}"
-            
-        response = chat.send_message(user_message)
+        response = model.generate_content(full_prompt)
         return response.text
     except Exception as e:
-        print(f"Chat Error: {e}")
-        return "Xin lỗi, AI đang bận hoặc chưa cấu hình đúng API Key. (Hãy kiểm tra Env Variable)"
+        print(f"AI Generation Error: {e}")
+        return "Xin lỗi, tôi đang gặp chút sự cố khi suy nghĩ. Bạn thử lại sau nhé! (Error: " + str(e) + ")"
 
 def parse_schedule_logic(command: str, current_date: str):
-    try:
-        prompt = f"""
-        Current Date: {current_date}
-        Command: "{command}"
-        Extract schedule event: title, start_time (HH:MM), end_time (HH:MM), day_of_week (0-6).
-        Return JSON ONLY: {{ "title": "...", "start_time": "...", "end_time": "...", "day_of_week": int, "location": null }}
-        If invalid, return {{ "error": "Invalid command" }}
-        """
-        model = get_generative_model()
-        response = model.generate_content(prompt)
-        text = response.text.replace('```json', '').replace('```', '').strip()
-        return json.loads(text)
-    except Exception as e:
-        print(f"Schedule Parse Error: {e}")
-        return {"error": "Lỗi xử lý AI"}
+    return {"error": "Tính năng này chưa khả dụng."}
 
 # --- ROUTES ---
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "environment": "Vercel"}
+    return {"status": "ok", "environment": "Local", "ai_enabled": model is not None}
 
 @app.post("/api/chat_finance")
 async def chat_finance(req: ChatRequest):
@@ -188,10 +152,7 @@ async def analyze_finance(req: AnalysisRequest):
 async def parse_schedule(req: CommandRequest):
     return parse_schedule_logic(req.command, req.current_date)
 
-# Fallback for local testing if running this file directly
+# Fallback for local testing
 if __name__ == "__main__":
     import uvicorn
-    # When running locally, we might not have /api prefix in the URL if we hit root
-    # But vite proxy sends /api.
-    # To mimic vercel:
     uvicorn.run(app, host="0.0.0.0", port=8000)

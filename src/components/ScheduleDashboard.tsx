@@ -4,9 +4,10 @@ import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, 
 import html2canvas from 'html2canvas';
 import CalendarWidget from './CalendarWidget';
 import FocusTimer from './FocusTimer';
-import { parseScheduleCommand } from '../services/aiService';
-import { Bot, Sparkles, Loader2, Send } from 'lucide-react';
+
+
 import MusicSpace from './MusicSpace';
+import AIAdvisor from './AIAdvisor';
 
 interface ScheduleDashboardProps {
   state: AppState;
@@ -16,7 +17,7 @@ interface ScheduleDashboardProps {
   onAddTimetable: (t: any) => void;
   onUpdateTimetable: (t: any) => void;
   onDeleteTimetable: (id: string) => void;
-  onAddTodo: (content: string, priority: TaskPriority) => void;
+  onAddTodo: (content: string, priority: TaskPriority, deadline?: string) => void;
   onUpdateTodo: (t: any) => void;
   onDeleteTodo: (id: string) => void;
   initialFocusMode?: boolean;
@@ -83,6 +84,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   // Todo Input
   const [newTodoContent, setNewTodoContent] = useState('');
   const [newTodoPriority, setNewTodoPriority] = useState<TaskPriority>(TaskPriority.FOCUS);
+  const [newTodoDeadline, setNewTodoDeadline] = useState('');
 
   // Motivational Feedback State
   const [showMotivation, setShowMotivation] = useState(false);
@@ -92,37 +94,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     audioRef.current = new Audio('/sounds/clapping.mp3');
   }, []);
 
-  // AI Command State
-  const [command, setCommand] = useState('');
-  const [isProcessingAI, setIsProcessingAI] = useState(false);
 
-  const handleAICommand = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!command.trim()) return;
-
-    setIsProcessingAI(true);
-    try {
-      const result = await parseScheduleCommand(command);
-      if (result && !result.error && result.title) {
-        // Add to timetable
-        onAddTimetable({
-          title: result.title,
-          start_time: result.start_time,
-          end_time: result.end_time,
-          day_of_week: result.day_of_week,
-          location: result.location
-        });
-        alert(`Đã thêm lịch: ${result.title} vào Thứ ${result.day_of_week === 0 ? 'CN' : result.day_of_week + 1}`);
-        setCommand('');
-      } else {
-        alert(result.error || "AI không hiểu được lệnh này. Thử lại nhé!");
-      }
-    } catch (err) {
-      alert("Lỗi kết nối tới AI Master.");
-    } finally {
-      setIsProcessingAI(false);
-    }
-  };
 
   // Filter Goals Logic
   const filteredGoals = goals.filter(g => {
@@ -251,9 +223,15 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     if (newTodoPriority === TaskPriority.URGENT) dbPriority = 'high';
     else if (newTodoPriority === TaskPriority.CHILL || newTodoPriority === TaskPriority.TEMP) dbPriority = 'low';
 
+    // Default deadline to "End of Today" if not selected
+    const deadlineToUse = newTodoDeadline
+      ? new Date(newTodoDeadline).toISOString()
+      : new Date(new Date().setHours(23, 59, 59, 999)).toISOString();
+
     // Use the mapped priority to avoid SQL Constraint check failure
-    onAddTodo(newTodoContent, dbPriority);
+    onAddTodo(newTodoContent, dbPriority, deadlineToUse);
     setNewTodoContent('');
+    setNewTodoDeadline('');
   };
 
   // -- RENDERERS --
@@ -299,29 +277,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
           </div>
         </div>
 
-        {/* AI Command Bar */}
-        <div className="bg-indigo-50/50 p-4 border-b border-indigo-100">
-          <form onSubmit={handleAICommand} className="relative flex items-center gap-2 max-w-2xl mx-auto">
-            <div className="absolute left-3 text-indigo-500 animate-pulse">
-              <Bot size={20} />
-            </div>
-            <input
-              type="text"
-              value={command}
-              onChange={(e) => setCommand(e.target.value)}
-              disabled={isProcessingAI}
-              placeholder="Gõ lệnh, ví dụ: 'Họp team sáng thứ 2 lúc 9h', 'Đi bơi chiều nay 5h'..."
-              className="w-full pl-10 pr-12 py-3 rounded-xl border border-indigo-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none shadow-sm text-sm"
-            />
-            <button
-              type="submit"
-              disabled={isProcessingAI || !command.trim()}
-              className="absolute right-2 p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-            >
-              {isProcessingAI ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-            </button>
-          </form>
-        </div>
+
 
         <div className="flex-1 overflow-x-auto custom-scrollbar">
           <div className="grid grid-cols-7 h-full min-h-[600px] min-w-[1000px] divide-x divide-gray-100 bg-white" ref={timetableRef}>
@@ -473,6 +429,41 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     );
   };
 
+  // Helper for Todo Countdown
+  const getTodoCountdown = (deadline: string) => {
+    const end = new Date(deadline).getTime();
+    const now = new Date().getTime();
+    const diff = end - now;
+
+    if (diff < 0) {
+      const absDiff = Math.abs(diff);
+      const days = Math.floor(absDiff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((absDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
+
+      let text = 'Trễ ';
+      if (days > 0) text += `${days} ngày `;
+      if (hours > 0) text += `${hours}h `;
+      text += `${minutes}p`;
+
+      return { text, color: 'bg-red-100 text-red-700 border-red-200', isOverdue: true };
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (days > 0) {
+      return { text: `Còn ${days} ngày ${hours}h`, color: 'bg-emerald-50 text-emerald-600 border-emerald-200', isOverdue: false };
+    }
+
+    // Less than 24h
+    let color = 'bg-blue-50 text-blue-600 border-blue-200';
+    if (hours < 1) color = 'bg-amber-50 text-amber-600 border-amber-200'; // Warning < 1h
+
+    return { text: `Còn ${hours}h ${minutes}p`, color, isOverdue: false };
+  };
+
   // 2. Todos View (Priority Grouped)
   const renderTodos = () => {
     // Sort: Uncompleted first, then by Priority Order (High -> Low)
@@ -527,6 +518,21 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             placeholder="Nhập công việc mới..."
             className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
           />
+
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Clock size={16} className="text-gray-400" />
+              </div>
+              <input
+                type="datetime-local"
+                value={newTodoDeadline}
+                onChange={(e) => setNewTodoDeadline(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 outline-none text-gray-600 font-medium"
+              />
+            </div>
+          </div>
+
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
             {Object.values(TaskPriority).map(p => {
               const config = PRIORITY_CONFIG[p];
@@ -554,6 +560,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         <div className="space-y-2 flex-1 pr-1">
           {sortedTodos.map(t => {
             const config = PRIORITY_CONFIG[t.priority as TaskPriority] || PRIORITY_CONFIG[TaskPriority.FOCUS];
+            const countdown = t.deadline ? getTodoCountdown(t.deadline) : null;
+
             return (
               <div key={t.id} className={`group flex items-start gap-3 p-3.5 rounded-2xl border transition-all ${t.is_completed ? 'bg-gray-50 border-transparent opacity-60' : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-md'}`}>
                 <button onClick={() => handleToggleTodo(t)} className={`mt-0.5 transition-colors ${t.is_completed ? 'text-emerald-500' : 'text-gray-300 hover:text-emerald-500'}`}>
@@ -561,11 +569,26 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 </button>
 
                 <div className="flex-1">
-                  <p className={`text-sm font-medium leading-snug ${t.is_completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{t.content}</p>
-                  <div className="flex items-center gap-2 mt-1.5">
+                  <div className="flex justify-between items-start">
+                    <p className={`text-sm font-medium leading-snug ${t.is_completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{t.content}</p>
+
+                    {/* Countdown Badge - Only show if not completed and has deadline */}
+                    {countdown && !t.is_completed && (
+                      <span className={`shrink-0 ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-bold border flex items-center gap-0.5 ${countdown.color} animate-pulse`}>
+                        <Clock size={8} /> {countdown.text}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide border flex items-center gap-1 w-fit ${config.color}`}>
                       {config.label}
                     </span>
+                    {t.deadline && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border flex items-center gap-1 w-fit text-gray-400 border-gray-100 bg-gray-50`}>
+                        {new Date(t.deadline).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -815,6 +838,9 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
 
       </div>
+
+      {/* AI Advisor - Floating Chat */}
+      <AIAdvisor appState={state} />
     </div>
   );
 };
