@@ -181,7 +181,17 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
     const monthTx = appState.transactions.filter(t => t.date.startsWith(currentMonth));
     const monthIncome = monthTx.filter(t => t.type === TransactionType.INCOME).reduce((s, t) => s + t.amount, 0);
     const monthExpense = monthTx.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
-    const savingsRate = monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 100) : 0;
+
+    // Tính tổng số dư hiện tại từ toàn bộ lịch sử
+    const totalIncomeAll = appState.transactions.filter(t => t.type === TransactionType.INCOME).reduce((s, t) => s + t.amount, 0);
+    const totalExpenseAll = appState.transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
+    const totalBalance = totalIncomeAll - totalExpenseAll;
+
+    // Tính tổng tiền tiết kiệm từ các mục tiêu tài chính
+    const totalSavings = appState.goals
+        .filter(g => g.target_amount && g.target_amount > 0)
+        .reduce((sum, g) => sum + (g.current_amount || 0), 0);
+    const savingsPercentOfIncome = monthIncome > 0 ? Math.round((totalSavings / monthIncome) * 100) : 0;
 
     return (
         <div className="animate-fade-in -m-4 md:-m-8 -mt-20 md:-mt-8 min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
@@ -233,7 +243,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
                         <div className="space-y-3">
                             <div className="flex justify-between items-center">
                                 <span className="text-xs text-gray-500">Số dư</span>
-                                <span className="font-bold text-gray-800 text-sm">{formatCurrency(appState.currentBalance)}</span>
+                                <span className="font-bold text-gray-800 text-sm">{formatCurrency(totalBalance)}</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-xs text-gray-500">Thu nhập</span>
@@ -245,13 +255,13 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
                             </div>
                             <div className="pt-2 border-t border-gray-50">
                                 <div className="flex justify-between items-center mb-1.5">
-                                    <span className="text-xs text-gray-500">Tỷ lệ tiết kiệm</span>
-                                    <span className={`font-bold text-sm ${savingsRate >= 20 ? 'text-emerald-600' : savingsRate >= 0 ? 'text-amber-600' : 'text-red-600'}`}>{savingsRate}%</span>
+                                    <span className="text-xs text-gray-500">Tổng quỹ tiết kiệm</span>
+                                    <span className="font-bold text-sm text-indigo-600">{formatCurrency(totalSavings)}</span>
                                 </div>
                                 <div className="w-full bg-gray-100 rounded-full h-2">
                                     <div
-                                        className={`h-2 rounded-full transition-all duration-700 ${savingsRate >= 20 ? 'bg-gradient-to-r from-emerald-400 to-teal-500' : savingsRate >= 0 ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-red-400 to-rose-500'}`}
-                                        style={{ width: `${Math.max(Math.min(savingsRate, 100), 0)}%` }}
+                                        className="h-2 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all duration-700 max-w-full"
+                                        style={{ width: `${Math.max(Math.min(savingsPercentOfIncome, 100), 5)}%` }}
                                     />
                                 </div>
                             </div>

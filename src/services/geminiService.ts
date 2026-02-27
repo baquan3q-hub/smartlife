@@ -23,7 +23,12 @@ function formatCurrency(amount: number): string {
 }
 
 function buildFinanceContext(state: AppState): string {
-    const { transactions, budgets, currentBalance } = state;
+    const { transactions, budgets } = state;
+
+    // Balance for all time
+    const totalIncomeAll = transactions.filter(t => t.type === TransactionType.INCOME).reduce((s, t) => s + t.amount, 0);
+    const totalExpenseAll = transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
+    const currentBalance = totalIncomeAll - totalExpenseAll;
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -77,7 +82,7 @@ function buildFinanceContext(state: AppState): string {
 - Số dư hiện tại: ${formatCurrency(currentBalance)}
 - Tổng thu: ${formatCurrency(income)}
 - Tổng chi: ${formatCurrency(expense)}
-- Tiết kiệm: ${formatCurrency(income - expense)}
+- Tiết kiệm (Từ Mục tiêu): ${formatCurrency(state.goals.filter(g => g.target_amount && g.target_amount > 0).reduce((s, g) => s + (g.current_amount || 0), 0))}
 
 📂 CHI TIẾT CHI TIÊU THEO DANH MỤC:
 ${categoryBreakdown || '  (Chưa có dữ liệu)'}
@@ -238,7 +243,7 @@ export async function generateQuickInsight(appState: AppState): Promise<string> 
     const messages: ChatMessage[] = [
         {
             role: 'user',
-            parts: [{ text: 'Hãy tóm tắt tình hình tài chính của tôi tháng này trong 3-4 dòng ngắn gọn. Nêu điểm tốt và điểm cần cải thiện.' }]
+            parts: [{ text: 'Hãy tóm tắt tình hình tài chính của tôi tháng này trong 3-4 dòng ngắn gọn. Hãy gọi phần "thu nhập trừ đi chi tiêu" là "số tiền dôi dư" hoặc "còn lại", TUYỆT ĐỐI KHÔNG gọi nó là "tiết kiệm" (vì quỹ tiết kiệm là riêng). Nêu điểm tốt và điểm cần cải thiện.' }]
         }
     ];
     return chatWithGemini(messages, appState);

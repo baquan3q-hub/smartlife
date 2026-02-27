@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { AppState, Goal, Todo, TimetableEvent } from '../types';
-import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot } from 'lucide-react';
 import MyStorage from './MyStorage';
 
 interface VisualBoardProps {
     appState: AppState;
     userName?: string;
     userId?: string;
-    onNavigate?: (tab: 'finance' | 'schedule' | 'music') => void;
+    onNavigate?: (tab: 'finance' | 'schedule' | 'music' | 'ai-advisor') => void;
 }
 
 const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, onNavigate }) => {
@@ -286,6 +286,31 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, o
                                 )}
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* NEW: AI Advisor Banner */}
+            <div
+                onClick={() => onNavigate?.('ai-advisor')}
+                className="mb-8 relative bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-3xl p-6 md:p-8 shadow-xl text-white cursor-pointer group overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
+            >
+                {/* Decorative elements */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-white/20 transition-colors" />
+                <div className="absolute bottom-0 right-10 w-32 h-32 bg-indigo-900/40 rounded-full blur-2xl pointer-events-none" />
+
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex-1 text-center md:text-left">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-white/20 shadow-sm backdrop-blur-md">
+                            <Sparkles size={14} className="animate-pulse text-yellow-300" /> Tính năng AI Mới
+                        </div>
+                        <h3 className="text-2xl md:text-3xl font-black mb-2 tracking-tight">Trợ lý AI Tài chính</h3>
+                        <p className="text-indigo-100 max-w-xl text-sm md:text-base leading-relaxed mx-auto md:mx-0">
+                            Chat trực tiếp với AI để phân tích dữ liệu thu chi, đánh giá ngân sách, và nhận các lời khuyên thông minh thiết kế riêng dựa trên dữ liệu thực tế của bạn.
+                        </p>
+                    </div>
+                    <div className="shrink-0 hidden sm:flex items-center justify-center p-5 bg-white/10 rounded-3xl backdrop-blur-md border border-white/20 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-2xl">
+                        <Bot size={48} className="text-white drop-shadow-lg" />
                     </div>
                 </div>
             </div>
