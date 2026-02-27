@@ -7,7 +7,7 @@ import FocusTimer from './FocusTimer';
 
 
 import MusicSpace from './MusicSpace';
-import AIAdvisor from './AIAdvisor';
+
 
 interface ScheduleDashboardProps {
   state: AppState;
@@ -840,7 +840,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
       </div>
 
       {/* AI Advisor - Floating Chat */}
-      <AIAdvisor appState={state} />
+
     </div>
   );
 };

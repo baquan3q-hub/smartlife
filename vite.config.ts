@@ -24,6 +24,14 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: 'autoUpdate',
         injectRegister: null, // Disable auto-registration to avoid conflict with firebase-messaging-sw.js
+        workbox: {
+          runtimeCaching: [
+            {
+              urlPattern: ({ request }) => request.headers.has('range'),
+              handler: 'NetworkOnly', // Bỏ qua cache cho các request trả về 206 Partial Content
+            }
+          ]
+        },
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         manifest: {
           name: 'SmartLife Assistant',

@@ -24,7 +24,7 @@ const SUGGESTIONS: SuggestionChip[] = [
     {
         icon: <BarChart3 size={14} />,
         label: 'Phân tích chi tiêu',
-        prompt: 'Hãy phân tích chi tiêu gần đây của tôi và đưa ra nhận xét chi tiết.',
+        prompt: 'Hãy phân tích chi tiêu gần đây của tôi và đưa ra nhận xét chi tiết, dự đoán và đưa ra lời khuyên.',
         color: 'from-blue-500 to-cyan-500',
     },
     {

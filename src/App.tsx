@@ -4,6 +4,8 @@ import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, Timer
 
 // Import các Components (Đảm bảo bạn đã tạo file trong thư mục components)
 import FinanceDashboard from './components/FinanceDashboard';
+import CashFlowDashboard from './components/CashFlowDashboard';
+import AIAdvisorPage from './components/AIAdvisorPage';
 import ScheduleDashboard from './components/ScheduleDashboard';
 import VisualBoard from './components/VisualBoard';
 import SettingsModal from './components/SettingsModal';
@@ -66,7 +68,7 @@ interface AuthenticatedAppProps {
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) => {
     const { user, signOut } = useAuth();
-    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music'>('visual');
+    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor'>('visual');
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -709,6 +711,22 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 const { error } = await supabase.from('budgets').delete().eq('id', id);
                                 if (!error) setAppState(prev => ({ ...prev, budgets: prev.budgets.filter(item => item.id !== id) }));
                             }}
+                            onNavigateToCashFlow={() => setActiveTab('cashflow')}
+                            onNavigateToAI={() => setActiveTab('ai-advisor')}
+                        />
+                    )}
+                    {activeTab === 'cashflow' && (
+                        <CashFlowDashboard
+                            state={appState}
+                            lang={lang}
+                            onBack={() => setActiveTab('finance')}
+                        />
+                    )}
+                    {activeTab === 'ai-advisor' && (
+                        <AIAdvisorPage
+                            appState={appState}
+                            lang={lang}
+                            onBack={() => setActiveTab('finance')}
                         />
                     )}
                     {activeTab === 'schedule' && (

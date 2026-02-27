@@ -4,7 +4,6 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, Maximize2, Minimize2, ExternalLink } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
-import { analyzeFinance } from '../services/financeService';
 
 
 
@@ -17,6 +16,8 @@ interface FinanceDashboardProps {
     onAddGoal: (g: any) => void;
     onUpdateGoal: (g: any) => void;
     onDeleteGoal: (id: string) => void;
+    onNavigateToCashFlow?: () => void;
+    onNavigateToAI?: () => void;
     isLoading?: boolean;
     lang: 'vi' | 'en';
     expenseCategories: string[];
@@ -111,7 +112,7 @@ const formatCurrency = (amount: number, lang: 'vi' | 'en') => {
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay(); // 0 = Sunday
 
-const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, isLoading, lang, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onAddBudget, onUpdateBudget, onDeleteBudget }) => {
+const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, onNavigateToCashFlow, onNavigateToAI, isLoading, lang, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onAddBudget, onUpdateBudget, onDeleteBudget }) => {
     const t = translations[lang];
     const { transactions } = state;
 
@@ -408,11 +409,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         setSelectedGoalForDeposit(null);
     };
 
-    const handleAnalyzeFinance = async () => {
-        setIsAnalyzing(true);
-        const result = await analyzeFinance(transactions);
-        setAiInsight(result);
-        setIsAnalyzing(false);
+    const handleAnalyzeFinance = () => {
+        onNavigateToAI?.();
     };
 
     // --- Budget Handlers ---
@@ -683,9 +681,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     </tbody>
                                 </table>
                             </div>
-                        ) : (
-                            <p className="text-center text-gray-400 py-4">Không có giao dịch nào trong ngày này.</p>
-                        )}
+                        ) : null}
                     </div>
                 )}
             </div>
@@ -695,7 +691,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     const renderHistory = () => {
         // Filter transactions for history view
         const filteredTransactions = transactions.filter(t => {
-            // Filter by Month/Year (reuse selectedMonth/Year from global state or allow independent?) 
+            // Filter by Month/Year (reuse selectedMonth/Year from global state or allow independent?)
             // User requested "Lịch sử chi tiêu" inside "Chi tiết", likely wants to see everything or filter specifically.
             // Let's use the global selectedMonth/Year for consistency with the rest of the dashboard,
             // BUT allow "All Time" or specific filtering if needed. 
@@ -848,7 +844,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         </div>
                     )}
                 </div>
-            </div >
+            </div>
         );
     };
 
@@ -1739,11 +1735,9 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             </div>
                         </div>
                     </div>
-                )
-            }
-
-
-        </div >
+                )}
+            {/* --- End Budget Modals --- */}
+        </div>
     );
 };
 
