@@ -96,15 +96,30 @@ function buildGoalsContext(state: AppState): string {
     const { goals } = state;
     if (!goals || goals.length === 0) return '\n🎯 MỤC TIÊU: Chưa thiết lập';
 
-    const goalLines = goals.map(g => {
-        const pct = g.target_amount && g.current_amount
-            ? Math.round((g.current_amount / g.target_amount) * 100)
-            : (g.progress || 0);
-        const bar = '█'.repeat(Math.floor(pct / 10)) + '░'.repeat(10 - Math.floor(pct / 10));
-        return `  - ${g.title}: ${bar} ${pct}%${g.target_amount ? ` (${formatCurrency(g.current_amount || 0)}/${formatCurrency(g.target_amount)})` : ''}${g.deadline ? ` [Hạn: ${g.deadline}]` : ''}`;
-    }).join('\n');
+    const financialGoals = goals.filter(g => g.target_amount && g.target_amount > 0);
+    const otherGoals = goals.filter(g => !g.target_amount || g.target_amount === 0);
 
-    return `\n🎯 MỤC TIÊU (${goals.length}):\n${goalLines}`;
+    let ctx = '';
+
+    if (financialGoals.length > 0) {
+        ctx += `\n🎯 MỤC TIÊU TÀI CHÍNH (Tiết kiệm/Đầu tư):\n`;
+        ctx += financialGoals.map(g => {
+            const pct = Math.round(((g.current_amount || 0) / (g.target_amount || 1)) * 100);
+            const bar = '█'.repeat(Math.floor(pct / 10)) + '░'.repeat(10 - Math.floor(pct / 10));
+            return `  - ${g.title}: ${bar} ${pct}% (${formatCurrency(g.current_amount || 0)}/${formatCurrency(g.target_amount || 0)})${g.deadline ? ` [Hạn: ${g.deadline}]` : ''}`;
+        }).join('\n');
+    }
+
+    if (otherGoals.length > 0) {
+        ctx += `\n🎯 MỤC TIÊU KỸ NĂNG/CÁ NHÂN:\n`;
+        ctx += otherGoals.map(g => {
+            const pct = g.progress || 0;
+            const bar = '█'.repeat(Math.floor(pct / 10)) + '░'.repeat(10 - Math.floor(pct / 10));
+            return `  - ${g.title}: ${bar} ${pct}%${g.deadline ? ` [Hạn: ${g.deadline}]` : ''}`;
+        }).join('\n');
+    }
+
+    return ctx;
 }
 
 function buildScheduleContext(state: AppState): string {
@@ -168,7 +183,7 @@ NGUYÊN TẮC:
 3. Khi phân tích chi tiêu: so sánh với ngân sách, chỉ ra danh mục chi nhiều nhất, đề xuất cắt giảm cụ thể.
 4. Khi dự đoán: dựa trên xu hướng 6 tháng, đưa ra con số cụ thể.
 5. Khi tư vấn mục tiêu: tính toán cần tiết kiệm bao nhiêu/tháng để đạt mục tiêu đúng hạn.
-6. Dùng Markdown formatting: **bold**, bullet points, tables khi cần.
+6. ƯU TIÊN dùng bảng (Table Markdown) để trình bày khi có dữ liệu dạng danh sách (như danh sách chi tiêu, kế hoạch tuần, phân loại ngân sách) cho dễ nhìn. Nêu cụ thể số tiền.
 7. Nếu thiếu dữ liệu, hỏi lại thay vì bịa số.
 8. Giọng điệu: chuyên nghiệp nhưng thân thiện, như một cố vấn tài chính đáng tin.`;
 

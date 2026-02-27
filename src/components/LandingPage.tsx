@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, MessageCircle, User, Archive, LockKeyhole, Star, Headphones, Coffee } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain } from 'lucide-react';
 import InstallGuideModal from './InstallGuideModal';
 
 interface LandingPageProps {
@@ -22,6 +22,10 @@ const translations = {
         featVisualTitle: 'Góc nhìn toàn cảnh,\nKiểm soát mọi thứ.',
         featVisualDesc: 'Theo dõi tổng quan lịch trình, mục tiêu và đếm ngược ngày lễ sắp tới. Nắm bắt bức tranh tài chính toàn diện với số liệu thu chi tổng hợp.',
         featVisualItems: ['Tổng quan lịch trình & Mục tiêu', 'Đếm ngược ngày lễ VN', 'Báo cáo thu chi tổng hợp'],
+
+        featAiTitle: 'AI Financial Advisor,\nTư vấn thông minh.',
+        featAiDesc: 'Trợ lý AI phân tích dữ liệu tài chính của riêng bạn, đưa ra nhận xét, dự đoán xu hướng và đề xuất cách tiết kiệm hiệu quả.',
+        featAiItems: ['Phân tích chi tiêu chi tiết', 'Dự đoán ngân sách tháng tới', 'Tư vấn cá nhân hóa bằng AI'],
 
         featFinanceTitle: 'Tài chính minh bạch,\nTiết kiệm tối đa.',
         featFinanceDesc: 'Theo dõi thu chi chi tiết, xem báo cáo trực quan và nhận phân tích thông minh từ AI để tối ưu hóa ngân sách của bạn.',
@@ -63,6 +67,10 @@ const translations = {
         featVisualTitle: 'Holistic View,\nControl Everything.',
         featVisualDesc: 'Get an overview of schedules, goals, and upcoming holiday countdowns. Master your financial picture with comprehensive income and expense data.',
         featVisualItems: ['Schedule & Goals Overview', 'Holiday Countdown', 'Comprehensive Financial Report'],
+
+        featAiTitle: 'AI Financial Advisor,\nSmart Consultation.',
+        featAiDesc: 'An AI assistant that analyzes your personal financial data, provides insights, predicts trends, and suggests effective ways to save.',
+        featAiItems: ['Detailed expense analysis', 'Budget prediction for next month', 'Personalized AI consultation'],
 
         featFinanceTitle: 'Transparent Finance,\nMaximize Savings.',
         featFinanceDesc: 'Track expenses in detail, view visual reports, and get smart AI analysis to optimize your budget.',
@@ -175,7 +183,40 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
 
             {/* Features Section */}
             <div id="features" className="space-y-24 py-20 pb-0">
-                {/* Feature 0: Visual Board (NEW) */}
+                {/* Feature NEW: AI Advisor */}
+                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 py-20 rounded-3xl border border-indigo-100">
+                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                        <div className="order-2 md:order-1 relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-300 to-purple-300 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            <img
+                                src="/ai-feature.png"
+                                alt="AI Financial Advisor"
+                                className="relative rounded-2xl shadow-2xl border border-white/50 transform group-hover:scale-[1.02] transition-transform duration-500"
+                            />
+                        </div>
+                        <div className="order-1 md:order-2 space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Sparkles size={14} className="animate-pulse" /> Tính năng AI Mới
+                            </div>
+                            <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featAiTitle}</h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {t.featAiDesc}
+                            </p>
+                            <ul className="space-y-4 pt-2">
+                                {t.featAiItems.map((item, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-indigo-50 shadow-sm">
+                                        <div className="bg-indigo-100 p-1.5 rounded-lg">
+                                            <Brain className="text-indigo-600" size={18} />
+                                        </div>
+                                        {item}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature 0: Visual Board */}
                 <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-indigo-50/30 py-20 rounded-3xl border border-indigo-50">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div className="space-y-6">

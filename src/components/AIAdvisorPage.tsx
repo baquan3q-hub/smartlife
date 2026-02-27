@@ -10,6 +10,7 @@ import {
 import { AppState, TransactionType } from '../types';
 import { chatWithGemini, generateQuickInsight, buildFullContext, type ChatMessage } from '../services/geminiService';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // ────────────────────────────────────────
 // Types
@@ -268,7 +269,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
                             </div>
                         ) : quickInsight ? (
                             <div className="text-sm text-indigo-900/80 leading-relaxed prose prose-sm prose-p:my-1">
-                                <ReactMarkdown>{quickInsight}</ReactMarkdown>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{quickInsight}</ReactMarkdown>
                             </div>
                         ) : (
                             <p className="text-sm text-indigo-400">Không thể tải nhận xét. Hãy thử hỏi AI trực tiếp.</p>
@@ -322,12 +323,23 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
                                 {/* Bubble */}
                                 <div className={`max-w-[85%] lg:max-w-[75%] px-4 py-3 text-sm leading-relaxed shadow-sm
                                     ${msg.role === 'user'
-                                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl rounded-br-md'
+                                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl rounded-br-md prose-invert prose-p:text-white prose-headings:text-white'
                                         : 'bg-gray-50 text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm prose-p:my-1.5 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-indigo-700 prose-h3:text-base prose-h3:mt-3 prose-h3:mb-1'
                                     }`}
                                 >
                                     {msg.role === 'assistant' ? (
-                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
+                                                thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
+                                                th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
+                                                td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
+                                                tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
+                                            }}
+                                        >
+                                            {msg.content}
+                                        </ReactMarkdown>
                                     ) : (
                                         msg.content
                                     )}
