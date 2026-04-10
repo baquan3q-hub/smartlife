@@ -727,6 +727,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             appState={appState}
                             lang={lang}
                             onBack={() => setActiveTab('finance')}
+                            onAddTimetable={handleAddTimetable}
+                            onAddTodo={handleAddTodo}
+                            onAddTransaction={handleAddTransaction}
                         />
                     )}
                     {activeTab === 'schedule' && (

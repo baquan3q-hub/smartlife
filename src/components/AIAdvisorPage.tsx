@@ -1,14 +1,20 @@
 // File: src/components/AIAdvisorPage.tsx
-// Full-page AI Financial Advisor Canvas
+// Full-page AI Financial Advisor Canvas v2
+// — Function Calling, Inline Charts, NL Actions
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     ArrowLeft, Send, Sparkles, Loader2, Bot, RefreshCw,
     TrendingDown, Target, ListChecks, BarChart3, Wallet,
-    PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight
+    PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight,
+    CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { AppState, TransactionType } from '../types';
-import { chatWithGemini, generateQuickInsight, buildFullContext, type ChatMessage } from '../services/geminiService';
+import { generateQuickInsight, getCurrentModel, type ChatMessage } from '../services/geminiService';
+import { chatWithAI, type ActionHandlers, type ChartData, type ActionResult } from '../services/aiEngine';
+import { chatHistoryService, type AIConversation } from '../services/chatHistoryService';
+import { memoryService } from '../services/memoryService';
+import InlineChatChart from './InlineChatChart';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -19,11 +25,17 @@ interface AIAdvisorPageProps {
     appState: AppState;
     lang: 'vi' | 'en';
     onBack: () => void;
+    // Action handlers from App.tsx
+    onAddTimetable?: (item: any) => Promise<void>;
+    onAddTodo?: (content: string, priority: string, deadline?: string) => Promise<void>;
+    onAddTransaction?: (tx: any) => Promise<void>;
 }
 
 interface UIMessage {
     role: 'user' | 'assistant';
     content: string;
+    charts?: ChartData[];
+    actions?: ActionResult[];
 }
 
 // ────────────────────────────────────────
@@ -39,14 +51,14 @@ interface Suggestion {
 const SUGGESTIONS: Suggestion[] = [
     {
         icon: <BarChart3 size={16} />,
-        label: 'Phân tích chi tiêu tháng này',
-        prompt: 'Hãy phân tích chi tiết chi tiêu tháng này của tôi. So sánh với ngân sách, chỉ ra danh mục chi nhiều nhất, và tỷ lệ tiết kiệm.',
+        label: 'Phân tích & Dự đoán',
+        prompt: 'Hãy phân tích chi tiết chi tiêu tháng này của tôi bằng bảng (table) theo danh mục và đưa ra dự đoán chi tiêu cho tháng tới.',
         gradient: 'from-blue-500 to-cyan-500',
     },
     {
         icon: <TrendingDown size={16} />,
-        label: 'Dự đoán chi tiêu tháng tới',
-        prompt: 'Dựa trên xu hướng chi tiêu 6 tháng, hãy dự đoán chi tiêu tháng tới và đề xuất cách tối ưu.',
+        label: 'Xu hướng chi tiêu',
+        prompt: 'Hãy truy vấn giao dịch các tháng qua, dùng bảng (table) so sánh xu hướng thu chi và đánh giá mức độ ổn định của tôi.',
         gradient: 'from-amber-500 to-orange-500',
     },
     {
@@ -64,13 +76,13 @@ const SUGGESTIONS: Suggestion[] = [
     {
         icon: <ListChecks size={16} />,
         label: 'Đánh giá ngân sách',
-        prompt: 'Hãy đánh giá ngân sách hiện tại của tôi. Nên điều chỉnh danh mục nào? Có cần thêm/bớt ngân sách cho danh mục nào không?',
+        prompt: 'Hãy truy vấn ngân sách và giao dịch tháng này, vẽ biểu đồ cột (bar) so sánh ngân sách vs thực tế và đưa ra nhận xét.',
         gradient: 'from-rose-500 to-red-500',
     },
     {
         icon: <CalendarCheck size={16} />,
-        label: 'Kế hoạch tài chính tuần này',
-        prompt: 'Dựa trên lịch trình, công việc và ngân sách còn lại, hãy lập kế hoạch tài chính cho tuần này.',
+        label: 'Thêm lịch trình mới',
+        prompt: 'Tôi muốn thêm lịch trình mới. Hãy hỏi tôi về tên sự kiện, ngày, giờ để thêm vào.',
         gradient: 'from-indigo-500 to-violet-500',
     },
 ];
@@ -85,11 +97,14 @@ function formatCurrency(amount: number): string {
 // ────────────────────────────────────────
 // Component
 // ────────────────────────────────────────
-const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack }) => {
+const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
+    appState, lang, onBack,
+    onAddTimetable, onAddTodo, onAddTransaction
+}) => {
     const [messages, setMessages] = useState<UIMessage[]>([
         {
             role: 'assistant',
-            content: '👋 Chào bạn! Mình là **SmartLife Advisor** — trợ lý AI phân tích tài chính cá nhân.\n\nMình có thể truy cập toàn bộ dữ liệu chi tiêu, ngân sách, mục tiêu và lịch trình của bạn để đưa ra phân tích chính xác nhất.\n\n💡 **Hãy thử hỏi mình:**\n- _"Tôi đã chi bao nhiêu cho ăn uống tháng này?"_\n- _"Dự đoán chi tiêu tháng tới"_\n- _"Tôi có đạt được mục tiêu tiết kiệm không?"_\n\nHoặc chọn một gợi ý bên dưới! 👇'
+            content: '👋 Chào bạn! Mình là **SmartLife Advisor v2** — trợ lý AI thông minh.\n\n🆕 **Khả năng mới:**\n- 📊 **Truy vấn dữ liệu** trực tiếp từ database\n- 📈 **Bảng tính (table) & Dự đoán** chi tiêu\n- ✏️ **Thêm lịch trình, việc cần làm, giao dịch** bằng ngôn ngữ tự nhiên\n\n💡 **Thử hỏi mình:**\n- _"Đưa ra dự đoán chi tiêu tháng tới cho tôi"_\n- _"Lập bảng so sánh thu chi 3 tháng gần nhất"_\n- _"Thêm lịch học IELTS thứ 3, thứ 5 lúc 19h"_\n\nHoặc chọn gợi ý bên dưới! 👇'
         }
     ]);
     const [input, setInput] = useState('');
@@ -97,8 +112,19 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
     const [quickInsight, setQuickInsight] = useState<string | null>(null);
     const [isLoadingInsight, setIsLoadingInsight] = useState(false);
 
+    // History and Memory State
+    const [conversationId, setConversationId] = useState<string | null>(null);
+    const [memoryContext, setMemoryContext] = useState<string>('');
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Action handlers for aiEngine
+    const actionHandlers: ActionHandlers = {
+        onAddTimetable,
+        onAddTodo,
+        onAddTransaction,
+    };
 
     // Auto scroll
     const scrollToBottom = useCallback(() => {
@@ -108,9 +134,9 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
     useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
     useEffect(() => { inputRef.current?.focus(); }, []);
 
-    // Load quick insight on mount
+    // Load quick insight — delayed 5s to avoid competing with chat for rate limit
     useEffect(() => {
-        const loadInsight = async () => {
+        const timer = setTimeout(async () => {
             setIsLoadingInsight(true);
             try {
                 const insight = await generateQuickInsight(appState);
@@ -121,11 +147,18 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
             } finally {
                 setIsLoadingInsight(false);
             }
-        };
-        loadInsight();
+        }, 5000);
+        return () => clearTimeout(timer);
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Build chat history for Gemini
+    // Load memory context on mount
+    useEffect(() => {
+        memoryService.getMemoryContextString()
+            .then(setMemoryContext)
+            .catch(console.error);
+    }, []);
+
+    // Build chat history for Gemini (convert UIMessage → ChatMessage)
     const buildHistory = (msgs: UIMessage[]): ChatMessage[] => {
         return msgs
             .filter(m => m.role !== 'assistant' || msgs.indexOf(m) > 0) // skip initial greeting
@@ -135,7 +168,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
             }));
     };
 
-    // Send message
+    // Send message — uses new aiEngine with function calling
     const handleSend = async (overrideMessage?: string) => {
         const msg = overrideMessage || input.trim();
         if (!msg || isLoading) return;
@@ -146,10 +179,48 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
         setIsLoading(true);
 
         try {
+            // Save conversation & user message to DB
+            let currentConvId = conversationId;
+            if (!currentConvId) {
+                const conv = await chatHistoryService.createConversation(msg.substring(0, 50) + '...');
+                if (conv) {
+                    currentConvId = conv.id;
+                    setConversationId(currentConvId);
+                }
+            }
+            if (currentConvId) {
+                await chatHistoryService.saveMessage(currentConvId, 'user', msg);
+            }
+
             const history = buildHistory(newMessages);
-            const response = await chatWithGemini(history, appState);
-            setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+            const response = await chatWithAI(history, appState, actionHandlers, memoryContext);
+
+            // Save AI response to DB
+            if (currentConvId) {
+                await chatHistoryService.saveMessage(
+                    currentConvId,
+                    'assistant',
+                    response.text,
+                    response.charts.length > 0 ? response.charts : undefined,
+                    response.actions.length > 0 ? response.actions : undefined
+                );
+            }
+
+            // Extract memories periodically (e.g. if conversation has grown)
+            if (newMessages.length > 3 && newMessages.length % 4 === 1) {
+                // Run in background
+                const chatText = newMessages.map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
+                memoryService.extractMemoriesFromConversation(chatText).catch(console.error);
+            }
+
+            setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: response.text,
+                charts: response.charts.length > 0 ? response.charts : undefined,
+                actions: response.actions.length > 0 ? response.actions : undefined,
+            }]);
         } catch (error: any) {
+            console.error(error);
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: `⚠️ Xin lỗi, đã có lỗi xảy ra: ${error.message}\n\nVui lòng thử lại.`
@@ -167,6 +238,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
     };
 
     const handleReset = () => {
+        setConversationId(null);
         setMessages([{
             role: 'assistant',
             content: '🔄 Cuộc trò chuyện đã được làm mới! Mình sẵn sàng phân tích dữ liệu cho bạn. 🌱'
@@ -181,13 +253,9 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
     const monthTx = appState.transactions.filter(t => t.date.startsWith(currentMonth));
     const monthIncome = monthTx.filter(t => t.type === TransactionType.INCOME).reduce((s, t) => s + t.amount, 0);
     const monthExpense = monthTx.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
-
-    // Tính tổng số dư hiện tại từ toàn bộ lịch sử
     const totalIncomeAll = appState.transactions.filter(t => t.type === TransactionType.INCOME).reduce((s, t) => s + t.amount, 0);
     const totalExpenseAll = appState.transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
     const totalBalance = totalIncomeAll - totalExpenseAll;
-
-    // Tính tổng tiền tiết kiệm từ các mục tiêu tài chính
     const totalSavings = appState.goals
         .filter(g => g.target_amount && g.target_amount > 0)
         .reduce((sum, g) => sum + (g.current_amount || 0), 0);
@@ -216,7 +284,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                     </span>
-                                    Gemini 1.5 Flash · Đang phân tích dữ liệu thực
+                                    Gemini ({getCurrentModel().replace('gemini-', '')}) · Function Calling · Truy vấn DB trực tiếp
                                 </div>
                             </div>
                         </div>
@@ -331,27 +399,60 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
                                 )}
 
                                 {/* Bubble */}
-                                <div className={`max-w-[85%] lg:max-w-[75%] px-4 py-3 text-sm leading-relaxed shadow-sm
-                                    ${msg.role === 'user'
-                                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl rounded-br-md prose-invert prose-p:text-white prose-headings:text-white'
-                                        : 'bg-gray-50 text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm prose-p:my-1.5 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-indigo-700 prose-h3:text-base prose-h3:mt-3 prose-h3:mb-1'
-                                    }`}
-                                >
-                                    {msg.role === 'assistant' ? (
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                            components={{
-                                                table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
-                                                thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
-                                                th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
-                                                td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
-                                                tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
-                                            }}
-                                        >
-                                            {msg.content}
-                                        </ReactMarkdown>
-                                    ) : (
-                                        msg.content
+                                <div className={`max-w-[85%] lg:max-w-[75%] ${msg.role === 'user' ? '' : ''}`}>
+                                    <div className={`px-4 py-3 text-sm leading-relaxed shadow-sm
+                                        ${msg.role === 'user'
+                                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl rounded-br-md prose-invert prose-p:text-white prose-headings:text-white'
+                                            : 'bg-gray-50 text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm prose-p:my-1.5 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-indigo-700 prose-h3:text-base prose-h3:mt-3 prose-h3:mb-1'
+                                        }`}
+                                    >
+                                        {msg.role === 'assistant' ? (
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
+                                                    thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
+                                                    th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
+                                                    td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
+                                                    tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
+                                                }}
+                                            >
+                                                {msg.content}
+                                            </ReactMarkdown>
+                                        ) : (
+                                            msg.content
+                                        )}
+                                    </div>
+
+                                    {/* Action Confirmations */}
+                                    {msg.actions && msg.actions.length > 0 && (
+                                        <div className="mt-2 space-y-1.5">
+                                            {msg.actions.map((action, ai) => (
+                                                <div
+                                                    key={ai}
+                                                    className={`flex items-start gap-2 px-3 py-2 rounded-xl text-xs ${
+                                                        action.success
+                                                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                                                            : 'bg-red-50 border border-red-200 text-red-700'
+                                                    }`}
+                                                >
+                                                    {action.success
+                                                        ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                                                        : <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                                                    }
+                                                    <span>{action.message}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Inline Charts */}
+                                    {msg.charts && msg.charts.length > 0 && (
+                                        <div className="mt-2 space-y-2">
+                                            {msg.charts.map((chart, ci) => (
+                                                <InlineChatChart key={ci} chart={chart} />
+                                            ))}
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -368,7 +469,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
                                         <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                                         <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                                         <span className="w-2 h-2 bg-pink-400 rounded-full animate-bounce"></span>
-                                        <span className="text-xs text-gray-400 ml-2">Đang phân tích dữ liệu...</span>
+                                        <span className="text-xs text-gray-400 ml-2">Đang phân tích & truy vấn dữ liệu...</span>
                                     </div>
                                 </div>
                             </div>
@@ -411,7 +512,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyPress}
-                                placeholder="Hỏi về chi tiêu, ngân sách, mục tiêu, dự đoán..."
+                                placeholder='Hỏi, phân tích, hoặc ra lệnh: "Thêm lịch học IELTS T3 T5 19h"...'
                                 className="flex-1 bg-transparent px-4 py-3 text-sm outline-none resize-none max-h-28 min-h-[48px] placeholder:text-gray-400"
                                 rows={1}
                             />
@@ -424,7 +525,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({ appState, lang, onBack })
                             </button>
                         </div>
                         <p className="text-[9px] text-center text-gray-400 mt-2">
-                            Powered by Gemini 1.5 Flash · Phân tích dựa trên dữ liệu thực · AI có thể mắc lỗi
+                            Powered by Gemini ({getCurrentModel().replace('gemini-', '')}) · Function Calling · Truy vấn DB trực tiếp · AI có thể mắc lỗi
                         </p>
                     </div>
                 </div>
