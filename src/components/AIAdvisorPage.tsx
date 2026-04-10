@@ -7,12 +7,12 @@ import {
     ArrowLeft, Send, Sparkles, Loader2, Bot, RefreshCw,
     TrendingDown, Target, ListChecks, BarChart3, Wallet,
     PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight,
-    CheckCircle2, AlertCircle
+    CheckCircle2, AlertCircle, History, X, Plus, Trash2
 } from 'lucide-react';
 import { AppState, TransactionType } from '../types';
 import { generateQuickInsight, getCurrentModel, type ChatMessage } from '../services/geminiService';
 import { chatWithAI, type ActionHandlers, type ChartData, type ActionResult } from '../services/aiEngine';
-import { chatHistoryService, type AIConversation } from '../services/chatHistoryService';
+import { chatHistoryService, type AIConversation, type AIMessage } from '../services/chatHistoryService';
 import { memoryService } from '../services/memoryService';
 import InlineChatChart from './InlineChatChart';
 import ReactMarkdown from 'react-markdown';
@@ -58,13 +58,13 @@ const SUGGESTIONS: Suggestion[] = [
     {
         icon: <TrendingDown size={16} />,
         label: 'Xu hướng chi tiêu',
-        prompt: 'Hãy truy vấn giao dịch các tháng qua, dùng bảng (table) so sánh xu hướng thu chi và đánh giá mức độ ổn định của tôi.',
+        prompt: 'Hãy truy vấn giao dịch các tháng qua, dùng bảng (table) so sánh xu hướng thu chi và đánh giá mức độ ổn định của tôi qua biểu đồ đường và cột.',
         gradient: 'from-amber-500 to-orange-500',
     },
     {
         icon: <Target size={16} />,
         label: 'Tiến độ mục tiêu',
-        prompt: 'Hãy đánh giá tiến độ các mục tiêu tài chính của tôi. Tôi cần tiết kiệm bao nhiêu mỗi tháng để đạt được chúng?',
+        prompt: 'Hãy đánh giá tiến độ các task và todolist deadline và các mục tiêu tài chính của tôi. Tôi cần tiết kiệm bao nhiêu mỗi tháng để đạt được chúng?',
         gradient: 'from-purple-500 to-pink-500',
     },
     {
@@ -81,8 +81,8 @@ const SUGGESTIONS: Suggestion[] = [
     },
     {
         icon: <CalendarCheck size={16} />,
-        label: 'Thêm lịch trình mới',
-        prompt: 'Tôi muốn thêm lịch trình mới. Hãy hỏi tôi về tên sự kiện, ngày, giờ để thêm vào.',
+        label: 'Lịch Trình và Việc Cần Làm',
+        prompt: 'Liệt kê lịch trình của tôi tuần này và các nhiệm vụ tôi đặt ra ?.',
         gradient: 'from-indigo-500 to-violet-500',
     },
 ];
@@ -115,6 +115,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     // History and Memory State
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [memoryContext, setMemoryContext] = useState<string>('');
+    const [conversations, setConversations] = useState<AIConversation[]>([]);
+    const [showHistory, setShowHistory] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -133,6 +135,11 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
     useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
     useEffect(() => { inputRef.current?.focus(); }, []);
+
+    // Load conversations when the component mounts or when conversationId changes
+    useEffect(() => {
+        chatHistoryService.getConversations().then(setConversations);
+    }, [conversationId]);
 
     // Load quick insight — delayed 5s to avoid competing with chat for rate limit
     useEffect(() => {
@@ -243,6 +250,41 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             role: 'assistant',
             content: '🔄 Cuộc trò chuyện đã được làm mới! Mình sẵn sàng phân tích dữ liệu cho bạn. 🌱'
         }]);
+        setShowHistory(false);
+    };
+
+    const loadConversation = async (convId: string) => {
+        setIsLoading(true);
+        try {
+            const msgs: AIMessage[] = await chatHistoryService.getMessages(convId);
+            const uiMsgs: UIMessage[] = msgs.map((m: AIMessage) => ({
+                role: m.role,
+                content: m.content,
+                charts: m.charts || undefined,
+                actions: m.actions || undefined
+            }));
+            setMessages(uiMsgs.length > 0 ? uiMsgs : [{
+                role: 'assistant',
+                content: 'Cuộc trò chuyện này trống. Hãy bắt đầu hỏi gì đó!'
+            }]);
+            setConversationId(convId);
+            setShowHistory(false);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleDeleteConversation = async (e: React.MouseEvent, convId: string) => {
+        e.stopPropagation();
+        const success = await chatHistoryService.deleteConversation(convId);
+        if (success) {
+            setConversations(prev => prev.filter(c => c.id !== convId));
+            if (conversationId === convId) {
+                handleReset();
+            }
+        }
     };
 
     const showSuggestions = messages.length <= 1 && !isLoading;
@@ -262,44 +304,107 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const savingsPercentOfIncome = monthIncome > 0 ? Math.round((totalSavings / monthIncome) * 100) : 0;
 
     return (
-        <div className="animate-fade-in -m-4 md:-m-8 -mt-20 md:-mt-8 min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
+        <div className="animate-fade-in relative bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex flex-col">
+            {/* History Overlay/Drawer */}
+            {showHistory && (
+                <div className="fixed inset-0 z-50 flex">
+                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setShowHistory(false)} />
+                    <div className="relative w-80 max-w-[85%] h-full bg-white shadow-2xl flex flex-col animate-fade-in-right">
+                        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                            <h2 className="font-bold text-gray-800 flex items-center gap-2">
+                                <History size={18} className="text-indigo-500" />
+                                Lịch sử trò chuyện
+                            </h2>
+                            <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-gray-200 rounded-lg">
+                                <X size={18} className="text-gray-500" />
+                            </button>
+                        </div>
+
+                        <div className="p-3">
+                            <button
+                                onClick={handleReset}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-50 text-indigo-700 rounded-xl hover:bg-indigo-100 font-medium transition-colors text-sm"
+                            >
+                                <Plus size={16} /> Cuộc trò chuyện mới
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1 custom-scrollbar">
+                            {conversations.length === 0 ? (
+                                <p className="text-center text-sm text-gray-400 mt-10">Chưa có lịch sử</p>
+                            ) : (
+                                conversations.map(conv => (
+                                    <div
+                                        key={conv.id}
+                                        onClick={() => loadConversation(conv.id)}
+                                        className={`group px-3 py-3 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${conversationId === conv.id ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-gray-50 border border-transparent'}`}
+                                    >
+                                        <div className="flex-1 min-w-0 pr-2">
+                                            <p className={`text-sm truncate font-medium ${conversationId === conv.id ? 'text-indigo-700' : 'text-gray-700'}`}>{conv.title}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5">{new Date(conv.updated_at).toLocaleDateString('vi-VN')}</p>
+                                        </div>
+                                        <button
+                                            onClick={(e) => handleDeleteConversation(e, conv.id)}
+                                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 hover:text-red-600 text-gray-400 rounded-lg transition-all"
+                                            title="Xóa"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                <div className="max-w-7xl mx-auto px-4 md:px-8 py-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={onBack}
-                            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-gray-700"
+                            className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-gray-700"
                         >
-                            <ArrowLeft size={20} />
+                            <ArrowLeft size={18} />
                         </button>
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                                <Brain size={20} className="text-white" />
+                            <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center shadow-md shadow-indigo-100">
+                                <Brain size={16} className="text-white" />
                             </div>
                             <div>
-                                <h1 className="font-bold text-gray-800 text-lg leading-tight">SmartLife AI Advisor</h1>
-                                <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                                <h1 className="font-bold text-gray-800 text-sm leading-tight">SmartLife AI Advisor</h1>
+                                <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
                                     <span className="relative flex h-2 w-2">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                     </span>
-                                    Gemini ({getCurrentModel().replace('gemini-', '')}) · Function Calling · Truy vấn DB trực tiếp
+                                    Gemini AI Advisor ({getCurrentModel().replace('gemini-', '')})
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <button
-                        onClick={handleReset}
-                        className="p-2.5 hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-gray-600"
-                        title="Làm mới cuộc trò chuyện"
-                    >
-                        <RefreshCw size={18} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setShowHistory(true)}
+                            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-indigo-600 flex items-center gap-1.5"
+                            title="Lịch sử chat"
+                        >
+                            <History size={16} />
+                            <span className="text-xs font-medium hidden sm:inline">Lịch sử</span>
+                        </button>
+                        <button
+                            onClick={handleReset}
+                            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-gray-600 hidden sm:flex items-center"
+                            title="Làm mới cuộc trò chuyện"
+                        >
+                            <RefreshCw size={16} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-0 lg:gap-6 px-0 lg:px-8 pt-0 lg:pt-6" style={{ height: 'calc(100vh - 65px)' }}>
+            <div className="max-w-7xl mx-auto flex-1 flex flex-col lg:flex-row gap-0 lg:gap-6 px-0 lg:px-8 pt-0 lg:pt-2 overflow-hidden w-full h-[calc(100dvh-140px)] md:h-auto">
 
                 {/* ── Sidebar (Desktop only) ── */}
                 <div className="hidden lg:flex flex-col w-80 shrink-0 gap-4 overflow-y-auto pb-6 pr-2 custom-scrollbar">
@@ -358,25 +463,47 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     {appState.goals.length > 0 && (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                             <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                                <Target size={16} className="text-purple-500" /> Mục tiêu
+                                <Target size={16} className="text-purple-500" /> Mục tiêu ({appState.goals.length})
                             </h3>
-                            <div className="space-y-3">
-                                {appState.goals.slice(0, 3).map(g => {
-                                    const pct = g.target_amount && g.current_amount
-                                        ? Math.round((g.current_amount / g.target_amount) * 100)
-                                        : (g.progress || 0);
+                            <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                                {appState.goals.map(g => {
+                                    // Financial goals: current_amount / target_amount
+                                    // Schedule/learning goals: time-based progress
+                                    let pct = 0;
+                                    let subLabel = '';
+
+                                    if (g.target_amount && g.target_amount > 0) {
+                                        // Financial goal
+                                        pct = Math.min(100, Math.round(((g.current_amount || 0) / g.target_amount) * 100));
+                                        subLabel = `${formatCurrency(g.current_amount || 0)} / ${formatCurrency(g.target_amount)}`;
+                                    } else if (g.progress != null) {
+                                        // Has explicit progress field
+                                        pct = g.progress;
+                                    } else if (g.created_at && g.deadline) {
+                                        // Time-based progress
+                                        const start = new Date(g.created_at).getTime();
+                                        const end = new Date(g.deadline).getTime();
+                                        const now = Date.now();
+                                        if (end > start) {
+                                            pct = Math.min(100, Math.max(0, Math.round(((now - start) / (end - start)) * 100)));
+                                        }
+                                    }
+
                                     return (
                                         <div key={g.id}>
                                             <div className="flex justify-between text-xs mb-1">
                                                 <span className="font-medium text-gray-700 truncate">{g.title}</span>
-                                                <span className="text-gray-500 ml-2">{pct}%</span>
+                                                <span className="text-gray-400 ml-2 shrink-0">{pct}%</span>
                                             </div>
-                                            <div className="w-full bg-gray-100 rounded-full h-1.5">
+                                            <div className="w-full bg-gray-100 rounded-full h-2 relative overflow-hidden">
                                                 <div
-                                                    className="h-1.5 rounded-full bg-gradient-to-r from-purple-400 to-pink-500 transition-all duration-500"
-                                                    style={{ width: `${Math.min(pct, 100)}%` }}
+                                                    className="h-full rounded-full bg-gradient-to-r from-purple-400 to-pink-500 transition-all duration-500"
+                                                    style={{ width: `${Math.max(pct, 2)}%` }}
                                                 />
                                             </div>
+                                            {subLabel && (
+                                                <p className="text-[10px] text-gray-400 mt-0.5 text-right">{subLabel}</p>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -393,17 +520,17 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <div key={idx} className={`flex items-end gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in`}>
                                 {/* Avatar */}
                                 {msg.role === 'assistant' && (
-                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
-                                        <Sparkles size={14} className="text-white" />
+                                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
+                                        <Sparkles size={12} className="text-white bg-transparent" />
                                     </div>
                                 )}
 
                                 {/* Bubble */}
-                                <div className={`max-w-[85%] lg:max-w-[75%] ${msg.role === 'user' ? '' : ''}`}>
-                                    <div className={`px-4 py-3 text-sm leading-relaxed shadow-sm
+                                <div className={`max-w-[88%] lg:max-w-[75%] ${msg.role === 'user' ? '' : ''}`}>
+                                    <div className={`px-3.5 py-2.5 md:px-4 md:py-3 text-sm leading-relaxed shadow-sm
                                         ${msg.role === 'user'
                                             ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl rounded-br-md prose-invert prose-p:text-white prose-headings:text-white'
-                                            : 'bg-gray-50 text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm prose-p:my-1.5 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-indigo-700 prose-h3:text-base prose-h3:mt-3 prose-h3:mb-1'
+                                            : 'bg-gray-50 text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm prose-p:my-1 md:prose-p:my-1.5 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-indigo-700 prose-h3:text-base prose-h3:mt-3 prose-h3:mb-1'
                                         }`}
                                     >
                                         {msg.role === 'assistant' ? (
@@ -430,11 +557,10 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                             {msg.actions.map((action, ai) => (
                                                 <div
                                                     key={ai}
-                                                    className={`flex items-start gap-2 px-3 py-2 rounded-xl text-xs ${
-                                                        action.success
-                                                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                                                            : 'bg-red-50 border border-red-200 text-red-700'
-                                                    }`}
+                                                    className={`flex items-start gap-2 px-3 py-2 rounded-xl text-xs ${action.success
+                                                        ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                                                        : 'bg-red-50 border border-red-200 text-red-700'
+                                                        }`}
                                                 >
                                                     {action.success
                                                         ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
@@ -461,15 +587,15 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         {/* Loading */}
                         {isLoading && (
                             <div className="flex items-end gap-2.5 animate-fade-in">
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0">
-                                    <Sparkles size={14} className="text-white" />
+                                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0">
+                                    <Sparkles size={12} className="text-white" />
                                 </div>
-                                <div className="bg-gray-50 px-5 py-4 rounded-2xl rounded-bl-md border border-gray-100 shadow-sm">
+                                <div className="bg-gray-50 px-4 py-3 md:px-5 md:py-4 rounded-2xl rounded-bl-md border border-gray-100 shadow-sm">
                                     <div className="flex items-center gap-2">
-                                        <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                        <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                        <span className="w-2 h-2 bg-pink-400 rounded-full animate-bounce"></span>
-                                        <span className="text-xs text-gray-400 ml-2">Đang phân tích & truy vấn dữ liệu...</span>
+                                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                        <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                        <span className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce"></span>
+                                        <span className="text-[10px] text-gray-400 ml-1">Đang phân tích dữ liệu...</span>
                                     </div>
                                 </div>
                             </div>
@@ -512,20 +638,20 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyPress}
-                                placeholder='Hỏi, phân tích, hoặc ra lệnh: "Thêm lịch học IELTS T3 T5 19h"...'
-                                className="flex-1 bg-transparent px-4 py-3 text-sm outline-none resize-none max-h-28 min-h-[48px] placeholder:text-gray-400"
+                                placeholder='Nhập đi bạn ơi ....'
+                                className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none resize-none max-h-28 min-h-[44px] placeholder:text-gray-400"
                                 rows={1}
                             />
                             <button
                                 onClick={() => handleSend()}
                                 disabled={!input.trim() || isLoading}
-                                className="m-1.5 p-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:shadow-indigo-200 disabled:opacity-40 disabled:hover:shadow-none transition-all shrink-0"
+                                className="m-1 p-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:shadow-indigo-200 disabled:opacity-40 disabled:hover:shadow-none transition-all shrink-0"
                             >
-                                {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                                {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                             </button>
                         </div>
                         <p className="text-[9px] text-center text-gray-400 mt-2">
-                            Powered by Gemini ({getCurrentModel().replace('gemini-', '')}) · Function Calling · Truy vấn DB trực tiếp · AI có thể mắc lỗi
+                            Powered by Gemini ({getCurrentModel().replace('gemini-', '')})
                         </p>
                     </div>
                 </div>

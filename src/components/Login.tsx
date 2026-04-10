@@ -107,8 +107,8 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                             <ArrowLeft size={20} />
                         </button>
                     )}
-                    <div className="bg-indigo-600 w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-200">
-                        <div className="text-white font-bold text-xl">S</div>
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden mx-auto mb-4 shadow-xl shadow-indigo-100 border-2 border-white">
+                        <img src="/pwa-192x192.png" alt="SmartLife Logo" className="w-full h-full object-cover" />
                     </div>
                     <h1 className="text-2xl font-bold text-gray-800">{isLoginMode ? 'Chào mừng trở lại' : 'Tạo tài khoản mới'}</h1>
                     <p className="text-gray-500 text-sm mt-1">Quản lý tài chính & lịch trình thông minh</p>

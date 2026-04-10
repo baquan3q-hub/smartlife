@@ -161,7 +161,7 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ appState }) => {
 
     const getWindowClass = () => {
         if (isFullscreen) return 'w-full h-full';
-        return 'w-[380px] h-[540px] md:w-[420px] md:h-[580px]';
+        return 'w-[calc(100vw-32px)] h-[calc(100dvh-120px)] max-h-[600px] md:w-[420px] md:h-[580px]';
     };
 
     return (
@@ -195,16 +195,16 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ appState }) => {
                         <div
                             ref={dragRef}
                             onMouseDown={onMouseDown}
-                            className={`bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 p-3.5 flex justify-between items-center text-white shrink-0 select-none ${!isFullscreen ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                            className={`bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 p-2 flex justify-between items-center text-white shrink-0 select-none touch-none ${!isFullscreen ? 'cursor-grab active:cursor-grabbing' : ''}`}
                         >
-                            <div className="flex items-center gap-3">
-                                {!isFullscreen && <GripHorizontal size={16} className="text-white/40" />}
-                                <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
-                                    <Bot size={18} className="text-white" />
+                            <div className="flex items-center gap-2">
+                                {!isFullscreen && <GripHorizontal size={14} className="text-white/40" />}
+                                <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center backdrop-blur-sm border border-white/20">
+                                    <Bot size={16} className="text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-sm leading-tight">SmartLife Advisor</h3>
-                                    <span className="flex items-center gap-1 text-[10px] text-indigo-200">
+                                    <h3 className="font-bold text-xs leading-tight">SmartLife Advisor</h3>
+                                    <span className="flex items-center gap-1 text-[9px] text-indigo-200">
                                         <span className="relative flex h-1.5 w-1.5">
                                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
@@ -214,14 +214,14 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ appState }) => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-0.5">
-                                <button onClick={handleReset} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-white" title="Làm mới">
-                                    <RefreshCw size={15} />
+                                <button onClick={handleReset} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-white" title="Làm mới">
+                                    <RefreshCw size={14} />
                                 </button>
-                                <button onClick={() => { setIsFullscreen(!isFullscreen); setPosition({ x: 0, y: 0 }); }} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-white" title={isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}>
-                                    {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                                <button onClick={() => { setIsFullscreen(!isFullscreen); setPosition({ x: 0, y: 0 }); }} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-white" title={isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}>
+                                    {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
                                 </button>
-                                <button onClick={() => { setIsOpen(false); setIsFullscreen(false); setPosition({ x: 0, y: 0 }); }} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-white" title="Đóng">
-                                    <X size={15} />
+                                <button onClick={() => { setIsOpen(false); setIsFullscreen(false); setPosition({ x: 0, y: 0 }); }} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-white" title="Đóng">
+                                    <X size={14} />
                                 </button>
                             </div>
                         </div>
@@ -238,7 +238,7 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ appState }) => {
                                     )}
 
                                     {/* Bubble */}
-                                    <div className={`max-w-[85%] px-4 py-3 text-sm leading-relaxed shadow-sm
+                                    <div className={`max-w-[88%] px-3 py-2 md:px-4 md:py-3 text-sm leading-relaxed shadow-sm
                     ${msg.role === 'user'
                                             ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl rounded-br-md'
                                             : 'bg-white text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-indigo-700'}`}
@@ -300,16 +300,16 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ appState }) => {
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={handleKeyPress}
-                                    placeholder="Hỏi gì đó về tài chính, kế hoạch..."
-                                    className="flex-1 bg-transparent px-4 py-3 text-sm outline-none resize-none max-h-24 min-h-[44px] placeholder:text-gray-400"
+                                    placeholder="Nhập đi bạn ơi ...."
+                                    className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none resize-none max-h-24 min-h-[40px] placeholder:text-gray-400"
                                     rows={1}
                                 />
                                 <button
                                     onClick={() => handleSend()}
                                     disabled={!input.trim() || isLoading}
-                                    className="m-1.5 p-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-md disabled:opacity-40 disabled:hover:shadow-none transition-all shrink-0"
+                                    className="m-1 p-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-md disabled:opacity-40 disabled:hover:shadow-none transition-all shrink-0"
                                 >
-                                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                                    {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                                 </button>
                             </div>
                             <p className="text-[9px] text-center text-gray-400 mt-1.5">

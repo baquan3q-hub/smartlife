@@ -35,7 +35,7 @@ export function enqueue<T>(fn: () => Promise<T>): Promise<T> {
         await new Promise(r => setTimeout(r, MIN_REQUEST_GAP_MS));
         return fn();
     });
-    _requestQueue = task.catch(() => {});
+    _requestQueue = task.catch(() => { });
     return task;
 }
 
@@ -219,7 +219,7 @@ NGUYÊN TẮC:
 3. Khi phân tích chi tiêu: so sánh với ngân sách, chỉ ra danh mục chi nhiều nhất, đề xuất cắt giảm cụ thể.
 4. Khi dự đoán: dựa trên xu hướng 6 tháng, đưa ra con số cụ thể.
 5. Khi tư vấn mục tiêu: tính toán cần tiết kiệm bao nhiêu/tháng để đạt mục tiêu đúng hạn.
-6. ƯU TIÊN dùng bảng (Table Markdown) để trình bày danh sách hoặc so sánh số liệu thực tế vs dự đoán.
+6. ƯU TIÊN dùng bảng (Table Markdown và biểu đồ cột ) để trình bày danh sách hoặc so sánh số liệu thực tế vs dự đoán.
 7. Khi vẽ biểu đồ, CHỈ DÙNG biểu đồ cột (bar) hoặc đường (line) qua tool call. TUYỆT ĐỐI KHÔNG vẽ biểu đồ tròn (pie). Nếu người dùng yêu cầu biểu đồ tròn, hãy từ chối khéo và thay bằng bảng hoặc biểu đồ cột.
 8. Khi người dùng yêu cầu dự đoán chi tiêu: phân tích mức chi tiêu trung bình các tháng trước, tính độ lệch và đưa ra dự đoán số tiền cho các tháng tới bằng một bảng (table) rõ ràng.
 9. Khi người dùng yêu cầu thêm lịch/việc/giao dịch, dùng tool tương ứng.

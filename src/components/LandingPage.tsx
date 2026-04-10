@@ -117,8 +117,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
             <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-2 rounded-lg">
-                            <LayoutDashboard className="text-white" size={20} />
+                        <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-indigo-100 border border-gray-100">
+                            <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
                         </div>
                         <span className="font-bold text-xl tracking-tight text-gray-800">SmartLife</span>
                     </div>
@@ -188,11 +188,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-indigo-300 to-purple-300 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
-                            <img
-                                src="/ai-feature.png"
-                                alt="AI Financial Advisor"
-                                className="relative rounded-2xl shadow-2xl border border-white/50 transform group-hover:scale-[1.02] transition-transform duration-500"
-                            />
+                            {/* Image Composition: Main + Sub overlay */}
+                            <div className="relative">
+                                {/* Ảnh chính (lớn) - trung tâm */}
+                                <img
+                                    src="/ai-feature-main.png"
+                                    alt="AI Financial Advisor"
+                                    className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
+                                />
+                                {/* Ảnh phụ (nhỏ) - góc dưới bên phải */}
+                                <img
+                                    src="/ai-feature-sub.png"
+                                    alt="AI Charts"
+                                    className="absolute -bottom-6 -right-4 w-2/5 rounded-2xl shadow-2xl border-2 border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-indigo-200/50"
+                                />
+                            </div>
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
@@ -220,8 +230,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-indigo-50/30 py-20 rounded-3xl border border-indigo-50">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div className="space-y-6">
-                            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
-                                <LayoutDashboard size={28} />
+                            <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-indigo-100 border border-indigo-50">
+                                <img src="/pwa-192x192.png" alt="Visual Board" className="w-full h-full object-cover" />
                             </div>
                             <h2 className="text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featVisualTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">

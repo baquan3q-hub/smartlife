@@ -600,8 +600,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             {/* Sidebar Desktop */}
             <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 fixed h-full z-20 shadow-sm">
                 <div className="p-6 flex items-center gap-3">
-                    <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-2.5 rounded-xl shadow-lg">
-                        <LayoutDashboard className="text-white" size={24} />
+                    <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-100 border border-gray-100 shrink-0">
+                        <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
                     </div>
                     <h1 className="text-xl font-bold text-gray-800 tracking-tight">SmartLife</h1>
                 </div>
@@ -657,8 +657,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 <header className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 z-30 transition-all h-16">
                     <div className="flex items-center justify-between px-4 h-full">
                         <div className="flex items-center gap-2">
-                            <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-1.5 rounded-lg">
-                                <LayoutDashboard className="text-white" size={18} />
+                            <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-100">
+                                <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
                             </div>
                             <span className="font-bold text-gray-800 text-lg tracking-tight hidden sm:block">SmartLife</span>
                         </div>
