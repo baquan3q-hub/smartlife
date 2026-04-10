@@ -653,8 +653,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 md:ml-64 min-h-screen relative bg-[#F8F9FC] pb-24 md:pb-8"> {/* Added safe bottom padding for mobile */}
-                <header className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 z-30 transition-all h-16">
+            <main className={`flex-1 md:ml-64 min-h-screen relative bg-[#F8F9FC] ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-24 md:pb-8'}`}> {/* Added safe bottom padding for mobile */}
+                {activeTab !== 'ai-advisor' && <header className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 z-30 transition-all h-16">
                     <div className="flex items-center justify-between px-4 h-full">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-100">
@@ -672,9 +672,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"><Settings size={20} /></button>
                         </div>
                     </div>
-                </header>
+                </header>}
 
-                <div className="max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative h-full"> {/* Ensure relative for absolute positioning if needed */}
+                <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative h-full'}`}> {/* AI Advisor gets full screen, others get padded layout */}
                     {activeTab === 'visual' && <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} onNavigate={(tab) => {
                         if (tab === 'music') {
                             setStartInFocusMode(true);
@@ -747,7 +747,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
 
             {/* Mobile Bottom Nav */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center z-40 pb-safe pt-1 h-[70px] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            {activeTab !== 'ai-advisor' && <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center z-40 pb-safe pt-1 h-[70px] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <button
                     onClick={() => setActiveTab('visual')}
                     className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'visual' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
@@ -778,7 +778,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     </div>
                     <span className="text-[10px] font-bold">{lang === 'vi' ? 'Lịch trình' : 'Schedule'}</span>
                 </button>
-            </nav>
+            </nav>}
 
 
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userId={user?.id || ''} onSignOut={signOut} />

@@ -304,7 +304,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const savingsPercentOfIncome = monthIncome > 0 ? Math.round((totalSavings / monthIncome) * 100) : 0;
 
     return (
-        <div className="animate-fade-in relative bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex flex-col">
+        <div className="animate-fade-in fixed inset-0 md:relative md:inset-auto bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex flex-col h-[100dvh] md:h-auto z-40 md:z-auto">
             {/* History Overlay/Drawer */}
             {showHistory && (
                 <div className="fixed inset-0 z-50 flex">
@@ -404,7 +404,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto flex-1 flex flex-col lg:flex-row gap-0 lg:gap-6 px-0 lg:px-8 pt-0 lg:pt-2 overflow-hidden w-full h-[calc(100dvh-140px)] md:h-auto">
+            <div className="max-w-7xl mx-auto flex-1 flex flex-col lg:flex-row gap-0 lg:gap-6 px-0 lg:px-8 pt-0 lg:pt-2 overflow-hidden w-full min-h-0">
 
                 {/* ── Sidebar (Desktop only) ── */}
                 <div className="hidden lg:flex flex-col w-80 shrink-0 gap-4 overflow-y-auto pb-6 pr-2 custom-scrollbar">
