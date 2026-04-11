@@ -7,7 +7,7 @@ import {
     ArrowLeft, Send, Sparkles, Loader2, Bot, RefreshCw,
     TrendingDown, Target, ListChecks, BarChart3, Wallet,
     PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight,
-    CheckCircle2, AlertCircle, History, X, Plus, Trash2
+    CheckCircle2, AlertCircle, History, X, Plus, Trash2, GraduationCap
 } from 'lucide-react';
 import { AppState, TransactionType } from '../types';
 import { generateQuickInsight, getCurrentModel, type ChatMessage } from '../services/geminiService';
@@ -84,6 +84,12 @@ const SUGGESTIONS: Suggestion[] = [
         label: 'Lịch Trình và Việc Cần Làm',
         prompt: 'Liệt kê lịch trình của tôi tuần này và các nhiệm vụ tôi đặt ra ?.',
         gradient: 'from-indigo-500 to-violet-500',
+    },
+    {
+        icon: <GraduationCap size={16} />,
+        label: 'Tư vấn lộ trình GPA',
+        prompt: 'Dựa vào điểm GPA hiện tại của tôi hãy ước tính tôi cần đạt được học lực loại gì cho các kỳ sau để đạt được hạng bằng Giỏi khi tốt nghiệp.',
+        gradient: 'from-sky-500 to-indigo-500',
     },
 ];
 

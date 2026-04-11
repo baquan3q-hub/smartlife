@@ -2,7 +2,13 @@
 // Gemini API client for SmartLife AI Advisor v2
 // — Single model, direct call (no fallback/retry)
 
-import { AppState, TransactionType } from '../types';
+import { AppState, TransactionType, GPATemplateType } from '../types';
+import {
+    computeAllCourses, calculateSemesterGPA, calculateCumulativeGPA,
+    getAcademicStanding, checkAcademicWarning, predictGraduationHonor,
+    calculateCumulativeData, computeCourse,
+} from './gpaCalculator';
+import { GRADE_SCALE, SEMESTER_TYPE_LABELS } from '../constants';
 
 // ────────────────────────────────────────
 // API Configuration
@@ -199,19 +205,67 @@ function buildProfileContext(state: AppState): string {
     return ctx;
 }
 
+function buildGPAContext(state: AppState): string {
+    const { gpaSemesters, gpaTargetCredits } = state;
+    if (!gpaSemesters || gpaSemesters.length === 0) return '\n🎓 GPA: Chưa có dữ liệu học kỳ';
+
+    const targetCredits = gpaTargetCredits || 120;
+    const semestersComputed = gpaSemesters.map(s => ({
+        ...s,
+        courses: computeAllCourses(s.courses),
+    }));
+
+    const cumulativeData = calculateCumulativeData(
+        semestersComputed,
+        targetCredits,
+        Math.max(...semestersComputed.map(s => s.year_of_study), 1)
+    );
+
+    let ctx = `\n🎓 GPA TỔNG QUAN:`;
+    ctx += `\n  - LƯU Ý PHÂN TÍCH: Khung chương trình chuẩn của người dùng này là 4 Năm học (với 8 Học kỳ chính). Sinh viên có thể học thêm Học kỳ Phụ (Hè). Hãy linh hoạt lên lịch trình dựa vào số Tín học hiển thị dưới đây.`;
+    ctx += `\n  - GPA Tích lũy: ${cumulativeData.gpa?.toFixed(2) || 'Chưa có'}`;
+    ctx += `\n  - Xếp loại học lực: ${cumulativeData.academic_standing || 'Chưa xác định'}`;
+    ctx += `\n  - Hạng tốt nghiệp dự báo: ${cumulativeData.graduation_projection || 'Chưa xác định'}`;
+    ctx += `\n  - Tín chỉ tích lũy: ${cumulativeData.credits_accumulated} / ${cumulativeData.total_credits_required} TC`;
+    ctx += `\n  - Mức cảnh báo: ${cumulativeData.warning_level || 'safe'}`;
+
+    ctx += `\n\n📚 CHI TIẾT TỪNG HỌC KỲ (${semestersComputed.length} kỳ):`;
+    semestersComputed.forEach(sem => {
+        const semGPA = calculateSemesterGPA(sem.courses);
+        const totalCredits = sem.courses.reduce((s, c) => s + c.credits, 0);
+        ctx += `\n\n  --- ${sem.name} (${sem.academic_year}) - Năm ${sem.year_of_study} ---`;
+        ctx += `\n  GPA Học kỳ: ${semGPA?.toFixed(2) || 'Chưa đủ điểm'} | TC: ${totalCredits}`;
+
+        sem.courses.forEach(c => {
+            const comp = c.computed || computeCourse(c);
+            ctx += `\n    • ${c.name || 'Chưa đặt tên'} (${c.credits}TC, Template ${c.template}): `;
+            if (comp.score10 != null) {
+                ctx += `${comp.score10.toFixed(1)}/10 = ${comp.letterGrade} (${comp.grade4?.toFixed(1)}/4.0)`;
+                if (!comp.passed) ctx += ' [KHÔNG ĐẠT]';
+            } else {
+                ctx += 'Chưa nhập đủ điểm';
+            }
+            if (c.exclude_from_gpa) ctx += ' [Không tính GPA]';
+        });
+    });
+
+    return ctx;
+}
+
 export function buildFullContext(state: AppState): string {
     return [
         buildProfileContext(state),
         buildFinanceContext(state),
         buildGoalsContext(state),
         buildScheduleContext(state),
+        buildGPAContext(state),
     ].join('\n');
 }
 
 // ────────────────────────────────────────
 // System Prompt
 // ────────────────────────────────────────
-export const SYSTEM_INSTRUCTION = `Bạn là **SmartLife Advisor** — trợ lý AI chuyên tư vấn tài chính cá nhân và quản lý cuộc sống.
+export const SYSTEM_INSTRUCTION = `Bạn là **SmartLife Advisor** — trợ lý AI chuyên tư vấn tài chính cá nhân, quản lý cuộc sống, và **tư vấn học vụ GPA cho sinh viên ĐHQGHN**.
 
 NGUYÊN TẮC:
 1. Luôn phân tích dựa trên DỮ LIỆU THỰC của người dùng (được cung cấp bên dưới hoặc qua tool query_database).
@@ -220,11 +274,28 @@ NGUYÊN TẮC:
 4. Khi dự đoán: dựa trên xu hướng 6 tháng, đưa ra con số cụ thể.
 5. Khi tư vấn mục tiêu: tính toán cần tiết kiệm bao nhiêu/tháng để đạt mục tiêu đúng hạn.
 6. ƯU TIÊN dùng bảng (Table Markdown và biểu đồ cột ) để trình bày danh sách hoặc so sánh số liệu thực tế vs dự đoán.
-7. Khi vẽ biểu đồ, CHỈ DÙNG biểu đồ cột (bar) hoặc đường (line) qua tool call. TUYỆT ĐỐI KHÔNG vẽ biểu đồ tròn (pie). Nếu người dùng yêu cầu biểu đồ tròn, hãy từ chối khéo và thay bằng bảng hoặc biểu đồ cột.
+7. Khi vẽ biểu đồ, CHỈ DÙNG biểu đồ cột (bar) hoặc đường (line) qua tool call. TUYỆT ĐỐI KHÔNG vẽ biểu đồ tròn (pie).
 8. Khi người dùng yêu cầu dự đoán chi tiêu: phân tích mức chi tiêu trung bình các tháng trước, tính độ lệch và đưa ra dự đoán số tiền cho các tháng tới bằng một bảng (table) rõ ràng.
 9. Khi người dùng yêu cầu thêm lịch/việc/giao dịch, dùng tool tương ứng.
 10. Giọng điệu chuyên nghiệp, ngắn gọn. Đầu ra phải dễ đọc trên giao diện mobile (tránh viết văn quá dài).
-11. Dùng tool \`query_database\` để tính toán tổng số tiền khi cần thiết, đừng tự bịa số.`;
+11. Dùng tool \`query_database\` để tính toán tổng số tiền khi cần thiết, đừng tự bịa số.
+
+🎓 QUY CHẾ GPA ĐHQGHN 2022:
+- Thang điểm: 10 → Chữ (A+/A/B+/B/C+/C/D+/D/F) → Thang 4 (4.0/3.7/3.5/3.0/2.5/2.0/1.5/1.0/0.0)
+- 3 Template tính điểm:
+  • A: CC1(10%) + CC2(30%) + CK(60%)
+  • B: CC1(10%) + CC2(10%) + CC3(20%) + CK(60%)
+  • C: CC1(20%) + CC2(20%) + CK(60%)
+- GPA Học kỳ = Σ(thang4 × TC) / Σ(TC) — kể cả F
+- GPA Tích lũy = Σ(thang4 × TC) / Σ(TC) — chỉ môn đạt (D trở lên)
+- Xếp loại: Xuất sắc ≥3.6, Giỏi ≥3.2, Khá ≥2.5, TB ≥2.0, Yếu <2.0
+- Cảnh báo học vụ: GPA tích lũy < ngưỡng theo năm (Năm 1: 1.2, Năm 2: 1.4, Năm 3: 1.6, Năm 4+: 1.8)
+
+Khi tư vấn GPA:
+- Tính chính xác điểm cần bao nhiêu cuối kỳ để đạt hạng mong muốn.
+- Phân tích môn nào nên tập trung cải thiện (dựa trên tín chỉ và khả năng tăng điểm).
+- Cảnh báo nếu sinh viên gần ngưỡng cảnh báo học vụ.
+- Dùng tool \`calculate_needed_gpa\` và \`simulate_gpa\` khi cần tính toán.`;
 
 // ────────────────────────────────────────
 // Core API Call — single model, but cycles API keys on 429

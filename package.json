@@ -32,7 +32,8 @@
     "react-number-format": "^5.4.4",
     "react-player": "^3.4.0",
     "recharts": "^3.6.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/html2canvas": "^0.5.35",

@@ -1,6 +1,6 @@
 // File: src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap } from 'lucide-react';
 
 // Import các Components (Đảm bảo bạn đã tạo file trong thư mục components)
 import FinanceDashboard from './components/FinanceDashboard';
@@ -14,6 +14,7 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 // Import FocusSpace
 import FocusSpace from './components/FocusSpace';
 import MusicSpace from './components/MusicSpace';
+import GPADashboard from './components/GPADashboard';
 
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -26,7 +27,7 @@ import { getToken, onMessage } from "firebase/messaging";
 import { useFocusTimer } from './hooks/useFocusTimer';
 
 // Types và Constants (Khớp với file đã sửa)
-import { AppState, Transaction, TaskPriority, SmartInsight } from './types';
+import { AppState, Transaction, TaskPriority, SmartInsight, GPASemester, GPACourse, GPATemplateType } from './types';
 import { INITIAL_BUDGET, INITIAL_GOALS, INITIAL_TRANSACTIONS, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './constants';
 
 const RealtimeClock: React.FC = () => {
@@ -68,7 +69,7 @@ interface AuthenticatedAppProps {
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) => {
     const { user, signOut } = useAuth();
-    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor'>('visual');
+    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa'>('visual');
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -104,11 +105,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         goals: INITIAL_GOALS,
         currentBalance: 0,
         profile: null,
-        // Optional: Adding calendarEvents to state if needed for global access, 
-        // but for now we just need them for notifications. 
-        // Let's add a "calendarEvents" field to AppState or just fetch locally for simplicity in a separate effect or combined?
-        // Let's add it to state to avoid multiple fetches if CalendarWidget also needs it (Refactor opportunity).
-        // For now, let's keep it simple: Add to AppState to be cleaner.
+        gpaSemesters: [], // GPA Module — khởi tạo rỗng, fetch từ Supabase
+        gpaTargetCredits: 135,
     });
 
     // Custom Category Management
@@ -118,9 +116,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     const allExpenseCategories = [...EXPENSE_CATEGORIES, ...customExpenseCats];
     const allIncomeCategories = [...INCOME_CATEGORIES, ...customIncomeCats];
 
-    // Add separate state for events or extend AppState interface? 
-    // Since AppState is in types.ts, let's just use a local state here for notification purposes 
-    // OR just fetch in the effect.
     // Smart Insights State 🧠
     const [insights, setInsights] = useState<SmartInsight[]>([]);
 
@@ -134,24 +129,24 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             setIsLoadingData(true);
             try {
                 // Gọi song song 6 bảng dữ liệu (added calendar_events)
-                const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes] = await Promise.all([
+                const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes, gpaSemRes, gpaCourseRes] = await Promise.all([
                     supabase.from('transactions').select('*').order('date', { ascending: false }),
                     supabase.from('goals').select('*').order('deadline', { ascending: true }),
                     supabase.from('timetable').select('*').order('start_time', { ascending: true }),
                     supabase.from('todos').select('*').order('created_at', { ascending: false }),
                     supabase.from('profiles').select('*').eq('id', user.id).single(),
-                    supabase.from('calendar_events').select('*'), // No date filter = get all for now (simpler)
-                    supabase.from('budgets').select('*')
+                    supabase.from('calendar_events').select('*'),
+                    supabase.from('budgets').select('*'),
+                    supabase.from('gpa_semesters').select('*').order('academic_year', { ascending: true }),
+                    supabase.from('gpa_courses').select('*').order('created_at', { ascending: true }),
                 ]);
 
                 if (txRes.error) throw txRes.error;
-                // Profile might be empty if new user, so don't throw error immediately or handle gracefully
 
                 // Cập nhật State
                 setAppState((prev: AppState) => ({
                     ...prev,
                     transactions: txRes.data.map(t => ({
-                        // Chuyển đổi dữ liệu cho khớp kiểu (đề phòng số lưu dạng chuỗi)
                         id: t.id,
                         user_id: t.user_id,
                         amount: Number(t.amount),
@@ -165,7 +160,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     budgets: budgetRes.data || [],
                     timetable: timeRes.data || [],
                     todos: todoRes.data || [],
-                    profile: profileRes.data || null
+                    profile: profileRes.data || null,
+                    // GPA: Combine semesters with their courses
+                    gpaSemesters: (gpaSemRes.data || []).map((sem: any) => ({
+                        ...sem,
+                        courses: (gpaCourseRes.data || []).filter((c: any) => c.semester_id === sem.id),
+                    })),
+                    gpaTargetCredits: Number(localStorage.getItem(`gpaTargetCredits_${user.id}`)) || 135,
                 }));
 
                 // Parse Custom Categories from Profile
@@ -174,7 +175,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     if (customCats.expense) setCustomExpenseCats(customCats.expense);
                     if (customCats.income) setCustomIncomeCats(customCats.income);
                 } else {
-                    // Initialize if empty (migration helper)
                     if (profileRes.data && !profileRes.data.custom_categories) {
                         await supabase.from('profiles').update({
                             custom_categories: { expense: [], income: [] }
@@ -200,7 +200,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     // --- FIREBASE MESSAGING LOGIC ---
     useEffect(() => {
-        // Feature detection to prevent crash on unsupported browsers (e.g. some mobile views)
         const isSupported = typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
 
         if (!isSupported) {
@@ -210,22 +209,18 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
         const requestPermission = async () => {
             try {
-                // 1. Xin quyền
                 const permission = await Notification.requestPermission();
 
                 if (permission === "granted") {
-                    // 2. Đăng ký Service Worker thủ công để đảm bảo nó chạy
                     const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
                     console.log("Service Worker đã sẵn sàng:", registration);
 
-                    // 3. Lấy Token và gắn kèm registration vừa tạo
                     const token = await getToken(messaging, {
                         vapidKey: "BNaKU7cMSXUBoTEpfqQ87cwaLYkqZgJZ4nWJQSD10gsl64Qj0XQiKmXbeGz3_PesfzY-pZ4bWalRKuMpGxN7Hi0",
-                        serviceWorkerRegistration: registration // Thêm dòng này để fix lỗi timeout
+                        serviceWorkerRegistration: registration
                     });
 
                     if (token) {
-                        // Token loaded successfully
                     }
                 }
             } catch (error) {
@@ -235,7 +230,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
         requestPermission();
 
-        // Handle foreground messages safely
         let unsubscribe = () => { };
         try {
             unsubscribe = onMessage(messaging, (payload) => {
@@ -255,7 +249,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     useEffect(() => {
         if (!notificationsEnabled) return;
 
-        // Run checks every minute
         const interval = setInterval(() => {
             if (appState.timetable.length) checkAndNotify(appState.timetable);
             checkCalendarAndNotify();
@@ -263,7 +256,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (calendarEvents.length) checkCustomEventsAndNotify(calendarEvents);
         }, 60000);
 
-        // Initial check on load (after data is ready)
         if (notificationsEnabled && (appState.timetable.length || calendarEvents.length)) {
             checkAndNotify(appState.timetable);
             checkCalendarAndNotify();
@@ -272,14 +264,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
 
         return () => clearInterval(interval);
-        return () => clearInterval(interval);
     }, [appState.timetable, appState.goals, calendarEvents]);
 
     // Confirm close app
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault();
-            e.returnValue = ''; // Legacy support
+            e.returnValue = '';
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -295,7 +286,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     const handleAddTransaction = async (newTx: Omit<Transaction, 'id'>) => {
         if (!user) return;
         const tempId = Date.now().toString();
-        // Optimistic UI: Hiển thị ngay lập tức trước khi lưu server
         const optimisticTx: Transaction = { ...newTx, id: tempId, user_id: user.id };
 
         setAppState((prev: AppState) => ({ ...prev, transactions: [optimisticTx, ...prev.transactions] }));
@@ -307,7 +297,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
             if (error) throw error;
             if (data) {
-                // Cập nhật lại ID thật từ server
                 setAppState((prev: AppState) => ({
                     ...prev,
                     transactions: prev.transactions.map(t => t.id === tempId ? { ...data, amount: Number(data.amount) } : t)
@@ -316,7 +305,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         } catch (error: any) {
             console.error('Lỗi thêm giao dịch:', error);
             alert(`Lỗi: ${error.message}`);
-            // Rollback (hoàn tác) nếu lỗi
             setAppState((prev: AppState) => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== tempId) }));
         }
     };
@@ -354,18 +342,15 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     const handleAddCategory = async (type: 'expense' | 'income', newCategory: string) => {
         if (!user || !newCategory.trim()) return;
 
-        // Anti-duplicate check
         const currentList = type === 'expense' ? allExpenseCategories : allIncomeCategories;
         if (currentList.includes(newCategory)) {
             alert("Danh mục này đã tồn tại!");
             return;
         }
 
-        // Update Local State first
         if (type === 'expense') setCustomExpenseCats(prev => [...prev, newCategory]);
         else setCustomIncomeCats(prev => [...prev, newCategory]);
 
-        // Update Database
         try {
             const currentProfile = appState.profile;
             const existingCustom = currentProfile?.custom_categories || { expense: [], income: [] };
@@ -381,7 +366,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
             if (error) throw error;
 
-            // Update Profile in AppState to reflect changes
             setAppState(prev => ({
                 ...prev,
                 profile: prev.profile ? { ...prev.profile, custom_categories: updatedCustom } : null
@@ -390,7 +374,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         } catch (error: any) {
             console.error("Lỗi thêm danh mục:", error);
             alert("Không thể lưu danh mục mới. Vui lòng thử lại.");
-            // Rollback local state
             if (type === 'expense') setCustomExpenseCats(prev => prev.filter(c => c !== newCategory));
             else setCustomIncomeCats(prev => prev.filter(c => c !== newCategory));
         }
@@ -401,16 +384,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
         if (!window.confirm(`Bạn có chắc muốn xóa danh mục "${categoryToDelete}"?`)) return;
 
-        // Update Local State
         if (type === 'expense') setCustomExpenseCats(prev => prev.filter(c => c !== categoryToDelete));
         else setCustomIncomeCats(prev => prev.filter(c => c !== categoryToDelete));
 
-        // Update Database
         try {
             const currentProfile = appState.profile;
             const existingCustom = currentProfile?.custom_categories || { expense: [], income: [] };
 
-            // Filter out the category
             const updatedList = (existingCustom[type as keyof typeof existingCustom] || []).filter((c: string) => c !== categoryToDelete);
 
             const updatedCustom = {
@@ -424,7 +404,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
             if (error) throw error;
 
-            // Update Profile in AppState
             setAppState(prev => ({
                 ...prev,
                 profile: prev.profile ? { ...prev.profile, custom_categories: updatedCustom } : null
@@ -433,13 +412,11 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         } catch (error: any) {
             console.error("Lỗi xóa danh mục:", error);
             alert("Không thể xóa danh mục. Vui lòng thử lại.");
-            // Rollback local state
             if (type === 'expense') setCustomExpenseCats(prev => [...prev, categoryToDelete]);
             else setCustomIncomeCats(prev => [...prev, categoryToDelete]);
         }
     };
 
-    // Các hàm giữ chỗ (Placeholder) cho Lịch trình - Bạn có thể copy logic tương tự Transaction
     // --- GOALS HANDLERS ---
     const handleAddGoal = async (newGoal: any) => {
         if (!user) return;
@@ -531,17 +508,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         const tempId = crypto.randomUUID();
         const newItem = { id: tempId, content, priority, is_completed: false, user_id: user.id, deadline };
 
-        // Optimistic UI: Update local state immediately
         setAppState((prev: AppState) => ({ ...prev, todos: [newItem, ...prev.todos] }));
 
-        // Map UI priority to DB priority if needed
-        let dbPriority = 'medium'; // Default fallback
+        let dbPriority = 'medium';
 
-        // If already a valid DB value, use it
         if (['high', 'medium', 'low'].includes(priority)) {
             dbPriority = priority;
         }
-        // Otherwise map from Enum values
         else if (priority === 'urgent' || priority === TaskPriority.URGENT) dbPriority = 'high';
         else if (priority === 'focus' || priority === TaskPriority.FOCUS) dbPriority = 'medium';
         else if (priority === 'chill' || priority === TaskPriority.CHILL) dbPriority = 'low';
@@ -595,6 +568,144 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     };
 
+    // --- GPA HANDLERS ---
+    const handleAddGPASemester = async (newSem: Omit<GPASemester, 'id' | 'courses'>) => {
+        if (!user) return;
+        const tempId = Date.now().toString();
+        const optimistic: GPASemester = { ...newSem, id: tempId, user_id: user.id, courses: [] };
+        setAppState(prev => ({ ...prev, gpaSemesters: [...prev.gpaSemesters, optimistic] }));
+        try {
+            const { data, error } = await supabase.from('gpa_semesters').insert([{
+                user_id: user.id, name: newSem.name, academic_year: newSem.academic_year,
+                semester_type: newSem.semester_type, year_of_study: newSem.year_of_study, is_current: newSem.is_current,
+            }]).select().single();
+            if (error) throw error;
+            if (data) setAppState(prev => ({ ...prev, gpaSemesters: prev.gpaSemesters.map(s => s.id === tempId ? { ...data, courses: [] } : s) }));
+        } catch (err: any) {
+            console.error('Error adding semester:', err);
+            setAppState(prev => ({ ...prev, gpaSemesters: prev.gpaSemesters.filter(s => s.id !== tempId) }));
+        }
+    };
+
+    const handleUpdateGPASemester = async (sem: GPASemester) => {
+        const prev = appState.gpaSemesters;
+        setAppState(p => ({ ...p, gpaSemesters: p.gpaSemesters.map(s => s.id === sem.id ? sem : s) }));
+        try {
+            const { error } = await supabase.from('gpa_semesters').update({
+                name: sem.name, academic_year: sem.academic_year, semester_type: sem.semester_type,
+                year_of_study: sem.year_of_study, is_current: sem.is_current,
+            }).eq('id', sem.id);
+            if (error) throw error;
+        } catch { setAppState(p => ({ ...p, gpaSemesters: prev })); }
+    };
+
+    const handleDeleteGPASemester = async (id: string) => {
+        const prev = appState.gpaSemesters;
+        setAppState(p => ({ ...p, gpaSemesters: p.gpaSemesters.filter(s => s.id !== id) }));
+        try {
+            const { error } = await supabase.from('gpa_semesters').delete().eq('id', id);
+            if (error) throw error;
+        } catch { setAppState(p => ({ ...p, gpaSemesters: prev })); }
+    };
+
+    const handleImportGPAData = async (importedSemesters: any[]) => {
+        if (!user) return;
+        try {
+            for (const sem of importedSemesters) {
+                const { data: semData, error: semErr } = await supabase.from('gpa_semesters').insert([{
+                    user_id: user.id, name: sem.name, academic_year: sem.academic_year,
+                    semester_type: sem.semester_type, year_of_study: sem.year_of_study, is_current: sem.is_current,
+                }]).select().single();
+                if (semErr) throw semErr;
+
+                if (semData && sem.courses && sem.courses.length > 0) {
+                    const coursesToInsert = sem.courses.map((c: any) => ({
+                        user_id: user.id, semester_id: semData.id, name: c.name, credits: c.credits,
+                        template: c.template, score_cc1: c.score_cc1, score_cc2: c.score_cc2,
+                        score_cc3: c.score_cc3, score_final: c.score_final,
+                        exclude_from_gpa: c.exclude_from_gpa, is_conditional: c.is_conditional
+                    }));
+                    const { error: coursesErr } = await supabase.from('gpa_courses').insert(coursesToInsert);
+                    if (coursesErr) throw coursesErr;
+                }
+            }
+            const [semRes, courseRes] = await Promise.all([
+                supabase.from('gpa_semesters').select('*').order('created_at', { ascending: true }),
+                supabase.from('gpa_courses').select('*').order('created_at', { ascending: true })
+            ]);
+            if (semRes.data && courseRes.data) {
+                const combinedSemesters = semRes.data.map(sem => ({
+                    ...sem,
+                    courses: courseRes.data.filter(c => c.semester_id === sem.id)
+                }));
+                setAppState(prev => ({ ...prev, gpaSemesters: combinedSemesters }));
+            }
+        } catch (err: any) {
+            console.error('Import Error:', err);
+            throw err;
+        }
+    };
+
+    const handleAddGPACourse = async (semesterId: string, course: Omit<GPACourse, 'id' | 'computed'>) => {
+        if (!user) return;
+        const tempId = Date.now().toString();
+        const optimistic: GPACourse = { ...course, id: tempId, user_id: user.id, semester_id: semesterId, exclude_from_gpa: course.exclude_from_gpa ?? false, is_conditional: course.is_conditional ?? false };
+        setAppState(prev => ({
+            ...prev, gpaSemesters: prev.gpaSemesters.map(s => s.id === semesterId ? { ...s, courses: [...s.courses, optimistic] } : s)
+        }));
+        try {
+            const { data, error } = await supabase.from('gpa_courses').insert([{
+                user_id: user.id, semester_id: semesterId, name: course.name, credits: course.credits,
+                template: course.template, score_cc1: course.score_cc1, score_cc2: course.score_cc2,
+                score_cc3: course.score_cc3, score_final: course.score_final,
+                exclude_from_gpa: course.exclude_from_gpa, is_conditional: course.is_conditional,
+            }]).select().single();
+            if (error) throw error;
+            if (data) setAppState(prev => ({
+                ...prev, gpaSemesters: prev.gpaSemesters.map(s => s.id === semesterId
+                    ? { ...s, courses: s.courses.map(c => c.id === tempId ? { ...data, exclude_from_gpa: data.exclude_from_gpa ?? false, is_conditional: data.is_conditional ?? false } : c) }
+                    : s)
+            }));
+        } catch (err: any) {
+            console.error('Error adding course:', err);
+            setAppState(prev => ({
+                ...prev, gpaSemesters: prev.gpaSemesters.map(s => s.id === semesterId ? { ...s, courses: s.courses.filter(c => c.id !== tempId) } : s)
+            }));
+        }
+    };
+
+    const handleUpdateGPACourse = async (course: GPACourse) => {
+        setAppState(prev => ({
+            ...prev, gpaSemesters: prev.gpaSemesters.map(s => ({
+                ...s, courses: s.courses.map(c => c.id === course.id ? course : c)
+            }))
+        }));
+        try {
+            await supabase.from('gpa_courses').update({
+                name: course.name, credits: course.credits, template: course.template,
+                score_cc1: course.score_cc1, score_cc2: course.score_cc2, score_cc3: course.score_cc3,
+                score_final: course.score_final, exclude_from_gpa: course.exclude_from_gpa,
+                is_conditional: course.is_conditional,
+            }).eq('id', course.id);
+        } catch (err) { console.error('Error updating course:', err); }
+    };
+    const handleUpdateGPATargetCredits = (credits: number) => {
+        if (!user) return;
+        setAppState(prev => ({ ...prev, gpaTargetCredits: credits }));
+        localStorage.setItem(`gpaTargetCredits_${user.id}`, credits.toString());
+    };
+
+    const handleDeleteGPACourse = async (id: string) => {
+        const prevState = appState.gpaSemesters;
+        setAppState(prev => ({
+            ...prev, gpaSemesters: prev.gpaSemesters.map(s => ({ ...s, courses: s.courses.filter(c => c.id !== id) }))
+        }));
+        try {
+            const { error } = await supabase.from('gpa_courses').delete().eq('id', id);
+            if (error) throw error;
+        } catch { setAppState(prev => ({ ...prev, gpaSemesters: prevState })); }
+    };
+
     return (
         <div className="min-h-screen bg-[#F8F9FC] font-sans text-gray-900 flex">
             {/* Sidebar Desktop */}
@@ -628,6 +739,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     </button>
                     <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}>
                         <CalendarDays size={20} /> Lịch trình & Mục tiêu
+                    </button>
+                    <button onClick={() => setActiveTab('gpa')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'gpa' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}>
+                        <GraduationCap size={20} /> GPA
                     </button>
 
                     {/* Notification Toggle Desktop */}
@@ -742,6 +856,22 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             onResetFocusMode={() => setStartInFocusMode(false)}
                         />
                     )}
+                    {activeTab === 'gpa' && (
+                        <GPADashboard
+                            semesters={appState.gpaSemesters}
+                            onAddSemester={handleAddGPASemester}
+                            onUpdateSemester={handleUpdateGPASemester}
+                            onDeleteSemester={handleDeleteGPASemester}
+                            onAddCourse={handleAddGPACourse}
+                            onUpdateCourse={handleUpdateGPACourse}
+                            onDeleteCourse={handleDeleteGPACourse}
+                            onImportGPAData={handleImportGPAData}
+                            targetCredits={appState.gpaTargetCredits}
+                            onUpdateTargetCredits={handleUpdateGPATargetCredits}
+                            isLoading={isLoadingData}
+                            lang={lang}
+                        />
+                    )}
                 </div>
             </main>
 
@@ -777,6 +907,16 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         <CalendarDays size={24} strokeWidth={activeTab === 'schedule' ? 2.5 : 2} />
                     </div>
                     <span className="text-[10px] font-bold">{lang === 'vi' ? 'Lịch trình' : 'Schedule'}</span>
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('gpa')}
+                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'gpa' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <div className={`p-1.5 rounded-xl transition-all ${activeTab === 'gpa' ? 'bg-indigo-50' : 'bg-transparent'}`}>
+                        <GraduationCap size={24} strokeWidth={activeTab === 'gpa' ? 2.5 : 2} />
+                    </div>
+                    <span className="text-[10px] font-bold">GPA</span>
                 </button>
             </nav>}
 

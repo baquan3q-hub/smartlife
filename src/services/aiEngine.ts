@@ -1,6 +1,6 @@
 // File: src/services/aiEngine.ts
 // SmartLife AI Engine v2 — Orchestrator with Function Calling
-// Handles: query_database, add_timetable, add_todo, add_transaction, render_chart
+// Handles: query_database, add_timetable, add_todo, add_transaction, render_chart, GPA tools
 
 import { supabase } from './supabase';
 import {
@@ -9,6 +9,11 @@ import {
     type ChatMessage, type MessagePart, type ToolDeclaration
 } from './geminiService';
 import { AppState } from '../types';
+import {
+    computeAllCourses, calculateSemesterGPA, calculateCumulativeGPA,
+    calculateCumulativeData, calculateRequiredGPA, computeCourse,
+    getAcademicStanding, predictGraduationHonor,
+} from './gpaCalculator';
 
 // ────────────────────────────────────────
 // Types
@@ -52,7 +57,7 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
                 table: {
                     type: 'STRING',
                     description: 'Tên bảng cần truy vấn',
-                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events']
+                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events', 'gpa_semesters', 'gpa_courses']
                 },
                 select: {
                     type: 'STRING',
@@ -153,6 +158,47 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
             },
             required: ['chartType', 'title', 'data']
         }
+    },
+    {
+        name: 'calculate_needed_gpa',
+        description: 'Tính ngược: cần GPA bao nhiêu trong N tín chỉ còn lại để đạt GPA tích lũy mục tiêu. Dùng khi sinh viên hỏi "cần bao nhiêu điểm để đạt Giỏi/Xuất sắc".',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                target_gpa: {
+                    type: 'NUMBER',
+                    description: 'GPA tích lũy mục tiêu cần đạt. VD: 3.2 (Giỏi), 3.6 (Xuất sắc)'
+                },
+                remaining_credits: {
+                    type: 'INTEGER',
+                    description: 'Số tín chỉ còn lại phải học. Nếu không biết, dùng tổng TC yêu cầu trừ TC đã tích lũy.'
+                }
+            },
+            required: ['target_gpa']
+        }
+    },
+    {
+        name: 'simulate_gpa',
+        description: 'Mô phỏng "what-if": nếu đạt GPA X trong học kỳ tới với Y tín chỉ, GPA tích lũy sẽ thay đổi thế nào? Dùng để tư vấn kịch bản cho sinh viên.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                scenarios: {
+                    type: 'ARRAY',
+                    description: 'Danh sách kịch bản. Mỗi kịch bản có semester_gpa (GPA dự kiến) và credits (số TC).',
+                    items: {
+                        type: 'OBJECT',
+                        properties: {
+                            semester_gpa: { type: 'NUMBER', description: 'GPA dự kiến cho học kỳ tới. VD: 3.5' },
+                            credits: { type: 'INTEGER', description: 'Số tín chỉ đăng ký. VD: 18' },
+                            label: { type: 'STRING', description: 'Tên kịch bản. VD: "Kịch bản lạc quan"' }
+                        },
+                        required: ['semester_gpa', 'credits']
+                    }
+                }
+            },
+            required: ['scenarios']
+        }
     }
 ];
 
@@ -169,6 +215,8 @@ const DATE_COLUMNS: Record<string, string> = {
     todos: 'created_at',
     calendar_events: 'event_date',
     profiles: 'updated_at',
+    gpa_semesters: 'created_at',
+    gpa_courses: 'created_at',
 };
 
 async function executeQueryDatabase(args: any): Promise<any> {
@@ -384,6 +432,14 @@ export async function chatWithAI(
                         result = { success: true, message: `Biểu đồ "${args.title}" đã được tạo và hiển thị cho người dùng.` };
                         break;
                     }
+                    case 'calculate_needed_gpa': {
+                        result = executeCalculateNeededGPA(args, appState);
+                        break;
+                    }
+                    case 'simulate_gpa': {
+                        result = executeSimulateGPA(args, appState);
+                        break;
+                    }
                     default:
                         result = { error: `Unknown tool: ${name}` };
                 }
@@ -405,4 +461,104 @@ export async function chatWithAI(
         // If we hit the limit, return what we have
         return { text: '⚠️ AI đã thực hiện quá nhiều truy vấn. Vui lòng thử câu hỏi đơn giản hơn.', charts, actions };
     });
+}
+
+// ────────────────────────────────────────
+// GPA Tool Executors
+// ────────────────────────────────────────
+function executeCalculateNeededGPA(args: any, appState: AppState): any {
+    const { target_gpa, remaining_credits: userRemainingCredits } = args;
+    const { gpaSemesters } = appState;
+
+    if (!gpaSemesters || gpaSemesters.length === 0) {
+        return { error: 'Chưa có dữ liệu GPA. Sinh viên cần nhập điểm trước.' };
+    }
+
+    const semestersComputed = gpaSemesters.map(s => ({
+        ...s, courses: computeAllCourses(s.courses),
+    }));
+
+    const cumulativeData = calculateCumulativeData(
+        semestersComputed, 120,
+        Math.max(...semestersComputed.map(s => s.year_of_study), 1)
+    );
+
+    const currentGPA = cumulativeData.gpa ?? 0;
+    const currentCredits = cumulativeData.credits_accumulated;
+    const totalRequired = cumulativeData.total_credits_required;
+    const remainingCredits = userRemainingCredits ?? (totalRequired - currentCredits);
+
+    if (remainingCredits <= 0) {
+        return {
+            current_gpa: currentGPA,
+            current_credits: currentCredits,
+            message: 'Sinh viên đã hoàn thành đủ tín chỉ yêu cầu.',
+            target_gpa,
+            achievable: currentGPA >= target_gpa,
+        };
+    }
+
+    // Required GPA = (target * totalCreditsAfter - current * currentCredits) / remainingCredits
+    const totalCreditsAfter = currentCredits + remainingCredits;
+    const requiredGPA = (target_gpa * totalCreditsAfter - currentGPA * currentCredits) / remainingCredits;
+
+    return {
+        current_gpa: Number(currentGPA.toFixed(2)),
+        current_credits: currentCredits,
+        remaining_credits: remainingCredits,
+        target_gpa,
+        required_gpa_for_remaining: Number(requiredGPA.toFixed(2)),
+        achievable: requiredGPA <= 4.0 && requiredGPA >= 0,
+        standing_current: cumulativeData.academic_standing,
+        message: requiredGPA <= 4.0 && requiredGPA >= 0
+            ? `Cần đạt GPA trung bình ${requiredGPA.toFixed(2)} trong ${remainingCredits} TC còn lại để đạt GPA tích lũy ${target_gpa}.`
+            : `Không thể đạt GPA tích lũy ${target_gpa} với ${remainingCredits} TC còn lại (cần GPA ${requiredGPA.toFixed(2)} — vượt thang 4.0).`,
+    };
+}
+
+function executeSimulateGPA(args: any, appState: AppState): any {
+    const { scenarios } = args;
+    const { gpaSemesters } = appState;
+
+    if (!gpaSemesters || gpaSemesters.length === 0) {
+        return { error: 'Chưa có dữ liệu GPA. Sinh viên cần nhập điểm trước.' };
+    }
+
+    const semestersComputed = gpaSemesters.map(s => ({
+        ...s, courses: computeAllCourses(s.courses),
+    }));
+
+    const cumulativeData = calculateCumulativeData(
+        semestersComputed, 120,
+        Math.max(...semestersComputed.map(s => s.year_of_study), 1)
+    );
+
+    const currentGPA = cumulativeData.gpa ?? 0;
+    const currentCredits = cumulativeData.credits_accumulated;
+
+    const results = (scenarios || []).map((sc: any) => {
+        const { semester_gpa, credits, label } = sc;
+        const newTotalCredits = currentCredits + credits;
+        const newGPA = (currentGPA * currentCredits + semester_gpa * credits) / newTotalCredits;
+        const newStanding = getAcademicStanding(newGPA);
+        const newHonor = predictGraduationHonor(newGPA);
+
+        return {
+            label: label || `GPA ${semester_gpa} × ${credits}TC`,
+            semester_gpa,
+            credits,
+            projected_cumulative_gpa: Number(newGPA.toFixed(2)),
+            gpa_change: Number((newGPA - currentGPA).toFixed(3)),
+            new_standing: newStanding,
+            graduation_honor: newHonor,
+            total_credits_after: newTotalCredits,
+        };
+    });
+
+    return {
+        current_gpa: Number(currentGPA.toFixed(2)),
+        current_credits: currentCredits,
+        current_standing: cumulativeData.academic_standing,
+        scenarios: results,
+    };
 }
