@@ -18,6 +18,7 @@ import {
   GPASemester, GPACourse, GPATemplateType, SemesterType,
   GPAComputed, GPACumulativeData,
 } from '../types';
+import ConfirmModal from './ConfirmModal';
 import {
   computeAllCourses, computeCourse, calculateSemesterGPA,
   calculateCumulativeGPA, calculateCumulativeData,
@@ -81,6 +82,13 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
   const [viewMode, setViewMode] = useState<'dashboard' | 'history' | 'charts'>('dashboard');
   const [expandedHistorySemId, setExpandedHistorySemId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   // Semester form
   const [formSemType, setFormSemType] = useState<SemesterType>(SemesterType.HK1);
@@ -677,10 +685,15 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
                       </button>
                       <button
                         onClick={() => {
-                          if (window.confirm(`Xóa "${selectedSemester.name} — ${selectedSemester.academic_year}"?`)) {
-                            onDeleteSemester(selectedSemester.id);
-                            setSelectedSemesterId(null);
-                          }
+                          setConfirmDialog({
+                            isOpen: true,
+                            title: 'Xóa học kỳ',
+                            message: `Bạn có chắc chắn muốn xóa "${selectedSemester.name} — ${selectedSemester.academic_year}"?`,
+                            onConfirm: () => {
+                              onDeleteSemester(selectedSemester.id);
+                              setSelectedSemesterId(null);
+                            }
+                          });
                         }}
                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
                         title="Xóa học kỳ"
@@ -1015,6 +1028,14 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
           </div>
         </div>
       )}
+
+      <ConfirmModal 
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(p => ({ ...p, isOpen: false }))}
+      />
     </div>
   );
 };
@@ -1095,6 +1116,13 @@ const CourseTable: React.FC<{
   onDeleteCourse: (id: string) => void;
 }> = ({ courses, onUpdateCourse, onDeleteCourse }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   const handleScoreChange = useCallback((course: GPACourse, field: string, value: string) => {
     const numVal = value === '' ? null : parseFloat(value);
@@ -1264,7 +1292,14 @@ const CourseTable: React.FC<{
                   {/* Delete */}
                   <td className="px-2 py-2.5 text-center">
                     <button
-                      onClick={() => onDeleteCourse(course.id)}
+                      onClick={() => {
+                        setConfirmDialog({
+                          isOpen: true,
+                          title: 'Xóa môn học',
+                          message: `Bạn có chắc chắn muốn xóa môn "${course.name || 'chưa đặt tên'}"?`,
+                          onConfirm: () => onDeleteCourse(course.id)
+                        });
+                      }}
                       className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                     >
                       <Trash2 size={14} />
@@ -1335,7 +1370,14 @@ const CourseTable: React.FC<{
                   ∅GPA
                 </label>
                 <button
-                  onClick={() => onDeleteCourse(course.id)}
+                  onClick={() => {
+                    setConfirmDialog({
+                      isOpen: true,
+                      title: 'Xóa môn học',
+                      message: `Bạn có chắc chắn muốn xóa môn "${course.name || 'chưa đặt tên'}"?`,
+                      onConfirm: () => onDeleteCourse(course.id)
+                    });
+                  }}
                   className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg"
                 >
                   <Trash2 size={14} />
@@ -1401,11 +1443,16 @@ const CourseTable: React.FC<{
           );
         })}
       </div>
+      <ConfirmModal 
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(p => ({ ...p, isOpen: false }))}
+      />
     </div>
   );
 };
-
-// ── Score Input (Desktop) ──
 const ScoreInput: React.FC<{
   value: number | null | undefined;
   onChange: (value: string) => void;

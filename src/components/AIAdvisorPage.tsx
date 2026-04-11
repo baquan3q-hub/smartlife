@@ -17,6 +17,7 @@ import { memoryService } from '../services/memoryService';
 import InlineChatChart from './InlineChatChart';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import ConfirmModal from './ConfirmModal';
 
 // ────────────────────────────────────────
 // Types
@@ -123,6 +124,13 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const [memoryContext, setMemoryContext] = useState<string>('');
     const [conversations, setConversations] = useState<AIConversation[]>([]);
     const [showHistory, setShowHistory] = useState(false);
+
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+    });
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -284,13 +292,20 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
     const handleDeleteConversation = async (e: React.MouseEvent, convId: string) => {
         e.stopPropagation();
-        const success = await chatHistoryService.deleteConversation(convId);
-        if (success) {
-            setConversations(prev => prev.filter(c => c.id !== convId));
-            if (conversationId === convId) {
-                handleReset();
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Xóa hội thoại',
+            message: 'Bạn có chắc chắn muốn xóa cuộc trò chuyện này?',
+            onConfirm: async () => {
+                const success = await chatHistoryService.deleteConversation(convId);
+                if (success) {
+                    setConversations(prev => prev.filter(c => c.id !== convId));
+                    if (conversationId === convId) {
+                        handleReset();
+                    }
+                }
             }
-        }
+        });
     };
 
     const showSuggestions = messages.length <= 1 && !isLoading;
@@ -662,6 +677,13 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     </div>
                 </div>
             </div>
+            <ConfirmModal 
+                isOpen={confirmDialog.isOpen}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={() => setConfirmDialog(p => ({ ...p, isOpen: false }))}
+            />
         </div>
     );
 };
