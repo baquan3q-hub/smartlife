@@ -19,12 +19,27 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/messaging'],
+            'vendor-supabase': ['@supabase/supabase-js'],
+            'vendor-charts': ['recharts'],
+            'vendor-ui': ['lucide-react', 'react-markdown', 'remark-gfm'],
+            'vendor-utils': ['xlsx', 'html2canvas', 'react-number-format', 'lunar-javascript'],
+          }
+        }
+      }
+    },
     plugins: [
       react(),
       VitePWA({
         registerType: 'autoUpdate',
         injectRegister: null, // Disable auto-registration to avoid conflict with firebase-messaging-sw.js
         workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit
           runtimeCaching: [
             {
               urlPattern: ({ request }) => request.headers.has('range'),
