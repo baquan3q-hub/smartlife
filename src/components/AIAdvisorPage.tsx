@@ -87,8 +87,8 @@ const SUGGESTIONS: Suggestion[] = [
     },
     {
         icon: <GraduationCap size={16} />,
-        label: 'Tư vấn lộ trình GPA',
-        prompt: 'Dựa vào điểm GPA hiện tại của tôi hãy ước tính tôi cần đạt được học lực loại gì cho các kỳ sau để đạt được hạng bằng Giỏi khi tốt nghiệp.',
+        label: 'Ước tính GPA',
+        prompt: 'Dựa vào điểm GPA hiện tại của tôi hãy ước tính và dự đoán mức điểm/tín chỉ GPA các kỳ của tôi phải được bao tối đa bao nhiêu điểm để đạt được xếp loại giỏi bằng tốt nghiệp',
         gradient: 'from-sky-500 to-indigo-500',
     },
 ];
