@@ -373,6 +373,22 @@ export async function chatWithAI(
             const body = buildRequest(contents);
             const data = await callGeminiRaw(body);
 
+            // Log token usage
+            if (data?.usageMetadata?.totalTokenCount) {
+                supabase.auth.getUser().then(({ data: authData }) => {
+                    const uid = authData?.user?.id;
+                    if (!uid) { console.warn('[SmartLife] Token log skipped: no user'); return; }
+                    supabase.from('api_logs').insert([{
+                        user_id: uid,
+                        action: 'chat',
+                        tokens_used: data.usageMetadata.totalTokenCount
+                    }]).then(({ error }) => {
+                        if (error) console.error('[SmartLife] ❌ Token log failed:', error.message);
+                        else console.info(`[SmartLife] ✅ Logged ${data.usageMetadata.totalTokenCount} tokens`);
+                    });
+                });
+            }
+
             const candidate = data?.candidates?.[0];
             if (!candidate?.content?.parts) {
                 return { text: 'Không nhận được phản hồi từ AI.', charts, actions };

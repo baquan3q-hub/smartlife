@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap } from 'lucide-react';
 import InstallGuideModal from './InstallGuideModal';
 
 interface LandingPageProps {
@@ -42,6 +42,10 @@ const translations = {
         featGoalsTitle: 'Đặt mục tiêu,\nHiện thực hóa ước mơ.',
         featGoalsDesc: 'Theo dõi từng bước tiến của bạn với tính năng quản lý mục tiêu dài hạn và ngắn hạn. Đừng chỉ mơ ước, hãy thực hiện.',
         featGoalsItems: ['Theo dõi tiến độ trực quan', 'Nhắc nhở hạn chót', 'Giao diện lịch vạn niên'],
+
+        featGpaTitle: 'GPA Tracker,\nLàm chủ điểm số.',
+        featGpaDesc: 'Công cụ tính toán GPA cá nhân hóa. Đặt mục tiêu tín chỉ, theo dõi tiến độ học tập từng kỳ và tự động tính toán tổng kết điểm chính xác.',
+        featGpaItems: ['Mục tiêu tín chỉ linh hoạt', 'Quản lý lộ trình học tập', 'Giao diện trực quan, dễ dùng'],
 
         promoTag: 'Tính năng mới',
         promoTitle: 'Khám phá My Storage',
@@ -87,6 +91,11 @@ const translations = {
         featGoalsTitle: 'Set Goals,\nRealize Dreams.',
         featGoalsDesc: 'Track your every step with long-term and short-term goal management. Don\'t just dream, make it happen.',
         featGoalsItems: ['Visual progress tracking', 'Deadline reminders', 'Perpetual calendar interface'],
+
+        featGpaTitle: 'GPA Tracker,\nMaster Your Grades.',
+        featGpaDesc: 'Personalized GPA calculation tool. Set credit goals, track your academic progress every semester, and accurately calculate your overall score.',
+        featGpaItems: ['Flexible credit targets', 'Academic roadmap management', 'Intuitive and easy-to-use interface'],
+        
         promoTag: 'New Feature',
         promoTitle: 'Discover My Storage',
         promoDesc: 'Secure personal storage space. Notes, files, images & media - all in one single place.',
@@ -380,6 +389,47 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                     </li>
                                 ))}
                             </ul>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature 4: GPA Tracker (NEW) */}
+                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-cyan-50/30 py-20 rounded-3xl border border-cyan-50 mb-20">
+                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                        <div className="space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Sparkles size={14} className="animate-pulse" /> Tính năng Mới
+                            </div>
+                            <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featGpaTitle}</h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {t.featGpaDesc}
+                            </p>
+                            <ul className="space-y-3 pt-2">
+                                {t.featGpaItems && t.featGpaItems.map((item: string, i: number) => (
+                                    <li key={i} className="flex items-center gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-cyan-50 shadow-sm">
+                                        <div className="bg-cyan-100 p-1.5 rounded-lg">
+                                            <GraduationCap className="text-cyan-600" size={18} />
+                                        </div>
+                                        {item}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div className="relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-cyan-200 to-sky-200 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            {/* Image Composition */}
+                            <div className="relative">
+                                <img
+                                    src="/GPA1.png"
+                                    alt="GPA Tracker Main"
+                                    className="relative rounded-2xl shadow-2xl border border-white/50 transform group-hover:scale-[1.02] transition-transform duration-500 z-10 w-full"
+                                />
+                                <img
+                                    src="/GPA2.png"
+                                    alt="GPA Tracker Details"
+                                    className="absolute -bottom-8 -left-6 w-1/2 rounded-2xl shadow-2xl border-2 border-white transform -rotate-3 group-hover:-rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-cyan-200/50"
+                                />
+                            </div>
                         </div>
                     </div>
                 </section>

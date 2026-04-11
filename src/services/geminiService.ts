@@ -9,6 +9,7 @@ import {
     calculateCumulativeData, computeCourse,
 } from './gpaCalculator';
 import { GRADE_SCALE, SEMESTER_TYPE_LABELS } from '../constants';
+import { supabase } from './supabase';
 
 // ────────────────────────────────────────
 // API Configuration
@@ -357,6 +358,23 @@ export async function chatWithGeminiSimple(
 
     return enqueue(async () => {
         const data = await callGeminiRaw(body);
+        
+        // Log token usage for quick insight
+        if (data?.usageMetadata?.totalTokenCount) {
+            supabase.auth.getUser().then(({ data: authData }) => {
+                const uid = authData?.user?.id;
+                if (!uid) return;
+                supabase.from('api_logs').insert([{
+                    user_id: uid,
+                    action: 'insight',
+                    tokens_used: data.usageMetadata.totalTokenCount
+                }]).then(({ error }) => {
+                    if (error) console.error('[SmartLife] ❌ Insight token log failed:', error.message);
+                    else console.info(`[SmartLife] ✅ Logged ${data.usageMetadata.totalTokenCount} insight tokens`);
+                });
+            });
+        }
+
         return data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Không nhận được phản hồi từ AI.';
     });
 }

@@ -1,6 +1,6 @@
 // File: src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown } from 'lucide-react';
 
 // Import các Components (Đảm bảo bạn đã tạo file trong thư mục components)
 import FinanceDashboard from './components/FinanceDashboard';
@@ -15,6 +15,10 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import FocusSpace from './components/FocusSpace';
 import MusicSpace from './components/MusicSpace';
 import GPADashboard from './components/GPADashboard';
+import AdminDashboard from './components/AdminDashboard';
+import PricingModal from './components/PricingModal';
+import InvoiceModal from './components/InvoiceModal';
+import ProGateOverlay from './components/ProGateOverlay';
 
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -25,6 +29,9 @@ import InsightCard from './components/InsightCard';
 import { messaging } from './services/firebase';
 import { getToken, onMessage } from "firebase/messaging";
 import { useFocusTimer } from './hooks/useFocusTimer';
+import { useProAccess } from './hooks/useProAccess';
+import { createSubscriptionOrder, setupTrialForNewUser } from './services/subscriptionService';
+import { SubscriptionPlanDuration, SubscriptionOrder } from './types';
 
 // Types và Constants (Khớp với file đã sửa)
 import { AppState, Transaction, TaskPriority, SmartInsight, GPASemester, GPACourse, GPATemplateType } from './types';
@@ -69,10 +76,15 @@ interface AuthenticatedAppProps {
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) => {
     const { user, signOut } = useAuth();
-    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa'>('visual');
+    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin'>('visual');
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    // Pro Subscription State
+    const [isPricingOpen, setIsPricingOpen] = useState(false);
+    const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+    const [currentOrder, setCurrentOrder] = useState<SubscriptionOrder | null>(null);
 
     // Shared Focus Timer Engine
     const timer = useFocusTimer();
@@ -95,6 +107,15 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     };
 
+    // Navigation state
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+    const handleSignOut = () => {
+        if (window.confirm('Bạn có chắc chắn muốn đăng xuất không?')) {
+            signOut();
+        }
+    };
+
     // App State - Khởi tạo dữ liệu mặc định
     const [appState, setAppState] = useState<AppState>({
         transactions: INITIAL_TRANSACTIONS,
@@ -109,6 +130,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         gpaTargetCredits: 135,
     });
 
+    // Pro Access (must be after appState declaration)
+    const proAccess = useProAccess(appState.profile, user?.email || undefined);
+
     // Custom Category Management
     const [customExpenseCats, setCustomExpenseCats] = useState<string[]>([]);
     const [customIncomeCats, setCustomIncomeCats] = useState<string[]>([]);
@@ -121,9 +145,62 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
 
+    // --- PRO SUBSCRIPTION: Handle plan selection ---
+    const handleSelectPlan = async (planId: SubscriptionPlanDuration) => {
+        if (!user) return;
+        const order = await createSubscriptionOrder(user.id, planId);
+        if (order) {
+            setCurrentOrder(order);
+            setIsPricingOpen(false);
+            setIsInvoiceOpen(true);
+        } else {
+            alert('Không thể tạo đơn hàng. Vui lòng thử lại.');
+        }
+    };
+
+    const handleCreateNewOrder = () => {
+        setIsInvoiceOpen(false);
+        setIsPricingOpen(true);
+    };
+
+    // --- PRO: Setup trial for new users ---
+    // Trial 30 ngày tính từ ngày tạo tài khoản (user.created_at)
+    useEffect(() => {
+        if (!user || !appState.profile) return;
+        const needsTrial = (!appState.profile.plan || appState.profile.plan === 'free') && !appState.profile.trial_started_at;
+        if (needsTrial) {
+            // Dùng ngày tạo tài khoản làm mốc bắt đầu trial
+            const accountCreatedAt = user.created_at || new Date().toISOString();
+            setupTrialForNewUser(user.id, accountCreatedAt).then(() => {
+                setAppState(prev => ({
+                    ...prev,
+                    profile: prev.profile ? {
+                        ...prev.profile,
+                        plan: 'trial',
+                        trial_started_at: accountCreatedAt,
+                    } : null,
+                }));
+            });
+        }
+    }, [user, appState.profile?.plan]);
+
     // Fetch Data từ Supabase khi user đăng nhập
     useEffect(() => {
         if (!user) return;
+
+        // Route URL /admin to admin tab if user has permission
+        if (window.location.pathname === '/admin' && user.email === 'baquan3q@gmail.com') {
+            setActiveTab('admin');
+        }
+
+        // Update last_active_at — ghi nhận thời gian online
+        supabase.from('profiles')
+            .update({ last_active_at: new Date().toISOString() })
+            .eq('id', user.id)
+            .then(({ error }) => {
+                if (error) console.warn('[SmartLife] Không update được last_active_at:', error.message);
+                else console.info('[SmartLife] ✅ last_active_at updated');
+            });
 
         const fetchData = async () => {
             setIsLoadingData(true);
@@ -709,65 +786,117 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     return (
         <div className="min-h-screen bg-[#F8F9FC] font-sans text-gray-900 flex">
             {/* Sidebar Desktop */}
-            <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 fixed h-full z-20 shadow-sm">
-                <div className="p-6 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-100 border border-gray-100 shrink-0">
-                        <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
+            <aside className={`hidden md:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 fixed h-full z-20 shadow-sm transition-all duration-300 ease-in-out`}>
+                <div className={`p-6 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} gap-3 relative`}>
+                    <div className="flex items-center gap-3 overflow-hidden">
+                        <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-100 border border-gray-100 shrink-0">
+                            <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
+                        </div>
+                        {!isSidebarCollapsed && <h1 className="text-xl font-bold text-gray-800 tracking-tight whitespace-nowrap">SmartLife</h1>}
                     </div>
-                    <h1 className="text-xl font-bold text-gray-800 tracking-tight">SmartLife</h1>
+                    
+                    {/* Toggle Button */}
+                    <button 
+                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        className={`absolute -right-3 top-8 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all z-30`}
+                    >
+                        {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                    </button>
                 </div>
 
                 {/* Real-time Clock */}
-                <div className="px-6 pb-2">
-                    <RealtimeClock />
-                </div>
+                {!isSidebarCollapsed && (
+                    <div className="px-6 pb-2 animate-in fade-in duration-500">
+                        <RealtimeClock />
+                    </div>
+                )}
 
-                <nav className="flex-1 px-4 space-y-2 mt-2">
+                <nav className={`flex-1 overflow-y-auto px-4 space-y-2 mt-2 scrollbar-thin scrollbar-thumb-gray-200 hover:scrollbar-thumb-gray-300`}>
                     {/* Language Toggle Desktop */}
-                    <button onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')} className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-gray-50 cursor-pointer border border-dashed border-gray-200 mb-2">
+                    <button onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-gray-50 cursor-pointer border border-dashed border-gray-200 mb-2`}>
                         <div className="flex items-center gap-3">
-                            <span>🌐</span>
-                            <span>{lang === 'vi' ? 'Ngôn ngữ' : 'Language'}</span>
+                            <span title={lang === 'vi' ? 'Ngôn ngữ' : 'Language'}>🌐</span>
+                            {!isSidebarCollapsed && <span>{lang === 'vi' ? 'Ngôn ngữ' : 'Language'}</span>}
                         </div>
-                        <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs">{lang.toUpperCase()}</span>
+                        {!isSidebarCollapsed && <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs">{lang.toUpperCase()}</span>}
                     </button>
-                    <button onClick={() => setActiveTab('visual')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'visual' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}>
-                        <LayoutDashboard size={20} /> {lang === 'vi' ? 'Tổng quan' : 'Visual Board'}
+
+                    <button onClick={() => setActiveTab('visual')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'visual' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? (lang === 'vi' ? 'Tổng quan' : 'Visual Board') : ''}>
+                        <LayoutDashboard size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{lang === 'vi' ? 'Tổng quan' : 'Visual Board'}</span>}
+                        {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>
-                    <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'finance' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}>
-                        <Wallet size={20} /> Tài chính
+                    <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'finance' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Tài chính' : ''}>
+                        <Wallet size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Tài chính</span>}
                     </button>
-                    <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}>
-                        <CalendarDays size={20} /> Lịch trình & Mục tiêu
+                    <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Lịch trình & Mục tiêu' : ''}>
+                        <CalendarDays size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Lịch trình & Mục tiêu</span>}
+                        {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>
-                    <button onClick={() => setActiveTab('gpa')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'gpa' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}>
-                        <GraduationCap size={20} /> GPA
+                    <button onClick={() => setActiveTab('gpa')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'gpa' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'GPA' : ''}>
+                        <GraduationCap size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">GPA</span>}
                     </button>
+
+                    {/* Admin Panel Toggle */}
+                    {user?.email === 'baquan3q@gmail.com' && (
+                        <button onClick={() => setActiveTab('admin')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-bold text-sm ${activeTab === 'admin' ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-gray-50 hover:text-red-500'}`} title={isSidebarCollapsed ? 'Admin Panel' : ''}>
+                            <ShieldAlert size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Admin Panel</span>}
+                        </button>
+                    )}
+
+                    {/* Pro Upgrade Button */}
+                    {!proAccess.isProActive && !proAccess.isLifetime && (
+                        <button onClick={() => setIsPricingOpen(true)} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-semibold text-sm bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 hover:from-indigo-100 hover:to-purple-100 border border-indigo-100`} title={isSidebarCollapsed ? 'Nâng cấp Pro' : ''}>
+                            <Crown size={20} className="shrink-0 text-yellow-500" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Nâng cấp Pro</span>}
+                        </button>
+                    )}
 
                     {/* Notification Toggle Desktop */}
-                    <div className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-gray-50 cursor-pointer" onClick={toggleNotifications}>
+                    <div className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-gray-50 cursor-pointer`} onClick={toggleNotifications}>
                         <div className="flex items-center gap-3">
-                            <span>🔔</span>
-                            <span>Thông báo</span>
+                            <span title="Thông báo">🔔</span>
+                            {!isSidebarCollapsed && <span>Thông báo</span>}
                         </div>
-                        <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${notificationsEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`}>
-                            <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                        </div>
+                        {!isSidebarCollapsed && (
+                            <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${notificationsEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </div>
+                        )}
                     </div>
                 </nav>
 
-                <div className="p-4 border-t border-gray-100 space-y-2">
-                    <button onClick={signOut} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50 transition-all font-medium text-sm">
-                        <LogOut size={20} /> Đăng xuất
+                {/* Pro Status Badge */}
+                {!isSidebarCollapsed && (
+                    <div className="px-4 py-2">
+                        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold ${
+                            proAccess.badgeColor === 'green' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                            proAccess.badgeColor === 'yellow' ? 'bg-yellow-50 text-yellow-700 border border-yellow-100' :
+                            proAccess.badgeColor === 'red' ? 'bg-red-50 text-red-600 border border-red-100' :
+                            'bg-gray-50 text-gray-500 border border-gray-100'
+                        }`}>
+                            <span className={`w-2 h-2 rounded-full ${
+                                proAccess.badgeColor === 'green' ? 'bg-emerald-500' :
+                                proAccess.badgeColor === 'yellow' ? 'bg-yellow-500 animate-pulse' :
+                                proAccess.badgeColor === 'red' ? 'bg-red-500 animate-pulse' :
+                                'bg-gray-400'
+                            }`} />
+                            <span>{proAccess.badgeText}</span>
+                            <span className="ml-auto text-[10px] font-normal opacity-70">{proAccess.planLabel}</span>
+                        </div>
+                    </div>
+                )}
+
+                <div className={`p-4 border-t border-gray-100 space-y-2 ${isSidebarCollapsed ? 'flex flex-col items-center' : ''}`}>
+                    <button onClick={handleSignOut} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50 transition-all font-medium text-sm`} title={isSidebarCollapsed ? 'Đăng xuất' : ''}>
+                        <LogOut size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Đăng xuất</span>}
                     </button>
-                    <button onClick={() => setIsSettingsOpen(true)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-medium text-sm">
-                        <Settings size={20} /> Cài đặt
+                    <button onClick={() => setIsSettingsOpen(true)} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-medium text-sm`} title={isSidebarCollapsed ? 'Cài đặt' : ''}>
+                        <Settings size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Cài đặt</span>}
                     </button>
                 </div>
             </aside>
 
             {/* Main Content */}
-            <main className={`flex-1 md:ml-64 min-h-screen relative bg-[#F8F9FC] ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-24 md:pb-8'}`}> {/* Added safe bottom padding for mobile */}
+            <main className={`flex-1 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} min-h-screen relative bg-[#F8F9FC] transition-all duration-300 ease-in-out ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-24 md:pb-8'}`}> {/* Added safe bottom padding for mobile */}
                 {activeTab !== 'ai-advisor' && <header className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 z-30 transition-all h-16">
                     <div className="flex items-center justify-between px-4 h-full">
                         <div className="flex items-center gap-2">
@@ -780,6 +909,19 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             <button onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')} className="px-2.5 py-1 bg-gray-100 text-xs font-bold rounded-lg text-gray-600 uppercase hover:bg-gray-200 transition-colors">
                                 {lang}
                             </button>
+                            {/* Admin Panel — mobile header */}
+                            {user?.email === 'baquan3q@gmail.com' && (
+                                <button onClick={() => setActiveTab('admin')} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors" title="Admin Panel">
+                                    <ShieldAlert size={20} />
+                                </button>
+                            )}
+                            {/* Pro Crown — mobile header */}
+                            {!proAccess.isProActive && !proAccess.isLifetime && (
+                                <button onClick={() => setIsPricingOpen(true)} className="relative p-2 rounded-full hover:bg-yellow-50 transition-colors" title="Nâng cấp Pro">
+                                    <Crown size={20} className="text-yellow-500" fill="currentColor" />
+                                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white" />
+                                </button>
+                            )}
                             <button onClick={toggleNotifications} className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${notificationsEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`} title="Bật/Tắt thông báo">
                                 <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
                             </button>
@@ -789,14 +931,20 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 </header>}
 
                 <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative h-full'}`}> {/* AI Advisor gets full screen, others get padded layout */}
-                    {activeTab === 'visual' && <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} onNavigate={(tab) => {
-                        if (tab === 'music') {
-                            setStartInFocusMode(true);
-                            setActiveTab('schedule');
-                        } else {
-                            setActiveTab(tab);
-                        }
-                    }} />}
+                    {activeTab === 'visual' && (
+                        proAccess.hasAccess ? (
+                            <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} onNavigate={(tab) => {
+                                if (tab === 'music') {
+                                    setStartInFocusMode(true);
+                                    setActiveTab('schedule');
+                                } else {
+                                    setActiveTab(tab);
+                                }
+                            }} />
+                        ) : (
+                            <ProGateOverlay featureName="Visual Board" onUpgrade={() => setIsPricingOpen(true)} isGracePeriod={proAccess.isInGracePeriod} />
+                        )
+                    )}
                     {activeTab === 'finance' && (
                         <FinanceDashboard
                             state={appState}
@@ -837,24 +985,37 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         />
                     )}
                     {activeTab === 'ai-advisor' && (
-                        <AIAdvisorPage
-                            appState={appState}
-                            lang={lang}
-                            onBack={() => setActiveTab('finance')}
-                            onAddTimetable={handleAddTimetable}
-                            onAddTodo={handleAddTodo}
-                            onAddTransaction={handleAddTransaction}
-                        />
+                        proAccess.hasAccess ? (
+                            <AIAdvisorPage
+                                appState={appState}
+                                lang={lang}
+                                onBack={() => setActiveTab('finance')}
+                                onAddTimetable={handleAddTimetable}
+                                onAddTodo={handleAddTodo}
+                                onAddTransaction={handleAddTransaction}
+                            />
+                        ) : (
+                            <div className="max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8">
+                                <ProGateOverlay featureName="AI Advisor" onUpgrade={() => setIsPricingOpen(true)} isGracePeriod={proAccess.isInGracePeriod} />
+                            </div>
+                        )
+                    )}
+                    {activeTab === 'admin' && user?.email === 'baquan3q@gmail.com' && (
+                        <AdminDashboard adminEmail={user.email} />
                     )}
                     {activeTab === 'schedule' && (
-                        <ScheduleDashboard
-                            state={{ ...appState, timer, onOpenMusic: () => setActiveTab('music') } as any}
-                            onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
-                            onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
-                            onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo}
-                            initialFocusMode={startInFocusMode}
-                            onResetFocusMode={() => setStartInFocusMode(false)}
-                        />
+                        proAccess.hasAccess ? (
+                            <ScheduleDashboard
+                                state={{ ...appState, timer, onOpenMusic: () => setActiveTab('music') } as any}
+                                onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
+                                onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
+                                onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo}
+                                initialFocusMode={startInFocusMode}
+                                onResetFocusMode={() => setStartInFocusMode(false)}
+                            />
+                        ) : (
+                            <ProGateOverlay featureName="Lịch trình & Mục tiêu" onUpgrade={() => setIsPricingOpen(true)} isGracePeriod={proAccess.isInGracePeriod} />
+                        )
                     )}
                     {activeTab === 'gpa' && (
                         <GPADashboard
@@ -922,6 +1083,19 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
 
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userId={user?.id || ''} onSignOut={signOut} />
+            <PricingModal
+                isOpen={isPricingOpen}
+                onClose={() => setIsPricingOpen(false)}
+                onSelectPlan={handleSelectPlan}
+                daysRemaining={proAccess.daysRemaining}
+                isTrialExpired={!proAccess.hasAccess && !proAccess.isTrialActive}
+            />
+            <InvoiceModal
+                isOpen={isInvoiceOpen}
+                onClose={() => setIsInvoiceOpen(false)}
+                order={currentOrder}
+                onCreateNewOrder={handleCreateNewOrder}
+            />
             <PWAInstallPrompt />
         </div >
     );

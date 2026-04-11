@@ -78,6 +78,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId, 
                     age: profile.age,
                     job: profile.job,
                     monthly_salary: profile.monthly_salary,
+                    workplace: profile.workplace,
                     currency: profile.currency,
                     avatar_url: profile.avatar_url,
                     updated_at: new Date().toISOString(),
@@ -191,6 +192,32 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId, 
                                         </div>
                                     </div>
 
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Mức lương tháng</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    value={profile?.monthly_salary || ''}
+                                                    onChange={(e) => setProfile(prev => prev ? { ...prev, monthly_salary: Number(e.target.value) } : null)}
+                                                    className="w-full pl-4 pr-10 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50/50 outline-none font-medium transition-all"
+                                                    placeholder="0"
+                                                />
+                                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">đ</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Công ty / Trường học</label>
+                                            <input
+                                                type="text"
+                                                value={profile?.workplace || ''}
+                                                onChange={(e) => setProfile(prev => prev ? { ...prev, workplace: e.target.value } : null)}
+                                                className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50/50 outline-none font-medium transition-all"
+                                                placeholder="Nhập nơi làm việc/học tập..."
+                                            />
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Avatar URL</label>
                                         <input
@@ -280,7 +307,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId, 
                 {/* Footer */}
                 <div className="p-5 border-t border-gray-100 bg-white flex justify-between gap-3 z-10">
                     <button
-                        onClick={onSignOut}
+                        onClick={() => {
+                            if (window.confirm('Bạn có chắc chắn muốn đăng xuất không?')) {
+                                onSignOut();
+                            }
+                        }}
                         className="px-5 py-2.5 rounded-xl text-red-500 font-bold hover:bg-red-50 transition-colors flex items-center gap-2"
                     >
                         <LogOut size={18} />

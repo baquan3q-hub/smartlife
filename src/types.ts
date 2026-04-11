@@ -198,6 +198,11 @@ export interface Profile {
   currency?: string;
   avatar_url?: string;
   custom_categories?: { expense: string[]; income: string[] };
+  plan?: string;
+  pro_expiry_date?: string;
+  trial_started_at?: string;
+  last_active_at?: string;
+  workplace?: string; // Tên công ty hoặc trường học
   updated_at?: string;
 }
 
@@ -232,7 +237,33 @@ export interface SmartInsight {
   created_at?: string;
 }
 
-// 6. My Storage
+// 6. Subscription & Pro Plan
+export type SubscriptionPlanDuration = '1_month' | '3_months' | '6_months' | 'lifetime';
+
+export interface SubscriptionPlan {
+  id: SubscriptionPlanDuration;
+  label: string;
+  price: number;
+  duration_days: number | null; // null = lifetime
+  monthly_price: number;
+  save_percent: number;
+  is_popular?: boolean;
+}
+
+export interface SubscriptionOrder {
+  id: string;
+  user_id: string;
+  plan_type: SubscriptionPlanDuration;
+  amount: number;
+  status: 'pending' | 'confirmed' | 'expired' | 'cancelled';
+  transfer_content: string;
+  invoice_expires_at: string;
+  confirmed_at?: string;
+  confirmed_by?: string;
+  created_at: string;
+}
+
+// 7. My Storage
 export interface StorageItem {
   id: string;
   user_id?: string;
