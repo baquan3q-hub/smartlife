@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppState, Goal, Todo, TimetableEvent } from '../types';
-import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot } from 'lucide-react';
+import { calculateCumulativeGPA } from '../services/gpaCalculator';
+import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap } from 'lucide-react';
 import MyStorage from './MyStorage';
 
 interface VisualBoardProps {
@@ -34,6 +35,9 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, o
     const scheduleGoals = useMemo(() =>
         appState.goals.filter(g => g.type !== 'FINANCIAL' && (!g.target_amount || g.target_amount === 0)),
         [appState.goals]);
+
+    // NEW: Cumulative GPA
+    const cumulativeGPA = useMemo(() => calculateCumulativeGPA(appState.gpaSemesters), [appState.gpaSemesters]);
 
     // Top 3 Priority Todos
     const priorityTodos = useMemo(() => {
@@ -540,6 +544,47 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, o
                             {financeGoals.length === 0 && <div className="text-center text-gray-400 text-sm py-4">Chưa có mục tiêu tài chính.</div>}
                         </div>
                     </div>
+
+                    {/* NEW: GPA Snapshot Card */}
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all overflow-hidden group relative">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 pointer-events-none"></div>
+                        
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                    <GraduationCap size={18} className="text-blue-500" /> Điểm Tích Lũy
+                                </h3>
+                                <button onClick={() => onNavigate?.('gpa')} className="text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors">
+                                    Chi tiết
+                                </button>
+                            </div>
+                            
+                            <div className="flex items-center gap-5">
+                                <div className="flex-1">
+                                    <div className="text-4xl font-black text-gray-800 mb-1">
+                                        {cumulativeGPA != null ? cumulativeGPA.toFixed(2) : '0.00'}
+                                    </div>
+                                    <div className="text-xs text-gray-400 font-medium">Trung bình Tích lũy (Hệ số 4)</div>
+                                </div>
+                                <div 
+                                    onClick={() => onNavigate?.('gpa')}
+                                    className="shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30 group-hover:-translate-y-1 cursor-pointer transition-all hover:scale-105"
+                                >
+                                    <ArrowUpRight size={20} />
+                                </div>
+                            </div>
+
+                            <div className="mt-5 pt-5 border-t border-gray-50">
+                                <button 
+                                    onClick={() => onNavigate?.('gpa')}
+                                    className="w-full py-2.5 bg-blue-50/50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                                >
+                                    Theo dõi quá trình học tập
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
             </div>
