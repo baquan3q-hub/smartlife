@@ -10,6 +10,7 @@ export const GlobalLoader: React.FC = () => {
                     src="/wallet-money.lottie"
                     loop
                     autoplay
+                    speed={2.5}
                 />
             </div>
             
