@@ -246,3 +246,76 @@ export const setupTrialForNewUser = async (userId: string, trialStartDate?: stri
     console.error('[Subscription] Setup trial exception:', err);
   }
 };
+
+/**
+ * [ADMIN] Hủy đơn hàng (đưa về trạng thái cancelled)
+ */
+export const cancelOrder = async (orderId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('subscription_orders')
+      .update({ status: 'cancelled' })
+      .eq('id', orderId);
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('[Admin] Cancel order error:', error);
+    return false;
+  }
+};
+
+/**
+ * [ADMIN] Hoàn tác xác nhận đơn hàng (Đưa về trạng thái pending và hủy Pro)
+ */
+export const revertOrder = async (orderId: string): Promise<boolean> => {
+  try {
+    const { data: order, error: orderError } = await supabase
+      .from('subscription_orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+
+    if (orderError || !order) throw new Error('Order not found');
+
+    const { error: updateOrderError } = await supabase
+      .from('subscription_orders')
+      .update({
+        status: 'pending',
+        confirmed_at: null,
+        confirmed_by: null,
+      })
+      .eq('id', orderId);
+
+    if (updateOrderError) throw updateOrderError;
+
+    // Evaluate what plan the user should fallback to
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('trial_started_at')
+      .eq('id', order.user_id)
+      .single();
+
+    let fallbackPlan = 'free';
+    if (profile?.trial_started_at) {
+      const trialStart = new Date(profile.trial_started_at);
+      const trialEnd = new Date(trialStart);
+      trialEnd.setDate(trialEnd.getDate() + 30);
+      if (trialEnd > new Date()) fallbackPlan = 'trial';
+    }
+
+    const { error: updateProfileError } = await supabase
+      .from('profiles')
+      .update({
+        plan: fallbackPlan,
+        pro_expiry_date: null,
+      })
+      .eq('id', order.user_id);
+
+    if (updateProfileError) throw updateProfileError;
+
+    return true;
+  } catch (error) {
+    console.error('[Admin] Revert order error:', error);
+    return false;
+  }
+};

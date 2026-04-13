@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { ShieldAlert, Users, CheckCircle, RefreshCw, Activity, UserPlus, LogIn, CreditCard, Crown, XCircle } from 'lucide-react';
-import { getAllOrders, confirmOrder, SUBSCRIPTION_PLANS } from '../services/subscriptionService';
+import { getAllOrders, confirmOrder, cancelOrder, revertOrder, SUBSCRIPTION_PLANS } from '../services/subscriptionService';
 import { SubscriptionOrder } from '../types';
 
 interface AdminDashboardProps {
@@ -91,11 +91,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
     // Fetch subscription orders
     const fetchOrders = useCallback(async () => {
         const data = await getAllOrders(100);
-        setOrders(data);
+        const now = new Date().getTime();
+        const mappedData = data.map(order => {
+            if (order.status === 'pending') {
+                const orderTime = new Date(order.created_at).getTime();
+                if (now - orderTime > 60 * 60 * 1000) { // 1 tiếng không duyệt -> fail
+                    return { ...order, status: 'failed' as const };
+                }
+            }
+            return order;
+        });
+        setOrders(mappedData);
     }, []);
 
     const handleConfirmOrder = async (orderId: string) => {
-        if (!window.confirm('Xác nhận đơn hàng này? Pro sẽ được kích hoạt cho user.')) return;
+        if (!window.confirm('Xác nhận CÓ hoặc KHÔNG: Kích hoạt gói Pro cho đơn hàng này?')) return;
         setConfirmingOrderId(orderId);
         try {
             // Get current admin user id
@@ -110,6 +120,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
             } else {
                 log('❌ Lỗi xác nhận đơn hàng');
                 alert('Không thể xác nhận đơn hàng. Vui lòng thử lại.');
+            }
+        } catch (err: any) {
+            log('❌ Error: ' + err.message);
+        } finally {
+            setConfirmingOrderId(null);
+        }
+    };
+
+    const handleRevertOrder = async (orderId: string) => {
+        if (!window.confirm('Xác nhận CÓ hoặc KHÔNG: Hoàn tác đơn hàng này về Trạng thái Chờ và Hủy gói Pro của User?')) return;
+        setConfirmingOrderId(orderId);
+        try {
+            const success = await revertOrder(orderId);
+            if (success) {
+                log('✅ Đã hoàn tác đơn hàng: ' + orderId.slice(0, 8));
+                fetchOrders();
+                fetchAdminData();
+            } else {
+                alert('Không thể hoàn tác đơn hàng.');
+            }
+        } catch (err: any) {
+            log('❌ Error: ' + err.message);
+        } finally {
+            setConfirmingOrderId(null);
+        }
+    };
+
+    const handleCancelOrder = async (orderId: string) => {
+        if (!window.confirm('Xác nhận CÓ hoặc KHÔNG: Hủy bỏ vĩnh viễn đơn hàng này?')) return;
+        setConfirmingOrderId(orderId);
+        try {
+            const success = await cancelOrder(orderId);
+            if (success) {
+                log('✅ Đã hủy đơn hàng: ' + orderId.slice(0, 8));
+                fetchOrders();
+            } else {
+                alert('Không thể hủy đơn hàng.');
             }
         } catch (err: any) {
             log('❌ Error: ' + err.message);
@@ -206,6 +253,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
     const trialCount = users.filter(u => u.plan === 'trial' && getUserPlanStatus(u).days > 0).length;
     const lifetimeCount = users.filter(u => u.plan === 'lifetime').length;
 
+    // Visitors Today logic
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const visitorsToday = users.filter(u => u.last_active_at && new Date(u.last_active_at) >= todayStart).length;
+
     return (
         <div className="space-y-6 animate-fade-in pb-20">
             {/* Header */}
@@ -263,6 +315,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
                     <div>
                         <p className="text-xs text-gray-500 font-medium tracking-wide uppercase">Token AI hôm nay</p>
                         <p className="text-3xl font-bold text-emerald-600 mt-1">{tokensToday.toLocaleString()}</p>
+                        <div className="mt-2 flex items-center gap-1 text-[11px] text-emerald-600 bg-emerald-50 w-fit px-2 py-0.5 rounded-full font-medium">
+                            <CheckCircle size={12}/> System: Ổn định ({apiKeyCount} keys)
+                        </div>
                     </div>
                     <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
                         <Activity size={24} />
@@ -279,12 +334,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center">
-                    <p className="text-xs text-gray-500 font-medium tracking-wide uppercase">System Health</p>
-                    <p className="text-base font-bold text-emerald-600 mt-1 flex items-center gap-1">
-                        <CheckCircle size={18}/> API ổn định
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">{apiKeyCount} Gemini Key{apiKeyCount !== 1 ? 's' : ''} hoạt động</p>
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-xs text-gray-500 font-medium tracking-wide uppercase">Lượng truy cập today</p>
+                        <p className="text-3xl font-bold text-indigo-600 mt-1">{loading ? '...' : visitorsToday}</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                        <Users size={24} />
+                    </div>
                 </div>
             </div>
 
@@ -486,32 +543,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
                                                 }`}>
                                                     {order.status === 'pending' ? '⏳ Chờ xác nhận' :
                                                      order.status === 'confirmed' ? '✅ Đã xác nhận' :
-                                                     order.status === 'expired' ? '⚪ Hết hạn' : '❌ Đã hủy'}
+                                                     order.status === 'expired' ? '⚪ Hết hạn' :
+                                                     order.status === 'failed' ? '❌ Đã hủy (Quá hạn)' : '❌ Đã hủy'}
                                                 </span>
                                             </td>
                                             <td className="px-5 py-4 text-xs text-gray-500">
                                                 {formatDate(order.created_at)}
                                             </td>
                                             <td className="px-5 py-4">
-                                                {order.status === 'pending' && (
-                                                    <button
-                                                        onClick={() => handleConfirmOrder(order.id)}
-                                                        disabled={confirmingOrderId === order.id}
-                                                        className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                                                    >
-                                                        {confirmingOrderId === order.id ? (
-                                                            <RefreshCw size={12} className="animate-spin" />
-                                                        ) : (
-                                                            <Crown size={12} />
-                                                        )}
-                                                        Kích hoạt Pro
-                                                    </button>
-                                                )}
-                                                {order.status === 'confirmed' && (
-                                                    <span className="text-xs text-green-600 flex items-center gap-1">
-                                                        <CheckCircle size={12} /> Done
-                                                    </span>
-                                                )}
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {(order.status === 'pending' || order.status === 'failed') && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleConfirmOrder(order.id)}
+                                                                disabled={confirmingOrderId === order.id}
+                                                                className={`flex items-center gap-1 px-3 py-1.5 text-white text-[11px] font-bold rounded-lg transition-colors disabled:opacity-50 ${order.status === 'failed' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-600 hover:bg-green-700'}`}
+                                                            >
+                                                                {confirmingOrderId === order.id ? <RefreshCw size={12} className="animate-spin" /> : <Crown size={12} />}
+                                                                {order.status === 'failed' ? 'Ép Kích hoạt' : 'Kích hoạt'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleCancelOrder(order.id)}
+                                                                disabled={confirmingOrderId === order.id}
+                                                                className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 text-[11px] font-bold rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                                                            >
+                                                                Hủy
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {order.status === 'confirmed' && (
+                                                        <>
+                                                            <span className="text-xs text-green-600 flex items-center gap-1 font-bold">
+                                                                <CheckCircle size={12} /> Done
+                                                            </span>
+                                                            <button
+                                                                onClick={() => handleRevertOrder(order.id)}
+                                                                disabled={confirmingOrderId === order.id}
+                                                                className="flex items-center gap-1 px-2.5 py-1 text-orange-600 hover:text-orange-800 bg-orange-50 hover:bg-orange-100 text-[10px] font-bold rounded-md transition-colors disabled:opacity-50 ml-1"
+                                                                title="Hoàn tác xác nhận"
+                                                            >
+                                                                <RefreshCw size={10} className={confirmingOrderId === order.id ? 'animate-spin' : ''} />
+                                                                Undo
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     );

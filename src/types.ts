@@ -255,7 +255,7 @@ export interface SubscriptionOrder {
   user_id: string;
   plan_type: SubscriptionPlanDuration;
   amount: number;
-  status: 'pending' | 'confirmed' | 'expired' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'expired' | 'cancelled' | 'failed';
   transfer_content: string;
   invoice_expires_at: string;
   confirmed_at?: string;
