@@ -8,7 +8,7 @@ interface VisualBoardProps {
     appState: AppState;
     userName?: string;
     userId?: string;
-    onNavigate?: (tab: 'finance' | 'schedule' | 'music' | 'ai-advisor') => void;
+    onNavigate?: (tab: 'finance' | 'schedule' | 'music' | 'ai-advisor' | 'gpa') => void;
 }
 
 const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, onNavigate }) => {

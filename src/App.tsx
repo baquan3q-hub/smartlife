@@ -19,6 +19,7 @@ import AdminDashboard from './components/AdminDashboard';
 import PricingModal from './components/PricingModal';
 import InvoiceModal from './components/InvoiceModal';
 import ProGateOverlay from './components/ProGateOverlay';
+import { GlobalLoader } from './components/GlobalLoader';
 
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -1097,6 +1098,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 onCreateNewOrder={handleCreateNewOrder}
             />
             <PWAInstallPrompt />
+
+            {/* Global Lottie Overlay when data is initially loading */}
+            {isLoadingData && <GlobalLoader />}
         </div >
     );
 };
@@ -1108,7 +1112,7 @@ const AppWrapper: React.FC = () => {
     const [showLogin, setShowLogin] = useState(false);
     const [lang, setLang] = useState<'vi' | 'en'>('vi');
 
-    if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-600 animate-spin" /></div>;
+    if (loading) return <GlobalLoader />;
 
     if (user) return <AuthenticatedApp lang={lang} setLang={setLang} />;
 
