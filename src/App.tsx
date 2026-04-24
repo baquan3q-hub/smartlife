@@ -20,6 +20,7 @@ import PricingModal from './components/PricingModal';
 import InvoiceModal from './components/InvoiceModal';
 import ProGateOverlay from './components/ProGateOverlay';
 import { GlobalLoader } from './components/GlobalLoader';
+import MySpotify from './components/MySpotify';
 
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -81,6 +82,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isSpotifyOpen, setIsSpotifyOpen] = useState(false);
 
     // Pro Subscription State
     const [isPricingOpen, setIsPricingOpen] = useState(false);
@@ -851,18 +853,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         </button>
                     )}
 
-                    {/* Notification Toggle Desktop */}
-                    <div className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-gray-50 cursor-pointer`} onClick={toggleNotifications}>
-                        <div className="flex items-center gap-3">
-                            <span title="Thông báo">🔔</span>
-                            {!isSidebarCollapsed && <span>Thông báo</span>}
-                        </div>
-                        {!isSidebarCollapsed && (
-                            <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${notificationsEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`}>
-                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                            </div>
-                        )}
-                    </div>
                 </nav>
 
                 {/* Pro Status Badge */}
@@ -887,11 +877,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 )}
 
                 <div className={`p-4 border-t border-gray-100 space-y-2 ${isSidebarCollapsed ? 'flex flex-col items-center' : ''}`}>
+                    <button onClick={() => setIsSpotifyOpen(true)} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-all font-bold text-sm`} title={isSidebarCollapsed ? 'My Spotify' : ''}>
+                        <Music size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">My Spotify</span>}
+                    </button>
+                    <button onClick={() => setIsSettingsOpen(true)} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-gray-500 hover:text-indigo-600 hover:bg-gray-50 transition-all font-medium text-sm`} title={isSidebarCollapsed ? 'Cài đặt' : ''}>
+                        <Settings size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Cài đặt</span>}
+                    </button>
                     <button onClick={handleSignOut} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50 transition-all font-medium text-sm`} title={isSidebarCollapsed ? 'Đăng xuất' : ''}>
                         <LogOut size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Đăng xuất</span>}
-                    </button>
-                    <button onClick={() => setIsSettingsOpen(true)} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-medium text-sm`} title={isSidebarCollapsed ? 'Cài đặt' : ''}>
-                        <Settings size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Cài đặt</span>}
                     </button>
                 </div>
             </aside>
@@ -916,16 +909,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                     <ShieldAlert size={20} />
                                 </button>
                             )}
-                            {/* Pro Crown — mobile header */}
                             {!proAccess.isProActive && !proAccess.isLifetime && (
                                 <button onClick={() => setIsPricingOpen(true)} className="relative p-2 rounded-full hover:bg-yellow-50 transition-colors" title="Nâng cấp Pro">
                                     <Crown size={20} className="text-yellow-500" fill="currentColor" />
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white" />
                                 </button>
                             )}
-                            <button onClick={toggleNotifications} className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${notificationsEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`} title="Bật/Tắt thông báo">
-                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                            </button>
+                            <button onClick={() => setIsSpotifyOpen(true)} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-full transition-colors"><Music size={20} /></button>
                             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"><Settings size={20} /></button>
                         </div>
                     </div>
@@ -1083,7 +1073,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             </nav>}
 
 
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userId={user?.id || ''} onSignOut={signOut} />
+            <SettingsModal 
+                isOpen={isSettingsOpen} 
+                onClose={() => setIsSettingsOpen(false)} 
+                userId={user?.id || ''} 
+                onSignOut={signOut} 
+                notificationsEnabled={notificationsEnabled}
+                toggleNotifications={toggleNotifications}
+            />
             <PricingModal
                 isOpen={isPricingOpen}
                 onClose={() => setIsPricingOpen(false)}
@@ -1097,6 +1094,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 order={currentOrder}
                 onCreateNewOrder={handleCreateNewOrder}
             />
+            <MySpotify isOpen={isSpotifyOpen} onClose={() => setIsSpotifyOpen(false)} userId={user?.id || ''} />
             <PWAInstallPrompt />
 
             {/* Global Lottie Overlay when data is initially loading */}

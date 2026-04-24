@@ -278,3 +278,32 @@ export interface StorageItem {
   created_at?: string;
   updated_at?: string;
 }
+
+// 8. My Spotify — Personal Music Library
+export interface MyPlaylist {
+  id: string;
+  user_id?: string;
+  name: string;
+  description?: string;
+  cover_color?: string;
+  is_favorite?: boolean;
+  track_count?: number;
+  total_duration?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface MyTrack {
+  id: string;
+  user_id?: string;
+  playlist_id: string;
+  title: string;
+  artist?: string;
+  duration?: number;       // seconds
+  file_url: string;
+  file_path?: string;
+  file_name?: string;
+  file_size?: number;
+  sort_order?: number;
+  created_at?: string;
+}

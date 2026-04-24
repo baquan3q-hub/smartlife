@@ -8,6 +8,8 @@ interface SettingsModalProps {
     onClose: () => void;
     userId: string;
     onSignOut: () => void;
+    notificationsEnabled?: boolean;
+    toggleNotifications?: () => void;
 }
 
 const DEFAULT_NOTI_SETTINGS = {
@@ -19,7 +21,7 @@ const DEFAULT_NOTI_SETTINGS = {
     goals_remind: true
 };
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId, onSignOut }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId, onSignOut, notificationsEnabled, toggleNotifications }) => {
     const [activeTab, setActiveTab] = useState<'profile' | 'notifications'>('profile');
     const [profile, setProfile] = useState<Profile | null>(null);
     const [notiSettings, setNotiSettings] = useState(DEFAULT_NOTI_SETTINGS);
@@ -239,6 +241,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId, 
                             <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-4 rounded-2xl text-white shadow-lg mb-6">
                                 <h3 className="font-bold text-lg flex items-center gap-2 mb-1"><Sparkles size={18} /> Make it Yours</h3>
                                 <p className="text-indigo-100 text-sm opacity-90">Tùy chỉnh cách SmartLife làm phiền bạn (một cách đáng yêu). 💖</p>
+                            </div>
+
+                            {/* Section: Master Push Notifications */}
+                            <div className="space-y-3 mb-6">
+                                <h4 className="text-sm font-bold text-indigo-500 uppercase tracking-wider flex items-center gap-2"><Bell size={14} /> Thông báo đẩy (Push)</h4>
+                                <div className="bg-indigo-50/50 rounded-2xl p-2 border border-indigo-100">
+                                    <SwitchItem
+                                        label="Cho phép gửi thông báo"
+                                        desc="Nhận thông báo ngay cả khi không mở app."
+                                        checked={notificationsEnabled || false}
+                                        onChange={() => {
+                                            if (toggleNotifications) toggleNotifications();
+                                        }}
+                                    />
+                                </div>
                             </div>
 
                             {/* Section: Timetable */}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle } from 'lucide-react';
 import InstallGuideModal from './InstallGuideModal';
 
 interface LandingPageProps {
@@ -46,6 +46,10 @@ const translations = {
         featGpaTitle: 'GPA Tracker,\nLàm chủ điểm số.',
         featGpaDesc: 'Công cụ tính toán GPA cá nhân hóa. Đặt mục tiêu tín chỉ, theo dõi tiến độ học tập từng kỳ và tự động tính toán tổng kết điểm chính xác.',
         featGpaItems: ['Mục tiêu tín chỉ linh hoạt', 'Quản lý lộ trình học tập', 'Giao diện trực quan, dễ dùng'],
+
+        featSpotifyTitle: 'My Spotify,\nÂm nhạc không giới hạn.',
+        featSpotifyDesc: 'Nghe nhạc mọi lúc mọi nơi mà không cần đăng ký mua tài khoản Spotify. Trải nghiệm âm nhạc tuyệt đỉnh ngay trên ứng dụng, vô tư nghe khi đi đường.',
+        featSpotifyItems: ['Nghe nhạc không cần tài khoản Spotify', 'Chế độ nghe lặp lại siêu mượt', 'Tạo và chia playlist theo sở thích cá nhân'],
 
         promoTag: 'Tính năng mới',
         promoTitle: 'Khám phá My Storage',
@@ -95,7 +99,11 @@ const translations = {
         featGpaTitle: 'GPA Tracker,\nMaster Your Grades.',
         featGpaDesc: 'Personalized GPA calculation tool. Set credit goals, track your academic progress every semester, and accurately calculate your overall score.',
         featGpaItems: ['Flexible credit targets', 'Academic roadmap management', 'Intuitive and easy-to-use interface'],
-        
+
+        featSpotifyTitle: 'My Spotify,\nUnlimited Music.',
+        featSpotifyDesc: 'Listen to music anywhere without buying a premium Spotify account. Experience ultimate music streaming right in the app, perfect for on-the-go.',
+        featSpotifyItems: ['Listen without Spotify account', 'Seamless repeat playback mode', 'Create and share custom playlists'],
+
         promoTag: 'New Feature',
         promoTitle: 'Discover My Storage',
         promoDesc: 'Secure personal storage space. Notes, files, images & media - all in one single place.',
@@ -161,29 +169,56 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
             </header>
 
             {/* Hero Section */}
-            <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 -mr-40 -mt-40 w-96 h-96 bg-purple-100 rounded-full blur-3xl opacity-50"></div>
-                <div className="absolute bottom-0 left-0 -ml-40 -mb-40 w-96 h-96 bg-indigo-100 rounded-full blur-3xl opacity-50"></div>
+            <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden min-h-[85vh] flex flex-col justify-center">
+                {/* Background Animated Glows */}
+                <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-[120px] mix-blend-multiply animate-pulse" style={{ animationDuration: '4s' }}></div>
+                <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-[500px] h-[500px] bg-indigo-300/30 rounded-full blur-[120px] mix-blend-multiply animate-pulse" style={{ animationDuration: '6s', animationDelay: '1s' }}></div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-pink-200/20 rounded-full blur-[150px] pointer-events-none"></div>
+
+                {/* Floating Elements (Hidden on very small screens) */}
+                <div className="hidden md:block absolute inset-0 pointer-events-none z-0">
+                    {/* Floating Wallet */}
+                    <div className="absolute top-[20%] left-[15%] w-16 h-16 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '4s' }}>
+                        <Wallet className="text-emerald-500" size={32} />
+                    </div>
+                    {/* Floating Calendar */}
+                    <div className="absolute top-[15%] right-[15%] w-14 h-14 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '5s', animationDelay: '0.5s' }}>
+                        <CalendarDays className="text-blue-500" size={28} />
+                    </div>
+                    {/* Floating Music */}
+                    <div className="absolute bottom-[20%] left-[20%] w-14 h-14 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '1s' }}>
+                        <Music className="text-purple-500" size={28} />
+                    </div>
+                    {/* Floating AI */}
+                    <div className="absolute bottom-[25%] right-[20%] w-16 h-16 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '0.2s' }}>
+                        <Brain className="text-indigo-500" size={32} />
+                    </div>
+                </div>
 
                 <div className="max-w-5xl mx-auto text-center relative z-10">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-wider mb-6 animate-fade-in-up">
-                        <Zap size={14} /> {t.heroTag}
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-indigo-100 shadow-sm text-indigo-600 text-xs font-bold uppercase tracking-wider mb-8 animate-fade-in-up hover:scale-105 transition-transform cursor-default">
+                        <Zap size={14} className="text-yellow-500" /> {t.heroTag}
                     </div>
-                    <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight mb-6 leading-tight animate-fade-in-up delay-100">
+                    <h1 className="text-5xl md:text-7xl font-extrabold text-gray-900 tracking-tight mb-6 leading-[1.1] animate-fade-in-up delay-100">
                         {t.heroTitle1} <br className="hidden md:block" />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">{t.heroTitle2}</span>
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-[length:200%_auto] animate-pulse">
+                            {t.heroTitle2}
+                        </span>
                     </h1>
-                    <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-200">
+                    <p className="text-lg md:text-2xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-200">
                         {t.heroDesc}
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-300">
-                        <button
-                            onClick={onLogin}
-                            className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full font-bold text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-2"
-                        >
-                            {t.startNow} <ArrowRight size={20} />
-                        </button>
-                        <a href="#features" className="w-full sm:w-auto px-8 py-4 bg-white text-gray-700 border border-gray-200 rounded-full font-bold text-lg hover:bg-gray-50 transition-all flex items-center justify-center">
+                        <div className="relative group w-full sm:w-auto">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-60 transition duration-500"></div>
+                            <button
+                                onClick={onLogin}
+                                className="relative w-full sm:w-auto px-8 py-4 bg-gray-900 text-white rounded-full font-bold text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-2"
+                            >
+                                {t.startNow} <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                            </button>
+                        </div>
+                        <a href="#features" className="w-full sm:w-auto px-8 py-4 bg-white text-gray-700 border border-gray-200 shadow-sm rounded-full font-bold text-lg hover:bg-gray-50 hover:shadow-md transition-all flex items-center justify-center group">
                             {t.learnMore}
                         </a>
                     </div>
@@ -430,6 +465,50 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                     className="absolute -bottom-8 -left-6 w-1/2 rounded-2xl shadow-2xl border-2 border-white transform -rotate-3 group-hover:-rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-cyan-200/50"
                                 />
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature 5: My Spotify (NEW) */}
+                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-zinc-900 py-20 rounded-3xl border border-zinc-800 mb-20 shadow-2xl overflow-hidden relative">
+                    <div className="absolute top-0 right-0 -mr-40 -mt-40 w-96 h-96 bg-indigo-500 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
+                    <div className="absolute bottom-0 left-0 -ml-40 -mb-40 w-96 h-96 bg-purple-500 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
+
+                    <div className="grid md:grid-cols-2 gap-12 items-center relative z-10">
+                        <div className="order-2 md:order-1 relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            {/* Image Composition */}
+                            <div className="relative">
+                                <img
+                                    src="/assets/spotify_preview_2.png"
+                                    alt="My Spotify Player"
+                                    className="relative rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/10 transform group-hover:scale-[1.02] transition-transform duration-500 z-10 w-full"
+                                />
+                                <img
+                                    src="/assets/spotify_preview_1.png"
+                                    alt="My Spotify Playlist"
+                                    className="absolute -bottom-6 -right-4 w-1/3 max-w-[160px] md:max-w-[180px] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-2 border-zinc-800 transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-3 transition-all duration-500 z-20 cursor-pointer hover:shadow-indigo-500/50"
+                                />
+                            </div>
+                        </div>
+                        <div className="order-1 md:order-2 space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-indigo-400 border border-white/10 text-xs font-bold uppercase tracking-wider mb-2 shadow-sm backdrop-blur-md">
+                                <Sparkles size={14} className="animate-pulse text-purple-400" /> Cập nhật Mới Nhất
+                            </div>
+                            <h2 className="text-4xl font-black text-white whitespace-pre-line leading-tight">{t.featSpotifyTitle}</h2>
+                            <p className="text-gray-400 text-lg leading-relaxed">
+                                {t.featSpotifyDesc}
+                            </p>
+                            <ul className="space-y-3 pt-2">
+                                {t.featSpotifyItems && t.featSpotifyItems.map((item: string, i: number) => (
+                                    <li key={i} className="flex items-center gap-3 text-gray-200 font-semibold bg-white/5 p-3 rounded-xl border border-white/10 shadow-sm backdrop-blur-sm">
+                                        <div className="bg-indigo-500/20 p-1.5 rounded-lg border border-indigo-500/30">
+                                            <PlayCircle className="text-indigo-400" size={18} />
+                                        </div>
+                                        {item}
+                                    </li>
+                                ))}
+                            </ul>
                         </div>
                     </div>
                 </section>
