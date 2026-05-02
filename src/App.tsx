@@ -131,6 +131,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         profile: null,
         gpaSemesters: [], // GPA Module — khởi tạo rỗng, fetch từ Supabase
         gpaTargetCredits: 135,
+        gpaTargetGPA: null,
+        gpaTargetSemesters: 4,
     });
 
     // Pro Access (must be after appState declaration)
@@ -247,6 +249,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         courses: (gpaCourseRes.data || []).filter((c: any) => c.semester_id === sem.id),
                     })),
                     gpaTargetCredits: Number(localStorage.getItem(`gpaTargetCredits_${user.id}`)) || 135,
+                    gpaTargetGPA: localStorage.getItem(`gpaTargetGPA_${user.id}`) ? Number(localStorage.getItem(`gpaTargetGPA_${user.id}`)) : null,
+                    gpaTargetSemesters: Number(localStorage.getItem(`gpaTargetSemesters_${user.id}`)) || 4,
                 }));
 
                 // Parse Custom Categories from Profile
@@ -775,6 +779,17 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         localStorage.setItem(`gpaTargetCredits_${user.id}`, credits.toString());
     };
 
+    const handleUpdateGPATarget = (targetGPA: number | null, targetSemesters: number) => {
+        if (!user) return;
+        setAppState(prev => ({ ...prev, gpaTargetGPA: targetGPA, gpaTargetSemesters: targetSemesters }));
+        if (targetGPA != null) {
+            localStorage.setItem(`gpaTargetGPA_${user.id}`, targetGPA.toString());
+        } else {
+            localStorage.removeItem(`gpaTargetGPA_${user.id}`);
+        }
+        localStorage.setItem(`gpaTargetSemesters_${user.id}`, targetSemesters.toString());
+    };
+
     const handleDeleteGPACourse = async (id: string) => {
         const prevState = appState.gpaSemesters;
         setAppState(prev => ({
@@ -1020,6 +1035,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             onImportGPAData={handleImportGPAData}
                             targetCredits={appState.gpaTargetCredits}
                             onUpdateTargetCredits={handleUpdateGPATargetCredits}
+                            targetGPA={appState.gpaTargetGPA}
+                            targetSemesters={appState.gpaTargetSemesters}
+                            onUpdateGPATarget={handleUpdateGPATarget}
                             isLoading={isLoadingData}
                             lang={lang}
                         />

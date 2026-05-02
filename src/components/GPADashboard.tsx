@@ -7,7 +7,7 @@ import {
   Plus, Trash2, Edit2, ChevronDown, ChevronRight, GraduationCap,
   BookOpen, AlertTriangle, TrendingUp, Award, Calculator, Save,
   X, Check, BarChart3, Info, FileText, ChevronLeft, Download, Upload,
-  History, LineChart as LineChartIcon, Eye
+  History, LineChart as LineChartIcon, Eye, Target, Zap, Star, ArrowRight
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -16,7 +16,7 @@ import {
 import * as XLSX from 'xlsx';
 import {
   GPASemester, GPACourse, GPATemplateType, SemesterType,
-  GPAComputed, GPACumulativeData,
+  GPAComputed, GPACumulativeData, GPAProjection,
 } from '../types';
 import ConfirmModal from './ConfirmModal';
 import {
@@ -25,6 +25,7 @@ import {
   calculateSemesterSummary, getAcademicStanding,
   checkAcademicWarning, predictGraduationHonor,
   calculateRequiredGPA, validateScore, validateCredits,
+  calculateGPAProjection, getMinimumGradeForGPA,
 } from '../services/gpaCalculator';
 import {
   GRADE_SCALE, TEMPLATE_WEIGHTS, TEMPLATE_LABELS,
@@ -44,6 +45,9 @@ interface GPADashboardProps {
   onImportGPAData?: (data: any[]) => Promise<void>;
   targetCredits?: number;
   onUpdateTargetCredits?: (credits: number) => void;
+  targetGPA?: number | null;
+  targetSemesters?: number;
+  onUpdateGPATarget?: (targetGPA: number | null, targetSemesters: number) => void;
   isLoading?: boolean;
   lang: 'vi' | 'en';
 }
@@ -72,6 +76,8 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
   semesters, onAddSemester, onUpdateSemester, onDeleteSemester,
   onAddCourse, onUpdateCourse, onDeleteCourse, onImportGPAData,
   targetCredits = 135, onUpdateTargetCredits,
+  targetGPA: propTargetGPA, targetSemesters: propTargetSemesters = 4,
+  onUpdateGPATarget,
   isLoading, lang
 }) => {
   // ── State ──
@@ -79,7 +85,7 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
   const [showSemesterModal, setShowSemesterModal] = useState(false);
   const [editingSemester, setEditingSemester] = useState<GPASemester | null>(null);
   const [showMobileSemesterList, setShowMobileSemesterList] = useState(false);
-  const [viewMode, setViewMode] = useState<'dashboard' | 'history' | 'charts'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'history' | 'charts' | 'target'>('dashboard');
   const [expandedHistorySemId, setExpandedHistorySemId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -176,14 +182,27 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
   // ── Grade Distribution ──
   const gradeDistribution = useMemo(() => {
     const counts: Record<string, number> = { 'A+': 0, 'A': 0, 'B+': 0, 'B': 0, 'C+': 0, 'C': 0, 'D+': 0, 'D': 0, 'F': 0 };
+    const coursesByGrade: Record<string, { name: string; credits: number; score10: number | null; semester: string }[]> = {
+      'A+': [], 'A': [], 'B+': [], 'B': [], 'C+': [], 'C': [], 'D+': [], 'D': [], 'F': []
+    };
     semestersComputed.forEach(sem => {
       sem.courses.forEach(c => {
         const letter = c.computed?.letterGrade;
-        if (letter && letter in counts) counts[letter]++;
+        if (letter && letter in counts) {
+          counts[letter]++;
+          coursesByGrade[letter].push({
+            name: c.name,
+            credits: c.credits,
+            score10: c.computed?.score10 ?? null,
+            semester: sem.name,
+          });
+        }
       });
     });
-    return Object.entries(counts).map(([grade, count]) => ({ grade, count }));
+    return Object.entries(counts).map(([grade, count]) => ({ grade, count, courses: coursesByGrade[grade] }));
   }, [semestersComputed]);
+
+  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
 
   const gradeColors: Record<string, string> = {
     'A+': '#059669', 'A': '#10B981', 'B+': '#3B82F6', 'B': '#60A5FA',
@@ -432,7 +451,7 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+            <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
               <GraduationCap size={22} className="text-white" />
             </div>
             GPA Tracker
@@ -445,6 +464,7 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
           <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5">
             {[
               { key: 'dashboard' as const, label: 'Nhập điểm', icon: <GraduationCap size={14} /> },
+              { key: 'target' as const, label: 'Mục tiêu', icon: <Target size={14} /> },
               { key: 'charts' as const, label: 'Biểu đồ', icon: <LineChartIcon size={14} /> },
               { key: 'history' as const, label: 'Lịch sử', icon: <History size={14} /> },
             ].map(tab => (
@@ -522,7 +542,7 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
         {/* ─── Desktop Sidebar ─── */}
         <div className="hidden md:block w-64 shrink-0 space-y-4">
           {/* Cumulative GPA Card */}
-          <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600 rounded-2xl p-5 text-white shadow-xl shadow-indigo-200/50">
+          <div className="bg-gradient-to-br from-cyan-500 via-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-xl shadow-blue-200/50">
             <div className="text-xs font-medium text-white/70 uppercase tracking-wider">GPA Tích lũy</div>
             <div className="text-4xl font-black mt-1 tracking-tight">
               {cumulativeData.gpa != null ? cumulativeData.gpa.toFixed(2) : '—'}
@@ -786,22 +806,86 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
                   <h3 className="font-bold text-gray-800">Phân bổ điểm chữ</h3>
                 </div>
                 {gradeDistribution.some(d => d.count > 0) ? (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={gradeDistribution} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                      <XAxis dataKey="grade" tick={{ fontSize: 12, fontWeight: 600, fill: '#374151' }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7280' }} />
-                      <Tooltip
-                        contentStyle={{ borderRadius: '12px', border: '1px solid #E5E7EB' }}
-                        formatter={(value: number | undefined) => [`${value ?? 0} môn`, 'Số lượng']}
-                      />
-                      <Bar dataKey="count" radius={[8, 8, 0, 0]} maxBarSize={40}>
-                        {gradeDistribution.map((entry) => (
-                          <Cell key={entry.grade} fill={gradeColors[entry.grade] || '#6B7280'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <>
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={gradeDistribution} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                        <XAxis dataKey="grade" tick={{ fontSize: 12, fontWeight: 600, fill: '#374151' }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7280' }} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: '12px', border: '1px solid #E5E7EB' }}
+                          formatter={(value: number | undefined) => [`${value ?? 0} môn`, 'Số lượng']}
+                        />
+                        <Bar
+                          dataKey="count"
+                          radius={[8, 8, 0, 0]}
+                          maxBarSize={40}
+                          cursor="pointer"
+                          onClick={(data: any) => {
+                            if (data && data.grade && data.count > 0) {
+                              setSelectedGrade(prev => prev === data.grade ? null : data.grade);
+                            }
+                          }}
+                        >
+                          {gradeDistribution.map((entry) => (
+                            <Cell
+                              key={entry.grade}
+                              fill={gradeColors[entry.grade] || '#6B7280'}
+                              opacity={selectedGrade && selectedGrade !== entry.grade ? 0.35 : 1}
+                              stroke={selectedGrade === entry.grade ? gradeColors[entry.grade] : 'none'}
+                              strokeWidth={selectedGrade === entry.grade ? 3 : 0}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+
+                    {/* Course detail panel when a bar is clicked */}
+                    {selectedGrade && (() => {
+                      const selected = gradeDistribution.find(d => d.grade === selectedGrade);
+                      if (!selected || selected.courses.length === 0) return null;
+                      return (
+                        <div className="mt-4 border border-gray-100 rounded-xl overflow-hidden animate-fade-in">
+                          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: gradeColors[selectedGrade] }}
+                              />
+                              <span className="text-sm font-bold text-gray-700">
+                                Điểm {selectedGrade} — {selected.courses.length} môn
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => setSelectedGrade(null)}
+                              className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                              <X size={14} className="text-gray-400" />
+                            </button>
+                          </div>
+                          <div className="divide-y divide-gray-50 max-h-52 overflow-y-auto">
+                            {selected.courses.map((course, i) => (
+                              <div key={i} className="px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium text-gray-800 truncate">{course.name}</div>
+                                  <div className="text-[11px] text-gray-400">{course.semester}</div>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0 ml-3">
+                                  <span className="text-xs text-gray-500">{course.credits} TC</span>
+                                  <span
+                                    className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
+                                    style={{ backgroundColor: gradeColors[selectedGrade] }}
+                                  >
+                                    {course.score10 != null ? course.score10.toFixed(1) : '—'}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </>
                 ) : (
                   <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
                     Chưa có dữ liệu điểm
@@ -966,6 +1050,18 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
                 </div>
               )}
             </div>
+          )}
+
+          {/* ══════════ TARGET VIEW ══════════ */}
+          {viewMode === 'target' && (
+            <GPATargetPanel
+              semesters={semesters}
+              cumulativeData={cumulativeData}
+              targetCredits={targetCredits}
+              propTargetGPA={propTargetGPA}
+              propTargetSemesters={propTargetSemesters}
+              onUpdateGPATarget={onUpdateGPATarget}
+            />
           )}
         </div>
       </div>
@@ -1476,5 +1572,383 @@ const ScoreInput: React.FC<{
     )}
   </div>
 );
+// ── GPA Target Panel ──
+const GPATargetPanel: React.FC<{
+  semesters: GPASemester[];
+  cumulativeData: GPACumulativeData;
+  targetCredits: number;
+  propTargetGPA?: number | null;
+  propTargetSemesters: number;
+  onUpdateGPATarget?: (targetGPA: number | null, targetSemesters: number) => void;
+}> = ({ semesters, cumulativeData, targetCredits, propTargetGPA, propTargetSemesters, onUpdateGPATarget }) => {
+
+  const [localTargetGPA, setLocalTargetGPA] = useState<string>(propTargetGPA?.toString() || '');
+  const [localTargetSemesters, setLocalTargetSemesters] = useState<number>(propTargetSemesters);
+  const [hasCalculated, setHasCalculated] = useState(propTargetGPA != null);
+
+  // Sync from props
+  useEffect(() => {
+    if (propTargetGPA != null) {
+      setLocalTargetGPA(propTargetGPA.toString());
+      setHasCalculated(true);
+    }
+  }, [propTargetGPA]);
+
+  useEffect(() => {
+    setLocalTargetSemesters(propTargetSemesters);
+  }, [propTargetSemesters]);
+
+  const projection: GPAProjection | null = useMemo(() => {
+    const gpa = parseFloat(localTargetGPA);
+    if (!hasCalculated || isNaN(gpa) || gpa <= 0 || gpa > 4.0) return null;
+
+    const computedSemesters = semesters.map(s => ({
+      ...s,
+      courses: computeAllCourses(s.courses),
+    }));
+
+    return calculateGPAProjection(computedSemesters, gpa, targetCredits, localTargetSemesters);
+  }, [hasCalculated, localTargetGPA, localTargetSemesters, semesters, targetCredits]);
+
+  const handleCalculate = () => {
+    const gpa = parseFloat(localTargetGPA);
+    if (isNaN(gpa) || gpa <= 0 || gpa > 4.0) {
+      alert('GPA mục tiêu phải từ 0.01 đến 4.00');
+      return;
+    }
+    if (localTargetSemesters < 1 || localTargetSemesters > 20) {
+      alert('Số kỳ còn lại phải từ 1 đến 20');
+      return;
+    }
+    setHasCalculated(true);
+    onUpdateGPATarget?.(gpa, localTargetSemesters);
+  };
+
+  const handlePreset = (gpa: number) => {
+    setLocalTargetGPA(gpa.toString());
+    setHasCalculated(true);
+    onUpdateGPATarget?.(gpa, localTargetSemesters);
+  };
+
+  const handleReset = () => {
+    setLocalTargetGPA('');
+    setHasCalculated(false);
+    onUpdateGPATarget?.(null, 4);
+  };
+
+  // Grade color mapping
+  const gradeColor = (grade: string | null): string => {
+    if (!grade) return 'text-gray-400';
+    if (grade === 'A+' || grade === 'A') return 'text-emerald-600';
+    if (grade === 'B+') return 'text-blue-600';
+    if (grade === 'B') return 'text-blue-500';
+    if (grade === 'C+' || grade === 'C') return 'text-yellow-600';
+    return 'text-orange-600';
+  };
+
+  // Feasibility icon
+  const feasibilityIcon = (p: GPAProjection) => {
+    if (p.alreadyAchieved) return <Award size={38} className="text-emerald-500" />;
+    if (!p.isFeasible) return <AlertTriangle size={38} className="text-red-500" />;
+    
+    // For feasible states
+    let colorClass = "text-blue-500";
+    if (p.requiredGPAPerSemester && p.requiredGPAPerSemester >= 3.8) {
+      colorClass = "text-indigo-500";
+    } else if (p.requiredGPAPerSemester && p.requiredGPAPerSemester >= 3.5) {
+      colorClass = "text-amber-500";
+    }
+    
+    return (
+      <div className={`p-3 rounded-2xl bg-white border shadow-sm ${colorClass} border-${colorClass.replace('text-', '')}/20`}>
+        <Target size={32} strokeWidth={2.5} />
+      </div>
+    );
+  };
+
+  const progressColor = (p: GPAProjection): string => {
+    if (p.alreadyAchieved) return 'from-emerald-500 to-green-400';
+    if (!p.isFeasible) return 'from-red-500 to-red-400';
+    if (p.requiredGPAPerSemester && p.requiredGPAPerSemester >= 3.5) return 'from-amber-500 to-orange-400';
+    return 'from-indigo-500 to-purple-500';
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-cyan-500 via-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+              <Target size={22} className="text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">GPA Kỳ Vọng</h3>
+              <p className="text-white/70 text-xs">Đặt mục tiêu và xem lộ trình đạt GPA mong muốn</p>
+            </div>
+          </div>
+
+          {/* Quick Preset Buttons */}
+          <div className="flex flex-wrap gap-2 mb-5">
+            <span className="text-xs text-white/60 self-center mr-1">Chọn nhanh:</span>
+            {[
+              { label: '🏆 Xuất sắc', gpa: 3.6 },
+              { label: '🎓 Giỏi', gpa: 3.2 },
+              { label: '📘 Khá', gpa: 2.5 },
+            ].map(p => (
+              <button
+                key={p.gpa}
+                onClick={() => handlePreset(p.gpa)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                  parseFloat(localTargetGPA) === p.gpa && hasCalculated
+                    ? 'bg-white text-blue-700 border-white shadow-lg scale-105'
+                    : 'bg-white/10 text-white/90 border-white/20 hover:bg-white/20'
+                }`}
+              >
+                {p.label} ({p.gpa.toFixed(1)})
+              </button>
+            ))}
+          </div>
+
+          {/* Input Form */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1">
+              <label className="block text-[10px] text-white/60 uppercase tracking-wider mb-1 font-semibold">GPA Mục tiêu (thang 4)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max="4.00"
+                value={localTargetGPA}
+                onChange={e => { setLocalTargetGPA(e.target.value); setHasCalculated(false); }}
+                placeholder="VD: 3.60"
+                className="w-full px-4 py-2.5 bg-white/15 backdrop-blur-sm border border-white/25 rounded-xl text-white font-bold text-lg placeholder:text-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/50 outline-none transition-all"
+              />
+            </div>
+            <div className="w-full sm:w-32">
+              <label className="block text-[10px] text-white/60 uppercase tracking-wider mb-1 font-semibold">Số kỳ còn lại</label>
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={localTargetSemesters}
+                onChange={e => { setLocalTargetSemesters(parseInt(e.target.value) || 1); setHasCalculated(false); }}
+                className="w-full px-4 py-2.5 bg-white/15 backdrop-blur-sm border border-white/25 rounded-xl text-white font-bold text-lg focus:ring-2 focus:ring-white/40 focus:border-white/50 outline-none transition-all"
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <button
+                onClick={handleCalculate}
+                className="px-6 py-2.5 bg-white text-blue-700 font-bold rounded-xl hover:bg-blue-50 transition-all shadow-lg text-sm whitespace-nowrap"
+              >
+                <Calculator size={16} className="inline mr-1.5 -mt-0.5" />
+                Tính toán
+              </button>
+              {hasCalculated && (
+                <button
+                  onClick={handleReset}
+                  className="p-2.5 bg-white/10 text-white/70 rounded-xl hover:bg-white/20 transition-all"
+                  title="Xóa mục tiêu"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* No data state */}
+      {!hasCalculated && (
+        <div className="bg-white rounded-2xl border-2 border-dashed border-blue-200 p-12 text-center">
+          <Target size={48} className="mx-auto text-blue-300 mb-4" />
+          <p className="text-gray-500 font-medium mb-2">Chưa đặt mục tiêu GPA</p>
+          <p className="text-gray-400 text-sm">Chọn nhanh hoặc nhập GPA mong muốn ở trên để bắt đầu phân tích</p>
+        </div>
+      )}
+
+      {/* Projection Results */}
+      {projection && (
+        <div className="space-y-5">
+          {/* Current Status Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">GPA Hiện tại</div>
+              <div className="text-2xl font-black text-gray-900">{projection.currentGPA?.toFixed(2) || '—'}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{cumulativeData.academic_standing || 'Chưa có'}</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">GPA Mục tiêu</div>
+              <div className="text-2xl font-black text-indigo-600">{projection.targetGPA.toFixed(2)}</div>
+              <div className="text-xs text-gray-400 mt-0.5">
+                {projection.targetGPA >= 3.6 ? 'Xuất sắc' : projection.targetGPA >= 3.2 ? 'Giỏi' : projection.targetGPA >= 2.5 ? 'Khá' : 'Trung bình'}
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">TC Đã tích lũy</div>
+              <div className="text-2xl font-black text-gray-900">{projection.currentCredits}</div>
+              <div className="text-xs text-gray-400 mt-0.5">/ {targetCredits} TC</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">TC Còn lại</div>
+              <div className="text-2xl font-black text-purple-600">{projection.remainingCredits}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{projection.remainingSemesters} kỳ còn lại</div>
+            </div>
+          </div>
+
+          {/* Main Result Card */}
+          <div className={`rounded-2xl border-2 p-6 shadow-sm ${
+            projection.alreadyAchieved
+              ? 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200'
+              : !projection.isFeasible
+                ? 'bg-gradient-to-br from-red-50 to-orange-50 border-red-200'
+                : 'bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200'
+          }`}>
+            <div className="flex items-start gap-4">
+              <div className="shrink-0">{feasibilityIcon(projection)}</div>
+              <div className="flex-1 mt-1">
+                <h4 className="font-bold text-lg text-gray-800 mb-1">
+                  {projection.alreadyAchieved ? 'Bạn đã đạt mục tiêu!' :
+                   !projection.isFeasible ? 'Mục tiêu không khả thi' :
+                   'Yêu cầu để đạt mục tiêu'}
+                </h4>
+                <p className="text-sm text-gray-600 leading-relaxed">{projection.feasibilityNote}</p>
+              </div>
+            </div>
+
+            {/* Required GPA per semester */}
+            {projection.requiredGPAPerSemester != null && projection.isFeasible && (
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap size={16} className="text-indigo-600" />
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">GPA mỗi kỳ cần đạt</span>
+                  </div>
+                  <div className="text-3xl font-black text-indigo-700">{projection.requiredGPAPerSemester.toFixed(2)}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {projection.alreadyAchieved ? 'Tối thiểu để duy trì mục tiêu' : `Cho ${projection.remainingSemesters} kỳ còn lại`}
+                  </div>
+                </div>
+                <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Star size={16} className="text-purple-600" />
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Điểm chữ tối thiểu</span>
+                  </div>
+                  <div className={`text-3xl font-black ${gradeColor(projection.requiredMinGrade)}`}>
+                    {projection.requiredMinGrade || '—'}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Trung bình các môn phải đạt {projection.requiredMinGrade} trở lên
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Progress Bar */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp size={16} className="text-indigo-600" />
+                <span className="text-sm font-bold text-gray-700">Tiến độ mục tiêu</span>
+              </div>
+              <span className="text-sm font-bold text-indigo-600">{Math.min(projection.progressPercent, 100).toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
+              <div
+                className={`h-full bg-gradient-to-r ${progressColor(projection)} rounded-full transition-all duration-700 ease-out relative`}
+                style={{ width: `${Math.min(projection.progressPercent, 100)}%` }}
+              >
+                {projection.progressPercent >= 15 && (
+                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
+                    {projection.currentGPA?.toFixed(2)} → {projection.targetGPA.toFixed(2)}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-between mt-2 text-[10px] text-gray-400 font-medium">
+              <span>0.00</span>
+              <span>GPA Hiện tại: {projection.currentGPA?.toFixed(2) || '—'}</span>
+              <span>4.00</span>
+            </div>
+          </div>
+
+          {/* Grade Scale Reference */}
+          {projection.isFeasible && projection.requiredGPAPerSemester != null && !projection.alreadyAchieved && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <BookOpen size={16} className="text-purple-600" />
+                <h4 className="text-sm font-bold text-gray-700">Bảng quy đổi — Bạn cần đạt ít nhất</h4>
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {[
+                  { letter: 'A+', grade4: 4.0, min10: '9.0+' },
+                  { letter: 'A', grade4: 3.7, min10: '8.5+' },
+                  { letter: 'B+', grade4: 3.5, min10: '8.0+' },
+                  { letter: 'B', grade4: 3.0, min10: '7.0+' },
+                  { letter: 'C+', grade4: 2.5, min10: '6.5+' },
+                ].map(g => {
+                  const isRequired = projection.requiredMinGrade === g.letter;
+                  const isAbove = projection.requiredGPAPerSemester! >= g.grade4;
+                  return (
+                    <div
+                      key={g.letter}
+                      className={`text-center p-3 rounded-xl border-2 transition-all ${
+                        isRequired
+                          ? 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-200 scale-105'
+                          : isAbove
+                            ? 'bg-gray-50 border-gray-100 opacity-50'
+                            : 'bg-gray-50 border-gray-100'
+                      }`}
+                    >
+                      <div className={`text-lg font-black ${isRequired ? 'text-indigo-600' : 'text-gray-600'}`}>{g.letter}</div>
+                      <div className="text-[10px] text-gray-500 font-medium">Thang 4: {g.grade4}</div>
+                      <div className="text-[10px] text-gray-400">Thang 10: {g.min10}</div>
+                      {isRequired && (
+                        <div className="mt-1">
+                          <span className="text-[9px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full font-bold">TỐI THIỂU</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Strategy Suggestions */}
+          {projection.isFeasible && !projection.alreadyAchieved && (
+            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-2xl border border-amber-200 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap size={16} className="text-amber-600" />
+                <h4 className="text-sm font-bold text-amber-800">Gợi ý chiến lược</h4>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { icon: '📚', text: 'Ưu tiên đầu tư công sức cho các môn nhiều tín chỉ (3-4 TC) — ảnh hưởng lớn nhất đến GPA.' },
+                  { icon: '🎯', text: `Điểm cuối kỳ chiếm 60% — tập trung ôn thi kỹ sẽ tối ưu nhất cho GPA.` },
+                  { icon: '📊', text: `Mỗi kỳ đăng ký vừa phải (~${Math.ceil(projection.remainingCredits / projection.remainingSemesters)} TC/kỳ) để đảm bảo chất lượng.` },
+                  ...(projection.requiredGPAPerSemester && projection.requiredGPAPerSemester >= 3.5
+                    ? [{ icon: '⚡', text: 'Hạn chế đăng ký các môn khó cùng lúc. Phân bổ hợp lý giữa các kỳ.' }]
+                    : []),
+                  ...(projection.requiredGPAPerSemester && projection.requiredGPAPerSemester >= 3.0
+                    ? [{ icon: '📝', text: 'Không bỏ bê điểm chuyên cần (CC1, CC2) — đây là điểm dễ lấy nhất.' }]
+                    : []),
+                ].map((tip, i) => (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <span className="text-base mt-0.5 shrink-0">{tip.icon}</span>
+                    <p className="text-sm text-amber-900/80 leading-relaxed">{tip.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default GPADashboard;

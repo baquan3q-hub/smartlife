@@ -73,7 +73,7 @@ export const useFocusTimer = () => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/219/219-preview.mp3');
+        const audio = new Audio('/tiengthongbaobamgio.mp3');
         audio.volume = 1.0;
         audioRef.current = audio;
     }, []);

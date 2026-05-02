@@ -96,6 +96,20 @@ export interface GPACumulativeData {
   warning_level: 'safe' | 'early_warning' | 'warning' | 'danger' | null;
 }
 
+export interface GPAProjection {
+  targetGPA: number;
+  currentGPA: number | null;
+  currentCredits: number;
+  remainingCredits: number;
+  remainingSemesters: number;
+  requiredGPAPerSemester: number | null; // GPA mỗi kỳ phải đạt
+  requiredMinGrade: string | null;       // Điểm chữ tối thiểu (A, B+, ...)
+  isFeasible: boolean;                   // Có khả thi không?
+  feasibilityNote: string;               // Ghi chú khả thi
+  alreadyAchieved: boolean;              // Đã đạt rồi?
+  progressPercent: number;               // % tiến độ hướng tới mục tiêu
+}
+
 // 2. Các Interface cơ bản
 export interface Transaction {
   id: string;
@@ -182,6 +196,8 @@ export interface AppState {
   // GPA Module
   gpaSemesters: GPASemester[];
   gpaTargetCredits: number;
+  gpaTargetGPA: number | null;       // GPA mục tiêu tốt nghiệp
+  gpaTargetSemesters: number;        // Số kỳ còn lại dự kiến
 }
 
 

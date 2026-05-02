@@ -9,6 +9,7 @@ import {
   GPAComputed,
   GPASemesterSummary,
   GPACumulativeData,
+  GPAProjection,
 } from '../types';
 import {
   GRADE_SCALE,
@@ -465,6 +466,188 @@ export function calculateRequiredFinalScore(
   if (requiredFinal < 0) return 0; // Đã đủ rồi
 
   return roundTo1Decimal(Math.ceil(requiredFinal * 10) / 10); // Làm tròn lên
+}
+
+// ────────────────────────────────────────
+// 7. GPA KỲ VỌNG (Target GPA Projection)
+// ────────────────────────────────────────
+
+/**
+ * Ánh xạ GPA yêu cầu → Điểm chữ tối thiểu trung bình
+ * Dựa trên GRADE_SCALE của ĐHQGHN
+ */
+export function getMinimumGradeForGPA(gpa: number): string {
+  if (gpa >= 3.7) return 'A';
+  if (gpa >= 3.5) return 'B+';
+  if (gpa >= 3.0) return 'B';
+  if (gpa >= 2.5) return 'C+';
+  if (gpa >= 2.0) return 'C';
+  if (gpa >= 1.5) return 'D+';
+  if (gpa >= 1.0) return 'D';
+  return 'D';
+}
+
+/**
+ * Tính toán GPA Projection chi tiết cho tính năng "GPA Kỳ vọng"
+ * 
+ * Input:
+ *   - semesters: tất cả học kỳ đã có
+ *   - targetGPA: GPA mục tiêu tốt nghiệp (VD: 3.6)
+ *   - totalTargetCredits: tổng TC cần để tốt nghiệp (VD: 135)
+ *   - remainingSemesters: số kỳ còn lại ước tính
+ *
+ * Output: GPAProjection object chứa toàn bộ phân tích
+ */
+export function calculateGPAProjection(
+  semesters: GPASemester[],
+  targetGPA: number,
+  totalTargetCredits: number,
+  remainingSemesters: number
+): GPAProjection {
+  // 1. Tính GPA tích lũy hiện tại và tổng TC đã tích lũy
+  const cumulativeGPA = calculateCumulativeGPA(semesters);
+  const allCourses = collectAllCoursesWithRetakesPublic(semesters);
+  const currentCredits = allCourses
+    .filter(c => {
+      const computed = c.computed || computeCourse(c);
+      return computed.passed;
+    })
+    .reduce((sum, c) => sum + c.credits, 0);
+
+  const remainingCredits = Math.max(totalTargetCredits - currentCredits, 0);
+
+  // 2. Base case: chưa có dữ liệu
+  if (cumulativeGPA == null || currentCredits === 0) {
+    return {
+      targetGPA,
+      currentGPA: null,
+      currentCredits: 0,
+      remainingCredits: totalTargetCredits,
+      remainingSemesters,
+      requiredGPAPerSemester: null,
+      requiredMinGrade: null,
+      isFeasible: true,
+      feasibilityNote: 'Chưa có dữ liệu điểm. Hãy nhập ít nhất 1 học kỳ.',
+      alreadyAchieved: false,
+      progressPercent: 0,
+    };
+  }
+
+  // 3. Đã tốt nghiệp hết TC
+  if (remainingCredits <= 0) {
+    const achieved = cumulativeGPA >= targetGPA;
+    return {
+      targetGPA,
+      currentGPA: cumulativeGPA,
+      currentCredits,
+      remainingCredits: 0,
+      remainingSemesters: 0,
+      requiredGPAPerSemester: null,
+      requiredMinGrade: null,
+      isFeasible: achieved,
+      feasibilityNote: achieved
+        ? `Bạn đã đạt mục tiêu GPA ${targetGPA.toFixed(2)}! Chúc mừng!`
+        : `Bạn đã hoàn thành TC nhưng GPA hiện tại (${cumulativeGPA.toFixed(2)}) chưa đạt mục tiêu ${targetGPA.toFixed(2)}.`,
+      alreadyAchieved: achieved,
+      progressPercent: Math.min((cumulativeGPA / targetGPA) * 100, 100),
+    };
+  }
+
+  // 4. Đã đạt mục tiêu rồi
+  if (cumulativeGPA >= targetGPA) {
+    // Tính GPA tối thiểu để DUY TRÌ mục tiêu
+    const maintainGPA = calculateRequiredGPA(cumulativeGPA, currentCredits, targetGPA, remainingCredits);
+    return {
+      targetGPA,
+      currentGPA: cumulativeGPA,
+      currentCredits,
+      remainingCredits,
+      remainingSemesters,
+      requiredGPAPerSemester: maintainGPA,
+      requiredMinGrade: maintainGPA != null ? getMinimumGradeForGPA(maintainGPA) : null,
+      isFeasible: true,
+      feasibilityNote: maintainGPA != null && maintainGPA <= 0
+        ? `Tuyệt vời! Bạn đã đạt GPA ${cumulativeGPA.toFixed(2)}, vượt mục tiêu! Chỉ cần duy trì phong độ.`
+        : `Bạn đang đạt mục tiêu! GPA các kỳ tới chỉ cần tối thiểu ${maintainGPA?.toFixed(2)} để duy trì.`,
+      alreadyAchieved: true,
+      progressPercent: 100,
+    };
+  }
+
+  // 5. Tính GPA cần thiết cho phần TC còn lại
+  const requiredOverall = calculateRequiredGPA(cumulativeGPA, currentCredits, targetGPA, remainingCredits);
+
+  // 5a. Bất khả thi (cần > 4.0)
+  if (requiredOverall == null || requiredOverall > 4.0) {
+    // Tính GPA tối đa có thể đạt được
+    const maxPossibleGPA = roundTo2Decimal(
+      (cumulativeGPA * currentCredits + 4.0 * remainingCredits) / (currentCredits + remainingCredits)
+    );
+    return {
+      targetGPA,
+      currentGPA: cumulativeGPA,
+      currentCredits,
+      remainingCredits,
+      remainingSemesters,
+      requiredGPAPerSemester: null,
+      requiredMinGrade: null,
+      isFeasible: false,
+      feasibilityNote: `Không thể đạt GPA ${targetGPA.toFixed(2)}. Ngay cả khi đạt toàn A+ (4.0) cho ${remainingCredits} TC còn lại, GPA tối đa chỉ đạt ${maxPossibleGPA.toFixed(2)}. Hãy điều chỉnh mục tiêu.`,
+      alreadyAchieved: false,
+      progressPercent: roundTo2Decimal((cumulativeGPA / targetGPA) * 100),
+    };
+  }
+
+  // 6. Khả thi — tính chi tiết per-semester
+  const requiredPerSemester = roundTo2Decimal(requiredOverall); // Mỗi kỳ đều phải đạt mức này
+  const minGrade = getMinimumGradeForGPA(requiredPerSemester);
+
+  // 7. Đánh giá mức độ khả thi
+  let feasibilityNote: string;
+  if (requiredPerSemester >= 3.8) {
+    feasibilityNote = `Rất thách thức! Bạn phải đạt gần như toàn A (≥ ${requiredPerSemester.toFixed(2)}) mỗi kỳ. Cần nỗ lực tối đa!`;
+  } else if (requiredPerSemester >= 3.5) {
+    feasibilityNote = `Thách thức nhưng khả thi! GPA mỗi kỳ cần ≥ ${requiredPerSemester.toFixed(2)}. Tập trung hết sức!`;
+  } else if (requiredPerSemester >= 3.0) {
+    feasibilityNote = `Hoàn toàn khả thi! Duy trì GPA ≥ ${requiredPerSemester.toFixed(2)} mỗi kỳ là đạt mục tiêu.`;
+  } else if (requiredPerSemester >= 2.0) {
+    feasibilityNote = `Dễ dàng đạt được! Chỉ cần duy trì GPA ≥ ${requiredPerSemester.toFixed(2)} mỗi kỳ.`;
+  } else {
+    feasibilityNote = `Rất dễ! GPA yêu cầu thấp (${requiredPerSemester.toFixed(2)}). Bạn gần như chắc chắn đạt mục tiêu.`;
+  }
+
+  return {
+    targetGPA,
+    currentGPA: cumulativeGPA,
+    currentCredits,
+    remainingCredits,
+    remainingSemesters,
+    requiredGPAPerSemester: requiredPerSemester,
+    requiredMinGrade: minGrade,
+    isFeasible: true,
+    feasibilityNote,
+    alreadyAchieved: false,
+    progressPercent: roundTo2Decimal((cumulativeGPA / targetGPA) * 100),
+  };
+}
+
+/**
+ * Public wrapper cho collectAllCoursesWithRetakes
+ */
+function collectAllCoursesWithRetakesPublic(semesters: GPASemester[]): GPACourse[] {
+  const allCourses: GPACourse[] = [];
+  const retakenIds = new Set<string>();
+  for (const sem of semesters) {
+    for (const course of sem.courses) {
+      if (course.retake_of) retakenIds.add(course.retake_of);
+    }
+  }
+  for (const sem of semesters) {
+    for (const course of sem.courses) {
+      if (!retakenIds.has(course.id)) allCourses.push(course);
+    }
+  }
+  return allCourses;
 }
 
 // ────────────────────────────────────────
