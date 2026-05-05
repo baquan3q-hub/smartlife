@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AppState, TimetableEvent, Goal, Todo, TaskPriority } from '../types';
-import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Star, Download, Image as ImageIcon } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Star, Download, Image as ImageIcon, GripVertical, ArrowUpToLine, ArrowDownToLine, Save } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import CalendarWidget from './CalendarWidget';
 import FocusTimer from './FocusTimer';
-
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 import MusicSpace from './MusicSpace';
 
@@ -20,9 +22,90 @@ interface ScheduleDashboardProps {
   onAddTodo: (content: string, priority: TaskPriority, deadline?: string) => void;
   onUpdateTodo: (t: any) => void;
   onDeleteTodo: (id: string) => void;
+  onReorderTodos: (reordered: Todo[]) => void;
   initialFocusMode?: boolean;
   onResetFocusMode?: () => void;
 }
+
+// --- Sortable Todo Item Component ---
+interface SortableTodoItemProps {
+  todo: Todo;
+  config: any;
+  countdown: { text: string; color: string; isOverdue?: boolean } | null;
+  onToggle: (todo: Todo) => void;
+  onDelete: (id: string) => void;
+  onEdit: (todo: Todo) => void;
+  onMoveToTop: (id: string) => void;
+  onMoveToBottom: (id: string) => void;
+}
+
+const SortableTodoItem: React.FC<SortableTodoItemProps> = ({ todo, config, countdown, onToggle, onDelete, onEdit, onMoveToTop, onMoveToBottom }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: todo.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 'auto' as any,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className={`group flex items-start gap-2 p-3.5 rounded-2xl border transition-all ${isDragging ? 'shadow-2xl ring-2 ring-indigo-400 bg-indigo-50/80 scale-[1.02]' : todo.is_completed ? 'bg-gray-50 border-transparent opacity-60' : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-md'}`}>
+      {/* Drag Handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="mt-1 p-1 cursor-grab active:cursor-grabbing text-gray-300 hover:text-indigo-500 transition-colors touch-none"
+        title="Kéo để sắp xếp"
+      >
+        <GripVertical size={16} />
+      </button>
+
+      {/* Toggle */}
+      <button onClick={() => onToggle(todo)} className={`mt-0.5 transition-colors ${todo.is_completed ? 'text-emerald-500' : 'text-gray-300 hover:text-emerald-500'}`}>
+        {todo.is_completed ? <CheckCircle2 size={22} /> : <Circle size={22} />}
+      </button>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-start gap-2">
+          <p className={`text-sm font-medium leading-snug ${todo.is_completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{todo.content}</p>
+        </div>
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide border flex items-center gap-1 w-fit ${config.color}`}>
+            {config.label}
+          </span>
+          {todo.deadline && (
+            <span className="text-[10px] px-2 py-0.5 rounded-md font-bold border flex items-center gap-1 w-fit text-gray-400 border-gray-100 bg-gray-50">
+              {new Date(todo.deadline).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+            </span>
+          )}
+          {countdown && !todo.is_completed && (
+            <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-bold border flex items-center gap-0.5 ${countdown.color} ${countdown.isOverdue ? 'animate-pulse' : ''}`}>
+              <Clock size={8} /> {countdown.text}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <button onClick={() => onMoveToTop(todo.id)} className="p-1 text-gray-300 hover:text-indigo-500 transition-colors" title="Lên đầu">
+          <ArrowUpToLine size={14} />
+        </button>
+        <button onClick={() => onMoveToBottom(todo.id)} className="p-1 text-gray-300 hover:text-indigo-500 transition-colors" title="Xuống cuối">
+          <ArrowDownToLine size={14} />
+        </button>
+        <button onClick={() => onEdit(todo)} className="p-1 text-gray-300 hover:text-blue-500 transition-colors" title="Sửa">
+          <Edit2 size={14} />
+        </button>
+        <button onClick={() => onDelete(todo.id)} className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Xóa">
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // Reordered: Mon (1) -> Sat (6) -> Sun (0)
 const DISPLAY_DAYS = [
@@ -49,9 +132,9 @@ const PRIORITY_CONFIG = {
 const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   state,
   onAddGoal, onUpdateGoal, onDeleteGoal,
-  onAddTodo, onUpdateTodo, onDeleteTodo,
+  onAddTodo, onUpdateTodo, onDeleteTodo, onReorderTodos,
   initialFocusMode = false, onResetFocusMode,
-  onAddTimetable, onUpdateTimetable, onDeleteTimetable, // Kept these as they were removed in instruction but are needed
+  onAddTimetable, onUpdateTimetable, onDeleteTimetable,
 }) => {
   const { timetable, goals, todos } = state;
   const { timer, onOpenMusic } = state as any;
@@ -85,6 +168,19 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const [newTodoContent, setNewTodoContent] = useState('');
   const [newTodoPriority, setNewTodoPriority] = useState<TaskPriority>(TaskPriority.FOCUS);
   const [newTodoDeadline, setNewTodoDeadline] = useState('');
+
+  // Todo Inline Edit State
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [editPriority, setEditPriority] = useState<string>('medium');
+  const [editDeadline, setEditDeadline] = useState('');
+
+  // DnD Sensors (pointer for desktop, touch for mobile, keyboard for a11y)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   // Motivational Feedback State
   const [showMotivation, setShowMotivation] = useState(false);
@@ -464,36 +560,103 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     return { text: `Còn ${hours}h ${minutes}p`, color, isOverdue: false };
   };
 
-  // 2. Todos View (Priority Grouped)
+  // 2. Todos View (Drag & Drop + Inline Edit)
   const renderTodos = () => {
-    // Sort: Uncompleted first, then by Priority Order (High -> Low)
-    const getPriorityScore = (p: any) => {
-      if (p === 'high' || p === 'urgent' || p === TaskPriority.URGENT) return 0;
-      if (p === 'medium' || p === 'focus' || p === TaskPriority.FOCUS) return 1;
-      if (p === 'low' || p === 'chill' || p === TaskPriority.CHILL) return 2;
-      if (p === 'temp' || p === TaskPriority.TEMP) return 3;
-      return 4;
-    };
-
+    // Sort by user-defined sort_order, completed at bottom
     const sortedTodos = [...todos].sort((a, b) => {
       // 1. Completed at bottom
       if (a.is_completed !== b.is_completed) {
         return a.is_completed ? 1 : -1;
       }
-      // 2. Priority Score (Lower is better/higher priority)
-      const scoreA = getPriorityScore(a.priority);
-      const scoreB = getPriorityScore(b.priority);
-      return scoreA - scoreB;
+      // 2. Sort by user-defined sort_order
+      const orderA = a.sort_order ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.sort_order ?? Number.MAX_SAFE_INTEGER;
+      return orderA - orderB;
     });
 
     const totalTodos = todos.length;
     const completedTodos = todos.filter(t => t.is_completed).length;
     const progressPercentage = totalTodos === 0 ? 0 : Math.round((completedTodos / totalTodos) * 100);
 
+    // DnD handler
+    const handleDragEnd = (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const oldIndex = sortedTodos.findIndex(t => t.id === active.id);
+      const newIndex = sortedTodos.findIndex(t => t.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = arrayMove(sortedTodos, oldIndex, newIndex);
+      onReorderTodos(reordered);
+    };
+
+    // Quick Move handlers
+    const handleMoveToTop = (todoId: string) => {
+      const idx = sortedTodos.findIndex(t => t.id === todoId);
+      if (idx <= 0) return;
+      const reordered = arrayMove(sortedTodos, idx, 0);
+      onReorderTodos(reordered);
+    };
+
+    const handleMoveToBottom = (todoId: string) => {
+      const idx = sortedTodos.findIndex(t => t.id === todoId);
+      if (idx === -1 || idx === sortedTodos.length - 1) return;
+      const reordered = arrayMove(sortedTodos, idx, sortedTodos.length - 1);
+      onReorderTodos(reordered);
+    };
+
+    // Open Edit Modal
+    const handleOpenEdit = (todo: Todo) => {
+      setEditingTodo(todo);
+      setEditContent(todo.content);
+      setEditPriority(todo.priority);
+      setEditDeadline(todo.deadline ? new Date(todo.deadline).toISOString().slice(0, 16) : '');
+    };
+
+    // Save Edit
+    const handleSaveEdit = () => {
+      if (!editingTodo) return;
+      // Map UI priority to DB priority
+      let dbPriority = editPriority;
+      if (editPriority === 'urgent' || editPriority === TaskPriority.URGENT) dbPriority = 'high';
+      else if (editPriority === 'focus' || editPriority === TaskPriority.FOCUS) dbPriority = 'medium';
+      else if (editPriority === 'chill' || editPriority === TaskPriority.CHILL) dbPriority = 'low';
+      else if (editPriority === 'temp' || editPriority === TaskPriority.TEMP) dbPriority = 'temp';
+      else if (['high', 'medium', 'low'].includes(editPriority)) dbPriority = editPriority;
+
+      onUpdateTodo({
+        ...editingTodo,
+        content: editContent,
+        priority: dbPriority,
+        deadline: editDeadline ? new Date(editDeadline).toISOString() : undefined,
+      });
+      setEditingTodo(null);
+    };
+
+    // Map priority to UI display config
+    const getPriorityDisplayKey = (p: string): string => {
+      if (p === 'high') return 'urgent';
+      if (p === 'medium') return 'focus';
+      if (p === 'low') return 'chill';
+      return p;
+    };
+
+    // Edit priority options for the modal
+    const EDIT_PRIORITY_OPTIONS = [
+      { value: 'high', label: 'Ưu tiên', color: 'bg-red-100 text-red-700 border-red-200', icon: AlertCircle },
+      { value: 'medium', label: 'Tập trung', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: Zap },
+      { value: 'low', label: 'Chill', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: Coffee },
+      { value: 'temp', label: 'Tạm thời', color: 'bg-gray-100 text-gray-700 border-gray-200', icon: Layers },
+    ];
+
     return (
       <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 flex flex-col">
         <div className="mb-4">
-          <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-1"><CheckCircle2 size={24} className="text-emerald-500" />Todo list</h3>
+          <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-1">
+            <CheckCircle2 size={24} className="text-emerald-500" />Todo list
+            <span className="text-xs font-medium text-gray-400 ml-auto flex items-center gap-1"><GripVertical size={12} /> Kéo để sắp xếp</span>
+          </h3>
 
           {/* Progress Bar */}
           <div className="mt-2">
@@ -557,47 +720,108 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
           </button>
         </form>
 
-        <div className="space-y-2 flex-1 pr-1">
-          {sortedTodos.map(t => {
-            const config = PRIORITY_CONFIG[t.priority as TaskPriority] || PRIORITY_CONFIG[TaskPriority.FOCUS];
-            const countdown = t.deadline ? getTodoCountdown(t.deadline) : null;
+        {/* Sortable Todo List */}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={sortedTodos.map(t => t.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2 flex-1 pr-1">
+              {sortedTodos.map(t => {
+                const displayKey = getPriorityDisplayKey(t.priority);
+                const config = PRIORITY_CONFIG[displayKey as TaskPriority] || PRIORITY_CONFIG[t.priority as TaskPriority] || PRIORITY_CONFIG[TaskPriority.FOCUS];
+                const countdown = t.deadline ? getTodoCountdown(t.deadline) : null;
 
-            return (
-              <div key={t.id} className={`group flex items-start gap-3 p-3.5 rounded-2xl border transition-all ${t.is_completed ? 'bg-gray-50 border-transparent opacity-60' : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-md'}`}>
-                <button onClick={() => handleToggleTodo(t)} className={`mt-0.5 transition-colors ${t.is_completed ? 'text-emerald-500' : 'text-gray-300 hover:text-emerald-500'}`}>
-                  {t.is_completed ? <CheckCircle2 size={22} /> : <Circle size={22} />}
-                </button>
+                return (
+                  <SortableTodoItem
+                    key={t.id}
+                    todo={t}
+                    config={config}
+                    countdown={countdown}
+                    onToggle={handleToggleTodo}
+                    onDelete={onDeleteTodo}
+                    onEdit={handleOpenEdit}
+                    onMoveToTop={handleMoveToTop}
+                    onMoveToBottom={handleMoveToBottom}
+                  />
+                );
+              })}
+              {todos.length === 0 && <p className="text-center text-sm text-gray-400 italic py-10">Bạn chưa có công việc nào!</p>}
+            </div>
+          </SortableContext>
+        </DndContext>
 
-                <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                    <p className={`text-sm font-medium leading-snug ${t.is_completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{t.content}</p>
+        {/* Edit Todo Modal */}
+        {editingTodo && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setEditingTodo(null)}>
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Edit2 size={18} className="text-indigo-500" /> Sửa công việc</h3>
+                <button onClick={() => setEditingTodo(null)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+              </div>
 
-                    {/* Countdown Badge - Only show if not completed and has deadline */}
-                    {countdown && !t.is_completed && (
-                      <span className={`shrink-0 ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-bold border flex items-center gap-0.5 ${countdown.color} animate-pulse`}>
-                        <Clock size={8} /> {countdown.text}
-                      </span>
-                    )}
-                  </div>
+              <div className="space-y-4">
+                {/* Content */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Nội dung</label>
+                  <input
+                    type="text"
+                    value={editContent}
+                    onChange={e => setEditContent(e.target.value)}
+                    className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
 
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide border flex items-center gap-1 w-fit ${config.color}`}>
-                      {config.label}
-                    </span>
-                    {t.deadline && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border flex items-center gap-1 w-fit text-gray-400 border-gray-100 bg-gray-50`}>
-                        {new Date(t.deadline).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
-                      </span>
-                    )}
+                {/* Priority */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-bold ml-1 mb-2 block">Mức ưu tiên</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {EDIT_PRIORITY_OPTIONS.map(opt => {
+                      const Icon = opt.icon;
+                      const isSelected = editPriority === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setEditPriority(opt.value)}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border
+                            ${isSelected ? opt.color + ' ring-2 ring-offset-1 ring-gray-200 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}
+                          `}
+                        >
+                          <Icon size={14} /> {opt.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <button onClick={() => onDeleteTodo(t.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity p-1"><X size={18} /></button>
+                {/* Deadline */}
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Thời hạn</label>
+                  <input
+                    type="datetime-local"
+                    value={editDeadline}
+                    onChange={e => setEditDeadline(e.target.value)}
+                    className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setEditingTodo(null)}
+                    className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    className="flex-[2] py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Save size={16} /> Lưu thay đổi
+                  </button>
+                </div>
               </div>
-            );
-          })}
-          {todos.length === 0 && <p className="text-center text-sm text-gray-400 italic py-10">Bạn chưa có công việc nào!</p>}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };

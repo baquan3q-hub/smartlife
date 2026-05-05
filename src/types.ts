@@ -171,6 +171,7 @@ export interface Todo {
   is_completed: boolean;
   priority: 'low' | 'medium' | 'high' | 'urgent' | 'focus' | 'chill' | 'temp';
   deadline?: string;
+  sort_order?: number;
 }
 
 // Interface cho Ngân sách (Budget)

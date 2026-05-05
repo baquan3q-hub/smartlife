@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, TransactionType, Transaction, Goal, BudgetConfig } from '../types';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, Maximize2, Minimize2, ExternalLink } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, LineChart, Line } from 'recharts';
+import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
 
@@ -120,7 +120,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-    const [viewMode, setViewMode] = useState<'overview' | 'calendar' | 'history'>('overview');
+    const [viewMode, setViewMode] = useState<'overview' | 'calendar' | 'history' | 'report'>('overview');
 
     // Edit State
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -557,6 +557,299 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         );
     };
 
+    // ========== REPORT TAB ==========
+    const [reportPeriod, setReportPeriod] = useState<'month' | 'quarter' | 'year'>('month');
+    const [reportYear, setReportYear] = useState(today.getFullYear());
+    const [reportQuarter, setReportQuarter] = useState(Math.ceil((today.getMonth() + 1) / 3));
+    const [reportMonth, setReportMonth] = useState(today.getMonth());
+    const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+
+    const renderReport = () => {
+        // Filter transactions by selected period
+        const getFilteredTx = () => {
+            return transactions.filter(t => {
+                if (t.category === 'Điều chỉnh số dư') return false;
+                const d = new Date(t.date);
+                if (reportPeriod === 'month') {
+                    return d.getFullYear() === reportYear && d.getMonth() === reportMonth;
+                } else if (reportPeriod === 'quarter') {
+                    const q = Math.ceil((d.getMonth() + 1) / 3);
+                    return d.getFullYear() === reportYear && q === reportQuarter;
+                } else {
+                    return d.getFullYear() === reportYear;
+                }
+            });
+        };
+
+        const filteredTx = getFilteredTx();
+        const totalIncome = filteredTx.filter(t => t.type === TransactionType.INCOME).reduce((a, b) => a + b.amount, 0);
+        const totalExpense = filteredTx.filter(t => t.type === TransactionType.EXPENSE).reduce((a, b) => a + b.amount, 0);
+        const netSavings = totalIncome - totalExpense;
+        const savingsRate = totalIncome > 0 ? Math.round((netSavings / totalIncome) * 100) : 0;
+
+        // Chart data: monthly breakdown within selected period
+        const getChartData = () => {
+            const map: Record<string, { income: number; expense: number }> = {};
+            filteredTx.forEach(t => {
+                const d = new Date(t.date);
+                const key = `T${d.getMonth() + 1}`;
+                if (!map[key]) map[key] = { income: 0, expense: 0 };
+                if (t.type === TransactionType.INCOME) map[key].income += t.amount;
+                else map[key].expense += t.amount;
+            });
+            return Object.entries(map).sort(([a], [b]) => {
+                const na = parseInt(a.replace('T', '')); const nb = parseInt(b.replace('T', ''));
+                return na - nb;
+            }).map(([name, data]) => ({ name, ...data, savings: data.income - data.expense }));
+        };
+
+        // Category breakdown
+        const getCategoryBreakdown = (type: TransactionType) => {
+            const map: Record<string, { total: number; count: number; transactions: Transaction[] }> = {};
+            filteredTx.filter(t => t.type === type).forEach(t => {
+                if (!map[t.category]) map[t.category] = { total: 0, count: 0, transactions: [] };
+                map[t.category].total += t.amount;
+                map[t.category].count++;
+                map[t.category].transactions.push(t);
+            });
+            const grandTotal = type === TransactionType.INCOME ? totalIncome : totalExpense;
+            return Object.entries(map)
+                .map(([name, d]) => ({ name, ...d, percent: grandTotal > 0 ? (d.total / grandTotal) * 100 : 0 }))
+                .sort((a, b) => b.total - a.total);
+        };
+
+        const expenseBreakdown = getCategoryBreakdown(TransactionType.EXPENSE);
+        const incomeBreakdown = getCategoryBreakdown(TransactionType.INCOME);
+        const chartData = getChartData();
+
+        // Pie data
+        const pieData = expenseBreakdown.map(e => ({ name: e.name, value: e.total }));
+
+        // Period label
+        const getPeriodLabel = () => {
+            if (reportPeriod === 'month') return `Tháng ${reportMonth + 1}/${reportYear}`;
+            if (reportPeriod === 'quarter') return `Quý ${reportQuarter}/${reportYear}`;
+            return `Năm ${reportYear}`;
+        };
+
+        return (
+            <div className="space-y-6 animate-fade-in">
+                {/* Period Selector */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                <FileBarChart size={22} className="text-indigo-600" /> Báo cáo Tài chính
+                            </h3>
+                            <p className="text-sm text-gray-500">{getPeriodLabel()}</p>
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                            {/* Period Type */}
+                            <div className="flex bg-gray-100 rounded-xl p-1">
+                                {(['month', 'quarter', 'year'] as const).map(p => (
+                                    <button key={p} onClick={() => setReportPeriod(p)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${reportPeriod === p ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                        {p === 'month' ? 'Tháng' : p === 'quarter' ? 'Quý' : 'Năm'}
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Year */}
+                            <div className="flex items-center bg-white border border-gray-200 rounded-xl px-2 py-1">
+                                <button onClick={() => setReportYear(y => y - 1)} className="p-1 hover:bg-gray-100 rounded text-gray-400">❮</button>
+                                <span className="mx-2 font-semibold text-gray-700 text-sm min-w-[40px] text-center">{reportYear}</span>
+                                <button onClick={() => setReportYear(y => y + 1)} className="p-1 hover:bg-gray-100 rounded text-gray-400">❯</button>
+                            </div>
+                            {/* Month/Quarter picker */}
+                            {reportPeriod === 'month' && (
+                                <select value={reportMonth} onChange={e => setReportMonth(Number(e.target.value))}
+                                    className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 outline-none">
+                                    {Array.from({ length: 12 }, (_, i) => <option key={i} value={i}>Tháng {i + 1}</option>)}
+                                </select>
+                            )}
+                            {reportPeriod === 'quarter' && (
+                                <select value={reportQuarter} onChange={e => setReportQuarter(Number(e.target.value))}
+                                    className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 outline-none">
+                                    {[1, 2, 3, 4].map(q => <option key={q} value={q}>Quý {q}</option>)}
+                                </select>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-1">Tổng thu nhập</p>
+                        <p className="text-xl font-bold text-emerald-600">+{formatCurrency(totalIncome, lang)}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-1">Tổng chi tiêu</p>
+                        <p className="text-xl font-bold text-rose-600">-{formatCurrency(totalExpense, lang)}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-1">Tiết kiệm ròng</p>
+                        <p className={`text-xl font-bold ${netSavings >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(netSavings, lang)}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-1">Tỷ lệ tiết kiệm</p>
+                        <p className={`text-xl font-bold ${savingsRate >= 20 ? 'text-emerald-600' : savingsRate >= 0 ? 'text-amber-600' : 'text-red-600'}`}>{savingsRate}%</p>
+                    </div>
+                </div>
+
+                {/* Charts Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Bar Chart */}
+                    <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <h4 className="font-bold text-gray-800 mb-4">Biểu đồ Thu - Chi {reportPeriod === 'month' ? '' : `(${getPeriodLabel()})`}</h4>
+                        <div className="h-72 w-full">
+                            {chartData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartData} barGap={8}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={v => `${(v / 1000000).toFixed(1)}M`} />
+                                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={(v: number | undefined) => formatCurrency(v || 0, lang)} />
+                                        <Legend iconType="circle" />
+                                        <Bar dataKey="income" name="Thu nhập" fill="#10B981" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                                        <Bar dataKey="expense" name="Chi tiêu" fill="#EF4444" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-gray-400 text-sm">Không có dữ liệu trong kỳ này</div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Pie Chart */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <h4 className="font-bold text-gray-800 mb-4">Cơ cấu Chi tiêu</h4>
+                        <div className="h-48 w-full">
+                            {pieData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="value">
+                                            {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                                        </Pie>
+                                        <Tooltip formatter={(v: number | undefined) => formatCurrency(v || 0, lang)} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-gray-400 text-sm">Chưa có dữ liệu</div>
+                            )}
+                        </div>
+                        <div className="space-y-1.5 mt-3 max-h-32 overflow-y-auto scrollbar-thin">
+                            {expenseBreakdown.map((e, i) => (
+                                <div key={e.name} className="flex justify-between text-xs">
+                                    <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>{e.name}</span>
+                                    <span className="font-semibold">{Math.round(e.percent)}%</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Detailed Breakdown Table */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-5 border-b border-gray-100">
+                        <h4 className="font-bold text-gray-800">Chi tiết theo Danh mục</h4>
+                        <p className="text-xs text-gray-500 mt-1">{getPeriodLabel()} — Nhấn vào danh mục để xem giao dịch</p>
+                    </div>
+
+                    {/* Expense Section */}
+                    {expenseBreakdown.length > 0 && (
+                        <div>
+                            <div className="px-5 py-3 bg-red-50 border-b border-red-100">
+                                <span className="text-sm font-bold text-red-700">Chi tiêu ({formatCurrency(totalExpense, lang)})</span>
+                            </div>
+                            {expenseBreakdown.map((cat, idx) => (
+                                <div key={cat.name}>
+                                    <button onClick={() => setExpandedCategory(expandedCategory === `e-${cat.name}` ? null : `e-${cat.name}`)}
+                                        className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 text-left">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }}></div>
+                                            <span className="text-sm font-medium text-gray-800">{cat.name}</span>
+                                            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold">{cat.count} giao dịch</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm font-bold text-gray-900">{formatCurrency(cat.total, lang)}</span>
+                                            <span className="text-xs text-gray-400 w-10 text-right">{Math.round(cat.percent)}%</span>
+                                            {expandedCategory === `e-${cat.name}` ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+                                        </div>
+                                    </button>
+                                    {expandedCategory === `e-${cat.name}` && (
+                                        <div className="bg-gray-50 border-b border-gray-100">
+                                            <table className="w-full text-xs">
+                                                <thead><tr className="text-gray-400 uppercase"><th className="px-8 py-2 text-left">Ngày</th><th className="px-3 py-2 text-left">Mô tả</th><th className="px-3 py-2 text-right">Số tiền</th></tr></thead>
+                                                <tbody>
+                                                    {cat.transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(t => (
+                                                        <tr key={t.id} className="border-t border-gray-100 hover:bg-white transition-colors">
+                                                            <td className="px-8 py-2 text-gray-500">{new Date(t.date).toLocaleDateString('vi-VN')}</td>
+                                                            <td className="px-3 py-2 text-gray-700">{t.description || '—'}</td>
+                                                            <td className="px-3 py-2 text-right font-bold text-red-600">-{formatCurrency(t.amount, lang)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Income Section */}
+                    {incomeBreakdown.length > 0 && (
+                        <div>
+                            <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-100">
+                                <span className="text-sm font-bold text-emerald-700">Thu nhập ({formatCurrency(totalIncome, lang)})</span>
+                            </div>
+                            {incomeBreakdown.map(cat => (
+                                <div key={cat.name}>
+                                    <button onClick={() => setExpandedCategory(expandedCategory === `i-${cat.name}` ? null : `i-${cat.name}`)}
+                                        className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 text-left">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
+                                            <span className="text-sm font-medium text-gray-800">{cat.name}</span>
+                                            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold">{cat.count} giao dịch</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm font-bold text-emerald-600">+{formatCurrency(cat.total, lang)}</span>
+                                            <span className="text-xs text-gray-400 w-10 text-right">{Math.round(cat.percent)}%</span>
+                                            {expandedCategory === `i-${cat.name}` ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+                                        </div>
+                                    </button>
+                                    {expandedCategory === `i-${cat.name}` && (
+                                        <div className="bg-gray-50 border-b border-gray-100">
+                                            <table className="w-full text-xs">
+                                                <thead><tr className="text-gray-400 uppercase"><th className="px-8 py-2 text-left">Ngày</th><th className="px-3 py-2 text-left">Mô tả</th><th className="px-3 py-2 text-right">Số tiền</th></tr></thead>
+                                                <tbody>
+                                                    {cat.transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(t => (
+                                                        <tr key={t.id} className="border-t border-gray-100 hover:bg-white transition-colors">
+                                                            <td className="px-8 py-2 text-gray-500">{new Date(t.date).toLocaleDateString('vi-VN')}</td>
+                                                            <td className="px-3 py-2 text-gray-700">{t.description || '—'}</td>
+                                                            <td className="px-3 py-2 text-right font-bold text-emerald-600">+{formatCurrency(t.amount, lang)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {filteredTx.length === 0 && (
+                        <div className="py-16 text-center text-gray-400">
+                            <FileBarChart size={40} className="mx-auto mb-3 opacity-30" />
+                            <p className="font-medium">Không có giao dịch nào trong {getPeriodLabel()}</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     const renderCalendar = () => {
         const daysInMonth = getDaysInMonth(selectedYear, selectedMonth);
         const firstDay = getFirstDayOfMonth(selectedYear, selectedMonth);
@@ -874,6 +1167,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         <button onClick={() => setViewMode('overview')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'overview' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Tổng quan"><LayoutDashboard size={18} /></button>
                         <button onClick={() => setViewMode('calendar')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Lịch"><CalendarDays size={18} /></button>
                         <button onClick={() => setViewMode('history')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'history' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Danh sách"><List size={18} /></button>
+                        <button onClick={() => setViewMode('report')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'report' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Báo cáo"><FileBarChart size={18} /></button>
                     </div>
 
                     {/* Buttons Group */}
@@ -1116,6 +1410,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                 {viewMode === 'calendar' && renderCalendar()}
 
                 {viewMode === 'history' && renderHistory()}
+
+                {viewMode === 'report' && renderReport()}
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

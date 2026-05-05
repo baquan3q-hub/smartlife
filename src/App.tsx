@@ -36,7 +36,7 @@ import { createSubscriptionOrder, setupTrialForNewUser } from './services/subscr
 import { SubscriptionPlanDuration, SubscriptionOrder } from './types';
 
 // Types và Constants (Khớp với file đã sửa)
-import { AppState, Transaction, TaskPriority, SmartInsight, GPASemester, GPACourse, GPATemplateType } from './types';
+import { AppState, Transaction, Todo, TaskPriority, SmartInsight, GPASemester, GPACourse, GPATemplateType } from './types';
 import { INITIAL_BUDGET, INITIAL_GOALS, INITIAL_TRANSACTIONS, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './constants';
 
 const RealtimeClock: React.FC = () => {
@@ -590,7 +590,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     const handleAddTodo = async (content: string, priority: any, deadline?: string) => {
         if (!user) return;
         const tempId = crypto.randomUUID();
-        const newItem = { id: tempId, content, priority, is_completed: false, user_id: user.id, deadline };
+        // New todos get sort_order = 0 (top), existing items shift up
+        const minOrder = appState.todos.length > 0 ? Math.min(...appState.todos.map(t => t.sort_order ?? 0)) : 0;
+        const newSortOrder = minOrder - 1;
+        const newItem = { id: tempId, content, priority, is_completed: false, user_id: user.id, deadline, sort_order: newSortOrder };
 
         setAppState((prev: AppState) => ({ ...prev, todos: [newItem, ...prev.todos] }));
 
@@ -606,7 +609,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
         try {
             const { data, error } = await supabase.from('todos').insert([{
-                content, priority: dbPriority, is_completed: false, user_id: user.id, deadline
+                content, priority: dbPriority, is_completed: false, user_id: user.id, deadline, sort_order: newSortOrder
             }]).select().single();
 
             if (error) throw error;
@@ -626,10 +629,12 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     const handleUpdateTodo = async (item: any) => {
         const prevTodos = [...appState.todos];
-        setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.map(t => t.id === item.id ? item : t) }));
+        setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.map(t => t.id === item.id ? { ...t, ...item } : t) }));
 
         try {
-            const { error } = await supabase.from('todos').update(item).eq('id', item.id);
+            // Only send DB-safe fields
+            const { id, user_id, created_at, ...updateFields } = item;
+            const { error } = await supabase.from('todos').update(updateFields).eq('id', item.id);
             if (error) throw error;
         } catch (error: any) {
             console.error(error);
@@ -648,6 +653,27 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         } catch (error: any) {
             console.error(error);
             alert("Lỗi xóa việc: " + error.message);
+            setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
+        }
+    };
+
+    // Batch reorder todos after drag-drop (optimistic + persist)
+    const handleReorderTodos = async (reorderedTodos: Todo[]) => {
+        const prevTodos = [...appState.todos];
+        // Assign fresh sort_order based on array position
+        const withOrder = reorderedTodos.map((t, idx) => ({ ...t, sort_order: idx }));
+        setAppState((prev: AppState) => ({ ...prev, todos: withOrder }));
+
+        try {
+            // Batch update sort_order for each item
+            const updates = withOrder.map(t =>
+                supabase.from('todos').update({ sort_order: t.sort_order }).eq('id', t.id)
+            );
+            const results = await Promise.all(updates);
+            const failed = results.find(r => r.error);
+            if (failed?.error) throw failed.error;
+        } catch (error: any) {
+            console.error('Reorder failed:', error);
             setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
         }
     };
@@ -1015,7 +1041,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 state={{ ...appState, timer, onOpenMusic: () => setActiveTab('music') } as any}
                                 onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
                                 onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
-                                onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo}
+                                onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onReorderTodos={handleReorderTodos}
                                 initialFocusMode={startInFocusMode}
                                 onResetFocusMode={() => setStartInFocusMode(false)}
                             />
