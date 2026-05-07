@@ -26,7 +26,7 @@ import HabitDashboard from './components/HabitDashboard';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { supabase } from './services/supabase';
-import { requestNotificationPermission, checkAndNotify, checkCalendarAndNotify, checkGoalsAndNotify, checkCustomEventsAndNotify } from './services/notificationService';
+import { requestNotificationPermission, checkAndNotify, checkCalendarAndNotify, checkGoalsAndNotify, checkCustomEventsAndNotify, checkHabitsFromDBAndNotify } from './services/notificationService';
 import { generateInsights } from './services/smartEngine';
 import InsightCard from './components/InsightCard';
 import { messaging } from './services/firebase';
@@ -339,6 +339,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             checkCalendarAndNotify();
             if (appState.goals.length) checkGoalsAndNotify(appState.goals);
             if (calendarEvents.length) checkCustomEventsAndNotify(calendarEvents);
+            if (user?.id) checkHabitsFromDBAndNotify(user.id);
         }, 60000);
 
         if (notificationsEnabled && (appState.timetable.length || calendarEvents.length)) {
@@ -346,6 +347,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             checkCalendarAndNotify();
             if (appState.goals.length) checkGoalsAndNotify(appState.goals);
             if (calendarEvents.length) checkCustomEventsAndNotify(calendarEvents);
+            if (user?.id) checkHabitsFromDBAndNotify(user.id);
         }
 
         return () => clearInterval(interval);

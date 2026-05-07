@@ -253,10 +253,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
     const trialCount = users.filter(u => u.plan === 'trial' && getUserPlanStatus(u).days > 0).length;
     const lifetimeCount = users.filter(u => u.plan === 'lifetime').length;
 
-    // Visitors Today logic
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const visitorsToday = users.filter(u => u.last_active_at && new Date(u.last_active_at) >= todayStart).length;
+    // Visitors logic
+    const now = new Date();
+    const ms24h = 24 * 60 * 60 * 1000;
+    const ms7d = 7 * 24 * 60 * 60 * 1000;
+    const visitors24h = users.filter(u => u.last_active_at && (now.getTime() - new Date(u.last_active_at).getTime()) <= ms24h).length;
+    const visitors7d = users.filter(u => u.last_active_at && (now.getTime() - new Date(u.last_active_at).getTime()) <= ms7d).length;
 
     return (
         <div className="space-y-6 animate-fade-in pb-20">
@@ -336,8 +338,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
 
                 <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-xs text-gray-500 font-medium tracking-wide uppercase">Lượng truy cập today</p>
-                        <p className="text-3xl font-bold text-indigo-600 mt-1">{loading ? '...' : visitorsToday}</p>
+                        <p className="text-xs text-gray-500 font-medium tracking-wide uppercase">Truy cập (24h qua)</p>
+                        <p className="text-3xl font-bold text-indigo-600 mt-1">{loading ? '...' : visitors24h}</p>
+                        <div className="mt-2 flex items-center gap-1 text-[11px] text-indigo-600 bg-indigo-50 w-fit px-2 py-0.5 rounded-full font-medium">
+                            <Activity size={12} /> 7 ngày: {loading ? '...' : visitors7d} user
+                        </div>
                     </div>
                     <div className="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
                         <Users size={24} />

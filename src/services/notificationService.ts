@@ -1,5 +1,7 @@
 import { TimetableEvent, Goal } from "../types";
+// @ts-ignore
 import { Solar, Lunar } from "lunar-javascript";
+import { supabase } from "./supabase";
 
 // Simple "Ding" sound (Base64 MP3 to avoid external deps)
 const NOTIFICATION_SOUND = "data:audio/mp3;base64,SUQzBAAAAAABAFRYVFgAAAASAAADbWFqb3JfYnJhbmQAbXA0MgBUWFRYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFRYAAAAEAAAA2NvbXBhdGlibGVfYnJhbmQAbXA0Mmlzb21tcDQxAFRTU0UAAAAOAAADTGF2ZjU3LjU2LjEwMAAAAAAAAAAAAAAA//uQZAAAAAAAABAAAAAAAAAAAAQD//7kmRAAAAAAAAIAAAAA///+5JkAAABUAW4AAAAAAACAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/8zEAAAAAABhAAABAAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA="; // Placeholder, too long. I will use a shorter one or a link if base64 is too massive for inline.
@@ -86,8 +88,8 @@ export const checkAndNotify = (timetable: TimetableEvent[]) => {
         // Notify 15 minutes before
         if (settings.timetable_pre && diffMinutes === 15) {
             sendNotification(`⏳ Sắp diễn ra =))): ${event.title}`, {
-                body: `Còn 15 phút nữa là đến giờ rồi bạn ơi! (${event.start_time})`,
-                tag: `pre-15-${event.id}-${now.toDateString()}`
+                body: `Còn 30 phút nữa là đến giờ rồi bạn ơi! (${event.start_time})`,
+                tag: `pre--30{event.id}-${now.toDateString()}`
             });
         }
 
@@ -159,7 +161,7 @@ export const checkGoalsAndNotify = (goals: Goal[]) => {
     // Pick a random time? Or just notify at 9 AM?
     // Let's notify at 9 AM or 3 PM if not done
     if (now.getHours() === 9 || now.getHours() === 15) {
-        const pendingGoals = goals.filter(g => g.progress < 100);
+        const pendingGoals = goals.filter(g => (g?.progress ?? 0) < 100);
         if (pendingGoals.length > 0) {
             const randomGoal = pendingGoals[Math.floor(Math.random() * pendingGoals.length)];
             const messages = [
@@ -170,7 +172,7 @@ export const checkGoalsAndNotify = (goals: Goal[]) => {
             const msg = messages[Math.floor(Math.random() * messages.length)];
 
             sendNotification(msg, {
-                body: `Tiến độ hiện tại: ${randomGoal.progress}%. Keep going! 🚀`,
+                body: `Tiến độ hiện tại: ${randomGoal?.progress ?? 0}%. Keep going! 🚀`,
                 tag
             });
             markNotified(tag);
@@ -237,6 +239,78 @@ export const checkCustomEventsAndNotify = (events: CalendarEvent[]) => {
             }
         }
     });
+};
+
+export const checkHabitsFromDBAndNotify = async (userId: string) => {
+    if (Notification.permission !== "granted") return;
+
+    const now = new Date();
+    const h = now.getHours();
+
+    // Chỉ nhắc vào lúc 8h sáng và 20h tối (8 PM)
+    if (h !== 8 && h !== 20) return;
+
+    const tag = `habit-remind-${now.toDateString()}-${h}`;
+    if (hasNotifiedRecently(tag)) return;
+
+    try {
+        const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        const daysOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const currentDayStr = daysOfWeek[now.getDay()];
+
+        // 1. Lấy danh sách habit active của user
+        const { data: habits, error: habitsError } = await supabase
+            .from('habits')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('is_active', true);
+
+        if (habitsError || !habits) return;
+
+        const todayHabits = habits.filter((h: any) =>
+            h.frequency === 'daily' ||
+            (h.frequency === 'custom' && h.active_days?.includes(currentDayStr))
+        );
+
+        if (todayHabits.length === 0) return;
+
+        // 2. Lấy log hôm nay
+        const { data: logs, error: logsError } = await supabase
+            .from('habit_logs')
+            .select('*')
+            .in('habit_id', todayHabits.map((h: any) => h.id))
+            .eq('log_date', dateStr);
+
+        if (logsError) return;
+
+        const completedHabitIds = (logs || []).filter((l: any) => l.completed).map((l: any) => l.habit_id);
+        const pendingHabits = todayHabits.filter((h: any) => !completedHabitIds.includes(h.id));
+
+        if (pendingHabits.length > 0) {
+            if (h === 8) {
+                sendNotification("🌅 Chào buổi sáng!", {
+                    body: `Bạn có ${pendingHabits.length} thói quen cần hoàn thành hôm nay. Hãy bắt đầu ngày mới đầy năng lượng nhé!`,
+                    tag
+                });
+            } else if (h === 20) {
+                sendNotification("🌙 Nhắc nhở thói quen", {
+                    body: `Bạn vẫn còn ${pendingHabits.length} thói quen chưa xong (như: ${pendingHabits[0].title}). Dành chút thời gian hoàn thành nào! 💪`,
+                    tag
+                });
+            }
+            markNotified(tag);
+        } else if (h === 20) {
+            // Đã hoàn thành hết lúc 20h
+            sendNotification("🎉 Tuyệt vời!", {
+                body: "Bạn đã hoàn thành TẤT CẢ thói quen hôm nay. Chúc bạn ngủ ngon! 😴",
+                tag
+            });
+            markNotified(tag);
+        }
+
+    } catch (e) {
+        console.error("Habit notification error:", e);
+    }
 };
 
 // Helper: Prevent duplicate notifications in same session/day
