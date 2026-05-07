@@ -10,6 +10,8 @@ interface SettingsModalProps {
     onSignOut: () => void;
     notificationsEnabled?: boolean;
     toggleNotifications?: () => void;
+    lang: 'vi' | 'en';
+    setLang: (lang: 'vi' | 'en') => void;
 }
 
 const DEFAULT_NOTI_SETTINGS = {
@@ -21,7 +23,7 @@ const DEFAULT_NOTI_SETTINGS = {
     goals_remind: true
 };
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId, onSignOut, notificationsEnabled, toggleNotifications }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId, onSignOut, notificationsEnabled, toggleNotifications, lang, setLang }) => {
     const [activeTab, setActiveTab] = useState<'profile' | 'notifications'>('profile');
     const [profile, setProfile] = useState<Profile | null>(null);
     const [notiSettings, setNotiSettings] = useState(DEFAULT_NOTI_SETTINGS);
@@ -162,6 +164,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userId, 
                                 </div>
 
                                 <div className="space-y-4">
+                                    <div className="bg-gray-50 rounded-2xl p-2 border border-gray-100">
+                                        <div className="flex items-center justify-between p-3">
+                                            <div className="pr-4">
+                                                <div className="font-bold text-gray-800 text-sm">Ngôn ngữ / Language</div>
+                                                <div className="text-xs text-gray-400 font-medium mt-0.5">Chọn ngôn ngữ hiển thị chính</div>
+                                            </div>
+                                            <div className="flex bg-gray-200 rounded-lg p-1">
+                                                <button 
+                                                    onClick={() => setLang('vi')} 
+                                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${lang === 'vi' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                                >
+                                                    Tiếng Việt
+                                                </button>
+                                                <button 
+                                                    onClick={() => setLang('en')} 
+                                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${lang === 'en' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                                >
+                                                    English
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Họ và tên</label>
                                         <input

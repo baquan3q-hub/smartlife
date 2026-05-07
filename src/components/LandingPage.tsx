@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame } from 'lucide-react';
 import InstallGuideModal from './InstallGuideModal';
 
 interface LandingPageProps {
@@ -19,17 +19,17 @@ const translations = {
         startNow: 'Bắt đầu miễn phí',
         learnMore: 'Tìm hiểu thêm',
 
-        featVisualTitle: 'Góc nhìn toàn cảnh,\nKiểm soát mọi thứ.',
+        featVisualTitle: 'Visualboard - Góc nhìn toàn cảnh,\nKiểm soát mọi thứ.',
         featVisualDesc: 'Theo dõi tổng quan lịch trình, mục tiêu và đếm ngược ngày lễ sắp tới. Nắm bắt bức tranh tài chính toàn diện với số liệu thu chi tổng hợp.',
-        featVisualItems: ['Tổng quan lịch trình & Mục tiêu', 'Đếm ngược ngày lễ VN', 'Báo cáo thu chi tổng hợp'],
+        featVisualItems: ['Tổng quan lịch trình & Mục tiêu một cách trực quan hóa', 'Đếm ngược ngày lễ VN', 'Tổng quan tất cả mọi thứ trong app'],
 
         featAiTitle: 'AI Financial Advisor,\nTư vấn thông minh.',
         featAiDesc: 'Trợ lý AI phân tích dữ liệu tài chính của riêng bạn, đưa ra nhận xét, dự đoán xu hướng và đề xuất cách tiết kiệm hiệu quả.',
-        featAiItems: ['Phân tích chi tiêu chi tiết', 'Dự đoán ngân sách tháng tới', 'Tư vấn cá nhân hóa bằng AI'],
+        featAiItems: ['Phân tích chi tiêu chi tiết theo yêu cầu', 'Truy xuất toàn bộ dữ liệu để phản hồi cá nhân hóa', 'Thêm nhanh nhiều giao dịch thu chi cùng lúc bằng câu lệnh tự nhiên', 'Thêm và cập nhật lịch trình bằng ngôn ngữ đơn giản'],
 
         featFinanceTitle: 'Tài chính minh bạch,\nTiết kiệm tối đa.',
         featFinanceDesc: 'Theo dõi thu chi chi tiết, xem báo cáo trực quan và nhận phân tích thông minh từ AI để tối ưu hóa ngân sách của bạn.',
-        featFinanceItems: ['Báo cáo thu chi hàng tháng', 'Phân tích AI thông minh', 'Đặt mục tiêu tiết kiệm'],
+        featFinanceItems: ['Báo cáo thu chi hàng tháng/quý/năm', 'Quản lý và theo dõi thu chi chi tiết minh bạch', 'Đặt mục tiêu tiết kiệm'],
 
         featScheduleTitle: 'Làm chủ thời gian,\nNâng cao hiệu suất.',
         featScheduleDesc: 'Thời khóa biểu trực quan, To-do list ưu tiên thông minh và chế độ Focus mode giúp bạn tập trung hoàn thành mọi công việc.',
@@ -38,6 +38,10 @@ const translations = {
         featFocusTitle: 'Tập trung cao độ,\nThư giãn tuyệt đối.',
         featFocusDesc: 'Chế độ Focus với bộ đếm giờ Pomodoro và kho nhạc Lofi chill giúp bạn duy trì sự tập trung và giảm căng thẳng khi học tập, làm việc.',
         featFocusItems: ['Bộ đếm giờ Pomodoro tùy chỉnh', 'Kho nhạc Lofi & Background Sounds', 'Thống kê thời gian tập trung'],
+
+        featHabitTitle: 'Kỷ luật bản thân,\nHướng tới mục tiêu.',
+        featHabitDesc: 'Xây dựng và duy trì thói quen tích cực với bộ đếm chuỗi (streak). Đừng bỏ lỡ bất kỳ khoảnh khắc quan trọng nào với tính năng đếm ngược sự kiện và đếm tiến lưu giữ kỷ niệm.',
+        featHabitItems: ['Quản lý thói quen & đo lường chuỗi (Streak)', 'Đếm ngược các sự kiện quan trọng', 'Đếm tiến lưu giữ cột mốc kỷ niệm'],
 
         featGoalsTitle: 'Đặt mục tiêu,\nHiện thực hóa ước mơ.',
         featGoalsDesc: 'Theo dõi từng bước tiến của bạn với tính năng quản lý mục tiêu dài hạn và ngắn hạn. Đừng chỉ mơ ước, hãy thực hiện.',
@@ -78,7 +82,7 @@ const translations = {
 
         featAiTitle: 'AI Financial Advisor,\nSmart Consultation.',
         featAiDesc: 'An AI assistant that analyzes your personal financial data, provides insights, predicts trends, and suggests effective ways to save.',
-        featAiItems: ['Detailed expense analysis', 'Budget prediction for next month', 'Personalized AI consultation'],
+        featAiItems: ['Detailed expense analysis', 'Budget prediction for next month', 'Personalized AI consultation', 'Batch add multiple transactions at once', 'Manage schedule using natural language'],
 
         featFinanceTitle: 'Transparent Finance,\nMaximize Savings.',
         featFinanceDesc: 'Track expenses in detail, view visual reports, and get smart AI analysis to optimize your budget.',
@@ -91,6 +95,10 @@ const translations = {
         featFocusTitle: 'Deep Focus,\nAbsolute Relaxation.',
         featFocusDesc: 'Focus mode with Pomodoro timer and chill Lofi music library helps you maintain concentration and reduce stress while studying or working.',
         featFocusItems: ['Customizable Pomodoro Timer', 'Lofi Music & Background Sounds', 'Focus Time Statistics'],
+
+        featHabitTitle: 'Self-Discipline,\nGoal Oriented.',
+        featHabitDesc: 'Build and maintain positive habits with streak tracking. Never miss an important moment with event countdowns and milestone count-ups for your memories.',
+        featHabitItems: ['Habit tracking & Streak measurement', 'Countdown to important events', 'Count-up for milestone memories'],
 
         featGoalsTitle: 'Set Goals,\nRealize Dreams.',
         featGoalsDesc: 'Track your every step with long-term and short-term goal management. Don\'t just dream, make it happen.',
@@ -305,11 +313,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-emerald-100 to-teal-100 rounded-3xl blur-xl opacity-70 group-hover:opacity-100 transition-opacity"></div>
-                            <img
-                                src="/assets/finance_preview.png"
-                                alt="Quản lý Tài chính"
-                                className="relative rounded-2xl shadow-2xl border border-gray-100 transform group-hover:-translate-y-2 transition-transform duration-500"
-                            />
+                            <div className="relative">
+                                <img
+                                    src="/assets/finance_preview.png"
+                                    alt="Quản lý Tài chính"
+                                    className="relative rounded-2xl shadow-2xl border border-white/50 transform group-hover:scale-[1.02] transition-transform duration-500 z-10 w-full"
+                                />
+                                <img
+                                    src="/finance_preview2.png"
+                                    alt="Chi tiết Tài chính"
+                                    className="absolute -bottom-6 -left-4 w-2/5 rounded-2xl shadow-2xl border-2 border-white transform -rotate-3 group-hover:-rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-emerald-200/50"
+                                />
+                            </div>
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
                             <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
@@ -394,6 +409,47 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                     </li>
                                 ))}
                             </ul>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature 2.75: Habit Tracker & Countdown (NEW) */}
+                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-orange-50/30 py-20 rounded-3xl border border-orange-50">
+                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                        <div className="space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Sparkles size={14} className="animate-pulse" /> Tính năng Mới
+                            </div>
+                            <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featHabitTitle}</h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {t.featHabitDesc}
+                            </p>
+                            <ul className="space-y-3 pt-2">
+                                {t.featHabitItems && t.featHabitItems.map((item: string, i: number) => (
+                                    <li key={i} className="flex items-center gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-orange-50 shadow-sm">
+                                        <div className="bg-orange-100 p-1.5 rounded-lg">
+                                            <Flame className="text-orange-600" size={18} />
+                                        </div>
+                                        {item}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div className="relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-orange-200 to-amber-200 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            {/* Image Composition */}
+                            <div className="relative">
+                                <img
+                                    src="/habitprimary.png"
+                                    alt="Habit Tracker Main"
+                                    className="relative rounded-2xl shadow-2xl border border-white/50 transform scale-105 group-hover:scale-[1.07] transition-transform duration-500 z-10 w-full"
+                                />
+                                <img
+                                    src="/habitsecond.png"
+                                    alt="Countdown & Count-up"
+                                    className="absolute -bottom-10 -right-8 w-[35%] rounded-2xl shadow-2xl border-2 border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-orange-200/50"
+                                />
+                            </div>
                         </div>
                     </div>
                 </section>

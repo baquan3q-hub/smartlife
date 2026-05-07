@@ -1,7 +1,7 @@
 // File: src/hooks/useProAccess.ts
 import { Profile } from '../types';
 
-const TRIAL_DAYS = 30;
+const TRIAL_DAYS = 7;
 const GRACE_PERIOD_DAYS = 3;
 
 export interface ProAccessState {
@@ -29,7 +29,7 @@ export interface ProAccessState {
  * Hook đánh giá quyền truy cập Pro features  
  * Logic:
  * 1. Nếu plan = 'lifetime' → always active
- * 2. Nếu plan = 'trial' → check trial_started_at + 30 ngày
+ * 2. Nếu plan = 'trial' → check trial_started_at + 7 ngày
  * 3. Nếu plan = 'pro' → check pro_expiry_date
  * 4. Grace period: Khi hết hạn (trial hoặc pro), cho thêm 3 ngày
  * 5. Admin (baquan3q@gmail.com) luôn có access

@@ -132,6 +132,7 @@ export interface Goal {
   type?: 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM' | 'FINANCIAL' | 'PERSONAL';
   is_priority?: boolean;
   progress?: number;
+  status?: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED';
   created_at?: string;
 }
 
@@ -323,4 +324,55 @@ export interface MyTrack {
   file_size?: number;
   sort_order?: number;
   created_at?: string;
+}
+
+// 9. Countdown + Count-Up + Habit Tracker
+export interface CountdownItem {
+  id: string;
+  user_id?: string;
+  title: string;
+  description?: string;
+  target_date: string;       // ISO date string
+  is_recurring: boolean;
+  color_theme: string;
+  icon: string;              // emoji
+  created_at?: string;
+}
+
+export interface CountUpItem {
+  id: string;
+  user_id?: string;
+  title: string;
+  start_date: string;        // ISO date string
+  color_theme: string;
+  icon: string;              // emoji
+  milestones: number[];      // [7, 30, 100, 365, 1000]
+  created_at?: string;
+}
+
+export type HabitFrequency = 'daily' | 'custom' | 'weekly' | 'monthly';
+export type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+export interface Habit {
+  id: string;
+  user_id?: string;
+  title: string;
+  description?: string;
+  icon: string;
+  color_theme: string;
+  frequency: HabitFrequency;
+  target_per_period?: number; // Phase 3: number of times per week/month
+  active_days: DayOfWeek[];
+  start_date: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface HabitLog {
+  id: string;
+  habit_id: string;
+  log_date: string;          // ISO date string YYYY-MM-DD
+  completed: boolean;
+  note?: string;
+  logged_at?: string;
 }

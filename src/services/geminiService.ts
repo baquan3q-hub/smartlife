@@ -2,7 +2,7 @@
 // Gemini API client for SmartLife AI Advisor v2
 // — Single model, direct call (no fallback/retry)
 
-import { AppState, TransactionType, GPATemplateType } from '../types';
+import { AppState, TransactionType, GPATemplateType, Habit, HabitLog, CountdownItem, CountUpItem } from '../types';
 import {
     computeAllCourses, calculateSemesterGPA, calculateCumulativeGPA,
     getAcademicStanding, checkAcademicWarning, predictGraduationHonor,
@@ -253,6 +253,126 @@ function buildGPAContext(state: AppState): string {
     return ctx;
 }
 
+async function buildHabitContext(): Promise<string> {
+    try {
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData?.user?.id;
+        if (!uid) return '';
+
+        const [habitsRes, logsRes] = await Promise.all([
+            supabase.from('habits').select('*').eq('user_id', uid).eq('is_active', true),
+            supabase.from('habit_logs').select('*,habits!inner(user_id)').eq('habits.user_id', uid).order('log_date', { ascending: false }).limit(200)
+        ]);
+
+        const habits: Habit[] = habitsRes.data || [];
+        const logs: HabitLog[] = logsRes.data || [];
+
+        if (habits.length === 0) return '\n🔥 THÓI QUEN: Chưa thiết lập thói quen nào';
+
+        const today = new Date();
+        today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+        const todayStr = today.toISOString().split('T')[0];
+
+        let ctx = `\n🔥 THÓI QUEN (${habits.length} thói quen đang hoạt động):`;
+
+        habits.forEach(h => {
+            const habitLogs = logs.filter(l => l.habit_id === h.id);
+            const completedLogs = habitLogs.filter(l => l.completed);
+            const todayLog = habitLogs.find(l => l.log_date === todayStr);
+            const totalDays = Math.max(1, Math.floor((new Date().getTime() - new Date(h.start_date).getTime()) / (1000 * 3600 * 24)));
+            const completionRate = totalDays > 0 ? Math.round((completedLogs.length / totalDays) * 100) : 0;
+
+            // Calculate current streak
+            let currentStreak = 0;
+            const sortedDates = completedLogs.map(l => l.log_date).sort().reverse();
+            if (sortedDates.length > 0) {
+                const cursor = new Date(todayStr);
+                for (let i = 0; i < 365; i++) {
+                    const key = cursor.toISOString().split('T')[0];
+                    if (sortedDates.includes(key)) {
+                        currentStreak++;
+                        cursor.setDate(cursor.getDate() - 1);
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            ctx += `\n  - ${h.icon} ${h.title}: Streak ${currentStreak} ngày | Tỷ lệ: ${completionRate}% | Hôm nay: ${todayLog?.completed ? '✅' : '⬜'} | Tần suất: ${h.frequency} | Bắt đầu: ${h.start_date}`;
+        });
+
+        return ctx;
+    } catch (e) {
+        console.error('[SmartLife] Error building habit context:', e);
+        return '';
+    }
+}
+
+async function buildCountdownContext(): Promise<string> {
+    try {
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData?.user?.id;
+        if (!uid) return '';
+
+        const [cdRes, cuRes] = await Promise.all([
+            supabase.from('countdown_items').select('*').eq('user_id', uid).order('target_date', { ascending: true }),
+            supabase.from('countup_items').select('*').eq('user_id', uid).order('start_date', { ascending: false })
+        ]);
+
+        const countdowns: CountdownItem[] = cdRes.data || [];
+        const countups: CountUpItem[] = cuRes.data || [];
+
+        if (countdowns.length === 0 && countups.length === 0) return '';
+
+        let ctx = '';
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (countdowns.length > 0) {
+            ctx += `\n⏳ ĐẾM NGƯỢC (${countdowns.length} sự kiện):`;
+            countdowns.forEach(c => {
+                const target = new Date(c.target_date);
+                target.setHours(0, 0, 0, 0);
+                const daysLeft = Math.ceil((target.getTime() - today.getTime()) / (1000 * 3600 * 24));
+                const status = daysLeft > 0 ? `còn ${daysLeft} ngày` : daysLeft === 0 ? 'HÔM NAY!' : `đã qua ${Math.abs(daysLeft)} ngày`;
+                ctx += `\n  - ${c.icon} ${c.title}: ${status} (${c.target_date})`;
+            });
+        }
+
+        if (countups.length > 0) {
+            ctx += `\n📈 ĐẾM TIẾN (${countups.length} mốc):`;
+            countups.forEach(c => {
+                const start = new Date(c.start_date);
+                start.setHours(0, 0, 0, 0);
+                const daysPassed = Math.floor((today.getTime() - start.getTime()) / (1000 * 3600 * 24));
+                ctx += `\n  - ${c.icon} ${c.title}: ${daysPassed} ngày (từ ${c.start_date})`;
+            });
+        }
+
+        return ctx;
+    } catch (e) {
+        console.error('[SmartLife] Error building countdown context:', e);
+        return '';
+    }
+}
+
+export async function buildFullContextAsync(state: AppState): Promise<string> {
+    const [habitCtx, countdownCtx] = await Promise.all([
+        buildHabitContext(),
+        buildCountdownContext()
+    ]);
+
+    return [
+        buildProfileContext(state),
+        buildFinanceContext(state),
+        buildGoalsContext(state),
+        buildScheduleContext(state),
+        buildGPAContext(state),
+        habitCtx,
+        countdownCtx,
+    ].join('\n');
+}
+
 export function buildFullContext(state: AppState): string {
     return [
         buildProfileContext(state),
@@ -277,9 +397,18 @@ NGUYÊN TẮC:
 6. ƯU TIÊN dùng bảng (Table Markdown và biểu đồ cột ) để trình bày danh sách hoặc so sánh số liệu thực tế vs dự đoán.
 7. Khi vẽ biểu đồ, CHỈ DÙNG biểu đồ cột (bar) hoặc đường (line) qua tool call. TUYỆT ĐỐI KHÔNG vẽ biểu đồ tròn (pie).
 8. Khi người dùng yêu cầu dự đoán chi tiêu: phân tích mức chi tiêu trung bình các tháng trước, tính độ lệch và đưa ra dự đoán số tiền cho các tháng tới bằng một bảng (table) rõ ràng.
-9. Khi người dùng yêu cầu thêm lịch/việc/giao dịch, dùng tool tương ứng.
+9. Khi người dùng yêu cầu thêm lịch/việc/giao dịch, dùng tool tương ứng. Nếu người dùng liệt kê NHIỀU khoản thu chi trong 1 tin nhắn, LUÔN dùng tool \`batch_add_transactions\` thay vì gọi \`add_transaction\` nhiều lần.
 10. Giọng điệu chuyên nghiệp, ngắn gọn. Đầu ra phải dễ đọc trên giao diện mobile (tránh viết văn quá dài).
-11. Dùng tool \`query_database\` để tính toán tổng số tiền khi cần thiết, đừng tự bịa số.
+11. Dùng tool \`query_database\` để tính toán tổng số tiền khi cần thiết, đừng tự bịa số. Các bảng khả dụng: transactions, goals, budgets, timetable, todos, profiles, calendar_events, gpa_semesters, gpa_courses, habits, habit_logs, countdown_items, countup_items.
+
+🔥 THÓI QUEN (habits):
+- Dữ liệu thói quen (streak, tỷ lệ hoàn thành, check-in hôm nay) được cung cấp trong context.
+- Dùng tool \`query_database\` với bảng \`habits\` hoặc \`habit_logs\` khi cần phân tích chi tiết hơn.
+- Khi phân tích thói quen: đánh giá tỷ lệ hoàn thành, xu hướng streak, và đề xuất cải thiện.
+
+⏳ ĐẾM NGƯỢC / ĐẾM TIẾN (countdown_items, countup_items):
+- Dữ liệu sự kiện đếm ngược và mốc đếm tiến được cung cấp trong context.
+- Dùng tool \`query_database\` với bảng \`countdown_items\` hoặc \`countup_items\` khi cần.
 
 🎓 QUY CHẾ GPA ĐHQGHN 2022:
 - Thang điểm: 10 → Chữ (A+/A/B+/B/C+/C/D+/D/F) → Thang 4 (4.0/3.7/3.5/3.0/2.5/2.0/1.5/1.0/0.0)

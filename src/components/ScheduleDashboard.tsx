@@ -944,16 +944,34 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                             <h4 className="font-bold text-gray-800 text-sm">{g.title}</h4>
                           </div>
 
-                          <div className="flex flex-col gap-1 mt-2">
+                          <div className="flex flex-col gap-2 mt-2">
                             <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
                               <Calendar size={12} className="text-indigo-400" />
                               Hạn chót: <span className="text-gray-700">{new Date(g.deadline).toLocaleDateString('vi-VN')}</span>
                             </div>
-                            {g.type && g.type !== 'PERSONAL' && (
-                              <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-500 font-bold w-fit">
-                                {g.type === 'SHORT_TERM' ? 'Ngắn hạn' : g.type === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {(() => {
+                                    const currentStatus = g.status || (g.progress === 100 ? 'COMPLETED' : (g.progress && g.progress > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'));
+                                    const handleStatusClick = (e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        let nextStatus: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED' = 'NOT_STARTED';
+                                        let nextProgress = g.progress || 0;
+                                        if (currentStatus === 'NOT_STARTED') { nextStatus = 'IN_PROGRESS'; nextProgress = 50; }
+                                        else if (currentStatus === 'IN_PROGRESS') { nextStatus = 'COMPLETED'; nextProgress = 100; }
+                                        else if (currentStatus === 'COMPLETED') { nextStatus = 'NOT_STARTED'; nextProgress = 0; }
+                                        onUpdateGoal({ ...g, status: nextStatus, progress: nextProgress });
+                                    };
+                                    
+                                    if (currentStatus === 'COMPLETED') return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium border border-emerald-200 whitespace-nowrap hover:bg-emerald-200 transition-colors cursor-pointer">Đã hoàn thành</button>;
+                                    if (currentStatus === 'IN_PROGRESS') return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium border border-blue-200 whitespace-nowrap hover:bg-blue-200 transition-colors cursor-pointer">Đang hoàn thành</button>;
+                                    return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium border border-gray-200 whitespace-nowrap hover:bg-gray-200 transition-colors cursor-pointer">Chưa hoàn thành</button>;
+                                })()}
+                                {g.type && g.type !== 'PERSONAL' && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-500 font-bold w-fit">
+                                    {g.type === 'SHORT_TERM' ? 'Ngắn hạn' : g.type === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
+                                  </span>
+                                )}
+                            </div>
                           </div>
 
                         </div>

@@ -299,7 +299,7 @@ export const revertOrder = async (orderId: string): Promise<boolean> => {
     if (profile?.trial_started_at) {
       const trialStart = new Date(profile.trial_started_at);
       const trialEnd = new Date(trialStart);
-      trialEnd.setDate(trialEnd.getDate() + 30);
+      trialEnd.setDate(trialEnd.getDate() + 7);
       if (trialEnd > new Date()) fallbackPlan = 'trial';
     }
 

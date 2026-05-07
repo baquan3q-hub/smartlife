@@ -1,0 +1,576 @@
+# ⭐ StarBrain Reward System
+## Thiết kế Hệ thống Điểm Thưởng Dựa trên Tâm Lý Học Hành Vi
+### Module: Habit & Streak Tracker — SmartLife Web App
+**Phiên bản:** v1.0 | **Ngày:** 07/05/2026 | **Người đề xuất:** Bùi Anh Quân
+
+---
+
+## 1. NỀN TẢNG TÂM LÝ HỌC — TẠI SAO HỆ THỐNG NÀY HIỆU QUẢ
+
+### 1.1 Dopamine Loop — Vòng lặp kỳ vọng & phần thưởng
+
+Não người **không tiết dopamine khi nhận được phần thưởng** — mà tiết dopamine nhiều nhất **ngay trước khi nhận**, khi còn đang kỳ vọng. Đây là lý do casino, TikTok, và game mobile gây nghiện.
+
+```
+Thiết kế dựa trên vòng:
+  Hành động → Kỳ vọng phần thưởng → Nhận thưởng → Tìm kiếm lại
+              ↑                                              ↓
+              ←←←←←← Dopamine loop tự duy trì ←←←←←←←←←←←
+```
+
+**Ứng dụng:** Hệ thống sẽ tạo ra **sự không chắc chắn có kiểm soát** — người dùng biết check-in hôm nay sẽ nhận điểm, nhưng không biết chính xác bao nhiêu (có thể có bonus bất ngờ).
+
+---
+
+### 1.2 Variable Ratio Reinforcement — Lịch Thưởng Tỷ Lệ Biến Đổi
+
+Nghiên cứu của B.F. Skinner (1957) chứng minh: trong 4 kiểu lịch thưởng, **Variable Ratio** (thưởng ngẫu nhiên sau số lần hành động thay đổi) tạo ra **hành vi bền vững nhất và khó bỏ nhất**.
+
+| Kiểu thưởng | Ví dụ | Độ bền hành vi |
+|---|---|---|
+| Fixed Interval | Lương tháng | Thấp — làm nhiều trước kỳ thưởng |
+| Fixed Ratio | Tích 10 tem = 1 ly | Trung bình |
+| Variable Interval | Thông báo social media | Cao |
+| **Variable Ratio** | **Slot machine, loot box** | **Cao nhất** ✅ |
+
+**Ứng dụng:** Bonus điểm xuất hiện ngẫu nhiên theo thuật toán có kiểm soát, không theo chu kỳ cố định.
+
+---
+
+### 1.3 Loss Aversion — Sợ Mất Hơn Muốn Được
+
+Daniel Kahneman (Nobel Kinh tế 2002) chứng minh: **nỗi đau mất mát lớn gấp 2–2.5 lần niềm vui nhận được** cùng giá trị.
+
+**Ứng dụng:**
+- Streak sắp bị mất → hiển thị cảnh báo "Streak 🔥 sắp bị phá!"
+- Cho phép dùng "Streak Shield" (item bảo vệ) đổi bằng điểm sao
+
+---
+
+### 1.4 Progress Principle — Nguyên Tắc Tiến Độ Nhỏ
+
+Teresa Amabile (Harvard, 2011): **niềm vui lớn nhất không đến từ thành tựu lớn mà từ cảm giác tiến lên hàng ngày**, dù nhỏ.
+
+**Ứng dụng:**
+- Điểm sao tăng **không tuyến tính** theo streak → luôn cảm thấy "hôm nay tốt hơn hôm qua"
+- Progress bar đến mốc tiếp theo luôn hiển thị rõ
+
+---
+
+### 1.5 Self-Determination Theory — Tự Quyết Định Phần Thưởng
+
+Deci & Ryan (1985): Con người có động lực bền vững nhất khi cảm thấy **có quyền tự chủ**. Thưởng do người khác đặt ra gây hiệu ứng "overjustification" → giảm động lực nội tại.
+
+**Ứng dụng:**
+- Người dùng **tự định nghĩa phần thưởng** của mình (Reward Builder)
+- Hệ thống chỉ gợi ý, không áp đặt
+
+---
+
+## 2. CƠ CHẾ TÍNH ĐIỂM SAO ⭐
+
+### 2.1 Công thức điểm cơ bản
+
+```
+Điểm mỗi check-in = Base Points × Streak Multiplier × Time Bonus × Habit Difficulty
+```
+
+#### Base Points (điểm nền)
+```
+Mặc định: 10 ⭐ mỗi lần check-in
+```
+
+#### Streak Multiplier — Hệ số nhân theo streak (không tuyến tính)
+
+Công thức thiết kế theo hàm logarithmic để:
+- Tăng nhanh ban đầu (tạo hứng khởi)
+- Tăng chậm dần về sau (tránh cảm giác "đã ổn định rồi, không cần cố")
+- Vẫn luôn tăng (không trần)
+
+```
+Streak Multiplier = 1 + log₂(streak_days + 1) × 0.3
+
+Ví dụ cụ thể:
+  Streak 1  ngày  → × 1.30  → 13 ⭐
+  Streak 3  ngày  → × 1.60  → 16 ⭐
+  Streak 7  ngày  → × 1.90  → 19 ⭐
+  Streak 14 ngày  → × 2.15  → 21 ⭐
+  Streak 30 ngày  → × 2.50  → 25 ⭐
+  Streak 60 ngày  → × 2.80  → 28 ⭐
+  Streak 100 ngày → × 3.10  → 31 ⭐
+```
+
+**Lý do không tuyến tính:** Nếu điểm tăng đều đặn, não người sẽ "bình thường hóa" kỳ vọng. Tăng nhanh rồi chậm dần tạo cảm giác "surprise" sớm và duy trì kỳ vọng về lâu dài.
+
+#### Time Bonus — Thưởng theo giờ check-in
+
+```
+Sáng sớm (05:00–08:59)  → +5 ⭐   "Early Bird 🌅"
+Buổi sáng (09:00–11:59) → +3 ⭐   "Morning Person ☀️"
+Buổi chiều (12:00–17:59)→ +1 ⭐   "On Schedule 👍"
+Buổi tối (18:00–22:59)  →  0 ⭐   (bình thường)
+Đêm khuya (23:00–04:59) → -2 ⭐   "Night Owl 🦉" (penalty nhẹ — khuyến khích ngủ sớm)
+```
+
+**Lý do:** Dựa trên nghiên cứu về cortisol và willpower — ý chí mạnh nhất vào sáng sớm. Thưởng thêm để hình thành thói quen buổi sáng lành mạnh cho sinh viên.
+
+#### Habit Difficulty Multiplier — Hệ số theo độ khó thói quen
+
+```
+Người dùng tự đánh giá khi tạo habit:
+  Dễ   (1-2 điểm khó) → × 1.0
+  Vừa  (3-4 điểm khó) → × 1.3
+  Khó  (5   điểm khó) → × 1.6
+```
+
+Ví dụ: "Đọc sách 30 phút" = Vừa, "Tập gym" = Khó, "Uống đủ nước" = Dễ.
+
+---
+
+### 2.2 Bonus Events — Thưởng Đặc Biệt (Variable Ratio)
+
+Đây là cơ chế **dopamine surprise** — xuất hiện ngẫu nhiên, không báo trước.
+
+#### Lucky Bonus 🎰 (Random Jackpot)
+```
+Xác suất: 15% mỗi lần check-in
+Phần thưởng: +20 đến +50 ⭐ (random trong khoảng)
+Trigger: Hoàn toàn ngẫu nhiên
+Hiển thị: Animation đặc biệt "Lucky Day! +XX ⭐"
+```
+
+#### Comeback Bonus 💪 (Sau khi nghỉ)
+```
+Trigger: Check-in sau 1-3 ngày bỏ lỡ
+Phần thưởng: +15 ⭐ "Welcome Back!"
+Lý do TLH: Giảm rào cản quay lại — thay vì cảm giác thất bại, người dùng được chào đón
+```
+
+#### Milestone Bonus 🏆 (Mốc streak lịch sử)
+```
+Trigger: Đạt mốc streak lần đầu tiên
+  7  ngày → +50  ⭐ + badge "Week Warrior 🔥"
+  14 ngày → +80  ⭐ + badge "Fortnight Fighter ⚔️"
+  30 ngày → +150 ⭐ + badge "Monthly Master 👑"
+  60 ngày → +250 ⭐ + badge "Consistency King 🦁"
+  100 ngày→ +500 ⭐ + badge "Century Legend 🌟" + confetti full screen
+```
+
+#### Perfect Day Bonus ✨ (Hoàn thành tất cả habits trong ngày)
+```
+Trigger: Tất cả habits scheduled hôm nay đều check-in xong
+Phần thưởng: +30 ⭐ "Perfect Day! 🌈"
+Lý do TLH: Tạo mục tiêu kép — không chỉ 1 habit mà muốn hoàn thành tất cả
+```
+
+#### Perfect Week Bonus 🗓️
+```
+Trigger: 7 ngày liên tiếp không bỏ ngày nào (tất cả habits)
+Phần thưởng: +100 ⭐ "Flawless Week 💎"
+```
+
+#### Early Achiever Bonus ⚡
+```
+Trigger: Check-in habit trước 8:00 sáng
+Phần thưởng: +8 ⭐ (ngoài Time Bonus bình thường)
+```
+
+---
+
+### 2.3 Streak Shield — Bảo Vệ Streak (Dựa trên Loss Aversion)
+
+```
+Streak Shield 🛡️:
+  Chi phí: 80 ⭐
+  Công dụng: Bảo vệ streak không bị reset khi bỏ lỡ 1 ngày
+  Số lượng: Tối đa 2 shield/habit/tháng
+  Hiển thị: Icon khiên nhỏ trên habit card khi đang active
+```
+
+**Lý do thiết kế:** Khi streak dài (ví dụ 30 ngày), nỗi sợ mất nó KHỔNG LỒ. Người dùng sẽ sẵn sàng "mua bảo hiểm" bằng điểm sao đã tích lũy → tạo lý do giữ điểm và đồng thời tạo vòng lặp tiếp tục check-in.
+
+---
+
+### 2.4 Ví dụ Tổng Hợp Tính Điểm
+
+**Scenario:** Quân check-in "Ôn IELTS 1 tiếng" lúc 7:30 sáng, đang streak 14 ngày, habit độ khó "Khó".
+
+```
+Base Points      = 10
+Streak ×         = × 2.15  (streak 14 ngày)
+Habit Difficulty = × 1.6   (Khó)
+Time Bonus       = +5 ⭐    (Early Bird)
+
+Tổng = (10 × 2.15 × 1.6) + 5
+     = 34.4 + 5
+     = 39 ⭐
+
++ Lucky Bonus (15% chance): có thể +20 đến +50 ⭐ thêm
+→ Tổng có thể dao động từ 39 đến 89 ⭐ hôm nay
+```
+
+---
+
+## 3. HỆ THỐNG ĐỔI THƯỞNG 🎁
+
+### 3.1 Triết lý Reward Design cho Sinh Viên
+
+Thay vì thưởng tiền hoặc vật chất (khó implement và gây hiệu ứng "overjustification" — làm giảm động lực nội tại), hệ thống dùng **Self-Reward Framework**: người dùng tự xây dựng phần thưởng của mình.
+
+Nghiên cứu (Deci et al., 1999) chỉ ra: **phần thưởng cụ thể + tự chọn > phần thưởng chung + áp đặt** về hiệu quả duy trì động lực dài hạn.
+
+---
+
+### 3.2 Danh mục Reward Templates (Gợi ý cho Sinh Viên)
+
+Người dùng chọn từ danh sách gợi ý HOẶC tự tạo custom reward.
+
+#### 🎯 Danh mục: Thời gian Tự Do (Guilt-Free Time)
+```
+"1 tiếng xem phim không cảm thấy tội lỗi"     → 150 ⭐
+"30 phút chơi game sau khi học xong"           → 80  ⭐
+"Xem 2 tập anime mà không lo deadline"         → 200 ⭐
+"Ngủ nướng 1 tiếng cuối tuần"                  → 120 ⭐
+"1 buổi tối không chạm sách"                   → 250 ⭐
+```
+
+#### ☕ Danh mục: Tự Thưởng Ăn Uống
+```
+"Mua 1 ly trà sữa không cảm thấy phí tiền"   → 100 ⭐
+"Order đồ ăn yêu thích thay vì nấu"           → 180 ⭐
+"Cà phê đặc biệt buổi sáng hôm nay"           → 60  ⭐
+"Ăn snack đêm mà không lo calo"               → 80  ⭐
+```
+
+#### 📱 Danh mục: Social & Entertainment
+```
+"30 phút scroll TikTok không giới hạn"         → 70  ⭐
+"Chat với bạn bè mà không lo mất tập trung"   → 50  ⭐
+"1 tiếng nghe nhạc không cần học"             → 90  ⭐
+```
+
+#### 💆 Danh mục: Self-Care
+```
+"Nghỉ ngơi trọn vẹn 1 buổi chiều"            → 300 ⭐
+"Đi dạo 1 vòng không mang sách vở"           → 120 ⭐
+"Massage chân tự mình 15 phút"               → 80  ⭐
+```
+
+#### 🌟 Danh mục: Big Rewards (Dài hạn)
+```
+"Mua món đồ mình đã muốn từ lâu"            → 1000 ⭐ (tự đặt ngưỡng)
+"Dành 1 ngày đi chơi không học"             → 800  ⭐
+"Gọi video call dài với bạn thân xa"        → 500  ⭐
+"Mua sách mới mình thích"                   → 400  ⭐
+```
+
+---
+
+### 3.3 Custom Reward Builder
+
+Người dùng **tự tạo reward** với 3 trường:
+
+```
+CustomReward {
+  title       : string   // "Xem 1 tập Squid Game"
+  description : string?  // "Không được xem thêm, chỉ 1 tập thôi"
+  cost        : int      // Số sao cần để đổi
+  category    : enum     // TIME | FOOD | ENTERTAINMENT | SELF_CARE | BIG_GOAL
+  emoji       : emoji    // Biểu tượng
+}
+```
+
+**UX quan trọng:** Khi tạo reward, hệ thống hỏi: *"Bạn cần tích lũy thêm bao lâu để đạt mức này?"* → Hiển thị dự kiến ngày đạt được → Tạo kỳ vọng cụ thể.
+
+---
+
+### 3.4 Reward Redemption Flow
+
+```
+[User] → Vào tab "⭐ My Stars"
+       → Thấy tổng sao hiện tại + progress bar đến reward gần nhất
+       → Chọn reward muốn đổi
+       → Xác nhận: "Đổi 150 ⭐ để lấy [tên reward]?"
+       → Hệ thống trừ điểm + hiển thị "Reward Unlocked! 🎉"
+       → Hiển thị modal: "[Reward Title] — Hãy tận hưởng nhé! Bạn xứng đáng với điều này 💛"
+       → Lưu vào Redemption History
+```
+
+**Điểm tâm lý học quan trọng:** Modal cuối cùng phải **xác nhận và hợp lý hóa** hành động tận hưởng — không để người dùng cảm thấy guilty khi thực sự nghỉ ngơi.
+
+---
+
+## 4. GAMIFICATION LAYER — CÁC LỚP TRẢI NGHIỆM
+
+### 4.1 Level System — Hệ thống Cấp Độ
+
+```
+Level 1: Newcomer      🌱  0     – 199   ⭐ tổng tích lũy
+Level 2: Starter       🌿  200   – 499   ⭐
+Level 3: Builder       🔨  500   – 999   ⭐
+Level 4: Consistent    📅  1,000 – 1,999 ⭐
+Level 5: Dedicated     💪  2,000 – 3,999 ⭐
+Level 6: Achiever      🏅  4,000 – 6,999 ⭐
+Level 7: Champion      🏆  7,000 – 11,999⭐
+Level 8: Legend        👑  12,000+        ⭐
+```
+
+**Lưu ý:** Level dựa trên **tổng sao tích lũy từ trước đến nay** (không phải số dư hiện tại) để tránh người dùng không dám đổi thưởng vì sợ tụt level.
+
+### 4.2 Achievement Badges — Huy Hiệu Thành Tích
+
+```
+Habit Badges (per habit):
+  🔥 Week Warrior     — Streak 7 ngày
+  ⚔️  Fortnight Fighter — Streak 14 ngày
+  👑 Monthly Master   — Streak 30 ngày
+  🌟 Century Legend   — Streak 100 ngày
+
+Behavior Badges:
+  🌅 Early Bird       — Check-in trước 8am 7 lần
+  ⚡ Speed Demon      — Check-in trong vòng 5 phút mở app
+  🌈 Perfect Week     — 1 tuần hoàn thành tất cả habits
+  💎 Diamond Streak   — 30 ngày không bỏ ngày nào (mọi habit)
+  🔄 Comeback Kid     — Quay lại sau 3 ngày bỏ lỡ × 3 lần
+  🎰 Lucky Charm      — Nhận Lucky Bonus 5 lần
+
+Student-Specific Badges (gợi ý):
+  📚 Study Grinder    — 30 lần check-in habit học tập
+  🎓 Exam Warrior     — Check-in đều trong tuần thi
+  ☀️ Morning Scholar  — 14 ngày check-in học trước 8am
+```
+
+### 4.3 Weekly Challenge — Thử Thách Tuần
+
+Mỗi tuần tự động generate 1 thử thách ngẫu nhiên từ behavior của user:
+
+```
+Ví dụ thử thách:
+  "Tuần này: Check-in trước 8am 5/7 ngày → Thưởng 200 ⭐"
+  "Tuần này: Hoàn thành Perfect Day 3 lần → Thưởng 150 ⭐"
+  "Tuần này: Không bỏ ngày nào → Thưởng 180 ⭐"
+```
+
+Thử thách hiển thị với progress bar + ngày còn lại.
+
+---
+
+## 5. NOTIFICATION STRATEGY — TÂM LÝ NHẮC NHỞ
+
+### 5.1 Các loại notification theo tâm lý học
+
+#### Reminder bình thường (18:30 nếu user cài)
+```
+"⏰ Đừng quên: [Habit Name] hôm nay!"
+```
+
+#### Streak Protection Alert (Loss Aversion)
+```
+Trigger: 2 tiếng trước deadline (22:00) mà chưa check-in
+Nội dung: "🔥 Streak [N] ngày của bạn sắp bị phá! Còn 2 tiếng nữa thôi"
+Tone: Urgent nhưng không lo lắng
+```
+
+#### Milestone Approaching (Anticipation)
+```
+Trigger: Còn 2 ngày đến mốc streak tiếp theo
+Nội dung: "Còn 2 ngày nữa là bạn đạt streak 30 ngày 🎯 +150⭐ đang chờ!"
+```
+
+#### Morning Motivation (Consistency)
+```
+Trigger: 7:00 sáng nếu user có Early Bird habits
+Nội dung: "Chào buổi sáng! Check-in trước 8am để nhận thêm ⭐"
+```
+
+#### Lucky Bonus Tease (Variable Ratio anticipation)
+```
+Trigger: Không check-in trong 4 tiếng qua (buổi tối)
+Nội dung: "Hôm nay có thể là Lucky Day 🎰 — bạn chưa biết đâu!"
+```
+
+---
+
+## 6. DATA MODEL — CẤU TRÚC DỮ LIỆU
+
+```sql
+-- Bảng lưu sao
+star_transactions {
+  id          UUID PRIMARY KEY
+  user_id     UUID REFERENCES users
+  habit_id    UUID? REFERENCES habits
+  type        ENUM('EARN', 'REDEEM')
+  amount      INT          -- dương = nhận, âm = đổi
+  source      ENUM(
+    'CHECKIN_BASE',
+    'STREAK_BONUS',
+    'TIME_BONUS',
+    'HABIT_DIFFICULTY',
+    'LUCKY_BONUS',
+    'COMEBACK_BONUS',
+    'MILESTONE_BONUS',
+    'PERFECT_DAY',
+    'PERFECT_WEEK',
+    'WEEKLY_CHALLENGE',
+    'STREAK_SHIELD_PURCHASE',
+    'REWARD_REDEEM'
+  )
+  description TEXT         -- mô tả hiển thị cho user
+  created_at  TIMESTAMP
+}
+
+-- Bảng phần thưởng
+rewards {
+  id          UUID PRIMARY KEY
+  user_id     UUID REFERENCES users
+  title       TEXT
+  description TEXT
+  cost        INT
+  category    ENUM('TIME', 'FOOD', 'ENTERTAINMENT', 'SELF_CARE', 'BIG_GOAL')
+  emoji       TEXT
+  is_template BOOLEAN DEFAULT false  -- reward mẫu hay custom
+  created_at  TIMESTAMP
+}
+
+-- Lịch sử đổi thưởng
+reward_redemptions {
+  id          UUID PRIMARY KEY
+  user_id     UUID REFERENCES users
+  reward_id   UUID REFERENCES rewards
+  stars_spent INT
+  redeemed_at TIMESTAMP
+}
+
+-- Streak Shield
+streak_shields {
+  id          UUID PRIMARY KEY
+  user_id     UUID REFERENCES users
+  habit_id    UUID REFERENCES habits
+  activated   BOOLEAN DEFAULT false
+  used_on     DATE?
+  purchased_at TIMESTAMP
+}
+
+-- Badges
+user_badges {
+  id          UUID PRIMARY KEY
+  user_id     UUID REFERENCES users
+  badge_id    TEXT             -- 'week_warrior', 'century_legend', ...
+  earned_at   TIMESTAMP
+  habit_id    UUID?            -- nullable: badge của habit cụ thể
+}
+
+-- User stats (cache tính toán)
+user_star_stats {
+  user_id         UUID PRIMARY KEY
+  total_earned    INT DEFAULT 0   -- tổng sao tích lũy từ đầu (để tính level)
+  current_balance INT DEFAULT 0   -- sao hiện có
+  current_level   INT DEFAULT 1
+  updated_at      TIMESTAMP
+}
+```
+
+---
+
+## 7. LUỒNG NGHIỆP VỤ TÍCH ĐIỂM
+
+### 7.1 Luồng Check-in → Tính điểm
+
+```
+[User] Check-in habit
+  ↓
+Hệ thống tính điểm:
+  1. Lấy streak hiện tại của habit → Streak Multiplier
+  2. Kiểm tra giờ check-in → Time Bonus
+  3. Lấy difficulty level của habit → Difficulty Multiplier
+  4. Tính Base Score = 10 × Streak_Mult × Diff_Mult + Time_Bonus
+  5. Roll lucky (random 0–100):
+       < 15 → Lucky Bonus (random 20–50 ⭐ thêm)
+  6. Check milestone: Streak vừa đạt mốc mới?
+       Đúng → Milestone Bonus
+  7. Check Perfect Day: Tất cả habits hôm nay done?
+       Đúng → Perfect Day Bonus (+30⭐)
+  8. Check Comeback: Hôm qua/hôm kia bỏ lỡ?
+       Đúng → Comeback Bonus (+15⭐)
+  ↓
+Lưu star_transaction (type=EARN, amount=total)
+Cập nhật user_star_stats (balance += total, earned += total)
+Cập nhật level nếu threshold vượt qua
+  ↓
+Trả về: { total_stars_earned, breakdown[], new_balance, level_up?, badges_earned[] }
+  ↓
+UI hiển thị:
+  Animation điểm bay lên (+39⭐)
+  Breakdown chi tiết (slide lên)
+  Nếu Lucky: animation đặc biệt
+  Nếu Milestone: full celebration modal
+  Nếu Level Up: level up animation
+```
+
+### 7.2 Luồng Đổi Thưởng
+
+```
+[User] vào Rewards Store → chọn reward
+  ↓
+Kiểm tra: current_balance >= reward.cost?
+  Không đủ → Hiện: "Còn thiếu X⭐ — đạt được sau khoảng Y ngày nữa"
+  Đủ → Hiện confirm modal
+  ↓
+[User] xác nhận đổi
+  ↓
+Lưu reward_redemption
+Lưu star_transaction (type=REDEEM, amount=-reward.cost)
+Cập nhật current_balance -= reward.cost
+  ↓
+Hiện "Reward Unlocked! 🎉" modal với message khích lệ
+Lưu vào Redemption History
+```
+
+---
+
+## 8. UI SCREENS CẦN XÂY DỰNG
+
+```
+1. Star Balance Widget
+   └── Hiển thị trên habit card: "⭐ 1,240"
+   └── Nhỏ gọn, click vào → mở Star Dashboard
+
+2. Post Check-in Animation Screen
+   └── Điểm bay lên
+   └── Breakdown: base + bonus
+   └── Lucky bonus animation (nếu có)
+   └── Milestone celebration (nếu có)
+
+3. Star Dashboard Tab
+   ├── Tổng sao hiện tại + Level badge
+   ├── Progress bar → Level tiếp theo
+   ├── Recent Transactions (7 ngày gần nhất)
+   └── Achievements gallery
+
+4. Rewards Store Screen
+   ├── My Rewards (reward user đã tạo)
+   ├── Template Rewards (gợi ý theo danh mục)
+   ├── "Create Custom Reward" button
+   └── Redemption History
+
+5. Badge Gallery Screen
+   └── Tất cả badges, earned vs locked
+   └── Gợi ý cách đạt badge chưa có
+```
+
+---
+
+## 9. GHI CHÚ KỸ THUẬT CHO ANTIGRAVITY
+
+- **Lucky roll**: Server-side để tránh cheating. Client nhận kết quả, không tự tính.
+- **Perfect Day trigger**: Cần biết số habit scheduled hôm nay của user — query từ habits + active_days.
+- **Star balance**: Caching trong `user_star_stats` để tránh sum toàn bộ transactions mỗi lần load.
+- **Streak Shield**: Khi missed day được phát hiện bởi cron → check xem có shield active không trước khi reset streak.
+- **Level**: Tính từ `total_earned` (không phải `current_balance`) để level không giảm khi đổi thưởng.
+- **Notifications**: Cần background job kiểm tra streak 2 tiếng trước midnight.
+- **Weekly Challenge**: Generate vào 00:01 thứ Hai, expire Chủ Nhật 23:59.
+
+---
+
+*Tài liệu StarBrain Reward System — thiết kế dựa trên Behavioral Psychology, Neuroscience of Dopamine, và Self-Determination Theory.*
+*Dành cho Antigravity phân tích và tích hợp vào SmartLife Web App.*

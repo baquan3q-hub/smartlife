@@ -1,19 +1,141 @@
-import React, { useMemo, useState } from 'react';
-import { AppState, Goal, Todo, TimetableEvent } from '../types';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { AppState, Goal, Todo, TimetableEvent, Habit, CountdownItem, CountUpItem, HabitLog } from '../types';
 import { calculateCumulativeGPA } from '../services/gpaCalculator';
-import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap, Crown, X, ShieldCheck, Flame, Timer, TrendingUp, Download, Share2 } from 'lucide-react';
 import MyStorage from './MyStorage';
+import { useProAccess } from '../hooks/useProAccess';
+import { supabase } from '../services/supabase';
+import html2canvas from 'html2canvas';
 
 interface VisualBoardProps {
     appState: AppState;
     userName?: string;
     userId?: string;
-    onNavigate?: (tab: 'finance' | 'schedule' | 'music' | 'ai-advisor' | 'gpa') => void;
+    userEmail?: string;
+    onNavigate?: (tab: 'finance' | 'schedule' | 'music' | 'ai-advisor' | 'gpa' | 'habit') => void;
+    onUpgrade?: () => void;
+    onOpenSpotify?: () => void;
+    onUpdateGoal?: (goal: Goal) => void;
 }
 
-const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, onNavigate }) => {
+const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, userEmail, onNavigate, onUpgrade, onOpenSpotify, onUpdateGoal }) => {
     const [showAllHolidays, setShowAllHolidays] = useState(false);
     const [showStorage, setShowStorage] = useState(false);
+    const [showStorageGate, setShowStorageGate] = useState(false);
+    
+    // Habit & Event States
+    const [habits, setHabits] = useState<Habit[]>([]);
+    const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
+    const [countdowns, setCountdowns] = useState<CountdownItem[]>([]);
+    const [countups, setCountups] = useState<CountUpItem[]>([]);
+    const [loadingEvents, setLoadingEvents] = useState(true);
+    const shareRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!userId) return;
+        const fetchEvents = async () => {
+            const [cdRes, cuRes, hRes, hlRes] = await Promise.all([
+                supabase.from('countdown_items').select('*').eq('user_id', userId).order('target_date', { ascending: true }),
+                supabase.from('countup_items').select('*').eq('user_id', userId).order('start_date', { ascending: false }),
+                supabase.from('habits').select('*').eq('user_id', userId).eq('is_active', true),
+                supabase.from('habit_logs').select('*,habits!inner(user_id)').eq('habits.user_id', userId)
+            ]);
+            if (cdRes.data) setCountdowns(cdRes.data);
+            if (cuRes.data) setCountups(cuRes.data);
+            if (hRes.data) setHabits(hRes.data);
+            if (hlRes.data) setHabitLogs(hlRes.data);
+            setLoadingEvents(false);
+        };
+        fetchEvents();
+    }, [userId]);
+
+    const handleShare = async () => {
+        if (!shareRef.current) return;
+        try {
+            const canvas = await html2canvas(shareRef.current, { backgroundColor: '#111827', scale: 2 });
+            const image = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = image;
+            link.download = 'my-habit-streak.png';
+            link.click();
+        } catch (err) {
+            console.error('Error sharing image', err);
+            alert('Không thể tạo ảnh chia sẻ lúc này.');
+        }
+    };
+
+    // Helpers
+    const today = () => {
+        const d = new Date();
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        return d.toISOString().split('T')[0];
+    };
+    const getDayKey = (d: Date): any => ['mon','tue','wed','thu','fri','sat','sun'][d.getDay() === 0 ? 6 : d.getDay() - 1];
+    const diffDays = (d: string, isPast: boolean = false) => {
+        const target = new Date(d); target.setHours(0,0,0,0);
+        const now = new Date(today()); now.setHours(0,0,0,0);
+        return isPast ? Math.floor((now.getTime() - target.getTime())/(1000*3600*24)) : Math.ceil((target.getTime() - now.getTime())/(1000*3600*24));
+    };
+
+    const getWeekKey = (d: Date) => { const t = new Date(d); t.setDate(t.getDate() - (t.getDay() === 0 ? 6 : t.getDay() - 1)); return t.toISOString().split('T')[0]; };
+    const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`;
+
+    const getHabitStats = (habit: Habit) => {
+        const logs = habitLogs.filter(l => l.habit_id === habit.id);
+        const completedLogs = logs.filter(l => l.completed);
+
+        if (habit.frequency === 'weekly' || habit.frequency === 'monthly') {
+            const isWeekly = habit.frequency === 'weekly';
+            const getKey = isWeekly ? getWeekKey : getMonthKey;
+            const target = habit.target_per_period || 1;
+            const periodCounts: Record<string, number> = {};
+            completedLogs.forEach(l => { const k = getKey(new Date(l.log_date)); periodCounts[k] = (periodCounts[k] || 0) + 1; });
+            const d = new Date(today());
+            const currentKey = getKey(d);
+            let currentStreak = 0;
+            if ((periodCounts[currentKey] || 0) >= target) currentStreak++;
+            const cursor = new Date(d);
+            if (isWeekly) cursor.setDate(cursor.getDate() - 7); else cursor.setMonth(cursor.getMonth() - 1);
+            while (true) {
+                const k = getKey(cursor);
+                if ((periodCounts[k] || 0) >= target) {
+                    currentStreak++;
+                    if (isWeekly) cursor.setDate(cursor.getDate() - 7); else cursor.setMonth(cursor.getMonth() - 1);
+                } else break;
+            }
+            return { currentStreak };
+        }
+
+        let currentStreak = 0;
+        const d = new Date(today());
+        const todayLog = logs.find(l => l.log_date === today());
+        const todayScheduled = habit.active_days.includes(getDayKey(d));
+        if (todayScheduled && todayLog?.completed) currentStreak = 1;
+        
+        const cursor = new Date(d); cursor.setDate(cursor.getDate() - 1);
+        while (true) {
+            const ds = cursor.toISOString().split('T')[0];
+            const dayKey = getDayKey(cursor);
+            if (!habit.active_days.includes(dayKey)) { cursor.setDate(cursor.getDate() - 1); continue; }
+            const log = logs.find(l => l.log_date === ds);
+            if (log?.completed) { currentStreak++; cursor.setDate(cursor.getDate() - 1); }
+            else break;
+            if (currentStreak > 1000) break;
+        }
+        return { currentStreak };
+    };
+
+    // Pro access check for My Storage
+    const proAccess = useProAccess(appState.profile, userEmail);
+    const canUseStorage = proAccess.isProActive || proAccess.isLifetime;
+
+    const handleStorageClick = () => {
+        if (canUseStorage) {
+            setShowStorage(true);
+        } else {
+            setShowStorageGate(true);
+        }
+    };
 
     // derived data
     // 1. Finance: All-time stats
@@ -197,18 +319,103 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, o
                 </h1>
             </header>
 
+            {/* HABIT STREAK SHARE WIDGET */}
+            {!loadingEvents && habits.length > 0 && (
+                <div ref={shareRef} className="mb-6 bg-white rounded-2xl p-3 shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3 overflow-x-auto flex-1 mr-4 pb-1 custom-scrollbar">
+                        {habits.slice(0, 5).map(habit => {
+                            const stats = getHabitStats(habit);
+                            return (
+                                <button key={habit.id} onClick={() => onNavigate?.('habit')} className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-xl border border-gray-100 transition-colors shrink-0">
+                                    <span className="text-xl">{habit.icon}</span>
+                                    <span className="font-bold text-gray-700 text-sm max-w-[100px] truncate">{habit.title}</span>
+                                    <span className="flex items-center gap-1 text-orange-500 font-black text-sm bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-100">
+                                        <Flame size={14} /> {stats.currentStreak}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <button onClick={handleShare} className="shrink-0 p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors border border-transparent hover:border-indigo-100" title="Tải ảnh khoe Streak">
+                        <Download size={18} />
+                    </button>
+                </div>
+            )}
+
             {/* My Storage Toggle - Discreet */}
             <button
-                onClick={() => setShowStorage(true)}
+                onClick={handleStorageClick}
                 className="fixed bottom-24 right-6 z-50 w-12 h-12 bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 transition-all hover:scale-110 group"
                 title="My Storage"
             >
                 <Archive size={20} />
-                <span className="absolute right-full mr-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">My Storage</span>
+                {!canUseStorage && <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center"><Crown size={10} className="text-white" /></span>}
+                <span className="absolute right-full mr-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">My Storage {!canUseStorage ? '(Pro)' : ''}</span>
             </button>
 
-            {/* My Storage Modal */}
+            {/* My Storage Modal — Pro users only */}
             <MyStorage isOpen={showStorage} onClose={() => setShowStorage(false)} userId={userId || ''} />
+
+            {/* My Storage Pro Gate Modal */}
+            {showStorageGate && (
+                <div className="fixed inset-0 z-[9998] flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowStorageGate(false)} />
+                    <div className="relative w-[90%] max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                        {/* Header gradient */}
+                        <div className="bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 p-8 text-center relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl -mr-10 -mt-10" />
+                            <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl -ml-8 -mb-8" />
+                            <button onClick={() => setShowStorageGate(false)} className="absolute top-4 right-4 p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+                                <X size={18} />
+                            </button>
+                            <div className="relative z-10">
+                                <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                                    <LockKeyhole size={36} className="text-white" />
+                                </div>
+                                <h3 className="text-2xl font-bold text-white mb-2">My Storage</h3>
+                                <p className="text-indigo-200 text-sm">Tính năng dành cho gói Pro</p>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 space-y-5">
+                            <p className="text-gray-600 text-sm text-center leading-relaxed">
+                                Nâng cấp lên <strong className="text-indigo-600">SmartLife Pro</strong> để sử dụng kho lưu trữ riêng tư với ghi chú, liên kết, tệp tin, hình ảnh, âm thanh & video.
+                            </p>
+
+                            {/* Features list */}
+                            <div className="space-y-3">
+                                {[
+                                    { icon: '📝', text: 'Ghi chú với rich text (đậm, nghiêng, checkbox)' },
+                                    { icon: '🔗', text: 'Lưu trữ liên kết quan trọng' },
+                                    { icon: '📁', text: 'Upload tệp tin, hình ảnh, audio, video (50MB/tệp)' },
+                                    { icon: '🔒', text: 'Riêng tư & bảo mật trên cloud' },
+                                ].map((f, i) => (
+                                    <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                                        <span className="text-lg">{f.icon}</span>
+                                        <span className="text-sm text-gray-700">{f.text}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* CTA */}
+                            <button
+                                onClick={() => { setShowStorageGate(false); onUpgrade?.(); }}
+                                className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Crown size={18} className="text-yellow-300" />
+                                Nâng cấp Pro ngay
+                            </button>
+
+                            {proAccess.isTrialActive && (
+                                <p className="text-center text-xs text-gray-400">
+                                    Bạn đang dùng thử — còn {proAccess.daysRemaining} ngày. My Storage chỉ khả dụng với gói Pro.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 2. MAIN SCHEDULE SECTION (TOP) */}
             <div className="mb-8">
@@ -366,6 +573,54 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, o
                         </div>
                     </div>
 
+                    {/* COUNTDOWNS */}
+                    {!loadingEvents && countdowns.length > 0 && (
+                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
+                                <Timer className="text-indigo-500" /> Sắp diễn ra
+                            </h3>
+                            <div className="space-y-3">
+                                {countdowns.slice(0, 3).map(c => {
+                                    const d = diffDays(c.target_date);
+                                    return (
+                                        <div key={c.id} className="flex items-center gap-4 bg-gray-50 rounded-2xl p-3">
+                                            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-2xl">{c.icon}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold text-gray-800 truncate">{c.title}</div>
+                                                <div className="text-xs text-gray-400">{new Date(c.target_date).toLocaleDateString('vi-VN')}</div>
+                                            </div>
+                                            <div className="text-xl font-black text-indigo-600">{d > 0 ? d : 0} <span className="text-xs font-normal text-gray-500">ngày</span></div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* COUNTUPS */}
+                    {!loadingEvents && countups.length > 0 && (
+                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
+                                <TrendingUp className="text-emerald-500" /> Đã trôi qua
+                            </h3>
+                            <div className="space-y-3">
+                                {countups.slice(0, 3).map(c => {
+                                    const d = diffDays(c.start_date, true);
+                                    return (
+                                        <div key={c.id} className="flex items-center gap-4 bg-gray-50 rounded-2xl p-3">
+                                            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-2xl">{c.icon}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold text-gray-800 truncate">{c.title}</div>
+                                                <div className="text-xs text-gray-400">{new Date(c.start_date).toLocaleDateString('vi-VN')}</div>
+                                            </div>
+                                            <div className="text-xl font-black text-emerald-600">{d > 0 ? d : 0} <span className="text-xs font-normal text-gray-500">ngày</span></div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Holidays Countdown */}
                     <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-6 shadow-sm border border-pink-100 h-auto transition-all duration-500">
                         <div className="flex items-center justify-between mb-4">
@@ -453,8 +708,25 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, o
                                         </div>
 
                                         <div className="flex items-center gap-2 mb-2">
+                                            {(() => {
+                                                const currentStatus = goal.status || (goal.progress === 100 ? 'COMPLETED' : (goal.progress && goal.progress > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'));
+                                                const handleStatusClick = (e: React.MouseEvent) => {
+                                                    e.stopPropagation();
+                                                    if (!onUpdateGoal) return;
+                                                    let nextStatus: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED' = 'NOT_STARTED';
+                                                    let nextProgress = goal.progress || 0;
+                                                    if (currentStatus === 'NOT_STARTED') { nextStatus = 'IN_PROGRESS'; nextProgress = 50; }
+                                                    else if (currentStatus === 'IN_PROGRESS') { nextStatus = 'COMPLETED'; nextProgress = 100; }
+                                                    else if (currentStatus === 'COMPLETED') { nextStatus = 'NOT_STARTED'; nextProgress = 0; }
+                                                    onUpdateGoal({ ...goal, status: nextStatus, progress: nextProgress });
+                                                };
+                                                
+                                                if (currentStatus === 'COMPLETED') return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium border border-emerald-200 whitespace-nowrap hover:bg-emerald-200 transition-colors cursor-pointer">Đã hoàn thành</button>;
+                                                if (currentStatus === 'IN_PROGRESS') return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium border border-blue-200 whitespace-nowrap hover:bg-blue-200 transition-colors cursor-pointer">Đang hoàn thành</button>;
+                                                return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium border border-gray-200 whitespace-nowrap hover:bg-gray-200 transition-colors cursor-pointer">Chưa hoàn thành</button>;
+                                            })()}
                                             {goal.type && goal.type !== 'PERSONAL' && (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium whitespace-nowrap">
                                                     {goal.type === 'SHORT_TERM' ? 'Ngắn hạn' : goal.type === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
                                                 </span>
                                             )}
@@ -545,6 +817,29 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, o
                         </div>
                     </div>
 
+                    {/* NEW: MY SPOTIFY WIDGET */}
+                    <div 
+                        onClick={() => onOpenSpotify?.()}
+                        className="bg-[#121212] rounded-3xl p-6 shadow-md hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group border border-[#282828]"
+                    >
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#1DB954]/20 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+                        <div className="relative flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-full bg-[#1DB954] flex items-center justify-center shadow-lg shadow-[#1DB954]/20 group-hover:scale-110 transition-transform">
+                                    <Play size={20} className="text-black fill-black ml-1" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-white text-lg">My Spotify</h3>
+                                    <p className="text-[#1DB954] text-xs font-bold uppercase tracking-wider mt-0.5">Trình phát nhạc</p>
+                                </div>
+                            </div>
+                            <div className="text-gray-500 group-hover:text-white transition-colors">
+                                <ArrowUpRight size={20} />
+                            </div>
+                        </div>
+                    </div>
+
+
                     {/* NEW: GPA Snapshot Card */}
                     <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all overflow-hidden group relative">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 pointer-events-none"></div>
@@ -592,7 +887,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, o
             {/* MY STORAGE PROMO SECTION */}
             <div className="mt-8 mb-4">
                 <div
-                    onClick={() => setShowStorage(true)}
+                    onClick={handleStorageClick}
                     className="relative bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 rounded-3xl p-8 md:p-10 shadow-2xl cursor-pointer group overflow-hidden hover:shadow-[0_20px_60px_rgba(0,0,0,0.3)] transition-all duration-500"
                 >
                     {/* Decorative elements */}
@@ -602,6 +897,14 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, o
 
                     {/* Grid pattern overlay */}
                     <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} />
+
+                    {/* Pro badge */}
+                    {!canUseStorage && (
+                        <div className="absolute top-5 right-5 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 border border-yellow-500/30 rounded-full backdrop-blur-sm">
+                            <Crown size={14} className="text-yellow-400" />
+                            <span className="text-yellow-300 text-xs font-bold">PRO</span>
+                        </div>
+                    )}
 
                     <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 md:gap-10">
                         {/* Icon */}
@@ -630,8 +933,12 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, o
 
                         {/* CTA */}
                         <div className="shrink-0">
-                            <div className="bg-white text-gray-900 px-6 py-3 rounded-2xl font-bold text-sm shadow-lg group-hover:bg-indigo-100 group-hover:scale-105 transition-all duration-300 flex items-center gap-2">
-                                <LockKeyhole size={16} /> Mở kho
+                            <div className={`px-6 py-3 rounded-2xl font-bold text-sm shadow-lg group-hover:scale-105 transition-all duration-300 flex items-center gap-2 ${
+                                canUseStorage
+                                    ? 'bg-white text-gray-900 group-hover:bg-indigo-100'
+                                    : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white group-hover:from-indigo-600 group-hover:to-purple-700'
+                            }`}>
+                                {canUseStorage ? <><LockKeyhole size={16} /> Mở kho</> : <><Crown size={16} className="text-yellow-300" /> Nâng cấp Pro</>}
                             </div>
                         </div>
                     </div>

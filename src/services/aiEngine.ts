@@ -4,7 +4,7 @@
 
 import { supabase } from './supabase';
 import {
-    callGeminiRaw, enqueue, buildFullContext,
+    callGeminiRaw, enqueue, buildFullContext, buildFullContextAsync,
     SYSTEM_INSTRUCTION,
     type ChatMessage, type MessagePart, type ToolDeclaration
 } from './geminiService';
@@ -57,7 +57,7 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
                 table: {
                     type: 'STRING',
                     description: 'Tên bảng cần truy vấn',
-                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events', 'gpa_semesters', 'gpa_courses']
+                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events', 'gpa_semesters', 'gpa_courses', 'habits', 'habit_logs', 'countdown_items', 'countup_items']
                 },
                 select: {
                     type: 'STRING',
@@ -199,6 +199,31 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
             },
             required: ['scenarios']
         }
+    },
+    {
+        name: 'batch_add_transactions',
+        description: 'Thêm nhiều giao dịch thu nhập/chi tiêu cùng lúc. Dùng khi người dùng liệt kê nhiều khoản chi tiêu hoặc thu nhập trong một tin nhắn. VD: "Hôm nay tôi chi: ăn sáng 30k, grab 25k, mua sách 150k"',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                transactions: {
+                    type: 'ARRAY',
+                    description: 'Danh sách giao dịch cần thêm.',
+                    items: {
+                        type: 'OBJECT',
+                        properties: {
+                            amount: { type: 'NUMBER', description: 'Số tiền (VND). Lưu ý: 30k = 30000, 1tr = 1000000' },
+                            category: { type: 'STRING', description: 'Danh mục phù hợp nhất' },
+                            type: { type: 'STRING', enum: ['income', 'expense'] },
+                            date: { type: 'STRING', description: 'Ngày giao dịch YYYY-MM-DD. Mặc định hôm nay.' },
+                            description: { type: 'STRING', description: 'Mô tả ngắn gọn' }
+                        },
+                        required: ['amount', 'category', 'type']
+                    }
+                }
+            },
+            required: ['transactions']
+        }
     }
 ];
 
@@ -217,6 +242,10 @@ const DATE_COLUMNS: Record<string, string> = {
     profiles: 'updated_at',
     gpa_semesters: 'created_at',
     gpa_courses: 'created_at',
+    habits: 'created_at',
+    habit_logs: 'log_date',
+    countdown_items: 'target_date',
+    countup_items: 'start_date',
 };
 
 async function executeQueryDatabase(args: any): Promise<any> {
@@ -327,9 +356,54 @@ async function executeAddTransaction(
 }
 
 // ────────────────────────────────────────
+// Batch Transaction Executor
+// ────────────────────────────────────────
+async function executeBatchAddTransactions(
+    args: any,
+    handlers: ActionHandlers
+): Promise<ActionResult> {
+    const { transactions: txList } = args;
+    if (!txList || !Array.isArray(txList) || txList.length === 0) {
+        return { type: 'transaction', success: false, message: '❌ Danh sách giao dịch trống.' };
+    }
+
+    const results: string[] = [];
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const tx of txList) {
+        const date = tx.date || new Date().toISOString().slice(0, 10);
+        try {
+            if (handlers.onAddTransaction) {
+                await handlers.onAddTransaction({
+                    amount: tx.amount,
+                    category: tx.category,
+                    type: tx.type,
+                    date,
+                    description: tx.description || ''
+                });
+            }
+            const label = tx.type === 'income' ? 'thu' : 'chi';
+            results.push(`✅ ${label}: ${tx.amount.toLocaleString('vi-VN')}đ [${tx.category}]`);
+            successCount++;
+        } catch (error: any) {
+            results.push(`❌ Lỗi: ${tx.category} — ${error.message}`);
+            failCount++;
+        }
+    }
+
+    return {
+        type: 'transaction',
+        success: failCount === 0,
+        message: `Đã thêm ${successCount}/${txList.length} giao dịch:\n${results.join('\n')}`,
+        data: { successCount, failCount, total: txList.length }
+    };
+}
+
+// ────────────────────────────────────────
 // Main Orchestrator — Chat with Function Calling loop
 // ────────────────────────────────────────
-const MAX_TOOL_CALLS = 6; // Safety limit to prevent infinite loops
+const MAX_TOOL_CALLS = 10; // Safety limit to prevent infinite loops
 
 export async function chatWithAI(
     history: ChatMessage[],
@@ -337,7 +411,7 @@ export async function chatWithAI(
     handlers: ActionHandlers = {},
     memoryContext: string = ''
 ): Promise<AIResponse> {
-    const contextText = buildFullContext(appState);
+    const contextText = await buildFullContextAsync(appState);
     const fullSystemPrompt = SYSTEM_INSTRUCTION
         + '\n\n--- DỮ LIỆU NGƯỜI DÙNG (TÓM TẮT) ---\n' + contextText
         + (memoryContext ? '\n\n--- BỘ NHỚ DÀI HẠN ---\n' + memoryContext : '');
@@ -454,6 +528,12 @@ export async function chatWithAI(
                     }
                     case 'simulate_gpa': {
                         result = executeSimulateGPA(args, appState);
+                        break;
+                    }
+                    case 'batch_add_transactions': {
+                        const actionResult = await executeBatchAddTransactions(args, handlers);
+                        actions.push(actionResult);
+                        result = { success: actionResult.success, message: actionResult.message };
                         break;
                     }
                     default:
