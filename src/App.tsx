@@ -974,7 +974,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             </aside>
 
             {/* Main Content */}
-            <main className={`flex-1 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} min-h-screen relative bg-[#F8F9FC] transition-all duration-300 ease-in-out ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-24 md:pb-8'}`}> {/* Added safe bottom padding for mobile */}
+            <main className={`flex-1 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} min-h-screen relative bg-[#F8F9FC] transition-all duration-300 ease-in-out overflow-x-hidden ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-24 md:pb-8'}`}> {/* Added safe bottom padding for mobile */}
                 {activeTab !== 'ai-advisor' && <header className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 z-30 transition-all h-16">
                     <div className="flex items-center justify-between px-4 h-full">
                         <div className="flex items-center gap-2">

@@ -52,7 +52,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const handleShare = async () => {
         if (!shareRef.current) return;
         try {
-            const canvas = await html2canvas(shareRef.current, { backgroundColor: '#111827', scale: 2 });
+            const canvas = await html2canvas(shareRef.current, { background: '#111827', scale: 2 } as any);
             const image = canvas.toDataURL('image/png');
             const link = document.createElement('a');
             link.href = image;
@@ -308,13 +308,13 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const visibleHolidays = showAllHolidays ? holidays : holidays.slice(0, 4);
 
     return (
-        <div className="w-full h-full p-4 md:p-8 overflow-y-auto pb-32">
+        <div className="w-full h-full overflow-y-auto overflow-x-hidden pb-32 px-3 md:px-8 pt-4 md:pt-8">
             {/* 1. Welcome Header */}
             <header className="mb-6">
                 <div className="text-sm text-gray-500 font-medium uppercase tracking-wider mb-1">
                     {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </div>
-                <h1 className="text-3xl md:text-3xl font-bold text-gray-800">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 truncate">
                     Hello {userName || 'ban'}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-600">Have a nice day</span>
                 </h1>
             </header>
@@ -322,7 +322,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             {/* HABIT STREAK SHARE WIDGET */}
             {!loadingEvents && habits.length > 0 && (
                 <div ref={shareRef} className="mb-6 bg-white rounded-2xl p-3 shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3 overflow-x-auto flex-1 mr-4 pb-1 custom-scrollbar">
+                    <div className="flex items-center gap-3 overflow-x-auto flex-1 min-w-0 mr-4 pb-1 custom-scrollbar">
                         {habits.slice(0, 5).map(habit => {
                             const stats = getHabitStats(habit);
                             return (
@@ -429,9 +429,9 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     {/* TODAY CARD */}
-                    <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-100 relative overflow-hidden group">
+                    <div className="bg-white rounded-3xl p-3 md:p-5 shadow-sm border border-indigo-100 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110 pointer-events-none"></div>
                         <div className="relative z-10">
                             <h3 className="text-indigo-900 font-bold mb-4 flex items-center gap-2">
@@ -466,7 +466,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     </div>
 
                     {/* TOMORROW CARD */}
-                    <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 relative overflow-hidden group">
+                    <div className="bg-white rounded-3xl p-3 md:p-5 shadow-sm border border-gray-100 relative overflow-hidden group">
                         <div className="relative z-10">
                             <h3 className="text-gray-600 font-bold mb-4 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-gray-300"></span>
@@ -504,7 +504,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             {/* NEW: AI Advisor Banner */}
             <div
                 onClick={() => onNavigate?.('ai-advisor')}
-                className="mb-8 relative bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-3xl p-6 md:p-8 shadow-xl text-white cursor-pointer group overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
+                className="mb-8 relative bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl md:rounded-3xl p-4 md:p-8 shadow-xl text-white cursor-pointer group overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
             >
                 {/* Decorative elements */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-white/20 transition-colors" />
@@ -515,8 +515,8 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-white/20 shadow-sm backdrop-blur-md">
                             <Sparkles size={14} className="animate-pulse text-yellow-300" /> Tính năng AI Mới
                         </div>
-                        <h3 className="text-2xl md:text-3xl font-black mb-2 tracking-tight">Trợ lý AI Tài chính</h3>
-                        <p className="text-indigo-100 max-w-xl text-sm md:text-base leading-relaxed mx-auto md:mx-0">
+                        <h3 className="text-lg sm:text-2xl md:text-3xl font-black mb-2 tracking-tight">Trợ lý AI Tài chính</h3>
+                        <p className="text-indigo-100 max-w-xl text-xs sm:text-sm md:text-base leading-relaxed mx-auto md:mx-0">
                             Chat trực tiếp với AI để phân tích dữ liệu thu chi, đánh giá ngân sách, và nhận các lời khuyên thông minh thiết kế riêng dựa trên dữ liệu thực tế của bạn.
                         </p>
                     </div>
@@ -527,13 +527,13 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             </div>
 
             {/* 3. Masonry / Grid Layout (Remaining Items) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-8">
 
                 {/* COL 1: TASKS & HOLIDAYS (Was Col 3) */}
-                <div className="space-y-8">
+                <div className="space-y-4 md:space-y-8 min-w-0">
                     <div
                         onClick={() => onNavigate?.('schedule')}
-                        className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden min-h-[300px] flex flex-col cursor-pointer hover:shadow-2xl transition-all group"
+                        className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-4 md:p-6 shadow-xl text-white relative overflow-hidden min-h-[250px] md:min-h-[300px] flex flex-col cursor-pointer hover:shadow-2xl transition-all group"
                     >
                         {/* Decorative Background */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none group-hover:bg-white/10 transition-colors"></div>
@@ -575,7 +575,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
 
                     {/* COUNTDOWNS */}
                     {!loadingEvents && countdowns.length > 0 && (
-                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                        <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
                                 <Timer className="text-indigo-500" /> Sắp diễn ra
                             </h3>
@@ -599,7 +599,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
 
                     {/* COUNTUPS */}
                     {!loadingEvents && countups.length > 0 && (
-                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                        <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
                                 <TrendingUp className="text-emerald-500" /> Đã trôi qua
                             </h3>
@@ -622,7 +622,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     )}
 
                     {/* Holidays Countdown */}
-                    <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-6 shadow-sm border border-pink-100 h-auto transition-all duration-500">
+                    <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-4 md:p-6 shadow-sm border border-pink-100 h-auto transition-all duration-500">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
                                 <Gift size={18} className="text-rose-500" /> Lễ hội
@@ -657,11 +657,11 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                 </div>
 
                 {/* COL 2: FOCUS ZONE & SCHEDULE GOALS */}
-                <div className="space-y-8">
+                <div className="space-y-4 md:space-y-8 min-w-0">
                     {/* NEW: Music Focus Card */}
                     <div
                         onClick={() => onNavigate?.('music')}
-                        className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden group cursor-pointer transition-transform duration-300 hover:scale-[1.02]"
+                        className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-3xl p-4 md:p-6 shadow-xl text-white relative overflow-hidden group cursor-pointer transition-transform duration-300 hover:scale-[1.02]"
                     >
                         <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none group-hover:bg-white/20 transition-colors"></div>
                         <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/30 rounded-full blur-2xl -ml-6 -mb-6 pointer-events-none"></div>
@@ -684,7 +684,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     </div>
 
                     {/* Schedule Goals (New) */}
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 max-h-[500px] overflow-y-auto scrollbar-hide">
+                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 max-h-[500px] overflow-y-auto scrollbar-hide">
                         <div className="flex items-center justify-between mb-6 sticky top-0 bg-white z-10 py-1">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
                                 <Target size={18} className="text-indigo-500" /> Mục tiêu Lịch trình
@@ -751,9 +751,9 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                 </div>
 
                 {/* COL 3: FINANCE SNAPSHOT & GOALS (Was Col 1) */}
-                <div className="space-y-8">
+                <div className="space-y-4 md:space-y-8 min-w-0">
                     {/* Net Worth Card */}
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
 
                         <div className="relative">
@@ -763,7 +763,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                 </div>
                                 <span className="font-bold text-sm uppercase tracking-wide">Tài chính tổng quan</span>
                             </div>
-                            <div className="text-3xl font-bold text-gray-800 mb-2">
+                            <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-2 truncate">
                                 {formatCurrency(financeStats.balance)}
                             </div>
                             <div className="flex gap-4 mt-6">
@@ -787,7 +787,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     </div>
 
                     {/* Finance Goals */}
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
                                 <Target size={18} className="text-pink-500" /> Mục tiêu Tài chính
@@ -841,7 +841,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
 
 
                     {/* NEW: GPA Snapshot Card */}
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all overflow-hidden group relative">
+                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all overflow-hidden group relative">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 pointer-events-none"></div>
                         
                         <div className="relative">
@@ -856,7 +856,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             
                             <div className="flex items-center gap-5">
                                 <div className="flex-1">
-                                    <div className="text-4xl font-black text-gray-800 mb-1">
+                                    <div className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-800 mb-1">
                                         {cumulativeGPA != null ? cumulativeGPA.toFixed(2) : '0.00'}
                                     </div>
                                     <div className="text-xs text-gray-400 font-medium">Trung bình Tích lũy (Hệ số 4)</div>
@@ -888,7 +888,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             <div className="mt-8 mb-4">
                 <div
                     onClick={handleStorageClick}
-                    className="relative bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 rounded-3xl p-8 md:p-10 shadow-2xl cursor-pointer group overflow-hidden hover:shadow-[0_20px_60px_rgba(0,0,0,0.3)] transition-all duration-500"
+                    className="relative bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 rounded-2xl md:rounded-3xl p-5 md:p-10 shadow-2xl cursor-pointer group overflow-hidden hover:shadow-[0_20px_60px_rgba(0,0,0,0.3)] transition-all duration-500"
                 >
                     {/* Decorative elements */}
                     <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-indigo-500/20 transition-colors duration-500" />

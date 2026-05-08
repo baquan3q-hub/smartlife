@@ -379,7 +379,7 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
             <Flame className="text-orange-500" size={28} /> Thói quen & Sự kiện
@@ -387,41 +387,41 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
           <p className="text-gray-500 text-sm mt-1">Theo dõi sự kiện, mốc thời gian và thói quen hàng ngày</p>
         </div>
         {/* ── StarBrain Balance Widget ── */}
-        <div className="flex items-stretch gap-2">
-          <div className="bg-gradient-to-r from-amber-50/70 to-yellow-50/60 border border-amber-100 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
-            <div className="w-9 h-9 bg-gradient-to-br from-amber-300 to-yellow-400 rounded-xl flex items-center justify-center shadow-sm">
-              <Star size={18} className="text-white fill-white" />
+        <div className="flex items-stretch gap-2 w-full">
+          <div className="flex-1 bg-gradient-to-r from-amber-50/70 to-yellow-50/60 border border-amber-100 rounded-xl px-2 md:px-3 py-1.5 md:py-2 flex items-center justify-center gap-1.5 shadow-sm">
+            <div className="w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-amber-300 to-yellow-400 rounded-lg flex items-center justify-center shadow-sm shrink-0">
+              <Star size={14} className="text-white fill-white" />
             </div>
             <div>
-              <div className="text-lg font-black text-amber-600/80 leading-tight">{starStats.current_balance.toLocaleString()}</div>
-              <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+              <div className="text-sm md:text-base font-black text-amber-600/80 leading-tight">{starStats.current_balance.toLocaleString()}</div>
+              <div className="text-[9px] md:text-[10px] font-bold text-amber-400 uppercase tracking-wider">
                 {getLevelFromStars(starStats.total_earned).icon} {getLevelFromStars(starStats.total_earned).name}
               </div>
             </div>
           </div>
           <button
             onClick={() => setSubTab('stars')}
-            className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/60 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+            className="flex-1 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/60 rounded-xl px-2 md:px-3 py-1.5 md:py-2 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
           >
-            <div className="w-9 h-9 bg-gradient-to-br from-orange-300 to-rose-400 rounded-xl flex items-center justify-center shadow-sm">
-              <Gift size={18} className="text-white" />
+            <div className="w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-orange-300 to-rose-400 rounded-lg flex items-center justify-center shadow-sm shrink-0">
+              <Gift size={14} className="text-white" />
             </div>
-            <span className="text-sm font-bold text-orange-500">Đổi quà</span>
+            <span className="text-[11px] md:text-sm font-bold text-orange-500">Đổi quà</span>
           </button>
           <button
             onClick={() => onNavigateToSchedule?.()}
-            className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+            className="flex-1 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 rounded-xl px-2 md:px-3 py-1.5 md:py-2 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
           >
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-sm">
-              <ListChecks size={18} className="text-white" />
+            <div className="w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg flex items-center justify-center shadow-sm shrink-0">
+              <ListChecks size={14} className="text-white" />
             </div>
-            <span className="text-sm font-bold text-blue-500">Todo</span>
+            <span className="text-[11px] md:text-sm font-bold text-blue-500">Todo</span>
           </button>
         </div>
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex gap-2 bg-gray-100 p-1.5 rounded-2xl w-fit">
+      <div className="flex gap-1 md:gap-2 bg-gray-100 p-1 md:p-1.5 rounded-xl md:rounded-2xl w-fit">
         {([
           { key: 'habits', label: '🔥 Habits', icon: Flame },
           { key: 'countdown', label: '⏳ Countdown', icon: Timer },
@@ -429,7 +429,7 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
           { key: 'stars', label: '⭐ Stars', icon: Star },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setSubTab(t.key)}
-            className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${subTab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`px-2.5 md:px-4 py-1.5 md:py-2.5 rounded-lg md:rounded-xl text-[11px] md:text-sm font-semibold transition-all ${subTab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             {t.label}
           </button>
         ))}
