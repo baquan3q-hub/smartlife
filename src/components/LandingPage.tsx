@@ -40,8 +40,8 @@ const translations = {
         featFocusItems: ['Bộ đếm giờ Pomodoro tùy chỉnh', 'Kho nhạc Lofi & Background Sounds', 'Thống kê thời gian tập trung'],
 
         featHabitTitle: 'Kỷ luật bản thân,\nHướng tới mục tiêu.',
-        featHabitDesc: 'Xây dựng và duy trì thói quen tích cực với bộ đếm chuỗi (streak). Đừng bỏ lỡ bất kỳ khoảnh khắc quan trọng nào với tính năng đếm ngược sự kiện và đếm tiến lưu giữ kỷ niệm.',
-        featHabitItems: ['Quản lý thói quen & đo lường chuỗi (Streak)', 'Đếm ngược các sự kiện quan trọng', 'Đếm tiến lưu giữ cột mốc kỷ niệm'],
+        featHabitDesc: 'Xây dựng và duy trì thói quen tích cực với bộ đếm chuỗi (streak) theo cơ chế có sao thưởng để tăng. Đừng bỏ lỡ bất kỳ khoảnh khắc quan trọng nào với tính năng đếm ngược sự kiện và đếm tiến lưu giữ kỷ niệm.',
+        featHabitItems: ['Quản lý thói quen & đo lường chuỗi (Streak)', 'Cơ chế thưởng phạt bằng huy hiệu sao giúp người dùng có động lực và dopamine lành mạnh', 'Đếm ngược các sự kiện quan trọng', 'Đếm tiến lưu giữ cột mốc kỷ niệm'],
 
         featGoalsTitle: 'Đặt mục tiêu,\nHiện thực hóa ước mơ.',
         featGoalsDesc: 'Theo dõi từng bước tiến của bạn với tính năng quản lý mục tiêu dài hạn và ngắn hạn. Đừng chỉ mơ ước, hãy thực hiện.',
@@ -127,6 +127,7 @@ const translations = {
 
 const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => {
     const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+    const [isDescExpanded, setIsDescExpanded] = useState(false);
 
     const t = translations[lang];
 
@@ -213,9 +214,25 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             {t.heroTitle2}
                         </span>
                     </h1>
-                    <p className="text-lg md:text-2xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-200">
-                        {t.heroDesc}
-                    </p>
+                    <div className="text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed animate-fade-in-up delay-200">
+                        {lang === 'vi' ? (
+                            <div className="text-base md:text-xl text-left md:text-center">
+                                SmartLife <strong>super tool</strong> dành cho sinh viên. It helps them về <strong>tài chính</strong>, <strong>lịch trình</strong>, <strong>todolist mục tiêu cá nhân</strong>, <strong>thói quen</strong>, <strong>countdown/up</strong>.
+                                {isDescExpanded ? (
+                                    <span>
+                                        {' '}Ngoài ra còn có <strong>GPA tracker</strong> cho sinh viên VNU, <strong>My spotify</strong> nghe nhạc và podcast mình tự thêm, <strong>Pomodoro</strong> và các phương pháp bấm giờ học tập, <strong>Không gian học</strong>, <strong>Kho lưu trữ tập trung</strong>. Đặc biệt là <strong>Own AI Advisor</strong> nó truy cập toàn bộ dữ liệu và action theo yêu cầu của người dùng một cách thông minh và cá nhân hóa. Tất cả các tính năng sinh viên cần đều trong Smartlife. Mọi thứ mượt và chi tiết thông minh + tối giản.
+                                        <button onClick={() => setIsDescExpanded(false)} className="text-indigo-600 font-semibold hover:underline ml-2 text-sm md:text-base whitespace-nowrap">Ẩn bớt</button>
+                                    </span>
+                                ) : (
+                                    <span>
+                                        ... <button onClick={() => setIsDescExpanded(true)} className="text-indigo-600 font-semibold hover:underline ml-1 text-sm md:text-base whitespace-nowrap">Xem thêm</button>
+                                    </span>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="text-lg md:text-2xl">{t.heroDesc}</p>
+                        )}
+                    </div>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-300">
                         <div className="relative group w-full sm:w-auto">
                             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-60 transition duration-500"></div>

@@ -11,6 +11,7 @@ import VisualBoard from './components/VisualBoard';
 import SettingsModal from './components/SettingsModal';
 import Login from './components/Login';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import WelcomeTourModal from './components/WelcomeTourModal';
 // Import FocusSpace
 import FocusSpace from './components/FocusSpace';
 import MusicSpace from './components/MusicSpace';
@@ -33,7 +34,7 @@ import { messaging } from './services/firebase';
 import { getToken, onMessage } from "firebase/messaging";
 import { useFocusTimer } from './hooks/useFocusTimer';
 import { useProAccess } from './hooks/useProAccess';
-import { createSubscriptionOrder, setupTrialForNewUser } from './services/subscriptionService';
+import { createSubscriptionOrder, setupTrialForNewUser, getLatestPendingOrder } from './services/subscriptionService';
 import { SubscriptionPlanDuration, SubscriptionOrder } from './types';
 
 // Types và Constants (Khớp với file đã sửa)
@@ -113,6 +114,16 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     // Navigation state
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [isWelcomeTourOpen, setIsWelcomeTourOpen] = useState(false);
+
+    useEffect(() => {
+        if (!user) return;
+        const tourKey = `smartlife_has_seen_tour_${user.id}`;
+        if (!localStorage.getItem(tourKey)) {
+            setIsWelcomeTourOpen(true);
+            localStorage.setItem(tourKey, 'true');
+        }
+    }, [user]);
 
     const handleSignOut = () => {
         if (window.confirm('Bạn có chắc chắn muốn đăng xuất không?')) {
@@ -166,6 +177,35 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     const handleCreateNewOrder = () => {
         setIsInvoiceOpen(false);
+        setIsPricingOpen(true);
+    };
+
+    const handleOpenPricing = async () => {
+        if (!user) return;
+        
+        // Kiểm tra hóa đơn hiện tại trong state
+        if (currentOrder) {
+            const expireTime = new Date(currentOrder.invoice_expires_at).getTime();
+            if (expireTime > Date.now()) {
+                setIsInvoiceOpen(true);
+                return;
+            } else {
+                setCurrentOrder(null);
+            }
+        }
+        
+        // Gọi DB kiểm tra xem có hóa đơn pending nào không
+        const pendingOrder = await getLatestPendingOrder(user.id);
+        if (pendingOrder) {
+            const expireTime = new Date(pendingOrder.invoice_expires_at).getTime();
+            if (expireTime > Date.now()) {
+                setCurrentOrder(pendingOrder);
+                setIsInvoiceOpen(true);
+                return;
+            }
+        }
+
+        // Nếu không có hóa đơn nào hợp lệ, mở modal chọn gói
         setIsPricingOpen(true);
     };
 
@@ -895,7 +935,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
                     {/* Pro Upgrade Button */}
                     {!proAccess.isProActive && !proAccess.isLifetime && (
-                        <button onClick={() => setIsPricingOpen(true)} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-semibold text-sm bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 hover:from-indigo-100 hover:to-purple-100 border border-indigo-100`} title={isSidebarCollapsed ? 'Nâng cấp Pro' : ''}>
+                        <button onClick={handleOpenPricing} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-semibold text-sm bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 hover:from-indigo-100 hover:to-purple-100 border border-indigo-100`} title={isSidebarCollapsed ? 'Nâng cấp Pro' : ''}>
                             <Crown size={20} className="shrink-0 text-yellow-500" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Nâng cấp Pro</span>}
                         </button>
                     )}
@@ -954,7 +994,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 </button>
                             )}
                             {!proAccess.isProActive && !proAccess.isLifetime && (
-                                <button onClick={() => setIsPricingOpen(true)} className="relative p-2 rounded-full hover:bg-yellow-50 transition-colors" title="Nâng cấp Pro">
+                                <button onClick={handleOpenPricing} className="relative p-2 rounded-full hover:bg-yellow-50 transition-colors" title="Nâng cấp Pro">
                                     <Crown size={20} className="text-yellow-500" fill="currentColor" />
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white" />
                                 </button>
@@ -968,7 +1008,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative h-full'}`}> {/* AI Advisor gets full screen, others get padded layout */}
                     {activeTab === 'visual' && (
                         proAccess.hasAccess ? (
-                            <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={() => setIsPricingOpen(true)} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
+                            <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
                                 if (tab === 'music') {
                                     setStartInFocusMode(true);
                                     setActiveTab('schedule');
@@ -977,7 +1017,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 }
                             }} />
                         ) : (
-                            <ProGateOverlay featureName="Visual Board" onUpgrade={() => setIsPricingOpen(true)} isGracePeriod={proAccess.isInGracePeriod} />
+                            <ProGateOverlay featureName="Visual Board" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
                         )
                     )}
                     {activeTab === 'finance' && (
@@ -1031,7 +1071,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             />
                         ) : (
                             <div className="max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8">
-                                <ProGateOverlay featureName="AI Advisor" onUpgrade={() => setIsPricingOpen(true)} isGracePeriod={proAccess.isInGracePeriod} />
+                                <ProGateOverlay featureName="AI Advisor" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
                             </div>
                         )
                     )}
@@ -1049,7 +1089,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 onResetFocusMode={() => setStartInFocusMode(false)}
                             />
                         ) : (
-                            <ProGateOverlay featureName="Lịch trình & Mục tiêu" onUpgrade={() => setIsPricingOpen(true)} isGracePeriod={proAccess.isInGracePeriod} />
+                            <ProGateOverlay featureName="Lịch trình & Mục tiêu" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
                         )
                     )}
                     {activeTab === 'gpa' && (
@@ -1072,7 +1112,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         />
                     )}
                     {activeTab === 'habit' && (
-                        <HabitDashboard userId={user?.id || ''} />
+                        <HabitDashboard userId={user?.id || ''} onNavigateToSchedule={() => setActiveTab('schedule')} />
                     )}
                 </div>
             </main>
@@ -1145,6 +1185,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 onClose={() => setIsInvoiceOpen(false)}
                 order={currentOrder}
                 onCreateNewOrder={handleCreateNewOrder}
+            />
+            <WelcomeTourModal 
+                isOpen={isWelcomeTourOpen} 
+                onClose={() => setIsWelcomeTourOpen(false)} 
             />
             <MySpotify isOpen={isSpotifyOpen} onClose={() => setIsSpotifyOpen(false)} userId={user?.id || ''} />
             <PWAInstallPrompt />

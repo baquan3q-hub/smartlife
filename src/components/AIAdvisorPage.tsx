@@ -129,8 +129,10 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         isOpen: false,
         title: '',
         message: '',
-        onConfirm: () => {},
+        onConfirm: () => { },
     });
+
+    const [showPopupHint, setShowPopupHint] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -148,7 +150,16 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     }, []);
 
     useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
-    useEffect(() => { inputRef.current?.focus(); }, []);
+    useEffect(() => {
+        inputRef.current?.focus();
+
+        // Show hint popup for 8 seconds on mount
+        setShowPopupHint(true);
+        const timer = setTimeout(() => {
+            setShowPopupHint(false);
+        }, 8000);
+        return () => clearTimeout(timer);
+    }, []);
 
     // Load conversations when the component mounts or when conversationId changes
     useEffect(() => {
@@ -407,6 +418,14 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     </div>
                     <div className="flex items-center gap-1">
                         <button
+                            onClick={() => setShowPopupHint(!showPopupHint)}
+                            className={`p-2 rounded-xl transition-colors flex items-center gap-1.5 text-sm font-medium ${showPopupHint ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-100 text-amber-500 hover:text-amber-600'}`}
+                            title="Gợi ý lệnh AI Agent"
+                        >
+                            <Lightbulb size={16} />
+                            <span className="hidden sm:inline">Gợi ý lệnh</span>
+                        </button>
+                        <button
                             onClick={() => setShowHistory(true)}
                             className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-indigo-600 flex items-center gap-1.5"
                             title="Lịch sử chat"
@@ -424,6 +443,34 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Floating Suggestion Popup */}
+            {showPopupHint && (
+                <div className="absolute top-[60px] right-4 md:right-8 w-80 bg-white rounded-2xl shadow-2xl border border-indigo-100 p-4 z-[60] animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                            <Sparkles size={16} className="text-amber-500" /> Gợi ý lệnh AI nhanh
+                        </h3>
+                        <button onClick={() => setShowPopupHint(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                            <X size={14} />
+                        </button>
+                    </div>
+                    <div className="space-y-3">
+                        <button onClick={() => { setInput('Hôm nay ăn sáng 30k, uống cafe 25k, đổ xăng 50k.'); setShowPopupHint(false); inputRef.current?.focus(); }} className="w-full text-left p-2.5 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-transparent hover:border-indigo-100 transition-colors group">
+                            <p className="text-xs font-semibold text-gray-700 group-hover:text-indigo-700 flex items-center gap-1.5"><Wallet size={12} /> Thêm thu chi tự động bằng prompt tự nhiên </p>
+                            <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">"Hôm nay ăn sáng 30k, uống cafe 25k, đổ xăng 50k."</p>
+                        </button>
+                        <button onClick={() => { setInput('Thêm lịch học Toán vào 19h tối thứ 3 và thứ 5.'); setShowPopupHint(false); inputRef.current?.focus(); }} className="w-full text-left p-2.5 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-transparent hover:border-indigo-100 transition-colors group">
+                            <p className="text-xs font-semibold text-gray-700 group-hover:text-indigo-700 flex items-center gap-1.5"><CalendarCheck size={12} /> Tạo lịch trình nhanh</p>
+                            <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">"Thêm lịch học Toán vào 19h tối thứ 3 và thứ 5."</p>
+                        </button>
+                        <button onClick={() => { setInput('Nhắc tôi làm bài tập môn Hóa trước 22h tối nay.'); setShowPopupHint(false); inputRef.current?.focus(); }} className="w-full text-left p-2.5 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-transparent hover:border-indigo-100 transition-colors group">
+                            <p className="text-xs font-semibold text-gray-700 group-hover:text-indigo-700 flex items-center gap-1.5"><ListChecks size={12} /> Quản lý công việc (Todo)</p>
+                            <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">"Nhắc tôi làm bài tập môn Hóa trước 22h tối nay."</p>
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div className="max-w-7xl mx-auto flex-1 flex flex-col lg:flex-row gap-0 lg:gap-6 px-0 lg:px-8 pt-0 lg:pt-2 overflow-hidden w-full min-h-0">
 
@@ -677,7 +724,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     </div>
                 </div>
             </div>
-            <ConfirmModal 
+            <ConfirmModal
                 isOpen={confirmDialog.isOpen}
                 title={confirmDialog.title}
                 message={confirmDialog.message}

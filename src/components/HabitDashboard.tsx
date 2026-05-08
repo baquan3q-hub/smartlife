@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { CountdownItem, CountUpItem, Habit, HabitLog, DayOfWeek } from '../types';
+import { CountdownItem, CountUpItem, Habit, HabitLog, DayOfWeek, CheckinReward } from '../types';
 import { supabase } from '../services/supabase';
-import { Plus, X, Flame, Timer, TrendingUp, Trash2, Edit3, ChevronDown, RotateCcw, Award, CheckCircle2, Circle, Calendar, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
+import { processCheckin, reverseCheckinStars, fetchStarStats, getLevelFromStars, getNextLevel, LEVELS } from '../services/starBrainService';
+import StarBrainDashboard from './StarBrainDashboard';
+import { Plus, X, Flame, Timer, TrendingUp, Trash2, Edit3, ChevronDown, RotateCcw, Award, CheckCircle2, Circle, Calendar, BarChart3, ChevronLeft, ChevronRight, Star, Sparkles, Zap, Gift, ListChecks } from 'lucide-react';
 
 const DAY_LABELS: Record<DayOfWeek, string> = { mon:'T2', tue:'T3', wed:'T4', thu:'T5', fri:'T6', sat:'T7', sun:'CN' };
 const ALL_DAYS: DayOfWeek[] = ['mon','tue','wed','thu','fri','sat','sun'];
@@ -31,14 +33,18 @@ const EMOJI_PRESETS = [
 ];
 
 const getColorClasses = (theme: string) => COLOR_PRESETS.find(c => c.name === theme) || COLOR_PRESETS[0];
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const diffDays = (target: string) => Math.ceil((new Date(target).getTime() - new Date(today()).getTime()) / 86400000);
 
-interface Props { userId: string; }
+interface Props { userId: string; onNavigateToSchedule?: () => void; }
 
 // ── Main Component ──
-const HabitDashboard: React.FC<Props> = ({ userId }) => {
-  const [subTab, setSubTab] = useState<'habits' | 'countdown' | 'countup'>('habits');
+const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
+  const [subTab, setSubTab] = useState<'habits' | 'countdown' | 'countup' | 'stars'>('habits');
   const [countdowns, setCountdowns] = useState<CountdownItem[]>([]);
   const [countups, setCountups] = useState<CountUpItem[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -48,6 +54,10 @@ const HabitDashboard: React.FC<Props> = ({ userId }) => {
   const [editItem, setEditItem] = useState<any>(null);
   const [detailHabit, setDetailHabit] = useState<Habit | null>(null);
   const [detailMonth, setDetailMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
+
+  // ── StarBrain State ──
+  const [starStats, setStarStats] = useState({ total_earned: 0, current_balance: 0, current_level: 1 });
+  const [checkinResult, setCheckinResult] = useState<CheckinReward | null>(null);
 
   // ── Fetch Data ──
   useEffect(() => {
@@ -64,6 +74,8 @@ const HabitDashboard: React.FC<Props> = ({ userId }) => {
       if (cuRes.data) setCountups(cuRes.data.map((i: any) => ({ ...i, milestones: i.milestones || [7,30,100,365,1000] })));
       if (hRes.data) setHabits(hRes.data.map((h: any) => ({ ...h, active_days: h.active_days || ALL_DAYS })));
       if (hlRes.data) setHabitLogs(hlRes.data);
+      // Fetch star stats
+      try { const ss = await fetchStarStats(userId); setStarStats(ss); } catch {}
       setLoading(false);
     };
     fetchAll();
@@ -120,20 +132,74 @@ const HabitDashboard: React.FC<Props> = ({ userId }) => {
   const toggleCheckIn = async (habitId: string) => {
     const todayStr = today();
     const existing = habitLogs.find(l => l.habit_id === habitId && l.log_date === todayStr);
+    let justCheckedIn = false;
+
     if (existing) {
       const newVal = !existing.completed;
+      justCheckedIn = newVal;
       setHabitLogs(prev => prev.map(l => l.id === existing.id ? { ...l, completed: newVal } : l));
       await supabase.from('habit_logs').update({ completed: newVal }).eq('id', existing.id);
     } else {
+      justCheckedIn = true;
       const optimistic: HabitLog = { id: 'temp-' + Date.now(), habit_id: habitId, log_date: todayStr, completed: true };
       setHabitLogs(prev => [optimistic, ...prev]);
       const { data } = await supabase.from('habit_logs').insert([{ habit_id: habitId, log_date: todayStr, completed: true }]).select().single();
       if (data) setHabitLogs(prev => prev.map(l => l.id === optimistic.id ? data : l));
     }
+
+    // ── StarBrain: Award stars on check-in ──
+    if (justCheckedIn) {
+      try {
+        const habit = habits.find(h => h.id === habitId);
+        if (!habit) return;
+        const stats = getHabitStats(habit);
+
+        // Comeback detection
+        const prevLogs = habitLogs
+          .filter(l => l.habit_id === habitId && l.completed && l.log_date < todayStr)
+          .sort((a, b) => b.log_date.localeCompare(a.log_date));
+        const lastDate = prevLogs[0]?.log_date;
+        let wasInactiveForDays: number | undefined;
+        if (lastDate) {
+          const diff = Math.floor((new Date(todayStr).getTime() - new Date(lastDate).getTime()) / 86400000);
+          if (diff > 1) wasInactiveForDays = diff - 1;
+        }
+
+        // All today's habits for Perfect Day check
+        const allHabitsToday = todaysHabits.map(h => ({
+          id: h.id,
+          done: h.id === habitId ? true : habitLogs.some(l => l.habit_id === h.id && l.log_date === todayStr && l.completed),
+        }));
+
+        const result = await processCheckin({
+          userId, habitId,
+          streakDays: stats.currentStreak,
+          allHabitsToday,
+          wasInactiveForDays,
+        });
+
+        if (result) {
+          setCheckinResult(result);
+          setStarStats({ current_balance: result.newBalance, total_earned: result.newTotalEarned, current_level: result.level.level });
+          setTimeout(() => setCheckinResult(null), 5000);
+        }
+      } catch (err) {
+        console.warn('StarBrain error:', err);
+      }
+    } else {
+      // ── StarBrain: Reverse stars on uncheck ──
+      try {
+        const newBalance = await reverseCheckinStars(userId, habitId);
+        const ss = await fetchStarStats(userId);
+        setStarStats({ current_balance: ss.current_balance, total_earned: ss.total_earned, current_level: ss.current_level });
+      } catch (err) {
+        console.warn('StarBrain reverse error:', err);
+      }
+    }
   };
 
   // ── Streak Engine ──
-  const getWeekKey = (d: Date) => { const t = new Date(d); t.setDate(t.getDate() - (t.getDay() === 0 ? 6 : t.getDay() - 1)); return t.toISOString().split('T')[0]; };
+  const getWeekKey = (d: Date) => { const t = new Date(d); t.setDate(t.getDate() - (t.getDay() === 0 ? 6 : t.getDay() - 1)); return toLocalDateStr(t); };
   const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`;
 
   const getHabitStats = useCallback((habit: Habit) => {
@@ -197,7 +263,7 @@ const HabitDashboard: React.FC<Props> = ({ userId }) => {
     // Go backwards
     const cursor = new Date(d); cursor.setDate(cursor.getDate() - 1);
     while (true) {
-      const ds = cursor.toISOString().split('T')[0];
+      const ds = toLocalDateStr(cursor);
       const dayKey = getDayKey(cursor);
       if (!habit.active_days.includes(dayKey)) { cursor.setDate(cursor.getDate() - 1); continue; }
       const log = logs.find(l => l.log_date === ds);
@@ -320,6 +386,38 @@ const HabitDashboard: React.FC<Props> = ({ userId }) => {
           </h1>
           <p className="text-gray-500 text-sm mt-1">Theo dõi sự kiện, mốc thời gian và thói quen hàng ngày</p>
         </div>
+        {/* ── StarBrain Balance Widget ── */}
+        <div className="flex items-stretch gap-2">
+          <div className="bg-gradient-to-r from-amber-50/70 to-yellow-50/60 border border-amber-100 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
+            <div className="w-9 h-9 bg-gradient-to-br from-amber-300 to-yellow-400 rounded-xl flex items-center justify-center shadow-sm">
+              <Star size={18} className="text-white fill-white" />
+            </div>
+            <div>
+              <div className="text-lg font-black text-amber-600/80 leading-tight">{starStats.current_balance.toLocaleString()}</div>
+              <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                {getLevelFromStars(starStats.total_earned).icon} {getLevelFromStars(starStats.total_earned).name}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setSubTab('stars')}
+            className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/60 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+          >
+            <div className="w-9 h-9 bg-gradient-to-br from-orange-300 to-rose-400 rounded-xl flex items-center justify-center shadow-sm">
+              <Gift size={18} className="text-white" />
+            </div>
+            <span className="text-sm font-bold text-orange-500">Đổi quà</span>
+          </button>
+          <button
+            onClick={() => onNavigateToSchedule?.()}
+            className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+          >
+            <div className="w-9 h-9 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-sm">
+              <ListChecks size={18} className="text-white" />
+            </div>
+            <span className="text-sm font-bold text-blue-500">Todo</span>
+          </button>
+        </div>
       </div>
 
       {/* Sub-tabs */}
@@ -328,6 +426,7 @@ const HabitDashboard: React.FC<Props> = ({ userId }) => {
           { key: 'habits', label: '🔥 Habits', icon: Flame },
           { key: 'countdown', label: '⏳ Countdown', icon: Timer },
           { key: 'countup', label: '⬆️ Count-Up', icon: TrendingUp },
+          { key: 'stars', label: '⭐ Stars', icon: Star },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setSubTab(t.key)}
             className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${subTab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
@@ -542,6 +641,11 @@ const HabitDashboard: React.FC<Props> = ({ userId }) => {
         </div>
       )}
 
+      {/* ── STARS TAB ── */}
+      {subTab === 'stars' && (
+        <StarBrainDashboard userId={userId} />
+      )}
+
       {/* ── FORM MODAL ── */}
       {showForm && (
         <EventFormModal
@@ -566,6 +670,11 @@ const HabitDashboard: React.FC<Props> = ({ userId }) => {
           onEdit={() => { setEditItem(detailHabit); setShowForm('habit'); }}
           onDelete={() => deleteHabit(detailHabit.id)}
         />
+      )}
+
+      {/* ── STARBRAIN CHECKIN CELEBRATION ── */}
+      {checkinResult && (
+        <CheckinCelebration result={checkinResult} onClose={() => setCheckinResult(null)} />
       )}
     </div>
   );
@@ -871,6 +980,124 @@ const HabitDetailModal: React.FC<{
           <button onClick={() => { onClose(); onDelete(); }} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2"><Trash2 size={16} /> Xóa</button>
         </div>
       </div>
+    </div>
+  );
+};
+
+// ── Checkin Celebration Modal ──
+const CheckinCelebration: React.FC<{ result: CheckinReward; onClose: () => void }> = ({ result, onClose }) => {
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+        style={{ animation: 'starSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)' }}
+      >
+        {/* Header glow */}
+        <div className={`p-6 text-center ${
+          result.luckyBonus ? 'bg-gradient-to-br from-amber-400 via-yellow-400 to-orange-400' :
+          result.milestone ? 'bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500' :
+          'bg-gradient-to-br from-amber-400 to-orange-500'
+        } text-white relative overflow-hidden`}>
+          {/* Sparkle dots */}
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="absolute w-1.5 h-1.5 bg-white/40 rounded-full"
+                style={{
+                  left: `${10 + i * 12}%`, top: `${20 + (i % 3) * 25}%`,
+                  animation: `starFloat ${1.5 + i * 0.2}s ease-in-out infinite alternate`,
+                  animationDelay: `${i * 0.15}s`,
+                }} />
+            ))}
+          </div>
+
+          <div className="relative z-10">
+            {result.luckyBonus ? (
+              <div className="text-4xl mb-2" style={{ animation: 'starPulse 0.6s ease-in-out infinite alternate' }}>🎰</div>
+            ) : result.milestone ? (
+              <div className="text-4xl mb-2" style={{ animation: 'starPulse 0.6s ease-in-out infinite alternate' }}>{result.milestone.badge}</div>
+            ) : (
+              <Sparkles size={36} className="mx-auto mb-2" style={{ animation: 'starSpin 2s linear infinite' }} />
+            )}
+            <div className="text-5xl font-black" style={{ animation: 'starBounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)' }}>
+              +{result.totalStars} ⭐
+            </div>
+            {result.milestone && (
+              <div className="mt-2 text-sm font-bold bg-white/20 rounded-full px-4 py-1 inline-block">
+                {result.milestone.badge} {result.milestone.label}
+              </div>
+            )}
+            {result.levelUp && (
+              <div className="mt-2 text-sm font-bold bg-white/30 rounded-full px-4 py-1 inline-block">
+                🎉 Level Up! → {result.level.icon} {result.level.name}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Breakdown */}
+        <div className="p-5 space-y-2">
+          {result.breakdown.map((item, i) => (
+            <div key={i} className="flex items-center justify-between text-sm"
+              style={{ animation: `starFadeInRight 0.3s ease-out ${0.1 + i * 0.08}s both` }}>
+              <span className="text-gray-600 font-medium">{item.label}</span>
+              <span className={`font-bold ${item.amount > 0 ? 'text-amber-600' : 'text-red-400'}`}>
+                {item.amount > 0 ? '+' : ''}{item.amount} ⭐
+              </span>
+            </div>
+          ))}
+
+          <div className="border-t border-gray-100 pt-3 mt-3 flex items-center justify-between">
+            <span className="text-gray-500 text-sm font-medium">Số dư hiện tại</span>
+            <span className="text-lg font-black text-amber-600">{result.newBalance.toLocaleString()} ⭐</span>
+          </div>
+
+          {result.isPerfectDay && (
+            <div className="bg-emerald-50 text-emerald-700 rounded-xl p-3 text-center text-sm font-bold border border-emerald-100 mt-2">
+              🌈 Perfect Day! Hoàn thành tất cả thói quen!
+            </div>
+          )}
+          {result.isComeback && (
+            <div className="bg-blue-50 text-blue-700 rounded-xl p-3 text-center text-sm font-bold border border-blue-100 mt-2">
+              💪 Welcome Back! Chào mừng bạn quay lại!
+            </div>
+          )}
+        </div>
+
+        <button onClick={onClose}
+          className="w-full py-3.5 bg-gray-50 text-gray-500 font-bold text-sm hover:bg-gray-100 transition-colors border-t border-gray-100">
+          Tuyệt vời! ✨
+        </button>
+      </div>
+
+      <style>{`
+        @keyframes starSlideUp {
+          from { opacity: 0; transform: translateY(40px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes starBounceIn {
+          from { opacity: 0; transform: scale(0.3); }
+          50% { transform: scale(1.1); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes starFloat {
+          from { opacity: 0.3; transform: translateY(0); }
+          to { opacity: 0.8; transform: translateY(-8px); }
+        }
+        @keyframes starPulse {
+          from { transform: scale(1); }
+          to { transform: scale(1.15); }
+        }
+        @keyframes starSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes starFadeInRight {
+          from { opacity: 0; transform: translateX(-10px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
     </div>
   );
 };

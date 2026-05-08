@@ -8,7 +8,8 @@ interface AuthContextType {
     loading: boolean;
     signInWithGoogle: () => Promise<void>;
     signInWithEmail: (email: string, password: string) => Promise<{ error: any }>;
-    signUpWithEmail: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
+    signUpWithEmail: (email: string, password: string, fullName: string) => Promise<{ error: any; data: any }>;
+    resetPassword: (email: string) => Promise<{ error: any }>;
     signOut: () => Promise<void>;
 }
 
@@ -65,14 +66,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const signUpWithEmail = async (email: string, password: string, fullName: string) => {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
                 data: {
                     full_name: fullName,
                 },
+                emailRedirectTo: window.location.origin,
             },
+        });
+        return { data, error };
+    };
+
+    const resetPassword = async (email: string) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin,
         });
         return { error };
     };
@@ -80,14 +89,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const signOut = async () => {
         try {
             const { error } = await supabase.auth.signOut();
-            if (error) throw error;
+            if (error) console.error('Supabase signout error:', error);
         } catch (error) {
             console.error('Error signing out:', error);
+        } finally {
+            setUser(null);
+            setSession(null);
+            window.location.href = '/';
         }
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut }}>
+        <AuthContext.Provider value={{ user, session, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword, signOut }}>
             {children}
         </AuthContext.Provider>
     );

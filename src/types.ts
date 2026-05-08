@@ -256,7 +256,7 @@ export interface SmartInsight {
 }
 
 // 6. Subscription & Pro Plan
-export type SubscriptionPlanDuration = '1_month' | '3_months' | '6_months' | 'lifetime';
+export type SubscriptionPlanDuration = '1_month' | '3_months' | '12_months' | 'lifetime';
 
 export interface SubscriptionPlan {
   id: SubscriptionPlanDuration;
@@ -375,4 +375,65 @@ export interface HabitLog {
   completed: boolean;
   note?: string;
   logged_at?: string;
+}
+
+// 10. StarBrain Reward System
+export type StarTransactionSource =
+  | 'CHECKIN_BASE' | 'STREAK_BONUS' | 'TIME_BONUS'
+  | 'LUCKY_BONUS' | 'COMEBACK_BONUS' | 'MILESTONE_BONUS'
+  | 'PERFECT_DAY' | 'PERFECT_WEEK'
+  | 'REWARD_REDEEM' | 'EARLY_ACHIEVER';
+
+export interface StarTransaction {
+  id: string;
+  user_id?: string;
+  habit_id?: string | null;
+  type: 'EARN' | 'REDEEM';
+  amount: number;
+  source: StarTransactionSource;
+  description: string;
+  created_at?: string;
+}
+
+export interface UserStarStats {
+  user_id: string;
+  total_earned: number;
+  current_balance: number;
+  current_level: number;
+  updated_at?: string;
+}
+
+export interface CheckinReward {
+  totalStars: number;
+  breakdown: { source: string; amount: number; label: string }[];
+  luckyBonus: number | null;
+  milestone: { streakDays: number; stars: number; badge: string; label: string } | null;
+  isPerfectDay: boolean;
+  isComeback: boolean;
+  newBalance: number;
+  newTotalEarned: number;
+  levelUp: boolean;
+  level: { level: number; name: string; icon: string; minStars: number };
+}
+
+export type RewardCategory = 'TIME' | 'FOOD' | 'ENTERTAINMENT' | 'SELF_CARE' | 'BIG_GOAL';
+
+export interface Reward {
+  id: string;
+  user_id?: string;
+  title: string;
+  description?: string;
+  cost: number;
+  category: RewardCategory;
+  emoji: string;
+  is_template: boolean;
+  created_at?: string;
+}
+
+export interface RewardRedemption {
+  id: string;
+  user_id?: string;
+  reward_id: string;
+  stars_spent: number;
+  redeemed_at?: string;
 }

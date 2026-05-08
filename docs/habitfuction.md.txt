@@ -4,7 +4,7 @@
 **Phiên bản:** v1.0 | **Ngày:** 07/05/2026 | **Người đề xuất:** Bùi Anh Quân
 
 ---
-
+ 
 ## 1. NỀN TẢNG TÂM LÝ HỌC — TẠI SAO HỆ THỐNG NÀY HIỆU QUẢ
 
 ### 1.1 Dopamine Loop — Vòng lặp kỳ vọng & phần thưởng

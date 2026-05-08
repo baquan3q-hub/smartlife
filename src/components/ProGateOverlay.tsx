@@ -1,6 +1,6 @@
 // File: src/components/ProGateOverlay.tsx
 import React from 'react';
-import { Lock, Crown, Sparkles, CalendarDays, Brain, LayoutDashboard } from 'lucide-react';
+import { Lock, Crown, Sparkles, CalendarDays, Brain, LayoutDashboard, Flame, Star, Zap, TrendingUp, Trophy } from 'lucide-react';
 
 interface ProGateOverlayProps {
   featureName: string;
@@ -46,25 +46,50 @@ const ProGateOverlay: React.FC<ProGateOverlayProps> = ({ featureName, featureIco
           </p>
 
           <p className="text-gray-400 text-xs mb-6">
-            Chỉ từ 30.000đ/tháng — rẻ hơn 1 ly trà sữa 🧋
+            Chỉ từ 33.000đ/tháng — rẻ hơn 1 ly trà sữa 🧋
           </p>
 
-          {/* Locked features list */}
-          <div className="flex flex-col gap-2 mb-6">
+          {/* Locked features list (Scrollable) */}
+          <div className="flex flex-col gap-2 mb-6 max-h-48 overflow-y-auto pr-1 custom-scrollbar text-left">
+            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <LayoutDashboard size={16} className="text-pink-500 shrink-0" />
+              <span>Visual Board tổng quan</span>
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
+            </div>
             <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
               <CalendarDays size={16} className="text-indigo-500 shrink-0" />
-              <span>Lịch trình & Quản lý mục tiêu</span>
-              <Lock size={12} className="ml-auto text-gray-300" />
+              <span>Lịch trình, TKB & Todo</span>
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <Flame size={16} className="text-orange-500 shrink-0" />
+              <span>Habit Tracker (Streak & Đếm ngược)</span>
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <Star size={16} className="text-amber-500 shrink-0" />
+              <span>StarBrain ⭐ (Hệ thống phần thưởng)</span>
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
               <Brain size={16} className="text-purple-500 shrink-0" />
               <span>AI Cố vấn cá nhân</span>
-              <Lock size={12} className="ml-auto text-gray-300" />
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <LayoutDashboard size={16} className="text-pink-500 shrink-0" />
-              <span>Visual Board tổng quan</span>
-              <Lock size={12} className="ml-auto text-gray-300" />
+              <Zap size={16} className="text-yellow-500 shrink-0" />
+              <span>Focus Timer & Lofi Music</span>
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <TrendingUp size={16} className="text-emerald-500 shrink-0" />
+              <span>Quản lý tài chính & Cashflow</span>
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <Trophy size={16} className="text-blue-500 shrink-0" />
+              <span>GPA Tracker nâng cao</span>
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
           </div>
 
@@ -78,9 +103,10 @@ const ProGateOverlay: React.FC<ProGateOverlayProps> = ({ featureName, featureIco
           </button>
 
           {/* Free features reminder */}
-          <p className="text-[11px] text-gray-400 mt-4">
-            💡 GPA Tracker và Quản lý tài chính vẫn miễn phí
-          </p>
+          <div className="text-[11px] text-gray-400 mt-4 flex flex-col items-center gap-1">
+            <p>Tương lai nằm trong tay bạn. Đầu tư sớm, sinh lời cao!</p>
+            <p>💡 Đăng ký 3 tháng tặng thêm 1 tháng.</p>
+          </div>
         </div>
       </div>
     </div>
