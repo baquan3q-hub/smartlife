@@ -879,8 +879,6 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
           {/* 2.5 Music Player (Embedded or Fullscreen) */}
           {isFocusMode && (
             <MusicSpace
-              embedded={false}
-              showTimer={true}
               timer={timer}
               onBack={() => setIsFocusMode(false)}
               formatTime={(s: number) => {
