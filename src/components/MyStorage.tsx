@@ -34,7 +34,8 @@ const NOTE_COLORS = [
     { name: 'Tím', value: 'bg-violet-50', text: 'text-violet-900' },
 ];
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_SIZE_VIDEO = 2 * 1024 * 1024; // 2MB for video
+const MAX_FILE_SIZE_DEFAULT = 10 * 1024 * 1024; // 10MB for file, image, audio
 
 const MyStorage: React.FC<MyStorageProps> = ({ isOpen, onClose, userId }) => {
     const [activeTab, setActiveTab] = useState<TabType>('note');
@@ -260,8 +261,10 @@ const MyStorage: React.FC<MyStorageProps> = ({ isOpen, onClose, userId }) => {
         for (let i = 0; i < pendingFiles.length; i++) {
             const file = pendingFiles[i];
 
-            if (file.size > MAX_FILE_SIZE) {
-                setError(`Tệp "${file.name}" vượt quá 50MB (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+            const maxSize = activeTab === 'video' ? MAX_FILE_SIZE_VIDEO : MAX_FILE_SIZE_DEFAULT;
+            const maxSizeLabel = activeTab === 'video' ? '2MB' : '10MB';
+            if (file.size > maxSize) {
+                setError(`Tệp "${file.name}" vượt quá ${maxSizeLabel} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
                 continue;
             }
 
@@ -967,7 +970,7 @@ const MyStorage: React.FC<MyStorageProps> = ({ isOpen, onClose, userId }) => {
                 {/* Footer */}
                 <div className="p-3 bg-gray-50 border-t border-gray-100 text-center shrink-0">
                     <p className="text-[10px] text-gray-400">
-                        My Storage — Dữ liệu lưu trữ riêng tư trên Supabase | Giới hạn 50MB/tệp
+                        My Storage — Dữ liệu lưu trữ riêng tư trên Supabase | Giới hạn 10MB/tệp · Video 2MB
                     </p>
                 </div>
             </div>

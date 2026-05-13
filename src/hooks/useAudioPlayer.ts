@@ -49,7 +49,6 @@ export function useAudioPlayer() {
         const onDurationChange = () => setDuration(audio.duration || 0);
         const onLoadStart = () => setIsLoading(true);
         const onCanPlay = () => setIsLoading(false);
-        const onEnded = () => handleTrackEnd();
         const onError = (e: Event) => {
             console.error('Audio error:', e);
             setIsLoading(false);
@@ -60,7 +59,6 @@ export function useAudioPlayer() {
         audio.addEventListener('durationchange', onDurationChange);
         audio.addEventListener('loadstart', onLoadStart);
         audio.addEventListener('canplay', onCanPlay);
-        audio.addEventListener('ended', onEnded);
         audio.addEventListener('error', onError);
 
         return () => {
@@ -68,7 +66,6 @@ export function useAudioPlayer() {
             audio.removeEventListener('durationchange', onDurationChange);
             audio.removeEventListener('loadstart', onLoadStart);
             audio.removeEventListener('canplay', onCanPlay);
-            audio.removeEventListener('ended', onEnded);
             audio.removeEventListener('error', onError);
             audio.pause();
         };
@@ -270,7 +267,16 @@ export function useAudioPlayer() {
     // Seek
     const seek = useCallback((time: number) => {
         if (audioRef.current) {
-            audioRef.current.currentTime = time;
+            try {
+                audioRef.current.currentTime = time;
+            } catch (_) {
+                // If media not ready yet, wait for canplay then seek
+                const onReady = () => {
+                    audioRef.current!.currentTime = time;
+                    audioRef.current!.removeEventListener('canplay', onReady);
+                };
+                audioRef.current.addEventListener('canplay', onReady);
+            }
             setCurrentTime(time);
         }
     }, []);

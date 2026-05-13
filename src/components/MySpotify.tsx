@@ -202,14 +202,42 @@ const MySpotify: React.FC<MySpotifyProps> = ({ isOpen, onClose, userId }) => {
     }
   };
 
+  const MAX_FILE_SIZE_MB = 20;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !selectedPlaylist) return;
 
-    setIsUploading(true);
-
+    // Validate all files before uploading
+    const validFiles: File[] = [];
+    const rejected: string[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      // Check MP3 format
+      if (!file.name.toLowerCase().endsWith('.mp3') && file.type !== 'audio/mpeg') {
+        rejected.push(`"${file.name}" — không phải file MP3`);
+        continue;
+      }
+      // Check file size
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        rejected.push(`"${file.name}" — vượt quá ${MAX_FILE_SIZE_MB}MB (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (rejected.length > 0) {
+      alert(`Các file sau bị từ chối:\n${rejected.join('\n')}`);
+    }
+    if (validFiles.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setIsUploading(true);
+
+    for (const file of validFiles) {
       try {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
         const filePath = `${userId}/${selectedPlaylist.id}/${Date.now()}_${safeName}`;
@@ -241,7 +269,7 @@ const MySpotify: React.FC<MySpotifyProps> = ({ isOpen, onClose, userId }) => {
         if (insertError) throw insertError;
       } catch (err: any) {
         console.error('Error uploading track:', err);
-        alert(`Error uploading ${file.name}: ${err.message}`);
+        alert(`Lỗi tải "${file.name}": ${err.message}`);
       }
     }
 
@@ -525,17 +553,17 @@ const MySpotify: React.FC<MySpotifyProps> = ({ isOpen, onClose, userId }) => {
                   <div className="px-4 md:px-10 mt-6 animate-fade-in">
                     <div className="p-6 bg-[#242424] rounded-xl border border-white/10 shadow-lg">
                       <h3 className="font-bold mb-4">Tải bài hát lên</h3>
-                      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="audio/*" multiple className="hidden" />
-                      <div
-                        onClick={() => !isUploading && fileInputRef.current?.click()}
-                        className={`w-full p-8 border-2 border-dashed ${isUploading ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-600 hover:border-indigo-400 hover:bg-white/5'} rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all`}
+                      <input type="file" id="spotify-audio-upload" ref={fileInputRef} onChange={handleFileUpload} accept=".mp3,audio/mpeg" multiple className="hidden" />
+                      <label
+                        htmlFor={isUploading ? undefined : 'spotify-audio-upload'}
+                        className={`w-full p-6 md:p-8 border-2 border-dashed ${isUploading ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-600 hover:border-indigo-400 hover:bg-white/5'} rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all block`}
                       >
                         {isUploading ? (
                           <><Loader2 size={32} className="animate-spin text-indigo-500 mb-3" /><p className="text-indigo-400 font-bold">Đang tải lên...</p></>
                         ) : (
-                          <><Upload size={32} className="text-gray-400 mb-3" /><p className="font-bold mb-1">Bấm để chọn file nhạc</p><p className="text-sm text-gray-500">Hỗ trợ MP3, M4A, WAV (Giới hạn 50MB)</p></>
+                          <><Upload size={32} className="text-gray-400 mb-3" /><p className="font-bold mb-1">Bấm để chọn file nhạc</p><p className="text-sm text-gray-500">Chỉ hỗ trợ MP3 · Tối đa 20MB</p></>
                         )}
-                      </div>
+                      </label>
                     </div>
                   </div>
                 )}

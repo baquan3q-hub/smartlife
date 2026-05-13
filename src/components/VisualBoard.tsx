@@ -388,7 +388,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                 {[
                                     { icon: '📝', text: 'Ghi chú với rich text (đậm, nghiêng, checkbox)' },
                                     { icon: '🔗', text: 'Lưu trữ liên kết quan trọng' },
-                                    { icon: '📁', text: 'Upload tệp tin, hình ảnh, audio, video (50MB/tệp)' },
+                                    { icon: '📁', text: 'Upload tệp tin, hình ảnh, audio (10MB) · Video (2MB)' },
                                     { icon: '🔒', text: 'Riêng tư & bảo mật trên cloud' },
                                 ].map((f, i) => (
                                     <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
