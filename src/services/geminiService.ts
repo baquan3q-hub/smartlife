@@ -356,10 +356,55 @@ async function buildCountdownContext(): Promise<string> {
     }
 }
 
+async function buildJournalContext(): Promise<string> {
+    try {
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData?.user?.id;
+        if (!uid) return '';
+
+        const { data: entries, error } = await supabase
+            .from('journal_entries')
+            .select('entry_date, content, mood, gratitude')
+            .eq('user_id', uid)
+            .order('entry_date', { ascending: false })
+            .limit(5);
+
+        if (error) throw error;
+        if (!entries || entries.length === 0) return '\n📔 NHẬT KÝ GẦN ĐÂY: Chưa có nhật ký nào được viết.';
+
+        let ctx = `\n📔 NHẬT KÝ & CẢM XÚC GẦN ĐÂY (5 ngày gần nhất):`;
+        entries.forEach(e => {
+            const moodEmoji = e.mood === 1 ? '😢 Rất tệ' : 
+                              e.mood === 2 ? '😟 Không tốt' : 
+                              e.mood === 3 ? '😐 Bình thường' : 
+                              e.mood === 4 ? '😊 Tốt' : 
+                              e.mood === 5 ? '🤩 Tuyệt vời' : 'Chưa ghi nhận';
+                              
+            ctx += `\n  - Ngày ${e.entry_date} | Cảm xúc: ${moodEmoji}`;
+            if (e.gratitude && Array.isArray(e.gratitude) && e.gratitude.length > 0) {
+                const gratitudeFiltered = e.gratitude.filter(Boolean);
+                if (gratitudeFiltered.length > 0) {
+                    ctx += `\n    Biết ơn: ${gratitudeFiltered.join(', ')}`;
+                }
+            }
+            if (e.content) {
+                const excerpt = e.content.substring(0, 150).replace(/\n/g, ' ') + (e.content.length > 150 ? '...' : '');
+                ctx += `\n    Nội dung: "${excerpt}"`;
+            }
+        });
+
+        return ctx;
+    } catch (e) {
+        console.error('[SmartLife] Error building journal context:', e);
+        return '';
+    }
+}
+
 export async function buildFullContextAsync(state: AppState): Promise<string> {
-    const [habitCtx, countdownCtx] = await Promise.all([
+    const [habitCtx, countdownCtx, journalCtx] = await Promise.all([
         buildHabitContext(),
-        buildCountdownContext()
+        buildCountdownContext(),
+        buildJournalContext()
     ]);
 
     return [
@@ -370,6 +415,7 @@ export async function buildFullContextAsync(state: AppState): Promise<string> {
         buildGPAContext(state),
         habitCtx,
         countdownCtx,
+        journalCtx,
     ].join('\n');
 }
 

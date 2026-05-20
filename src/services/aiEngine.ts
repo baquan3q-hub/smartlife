@@ -57,7 +57,7 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
                 table: {
                     type: 'STRING',
                     description: 'Tên bảng cần truy vấn',
-                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events', 'gpa_semesters', 'gpa_courses', 'habits', 'habit_logs', 'countdown_items', 'countup_items']
+                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events', 'gpa_semesters', 'gpa_courses', 'habits', 'habit_logs', 'countdown_items', 'countup_items', 'journal_entries', 'journal_tags']
                 },
                 select: {
                     type: 'STRING',
@@ -246,6 +246,8 @@ const DATE_COLUMNS: Record<string, string> = {
     habit_logs: 'log_date',
     countdown_items: 'target_date',
     countup_items: 'start_date',
+    journal_entries: 'entry_date',
+    journal_tags: 'created_at',
 };
 
 async function executeQueryDatabase(args: any): Promise<any> {

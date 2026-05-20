@@ -437,3 +437,40 @@ export interface RewardRedemption {
   stars_spent: number;
   redeemed_at?: string;
 }
+
+// 11. Journal Types
+export type MoodLevel = 1 | 2 | 3 | 4 | 5;
+
+export interface JournalEntry {
+  id: string;
+  user_id?: string;
+  entry_date: string;          // Định dạng YYYY-MM-DD
+  content: string;             // Nội dung dạng Markdown
+  mood?: MoodLevel;            // 1: Rất tệ, 2: Không tốt, 3: Bình thường, 4: Tốt, 5: Tuyệt vời
+  gratitude: string[];         // Tối đa 3 điều biết ơn
+  word_count: number;          // Đếm số từ
+  is_favorite: boolean;
+  writing_prompt?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Các tag liên quan (kết hợp khi truy vấn)
+  tags?: string[];
+}
+
+export interface JournalTag {
+  id: string;
+  user_id?: string;
+  entry_id: string;
+  tag: string;
+  created_at?: string;
+}
+
+export interface JournalStats {
+  totalEntries: number;
+  currentStreak: number;
+  longestStreak: number;
+  averageMood: number;
+  totalWords: number;
+  moodDistribution: Record<MoodLevel, number>;
+  topTags: { tag: string; count: number }[];
+}

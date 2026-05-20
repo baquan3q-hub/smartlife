@@ -442,3 +442,88 @@ export async function fetchRedemptionHistory(userId: string, limit = 20) {
   return data || [];
 }
 
+export async function processJournalReward(params: {
+  userId: string;
+  wordCount: number;
+  hasMood: boolean;
+  gratitudeCount: number;
+}): Promise<{ totalStars: number; breakdown: { label: string; amount: number }[] } | null> {
+  const { userId, wordCount, hasMood, gratitudeCount } = params;
+
+  if (wordCount < 50) return null;
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const { data: existing } = await supabase
+    .from('star_transactions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('source', 'CHECKIN_BASE')
+    .like('description', '%Nhật ký%')
+    .gte('created_at', todayStart.toISOString())
+    .limit(1);
+
+  if (existing && existing.length > 0) return null;
+
+  const breakdown: { source: string; amount: number; label: string }[] = [];
+  const transactions: { user_id: string; type: string; amount: number; source: string; description: string }[] = [];
+  let totalStars = 0;
+
+  totalStars += 10;
+  breakdown.push({ source: 'CHECKIN_BASE', amount: 10, label: 'Viết nhật ký cơ bản (≥ 50 từ) 📝' });
+  transactions.push({
+    user_id: userId,
+    type: 'EARN',
+    amount: 10,
+    source: 'CHECKIN_BASE',
+    description: 'Viết nhật ký hàng ngày (≥ 50 từ)'
+  });
+
+  if (hasMood) {
+    totalStars += 2;
+    breakdown.push({ source: 'TIME_BONUS', amount: 2, label: 'Ghi nhận cảm xúc ngày hôm nay 😊' });
+    transactions.push({
+      user_id: userId,
+      type: 'EARN',
+      amount: 2,
+      source: 'TIME_BONUS',
+      description: 'Nhật ký: Ghi nhận cảm xúc'
+    });
+  }
+
+  if (gratitudeCount >= 3) {
+    totalStars += 5;
+    breakdown.push({ source: 'LUCKY_BONUS', amount: 5, label: 'Viết đủ 3 điều biết ơn 🙏' });
+    transactions.push({
+      user_id: userId,
+      type: 'EARN',
+      amount: 5,
+      source: 'LUCKY_BONUS',
+      description: 'Nhật ký: 3 điều biết ơn'
+    });
+  }
+
+  if (transactions.length > 0) {
+    await supabase.from('star_transactions').insert(transactions);
+  }
+
+  const stats = await fetchStarStats(userId);
+  const newBalance = stats.current_balance + totalStars;
+  const newTotalEarned = stats.total_earned + totalStars;
+  const newLevel = getLevelFromStars(newTotalEarned);
+
+  await supabase.from('user_star_stats').update({
+    current_balance: newBalance,
+    total_earned: newTotalEarned,
+    current_level: newLevel.level,
+    updated_at: new Date().toISOString()
+  }).eq('user_id', userId);
+
+  return {
+    totalStars,
+    breakdown: breakdown.map(b => ({ label: b.label, amount: b.amount }))
+  };
+}
+
+

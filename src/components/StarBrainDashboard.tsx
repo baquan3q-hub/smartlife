@@ -10,6 +10,7 @@ import {
   LEVELS, CATEGORY_INFO,
 } from '../services/starBrainService';
 import { Star, Gift, Clock, Plus, X, Trash2, ShoppingBag, History, TrendingUp, Sparkles, ChevronRight } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 
 interface Props { userId: string; }
 
@@ -18,6 +19,10 @@ const StarBrainDashboard: React.FC<Props> = ({ userId }) => {
   const [transactions, setTransactions] = useState<StarTransaction[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [redemptions, setRedemptions] = useState<any[]>([]);
+  
+  // Custom delete confirmation modal state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
+  const [rewardToDelete, setRewardToDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'dashboard' | 'store' | 'history'>('dashboard');
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -72,10 +77,16 @@ const StarBrainDashboard: React.FC<Props> = ({ userId }) => {
     setShowCreateForm(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Xóa phần thưởng này?')) return;
-    await deleteReward(id);
-    setRewards(prev => prev.filter(r => r.id !== id));
+  const handleDelete = (id: string) => {
+    setRewardToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (!rewardToDelete) return;
+    await deleteReward(rewardToDelete);
+    setRewards(prev => prev.filter(r => r.id !== rewardToDelete));
+    setRewardToDelete(null);
   };
 
   const filteredRewards = filterCat === 'ALL' ? rewards : rewards.filter(r => r.category === filterCat);
@@ -314,6 +325,17 @@ const StarBrainDashboard: React.FC<Props> = ({ userId }) => {
           to { opacity: 1; transform: translate(-50%, 0); }
         }
       `}</style>
+
+      {/* Custom delete confirmation modal */}
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        title="Xóa phần thưởng"
+        message="Bạn có chắc chắn muốn xóa phần thưởng tự chọn này không?"
+        onConfirm={executeDelete}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        confirmText="Xóa"
+        cancelText="Hủy"
+      />
     </div>
   );
 };

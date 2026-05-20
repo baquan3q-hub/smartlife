@@ -2,17 +2,69 @@ import React, { useMemo, useState } from 'react';
 import { AppState, TransactionType } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
 import { TrendingUp, Activity, ArrowLeft } from 'lucide-react';
+import { Lang } from '../i18n/i18n';
 
 const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#14B8A6', '#F97316', '#64748B'];
 
 interface CashFlowDashboardProps {
     state: AppState;
-    lang: 'vi' | 'en';
+    lang: Lang;
     onBack: () => void;
 }
 
-const formatCurrency = (amount: number, lang: 'vi' | 'en') => {
-    return new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US', { style: 'currency', currency: lang === 'vi' ? 'VND' : 'USD' }).format(lang === 'vi' ? amount : amount / 25000);
+const translations = {
+    vi: {
+        cashFlow: 'Dòng tiền',
+        cashFlowDesc: 'Báo cáo thu - chi chi tiết',
+        month: 'Tháng',
+        reportTitle: 'Báo cáo Dòng tiền',
+        ranking: 'Xếp hạng Thu - Chi',
+        totalIncome: 'Tổng thu',
+        totalExpense: 'Tổng chi',
+        structure: 'Cơ cấu chi tiêu chi tiết',
+        noData: 'Chưa có dữ liệu chi tiêu tháng này',
+        trend: 'Xu hướng chi tiêu 6 tháng',
+        trendIncome: 'Thu nhập',
+        trendExpense: 'Chi tiêu'
+    },
+    en: {
+        cashFlow: 'Cash Flow',
+        cashFlowDesc: 'Detailed income & expense report',
+        month: 'Month',
+        reportTitle: 'Cash Flow Report',
+        ranking: 'Income vs Expense Ranking',
+        totalIncome: 'Total Income',
+        totalExpense: 'Total Expense',
+        structure: 'Detailed Expense Structure',
+        noData: 'No expense data for this month',
+        trend: '6-Month Spending Trend',
+        trendIncome: 'Income',
+        trendExpense: 'Expense'
+    },
+    ko: {
+        cashFlow: '현금 흐름',
+        cashFlowDesc: '상세 수입 및 지출 보고서',
+        month: '월',
+        reportTitle: '현금 흐름 보고서',
+        ranking: '수입 vs 지출 순위',
+        totalIncome: '총수입',
+        totalExpense: '총지출',
+        structure: '상세 지출 구조',
+        noData: '이번 달 지출 데이터가 없습니다',
+        trend: '6개월 지출 추세',
+        trendIncome: '수입',
+        trendExpense: '지출'
+    }
+};
+
+const formatCurrency = (amount: number, lang: Lang) => {
+    if (lang === 'vi') {
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    } else if (lang === 'ko') {
+        return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount / 18.5);
+    } else {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount / 25000);
+    }
 };
 
 const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBack }) => {
@@ -20,6 +72,7 @@ const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBa
     const today = new Date();
     const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
     const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+    const t = translations[lang];
 
     const changeMonth = (offset: number) => {
         let newMonth = selectedMonth + offset;
@@ -45,10 +98,14 @@ const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBa
             else monthlyDataMap[key].expense += t.amount;
         });
 
-        const monthlyChartData = Object.keys(monthlyDataMap).sort().map(key => ({
-            name: `Tháng ${key.split('-')[1]}`,
-            ...monthlyDataMap[key]
-        })).slice(-6);
+        const monthlyChartData = Object.keys(monthlyDataMap).sort().map(key => {
+            const m = key.split('-')[1];
+            const nameStr = lang === 'vi' ? `Tháng ${m}` : lang === 'ko' ? `${m}월` : `Month ${m}`;
+            return {
+                name: nameStr,
+                ...monthlyDataMap[key]
+            };
+        }).slice(-6);
 
         const currentMonthTransactions = transactions.filter(t => {
             const d = new Date(t.date);
@@ -83,7 +140,7 @@ const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBa
             currentMonthExpense,
             currentMonthTransactions
         };
-    }, [transactions, selectedMonth, selectedYear]);
+    }, [transactions, selectedMonth, selectedYear, lang]);
 
     return (
         <div className="space-y-4 md:space-y-6 animate-fade-in pb-20">
@@ -93,34 +150,36 @@ const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBa
                     <ArrowLeft size={20} />
                 </button>
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Dòng tiền</h2>
-                    <p className="text-gray-400 text-sm">Báo cáo thu - chi chi tiết</p>
+                    <h2 className="text-2xl font-bold text-gray-800">{t.cashFlow}</h2>
+                    <p className="text-gray-400 text-sm">{t.cashFlowDesc}</p>
                 </div>
             </div>
 
             {/* Filter */}
             <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-2 py-1.5 md:px-3 md:py-2 shadow-sm w-fit mb-6">
                 <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-indigo-600 transition-colors">❮</button>
-                <span className="mx-2 md:mx-3 font-semibold text-gray-700 min-w-[90px] md:min-w-[100px] text-center text-sm md:text-base">Tháng {selectedMonth + 1}/{selectedYear}</span>
+                <span className="mx-2 md:mx-3 font-semibold text-gray-700 min-w-[90px] md:min-w-[100px] text-center text-sm md:text-base">
+                    {lang === 'vi' ? `Tháng ${selectedMonth + 1}/${selectedYear}` : lang === 'ko' ? `${selectedMonth + 1}월 / ${selectedYear}` : `${t.month} ${selectedMonth + 1}/${selectedYear}`}
+                </span>
                 <button onClick={() => changeMonth(1)} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-indigo-600 transition-colors">❯</button>
             </div>
 
             <div className="space-y-6">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <TrendingUp className="text-emerald-600" /> Báo cáo Dòng tiền tháng {selectedMonth + 1}/{selectedYear}
+                        <TrendingUp className="text-emerald-600" /> {t.reportTitle} ({lang === 'vi' ? `Tháng ${selectedMonth + 1}/${selectedYear}` : lang === 'ko' ? `${selectedMonth + 1}월 / ${selectedYear}` : `${selectedMonth + 1}/${selectedYear}`})
                     </h3>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {/* Cash Flow Bar Chart - Income vs Expense by Category */}
                         <div>
-                            <h4 className="text-md font-bold text-gray-700 mb-4 text-center">Xếp hạng Thu - Chi</h4>
+                            <h4 className="text-md font-bold text-gray-700 mb-4 text-center">{t.ranking}</h4>
                             <div className="h-64 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart
                                         layout="vertical"
                                         data={[
-                                            { name: 'Tổng thu', amount: stats.currentMonthIncome, fill: '#10B981' },
-                                            { name: 'Tổng chi', amount: stats.currentMonthExpense, fill: '#EF4444' }
+                                            { name: t.totalIncome, amount: stats.currentMonthIncome, fill: '#10B981' },
+                                            { name: t.totalExpense, amount: stats.currentMonthExpense, fill: '#EF4444' }
                                         ]}
                                         margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                                     >
@@ -135,8 +194,8 @@ const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBa
                                         <Bar dataKey="amount" radius={[0, 4, 4, 0]} barSize={30}>
                                             {
                                                 [
-                                                    { name: 'Tổng thu', amount: stats.currentMonthIncome, fill: '#10B981' },
-                                                    { name: 'Tổng chi', amount: stats.currentMonthExpense, fill: '#EF4444' }
+                                                    { name: t.totalIncome, amount: stats.currentMonthIncome, fill: '#10B981' },
+                                                    { name: t.totalExpense, amount: stats.currentMonthExpense, fill: '#EF4444' }
                                                 ].map((entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={entry.fill} />
                                                 ))
@@ -148,7 +207,7 @@ const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBa
                         </div>
                         {/* Cash Flow Pie Chart - Detailed Structure */}
                         <div>
-                            <h4 className="text-md font-bold text-gray-700 mb-4 text-center">Cơ cấu chi tiêu chi tiết</h4>
+                            <h4 className="text-md font-bold text-gray-700 mb-4 text-center">{t.structure}</h4>
                             <div className="h-64 w-full relative">
                                 {stats.categoryData.length > 0 ? (
                                     <ResponsiveContainer width="100%" height="100%">
@@ -173,7 +232,7 @@ const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBa
                                     </ResponsiveContainer>
                                 ) : (
                                     <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                                        Chưa có dữ liệu chi tiêu tháng này
+                                        {t.noData}
                                     </div>
                                 )}
                             </div>
@@ -183,7 +242,7 @@ const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBa
                     {/* Area Chart - Spending Trends */}
                     <div className="mt-8 pt-8 border-t border-gray-100">
                         <h4 className="text-md font-bold text-gray-700 mb-6 flex items-center justify-center gap-2">
-                            <Activity className="text-indigo-600" /> Xu hướng chi tiêu 6 tháng
+                            <Activity className="text-indigo-600" /> {t.trend}
                         </h4>
                         <div className="h-72 w-full">
                             <ResponsiveContainer width="100%" height="100%">
@@ -201,8 +260,8 @@ const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBa
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
                                         formatter={(value: any) => formatCurrency(Number(value), lang)}
                                     />
-                                    <Area type="monotone" dataKey="expense" name="Chi tiêu" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorTrend)" />
-                                    <Area type="monotone" dataKey="income" name="Thu nhập" stroke="#10B981" strokeWidth={2} strokeDasharray="5 5" fill="transparent" />
+                                    <Area type="monotone" dataKey="expense" name={t.trendExpense} stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorTrend)" />
+                                    <Area type="monotone" dataKey="income" name={t.trendIncome} stroke="#10B981" strokeWidth={2} strokeDasharray="5 5" fill="transparent" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>

@@ -18,13 +18,14 @@ import InlineChatChart from './InlineChatChart';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ConfirmModal from './ConfirmModal';
+import { Lang } from '../i18n/i18n';
 
 // ────────────────────────────────────────
 // Types
 // ────────────────────────────────────────
 interface AIAdvisorPageProps {
     appState: AppState;
-    lang: 'vi' | 'en';
+    lang: Lang;
     onBack: () => void;
     // Action handlers from App.tsx
     onAddTimetable?: (item: any) => Promise<void>;
