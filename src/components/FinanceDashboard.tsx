@@ -4,9 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
-
-
-
+import { Lang } from '../i18n/i18n';
 
 interface FinanceDashboardProps {
     state: AppState;
@@ -19,7 +17,7 @@ interface FinanceDashboardProps {
     onNavigateToCashFlow?: () => void;
     onNavigateToAI?: () => void;
     isLoading?: boolean;
-    lang: 'vi' | 'en';
+    lang: Lang;
     expenseCategories: string[];
     incomeCategories: string[];
     onAddCategory: (type: 'expense' | 'income', name: string) => void;
@@ -101,11 +99,52 @@ const translations = {
         expense_other: 'Other',
         month: 'Month',
         year: 'Year'
+    },
+    ko: {
+        financeOverview: '자산 현황',
+        income: '수입',
+        expense: '지출',
+        balance: '현재 잔액',
+        addTransaction: '거래 추가',
+        analysis: '자산 분석',
+        recentTransactions: '최근 거래 내역',
+        noTransactions: '등록된 거래가 없습니다.',
+        goals: '자산 관리 목표',
+        addGoal: '목표 추가',
+        savings: '저축',
+        date: '날짜',
+        category: '카테고리',
+        amount: '금액',
+        description: '설명',
+        actions: '작업',
+        edit: '수정',
+        delete: '삭제',
+        save: '저장',
+        cancel: '취소',
+        income_salary: '급여',
+        income_bonus: '보너스',
+        income_other: '기타',
+        expense_food: '식비',
+        expense_transport: '교통비',
+        expense_shopping: '쇼핑',
+        expense_bills: '공과금/요금',
+        expense_entertainment: '문화/여가',
+        expense_health: '의료/건강',
+        expense_education: '교육/학업',
+        expense_other: '기타',
+        month: '월',
+        year: '년'
     }
 };
 
-const formatCurrency = (amount: number, lang: 'vi' | 'en') => {
-    return new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US', { style: 'currency', currency: lang === 'vi' ? 'VND' : 'USD' }).format(lang === 'vi' ? amount : amount / 25000);
+const formatCurrency = (amount: number, lang: Lang) => {
+    if (lang === 'vi') {
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    } else if (lang === 'ko') {
+        return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount / 18.5);
+    } else {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount / 25000);
+    }
 };
 
 // --- Helper for Calendar ---

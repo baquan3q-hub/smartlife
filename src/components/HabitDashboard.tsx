@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import { processCheckin, reverseCheckinStars, fetchStarStats, getLevelFromStars, getNextLevel, LEVELS } from '../services/starBrainService';
 import StarBrainDashboard from './StarBrainDashboard';
 import { Plus, X, Flame, Timer, TrendingUp, Trash2, Edit3, ChevronDown, RotateCcw, Award, CheckCircle2, Circle, Calendar, BarChart3, ChevronLeft, ChevronRight, Star, Sparkles, Zap, Gift, ListChecks } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 
 const DAY_LABELS: Record<DayOfWeek, string> = { mon:'T2', tue:'T3', wed:'T4', thu:'T5', fri:'T6', sat:'T7', sun:'CN' };
 const ALL_DAYS: DayOfWeek[] = ['mon','tue','wed','thu','fri','sat','sun'];
@@ -58,6 +59,19 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
   // ── StarBrain State ──
   const [starStats, setStarStats] = useState({ total_earned: 0, current_balance: 0, current_level: 1 });
   const [checkinResult, setCheckinResult] = useState<CheckinReward | null>(null);
+
+  // Unified custom delete confirmation modal state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
 
   // ── Fetch Data ──
   useEffect(() => {
@@ -120,12 +134,18 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
     if (!error) setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
     setEditItem(null); setShowForm(null);
   };
-  const deleteHabit = async (id: string) => {
-    if (!window.confirm('Xóa thói quen này? Toàn bộ lịch sử check-in cũng sẽ bị xóa.')) return;
-    await supabase.from('habits').delete().eq('id', id);
-    setHabits(prev => prev.filter(h => h.id !== id));
-    setHabitLogs(prev => prev.filter(l => l.habit_id !== id));
-    if (detailHabit?.id === id) setDetailHabit(null);
+  const deleteHabit = (id: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Xóa thói quen',
+      message: 'Bạn có chắc chắn muốn xóa thói quen này? Toàn bộ lịch sử check-in của thói quen này cũng sẽ bị xóa vĩnh viễn và không thể khôi phục.',
+      onConfirm: async () => {
+        await supabase.from('habits').delete().eq('id', id);
+        setHabits(prev => prev.filter(h => h.id !== id));
+        setHabitLogs(prev => prev.filter(l => l.habit_id !== id));
+        if (detailHabit?.id === id) setDetailHabit(null);
+      }
+    });
   };
 
   // ── Check-in Toggle ──
@@ -327,10 +347,16 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
     setEditItem(null); setShowForm(null);
   };
 
-  const deleteCountdown = async (id: string) => {
-    if (!window.confirm('Xóa sự kiện này?')) return;
-    await supabase.from('countdown_items').delete().eq('id', id);
-    setCountdowns(prev => prev.filter(c => c.id !== id));
+  const deleteCountdown = (id: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Xóa sự kiện',
+      message: 'Bạn có chắc chắn muốn xóa sự kiện đếm ngược này?',
+      onConfirm: async () => {
+        await supabase.from('countdown_items').delete().eq('id', id);
+        setCountdowns(prev => prev.filter(c => c.id !== id));
+      }
+    });
   };
 
   // ── CRUD Count-Up ──
@@ -346,10 +372,16 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
     setEditItem(null); setShowForm(null);
   };
 
-  const deleteCountup = async (id: string) => {
-    if (!window.confirm('Xóa mốc sự kiện này?')) return;
-    await supabase.from('countup_items').delete().eq('id', id);
-    setCountups(prev => prev.filter(c => c.id !== id));
+  const deleteCountup = (id: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Xóa mốc sự kiện',
+      message: 'Bạn có chắc chắn muốn xóa mốc sự kiện đếm ngày này?',
+      onConfirm: async () => {
+        await supabase.from('countup_items').delete().eq('id', id);
+        setCountups(prev => prev.filter(c => c.id !== id));
+      }
+    });
   };
 
   // ── Countdown Groups ──
@@ -676,6 +708,17 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
       {checkinResult && (
         <CheckinCelebration result={checkinResult} onClose={() => setCheckinResult(null)} />
       )}
+
+      {/* Custom unified delete confirmation modal */}
+      <ConfirmModal
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(p => ({ ...p, isOpen: false }))}
+        confirmText="Xóa"
+        cancelText="Hủy"
+      />
     </div>
   );
 };

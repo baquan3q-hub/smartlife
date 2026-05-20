@@ -1,6 +1,6 @@
 // File: src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen } from 'lucide-react';
 
 // Import các Components (Đảm bảo bạn đã tạo file trong thư mục components)
 import FinanceDashboard from './components/FinanceDashboard';
@@ -23,6 +23,7 @@ import ProGateOverlay from './components/ProGateOverlay';
 import { GlobalLoader } from './components/GlobalLoader';
 import MySpotify from './components/MySpotify';
 import HabitDashboard from './components/HabitDashboard';
+import JournalDashboard from './components/JournalDashboard';
 
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -36,6 +37,7 @@ import { useFocusTimer } from './hooks/useFocusTimer';
 import { useProAccess } from './hooks/useProAccess';
 import { createSubscriptionOrder, setupTrialForNewUser, getLatestPendingOrder } from './services/subscriptionService';
 import { SubscriptionPlanDuration, SubscriptionOrder } from './types';
+import { Lang, t } from './i18n/i18n';
 
 // Types và Constants (Khớp với file đã sửa)
 import { AppState, Transaction, Todo, TaskPriority, SmartInsight, GPASemester, GPACourse, GPATemplateType } from './types';
@@ -74,17 +76,39 @@ const RealtimeClock: React.FC = () => {
 };
 
 interface AuthenticatedAppProps {
-    lang: 'vi' | 'en';
-    setLang: (lang: 'vi' | 'en') => void;
+    lang: Lang;
+    setLang: (lang: Lang) => void;
 }
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) => {
     const { user, signOut } = useAuth();
-    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit'>('visual');
+    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal'>('visual');
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isSpotifyOpen, setIsSpotifyOpen] = useState(false);
+
+    // Visible Mobile Navigation Tabs State
+    const [visibleMobileTabs, setVisibleMobileTabs] = useState<string[]>(() => {
+        const saved = localStorage.getItem(`smartlife_visible_tabs_${user?.id}`);
+        return saved ? JSON.parse(saved) : ['visual', 'finance', 'schedule', 'journal', 'habit'];
+    });
+
+    useEffect(() => {
+        if (user?.id) {
+            const saved = localStorage.getItem(`smartlife_visible_tabs_${user.id}`);
+            setVisibleMobileTabs(saved ? JSON.parse(saved) : ['visual', 'finance', 'schedule', 'journal', 'habit']);
+        }
+    }, [user?.id]);
+
+    const AVAILABLE_MOBILE_TABS = [
+        { id: 'visual', labelVi: 'Tổng quan', labelEn: 'Overview', labelKo: '개요', icon: LayoutDashboard, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', icon: Wallet, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { id: 'journal', labelVi: 'Nhật ký', labelEn: 'Journal', labelKo: '일기', icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { id: 'schedule', labelVi: 'Lịch trình', labelEn: 'Schedule', labelKo: '일정', icon: CalendarDays, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { id: 'habit', labelVi: 'Thói quen', labelEn: 'Habits', labelKo: '습관', icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50' },
+        { id: 'gpa', labelVi: 'GPA', labelEn: 'GPA', labelKo: 'GPA', icon: GraduationCap, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    ];
 
     // Pro Subscription State
     const [isPricingOpen, setIsPricingOpen] = useState(false);
@@ -900,27 +924,30 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
                 <nav className={`flex-1 overflow-y-auto px-4 space-y-2 mt-2 scrollbar-thin scrollbar-thumb-gray-200 hover:scrollbar-thumb-gray-300`}>
                     {/* Language Toggle Desktop */}
-                    <button onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-gray-50 cursor-pointer border border-dashed border-gray-200 mb-2`}>
+                    <button onClick={() => setLang(lang === 'vi' ? 'en' : lang === 'en' ? 'ko' : 'vi')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-gray-50 cursor-pointer border border-dashed border-gray-200 mb-2`}>
                         <div className="flex items-center gap-3">
-                            <span title={lang === 'vi' ? 'Ngôn ngữ' : 'Language'}>🌐</span>
-                            {!isSidebarCollapsed && <span>{lang === 'vi' ? 'Ngôn ngữ' : 'Language'}</span>}
+                            <span title={t('sidebar.language', lang)}>🌐</span>
+                            {!isSidebarCollapsed && <span>{t('sidebar.language', lang)}</span>}
                         </div>
-                        {!isSidebarCollapsed && <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs">{lang.toUpperCase()}</span>}
+                        {!isSidebarCollapsed && <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs">{lang === 'vi' ? '🇻🇳 VI' : lang === 'en' ? '🇺🇸 EN' : '🇰🇷 KO'}</span>}
                     </button>
 
-                    <button onClick={() => setActiveTab('visual')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'visual' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? (lang === 'vi' ? 'Tổng quan' : 'Visual Board') : ''}>
-                        <LayoutDashboard size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{lang === 'vi' ? 'Tổng quan' : 'Visual Board'}</span>}
+                    <button onClick={() => setActiveTab('visual')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'visual' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.overview', lang) : ''}>
+                        <LayoutDashboard size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.overview', lang)}</span>}
                         {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>
-                    <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'finance' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Tài chính' : ''}>
-                        <Wallet size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Tài chính</span>}
+                    <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'finance' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.finance', lang) : ''}>
+                        <Wallet size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.finance', lang)}</span>}
                     </button>
-                    <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Lịch trình & Mục tiêu' : ''}>
-                        <CalendarDays size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Lịch trình & Mục tiêu</span>}
+                    <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.schedule_goals', lang) : ''}>
+                        <CalendarDays size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.schedule_goals', lang)}</span>}
                         {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>
-                    <button onClick={() => setActiveTab('habit')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'habit' ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Thói quen' : ''}>
-                        <Flame size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Thói quen</span>}
+                    <button onClick={() => setActiveTab('habit')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'habit' ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.habit', lang) : ''}>
+                        <Flame size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.habit', lang)}</span>}
+                    </button>
+                    <button onClick={() => setActiveTab('journal')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'journal' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.journal', lang) : ''}>
+                        <BookOpen size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.journal', lang)}</span>}
                     </button>
                     <button onClick={() => setActiveTab('gpa')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'gpa' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'GPA' : ''}>
                         <GraduationCap size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">GPA</span>}
@@ -935,8 +962,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
                     {/* Pro Upgrade Button */}
                     {!proAccess.isProActive && !proAccess.isLifetime && (
-                        <button onClick={handleOpenPricing} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-semibold text-sm bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 hover:from-indigo-100 hover:to-purple-100 border border-indigo-100`} title={isSidebarCollapsed ? 'Nâng cấp Pro' : ''}>
-                            <Crown size={20} className="shrink-0 text-yellow-500" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Nâng cấp Pro</span>}
+                        <button onClick={handleOpenPricing} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-semibold text-sm bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 hover:from-indigo-100 hover:to-purple-100 border border-indigo-100`} title={isSidebarCollapsed ? t('sidebar.upgrade_pro', lang) : ''}>
+                            <Crown size={20} className="shrink-0 text-yellow-500" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('sidebar.upgrade_pro', lang)}</span>}
                         </button>
                     )}
 
@@ -1114,53 +1141,44 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     {activeTab === 'habit' && (
                         <HabitDashboard userId={user?.id || ''} onNavigateToSchedule={() => setActiveTab('schedule')} />
                     )}
+                    {activeTab === 'journal' && (
+                        <JournalDashboard userId={user?.id || ''} />
+                    )}
                 </div>
             </main>
 
 
             {/* Mobile Bottom Nav */}
-            {activeTab !== 'ai-advisor' && <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center z-40 pb-safe pt-1 h-[70px] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                <button
-                    onClick={() => setActiveTab('visual')}
-                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'visual' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                    <div className={`p-1.5 rounded-xl transition-all ${activeTab === 'visual' ? 'bg-indigo-50' : 'bg-transparent'}`}>
-                        <LayoutDashboard size={24} strokeWidth={activeTab === 'visual' ? 2.5 : 2} />
-                    </div>
-                    <span className="text-[10px] font-bold">{lang === 'vi' ? 'Tổng quan' : 'Overview'}</span>
-                </button>
+            {activeTab !== 'ai-advisor' && (
+                <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center z-40 pb-safe pt-1 h-[70px] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                    {AVAILABLE_MOBILE_TABS
+                        .filter(tab => visibleMobileTabs.includes(tab.id))
+                        .map(tab => {
+                            const IconComponent = tab.icon;
+                            const isActive = activeTab === tab.id;
+                            const activeColorClass = tab.color;
+                            const activeBgClass = tab.bg;
+                            const label = lang === 'vi' ? tab.labelVi : lang === 'en' ? tab.labelEn : tab.labelKo;
 
-
-                <button
-                    onClick={() => setActiveTab('finance')}
-                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'finance' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                    <div className={`p-1.5 rounded-xl transition-all ${activeTab === 'finance' ? 'bg-indigo-50' : 'bg-transparent'}`}>
-                        <Wallet size={24} strokeWidth={activeTab === 'finance' ? 2.5 : 2} />
-                    </div>
-                    <span className="text-[10px] font-bold">{lang === 'vi' ? 'Tài chính' : 'Finance'}</span>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('schedule')}
-                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'schedule' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                    <div className={`p-1.5 rounded-xl transition-all ${activeTab === 'schedule' ? 'bg-indigo-50' : 'bg-transparent'}`}>
-                        <CalendarDays size={24} strokeWidth={activeTab === 'schedule' ? 2.5 : 2} />
-                    </div>
-                    <span className="text-[10px] font-bold">{lang === 'vi' ? 'Lịch trình' : 'Schedule'}</span>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('habit')}
-                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'habit' ? 'text-orange-600' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                    <div className={`p-1.5 rounded-xl transition-all ${activeTab === 'habit' ? 'bg-orange-50' : 'bg-transparent'}`}>
-                        <Flame size={24} strokeWidth={activeTab === 'habit' ? 2.5 : 2} />
-                    </div>
-                    <span className="text-[10px] font-bold">{lang === 'vi' ? 'Thói quen' : 'Habits'}</span>
-                </button>
-            </nav>}
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as any)}
+                                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all active:scale-95 ${
+                                        isActive ? activeColorClass : 'text-gray-400 hover:text-gray-600'
+                                    }`}
+                                >
+                                    <div className={`p-1.5 rounded-xl transition-all ${
+                                        isActive ? activeBgClass : 'bg-transparent'
+                                    }`}>
+                                        <IconComponent size={24} strokeWidth={isActive ? 2.5 : 2} />
+                                    </div>
+                                    <span className="text-[10px] font-bold">{label}</span>
+                                </button>
+                            );
+                        })}
+                </nav>
+            )}
 
 
             <SettingsModal 
@@ -1172,6 +1190,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 toggleNotifications={toggleNotifications}
                 lang={lang}
                 setLang={setLang}
+                visibleMobileTabs={visibleMobileTabs}
+                onUpdateVisibleMobileTabs={setVisibleMobileTabs}
             />
             <PricingModal
                 isOpen={isPricingOpen}
@@ -1204,7 +1224,14 @@ import LandingPage from './components/LandingPage';
 const AppWrapper: React.FC = () => {
     const { user, loading } = useAuth();
     const [showLogin, setShowLogin] = useState(false);
-    const [lang, setLang] = useState<'vi' | 'en'>('vi');
+    const [lang, setLang] = useState<Lang>(() => {
+        const saved = localStorage.getItem('smartlife_lang');
+        return (saved === 'vi' || saved === 'en' || saved === 'ko') ? saved : 'vi';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('smartlife_lang', lang);
+    }, [lang]);
 
     if (loading) return <GlobalLoader />;
 

@@ -19,6 +19,7 @@ import {
   GPAComputed, GPACumulativeData, GPAProjection,
 } from '../types';
 import ConfirmModal from './ConfirmModal';
+import { Lang } from '../i18n/i18n';
 import {
   computeAllCourses, computeCourse, calculateSemesterGPA,
   calculateCumulativeGPA, calculateCumulativeData,
@@ -49,7 +50,7 @@ interface GPADashboardProps {
   targetSemesters?: number;
   onUpdateGPATarget?: (targetGPA: number | null, targetSemesters: number) => void;
   isLoading?: boolean;
-  lang: 'vi' | 'en';
+  lang: Lang;
 }
 
 // ─── Helpers ───────────────────────────

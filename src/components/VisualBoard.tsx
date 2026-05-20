@@ -1,18 +1,20 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { AppState, Goal, Todo, TimetableEvent, Habit, CountdownItem, CountUpItem, HabitLog } from '../types';
+import { AppState, Goal, Todo, TimetableEvent, Habit, CountdownItem, CountUpItem, HabitLog, JournalEntry, MoodLevel } from '../types';
 import { calculateCumulativeGPA } from '../services/gpaCalculator';
-import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap, Crown, X, ShieldCheck, Flame, Timer, TrendingUp, Download, Share2 } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap, Crown, X, ShieldCheck, Flame, Timer, TrendingUp, Download, Share2, Edit2, BookOpen } from 'lucide-react';
 import MyStorage from './MyStorage';
 import { useProAccess } from '../hooks/useProAccess';
 import { supabase } from '../services/supabase';
 import html2canvas from 'html2canvas';
+import { journalService } from '../services/journalService';
+import { processJournalReward } from '../services/starBrainService';
 
 interface VisualBoardProps {
     appState: AppState;
     userName?: string;
     userId?: string;
     userEmail?: string;
-    onNavigate?: (tab: 'finance' | 'schedule' | 'music' | 'ai-advisor' | 'gpa' | 'habit') => void;
+    onNavigate?: (tab: 'finance' | 'schedule' | 'music' | 'ai-advisor' | 'gpa' | 'habit' | 'journal') => void;
     onUpgrade?: () => void;
     onOpenSpotify?: () => void;
     onUpdateGoal?: (goal: Goal) => void;
@@ -31,6 +33,12 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const [loadingEvents, setLoadingEvents] = useState(true);
     const shareRef = useRef<HTMLDivElement>(null);
 
+    // Journal & Mood Widget States
+    const [todayJournal, setTodayJournal] = useState<JournalEntry | null>(null);
+    const [journalStreak, setJournalStreak] = useState<number>(0);
+    const [isSavingMood, setIsSavingMood] = useState<boolean>(false);
+    const [dashboardReward, setDashboardReward] = useState<number | null>(null);
+
     useEffect(() => {
         if (!userId) return;
         const fetchEvents = async () => {
@@ -47,7 +55,54 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             setLoadingEvents(false);
         };
         fetchEvents();
+
+        const loadJournalData = async () => {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const entry = await journalService.fetchEntryByDate(userId, todayStr);
+            setTodayJournal(entry);
+            
+            const stats = await journalService.fetchStats(userId);
+            setJournalStreak(stats.currentStreak);
+        };
+        loadJournalData();
     }, [userId]);
+
+    const handleQuickMoodSelect = async (selectedMood: MoodLevel) => {
+        if (!userId || isSavingMood) return;
+        setIsSavingMood(true);
+        const todayStr = new Date().toISOString().split('T')[0];
+        
+        const entryData = {
+            entry_date: todayStr,
+            content: todayJournal?.content || '',
+            mood: selectedMood,
+            gratitude: todayJournal?.gratitude || [],
+            word_count: todayJournal?.word_count || 0,
+            is_favorite: todayJournal?.is_favorite || false,
+            writing_prompt: todayJournal?.writing_prompt || '',
+            tags: todayJournal?.tags || []
+        };
+        
+        const saved = await journalService.saveEntry(userId, entryData);
+        if (saved) {
+            setTodayJournal(saved);
+            
+            const reward = await processJournalReward({
+                userId,
+                wordCount: saved.word_count,
+                hasMood: true,
+                gratitudeCount: saved.gratitude.length
+            });
+            if (reward) {
+                setDashboardReward(reward.totalStars);
+                setTimeout(() => setDashboardReward(null), 4000);
+            }
+            
+            const stats = await journalService.fetchStats(userId);
+            setJournalStreak(stats.currentStreak);
+        }
+        setIsSavingMood(false);
+    };
 
     const handleShare = async () => {
         if (!shareRef.current) return;
@@ -571,6 +626,78 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                 )}
                             </div>
                         </div>
+                    </div>
+
+                    {/* Quick Mood & Journal Streak Widget */}
+                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm md:text-base">
+                                <Heart className="text-emerald-500 fill-emerald-100" size={18} />
+                                <span>Tâm trạng hôm nay</span>
+                            </h3>
+                            {journalStreak > 0 && (
+                                <span className="flex items-center gap-1 bg-orange-50 text-orange-600 px-2 py-0.5 rounded-lg text-xs font-bold shrink-0">
+                                    <Flame size={12} fill="currentColor" /> {journalStreak} ngày
+                                </span>
+                            )}
+                        </div>
+
+                        {dashboardReward && (
+                            <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-center font-bold text-xs p-2 rounded-xl animate-bounce">
+                                🎉 Xuất sắc! Bạn nhận được +{dashboardReward} sao!
+                            </div>
+                        )}
+
+                        {todayJournal?.mood ? (
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3 border border-gray-100">
+                                    <span className="text-3xl">
+                                        {todayJournal.mood === 1 ? '😢' : 
+                                         todayJournal.mood === 2 ? '😟' : 
+                                         todayJournal.mood === 3 ? '😐' : 
+                                         todayJournal.mood === 4 ? '😊' : '🤩'}
+                                    </span>
+                                    <div>
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Cảm xúc của bạn</div>
+                                        <div className="font-bold text-sm text-gray-700">
+                                            {todayJournal.mood === 1 ? 'Rất tệ' : 
+                                             todayJournal.mood === 2 ? 'Không tốt' : 
+                                             todayJournal.mood === 3 ? 'Bình thường' : 
+                                             todayJournal.mood === 4 ? 'Tốt' : 'Tuyệt vời'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => onNavigate?.('journal' as any)}
+                                    className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl transition-all border border-emerald-100 flex items-center justify-center gap-1.5"
+                                >
+                                    <Edit2 size={12} /> Viết nhật ký chi tiết
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <p className="text-xs text-gray-400 font-semibold">Hôm nay bạn cảm thấy thế nào? Ghi nhận nhanh:</p>
+                                <div className="grid grid-cols-5 gap-2">
+                                    {([1, 2, 3, 4, 5] as MoodLevel[]).map(val => (
+                                        <button
+                                            key={val}
+                                            disabled={isSavingMood}
+                                            onClick={() => handleQuickMoodSelect(val)}
+                                            className="aspect-square bg-gray-50 hover:bg-emerald-50 hover:scale-105 active:scale-95 border border-gray-100 rounded-2xl flex items-center justify-center text-2xl transition-all disabled:opacity-50"
+                                            title={val === 1 ? 'Rất tệ' : val === 2 ? 'Không tốt' : val === 3 ? 'Bình thường' : val === 4 ? 'Tốt' : 'Tuyệt vời'}
+                                        >
+                                            {val === 1 ? '😢' : val === 2 ? '😟' : val === 3 ? '😐' : val === 4 ? '😊' : '🤩'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={() => onNavigate?.('journal' as any)}
+                                    className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl transition-all border border-emerald-100 flex items-center justify-center gap-1.5"
+                                >
+                                    <BookOpen size={12} /> Bắt đầu viết nhật ký
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* COUNTDOWNS */}

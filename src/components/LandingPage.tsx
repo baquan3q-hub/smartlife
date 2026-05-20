@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen } from 'lucide-react';
 import InstallGuideModal from './InstallGuideModal';
+import { Lang } from '../i18n/i18n';
 
 interface LandingPageProps {
     onLogin: () => void;
-    lang: 'vi' | 'en';
-    setLang: (lang: 'vi' | 'en') => void;
+    lang: Lang;
+    setLang: (lang: Lang) => void;
 }
 
 const translations = {
@@ -34,6 +35,16 @@ const translations = {
         featScheduleTitle: 'Làm chủ thời gian,\nNâng cao hiệu suất.',
         featScheduleDesc: 'Thời khóa biểu trực quan, To-do list ưu tiên thông minh và chế độ Focus mode giúp bạn tập trung hoàn thành mọi công việc.',
         featScheduleItems: ['Thời khóa biểu tuần/ngày', 'Todo list theo mức độ ưu tiên', 'Focus Timer tích hợp'],
+
+        featJournalTitle: 'Nhật ký cá nhân,\nChữa lành & Tự kiến tạo.',
+        featJournalDesc: 'Không gian ghi chép an toàn, riêng tư. Giúp bạn nhìn nhận lại cảm xúc, ghi nhận lòng biết ơn hàng ngày và xây dựng thói quen viết lách lành mạnh.',
+        featJournalItems: [
+            'Trình soạn thảo WYSIWYG chuyên nghiệp đầy đủ định dạng như Word',
+            'Theo dõi cảm xúc (Mood Tracker) trực quan với 5 emoji sinh động',
+            'Nhắc nhở lòng biết ơn & Câu hỏi gợi ý viết ngẫu nhiên theo chủ đề',
+            'Cơ chế tích lũy Sao thưởng StarBrain tạo động lực (Dopamine lành mạnh)',
+            'Kết nối đồng bộ thông tin ngữ cảnh giúp AI Advisor tư vấn sâu sắc hơn'
+        ],
 
         featFocusTitle: 'Tập trung cao độ,\nThư giãn tuyệt đối.',
         featFocusDesc: 'Chế độ Focus với bộ đếm giờ Pomodoro và kho nhạc Lofi chill giúp bạn duy trì sự tập trung và giảm căng thẳng khi học tập, làm việc.',
@@ -92,6 +103,16 @@ const translations = {
         featScheduleDesc: 'Visual timetable, smart prioritized To-do list, and Focus mode to help you concentrate on getting things done.',
         featScheduleItems: ['Weekly/Daily timetable', 'Priority-based Todo list', 'Integrated Focus Timer'],
 
+        featJournalTitle: 'Personal Digital Journal,\nHeal & Grow.',
+        featJournalDesc: 'Capture every moment, mood, and 3 gratitudes daily. An intuitive Word-like editor and StarBrain rewards help you maintain your writing habits.',
+        featJournalItems: [
+            'Professional Word-like WYSIWYG editor with full formatting options',
+            'Visual Mood Tracker with 5 interactive and colorful emojis',
+            'Daily gratitude prompts & randomized inspiration-driven writing prompts',
+            'StarBrain reward mechanism (Earn up to 10+ stars per entry for motivation)',
+            'Context synchronization with AI Advisor for deeply personalized guidance'
+        ],
+
         featFocusTitle: 'Deep Focus,\nAbsolute Relaxation.',
         featFocusDesc: 'Focus mode with Pomodoro timer and chill Lofi music library helps you maintain concentration and reduce stress while studying or working.',
         featFocusItems: ['Customizable Pomodoro Timer', 'Lofi Music & Background Sounds', 'Focus Time Statistics'],
@@ -122,6 +143,73 @@ const translations = {
         contactDesc: 'Contact for collaboration or feedback on app development.',
         footerBuilt: 'Built with ❤️ and advanced AI technology.',
         langName: 'English'
+    },
+    ko: {
+        install: '앱 설치',
+        login: '로그인',
+        heroTag: '올인원 개인 비서',
+        heroTitle1: '라이프 매니지먼트',
+        heroTitle2: '스마트하고 효율적으로',
+        heroDesc: 'SmartLife는 자산 관리, 일정 조율 및 개인 목표 달성을 도와줍니다. 하나의 통합 앱으로 해결하세요.',
+        startNow: '무료로 시작하기',
+        learnMore: '자세히 알아보기',
+
+        featVisualTitle: '비주얼보드 - 한눈에 보기,\n모든 것을 통제하세요.',
+        featVisualDesc: '전체 일정, 목표 및 다가오는 휴일 카운트다운을 모니터링합니다. 수입 및 지출 종합 데이터로 완벽한 재정 상태를 파악하세요.',
+        featVisualItems: ['직관적으로 시각화된 일정 및 목표 요약', '공휴일 카운트다운', '앱 내 모든 기능 통합 개요'],
+
+        featAiTitle: 'AI 자산 관리자,\n스마트한 맞춤 상담.',
+        featAiDesc: 'AI 비서가 사용자의 재정 데이터를 분석하여 소중한 의견, 추세 예측 및 효율적인 저축 방법을 제시합니다.',
+        featAiItems: ['요청 시 상세 지출 분석', '맞춤 피드백을 위한 전반적인 데이터 검색', '자연어로 다수의 입출금 내역 빠르게 추가', '간단한 언어로 일정 관리 및 업데이트'],
+
+        featFinanceTitle: '투명한 자산 관리,\n최대 저축 실현.',
+        featFinanceDesc: '상세 입출금 내역을 추적하고 직관적인 보고서를 보며, AI 분석을 통해 예산을 최적화하세요.',
+        featFinanceItems: ['월/분기/연간 입출금 보고서', '투명한 자산 흐름 기록 및 모니터링', '저축 목표 설정'],
+
+        featScheduleTitle: '시간 지배하기,\n생산성 향상.',
+        featScheduleDesc: '직관적인 일정표, 스마트 우선순위 할일 목록 및 집중 타스크 완수를 위한 뽀모도로 타이머.',
+        featScheduleItems: ['주간/일간 시간표', '우선순위별 할일 목록', '통합 집중 타이머'],
+
+        featJournalTitle: '개인 일기장,\n치유와 성장.',
+        featJournalDesc: '안전하고 프라이빗한 기록 공간. 감정을 돌아보고 감사 일기를 쓰며 꾸준한 기록 습관을 기릅니다.',
+        featJournalItems: [
+            '워드처럼 강력하고 전문적인 WYSIWYG 에디터',
+            '5가지 이모지로 기록하는 직관적인 감정 추적기 (Mood Tracker)',
+            '일일 감사 알림 및 다양한 영감 주제 무작위 제시',
+            'StarBrain 스타 포인트 보상으로 동기부여 제공 (도파민 생성)',
+            'AI 비서와 콘텍스트를 동기화하여 더욱 깊이 있는 맞춤 상담 지원'
+        ],
+
+        featFocusTitle: '깊은 집중,\n완벽한 휴식.',
+        featFocusDesc: '시간 맞춤형 뽀모도로 타이머와 힐링 로파이(Lofi) 음악 라이브러리로 학업 및 업무 집중도를 높입니다.',
+        featFocusItems: ['사용자 맞춤형 뽀모도로 타이머', '로파이 음악 및 배경 자연음 사운드', '집중 시간 통계 보고'],
+
+        featHabitTitle: '스스로의 룰,\n목표를 향해 나아가다.',
+        featHabitDesc: '보상형 별점(Streak) 기반 습관 형성을 시각화합니다. 디데이 카운트다운과 추억 기념일을 놓치지 마세요.',
+        featHabitItems: ['습관 관리 및 연속 일수(Streak) 분석', '별점 및 배지 시스템으로 건강한 동기부여 유도', '중요 일정 디데이(D-Day) 카운트다운', '추억과 이정표의 기념일 세기'],
+
+        featGoalsTitle: '목표 설정,\n꿈을 현실로.',
+        featGoalsDesc: '장기 및 단기 목표 진행률을 단계별로 파악하세요. 생각에 그치지 않고 행동으로 실현합니다.',
+        featGoalsItems: ['직관적인 진행률 대시보드', '데드라인 리마인더', '퍼페추얼 만년 달력 지원'],
+
+        featGpaTitle: 'GPA 트래커,\n학점 완벽 관리.',
+        featGpaDesc: '맞춤형 학점 관리 도구. 학기별 이수 목표를 설정하고 평점을 자동 정밀 산출합니다.',
+        featGpaItems: ['유연한 목표 학점 설정', '학업 로드맵 이력 관리', '쉽고 단순한 성적 대시보드'],
+
+        featSpotifyTitle: 'My Spotify,\n한계 없는 음악 스트리밍.',
+        featSpotifyDesc: '유료 멤버십 없이 언제 어디서나 스포티파이 음원 재생. 나만의 취향 플레이리스트로 백그라운드 재생까지 완벽.',
+        featSpotifyItems: ['스포티파이 계정 없이 즉시 감상', '반복 및 셔플 무제한 스트리밍', '취향 저격 플레이리스트 빌더'],
+
+        promoTag: '새로운 기능',
+        promoTitle: 'My Storage 둘러보기',
+        promoDesc: '안전하고 프라이빗한 클라우드 보관소. 텍스트 노트, 파일, 미디어 - 무엇이든 저장하세요.',
+        promoBtn: '지금 체험하기',
+        featStorageItems: ['서식 있는 미디어 노트 작성', '파일/이미지 업로드 및 미리보기', '최고 수준의 정보 보안'],
+
+        contactTitle: '문의 및 제안',
+        contactDesc: '앱 제휴 협력 및 발전을 위한 소중한 피드백을 기다립니다.',
+        footerBuilt: '❤️와 스마트 AI 융합 기술로 제작되었습니다.',
+        langName: '한국어'
     }
 };
 
@@ -131,8 +219,63 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
 
     const t = translations[lang];
 
+    const marqueeFeatures = lang === 'vi' ? [
+        { name: 'Cố vấn học tập AI 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'Nhật ký chữa lành 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
+        { name: 'GPA Tracker VNU 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
+        { name: 'Nghe nhạc Spotify 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
+        { name: 'Kỷ luật Thói quen 🔥', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
+        { name: 'Tập trung Pomodoro ⏳', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
+        { name: 'Quản lý Tài chính 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-250', targetId: 'finance' },
+        { name: 'Thời khóa biểu 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
+        { name: 'Lưu trữ Bảo mật 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
+        { name: 'Đếm ngược Sự kiện 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' },
+        { name: 'Thưởng Sao StarBrain ⚡', icon: '⭐', color: 'from-yellow-500/10 to-orange-500/10 text-amber-800 border-yellow-300', targetId: 'journal' },
+        { name: 'To-do List thông minh 📋', icon: '📝', color: 'from-violet-500/10 to-purple-500/10 text-violet-700 border-violet-200', targetId: 'schedule' }
+    ] : lang === 'ko' ? [
+        { name: 'AI 학습 멘토 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: '힐링 다이어리 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
+        { name: 'GPA 트래커 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
+        { name: '스포티파이 음악 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
+        { name: '습관 관리 🔥', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
+        { name: '뽀모도로 타이머 ⏳', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
+        { name: '자산 관리 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
+        { name: '시각적 일정표 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
+        { name: '안전한 보관소 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
+        { name: '이벤트 카운트다운 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' },
+        { name: 'StarBrain 리워드 ⚡', icon: '⭐', color: 'from-yellow-500/10 to-orange-500/10 text-amber-800 border-yellow-300', targetId: 'journal' },
+        { name: '스마트 할일 목록 📋', icon: '📝', color: 'from-violet-500/10 to-purple-500/10 text-violet-700 border-violet-200', targetId: 'schedule' }
+    ] : [
+        { name: 'AI Study Advisor 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'Healing Journal 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
+        { name: 'GPA Tracker 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
+        { name: 'Spotify Music Player 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
+        { name: 'Habit & Streaks 🔥', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
+        { name: 'Pomodoro Focus ⏳', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
+        { name: 'Finance Manager 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
+        { name: 'Visual Schedule 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
+        { name: 'Secure Storage 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
+        { name: 'Event Countdown 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' },
+        { name: 'StarBrain Rewards ⚡', icon: '⭐', color: 'from-yellow-500/10 to-orange-500/10 text-amber-800 border-yellow-300', targetId: 'journal' },
+        { name: 'Smart To-do List 📋', icon: '📝', color: 'from-violet-500/10 to-purple-500/10 text-violet-700 border-violet-200', targetId: 'schedule' }
+    ];
+
+    const scrollToSection = (id: string) => {
+        const element = document.getElementById(id);
+        if (element) {
+            const headerOffset = 80;
+            const elementPosition = element.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+            
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
+        }
+    };
+
     const toggleLang = () => {
-        setLang(lang === 'vi' ? 'en' : 'vi');
+        setLang(lang === 'vi' ? 'en' : lang === 'en' ? 'ko' : 'vi');
     };
 
     return (
@@ -214,10 +357,29 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             {t.heroTitle2}
                         </span>
                     </h1>
+
+                    {/* Infinite Scrolling Ticker of Features */}
+                    <div className="w-full py-2 mb-8 select-none relative overflow-hidden animate-fade-in-up delay-150">
+                        <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
+                        <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
+
+                        <div className="animate-marquee flex items-center gap-4 py-2">
+                            {[...marqueeFeatures, ...marqueeFeatures].map((item, idx) => (
+                                <div
+                                    key={idx}
+                                    onClick={() => scrollToSection(item.targetId)}
+                                    className={`flex items-center gap-2.5 px-6 py-3 bg-gradient-to-r ${item.color} border border-white/45 rounded-full font-bold text-sm shadow-[0_2px_10px_rgba(0,0,0,0.02)] whitespace-nowrap hover:scale-105 hover:-translate-y-0.5 hover:shadow-md active:scale-95 transition-all duration-300 cursor-pointer`}
+                                >
+                                    <span className="text-xl">{item.icon}</span>
+                                    <span>{item.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                     <div className="text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed animate-fade-in-up delay-200">
                         {lang === 'vi' ? (
                             <div className="text-base md:text-xl text-left md:text-center">
-                                SmartLife <strong>super tool</strong> dành cho sinh viên. It helps them về <strong>tài chính</strong>, <strong>lịch trình</strong>, <strong>todolist mục tiêu cá nhân</strong>, <strong>thói quen</strong>, <strong>countdown/up</strong>.
+                                SmartLife <strong>super tool</strong> dành cho sinh viên. It helps them về <strong>tài chính</strong>, <strong>lịch trình</strong>, <strong>todolist mục tiêu cá nhân</strong>, <strong>thói quen</strong>, <strong>countdown/up</strong> và cả <strong>Viết nhật kí</strong>.
                                 {isDescExpanded ? (
                                     <span>
                                         {' '}Ngoài ra còn có <strong>GPA tracker</strong> cho sinh viên VNU, <strong>My spotify</strong> nghe nhạc và podcast mình tự thêm, <strong>Pomodoro</strong> và các phương pháp bấm giờ học tập, <strong>Không gian học</strong>, <strong>Kho lưu trữ tập trung</strong>. Đặc biệt là <strong>Own AI Advisor</strong> nó truy cập toàn bộ dữ liệu và action theo yêu cầu của người dùng một cách thông minh và cá nhân hóa. Tất cả các tính năng sinh viên cần đều trong Smartlife. Mọi thứ mượt và chi tiết thông minh + tối giản.
@@ -229,8 +391,34 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                     </span>
                                 )}
                             </div>
+                        ) : lang === 'ko' ? (
+                            <div className="text-base md:text-xl text-left md:text-center">
+                                SmartLife는 대학생을 위한 <strong>슈퍼 툴(Super Tool)</strong>입니다. <strong>자산 관리</strong>, <strong>일정 계획</strong>, <strong>목표 달성</strong>, <strong>습관 관리</strong>, <strong>카운트다운/업</strong>, 그리고 <strong>일기 기록</strong>까지 하나로 해결하세요.
+                                {isDescExpanded ? (
+                                    <span>
+                                        {' '}추가로 VNU 학생들을 위한 <strong>GPA 트래커</strong>, 자유롭게 감상하는 <strong>My Spotify</strong> 음악 플레이어, <strong>뽀모도로 집중 타이머</strong>, <strong>학습 공간</strong> 및 <strong>프라이빗 저장소</strong>를 제공합니다. 특히 사용자의 데이터를 안전하게 연동하여 스마트하고 맞춤화된 조언을 주는 <strong>나만의 AI 어드바이저</strong> 기능이 탑재되어 있습니다. 대학 생활에 필요한 모든 도구를 스마트하고 심플한 디자인으로 만나보세요.
+                                        <button onClick={() => setIsDescExpanded(false)} className="text-indigo-600 font-semibold hover:underline ml-2 text-sm md:text-base whitespace-nowrap">접기</button>
+                                    </span>
+                                ) : (
+                                    <span>
+                                        ... <button onClick={() => setIsDescExpanded(true)} className="text-indigo-600 font-semibold hover:underline ml-1 text-sm md:text-base whitespace-nowrap">더 보기</button>
+                                    </span>
+                                )}
+                            </div>
                         ) : (
-                            <p className="text-lg md:text-2xl">{t.heroDesc}</p>
+                            <div className="text-base md:text-xl text-left md:text-center">
+                                SmartLife is a <strong>super tool</strong> designed for students. It helps them manage <strong>finances</strong>, <strong>schedules</strong>, <strong>personal goals</strong>, <strong>habits</strong>, <strong>countdowns/ups</strong>, and <strong>healing journals</strong>.
+                                {isDescExpanded ? (
+                                    <span>
+                                        {' '}It also features a VNU-specific <strong>GPA tracker</strong>, a custom <strong>My Spotify</strong> client, <strong>Pomodoro</strong> focus modes, <strong>learning spaces</strong>, and <strong>secure storage</strong>. Most importantly, your <strong>own AI Advisor</strong> analyzes your data to take smart, personalized actions. Every single tool you need is wrapped in a fluid, beautiful, and minimal interface.
+                                        <button onClick={() => setIsDescExpanded(false)} className="text-indigo-600 font-semibold hover:underline ml-2 text-sm md:text-base whitespace-nowrap">Show less</button>
+                                    </span>
+                                ) : (
+                                    <span>
+                                        ... <button onClick={() => setIsDescExpanded(true)} className="text-indigo-600 font-semibold hover:underline ml-1 text-sm md:text-base whitespace-nowrap">Read more</button>
+                                    </span>
+                                )}
+                            </div>
                         )}
                     </div>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-300">
@@ -253,7 +441,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
             {/* Features Section */}
             <div id="features" className="space-y-24 py-20 pb-0">
                 {/* Feature NEW: AI Advisor */}
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 py-20 rounded-3xl border border-indigo-100">
+                <section id="ai-advisor" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 py-20 rounded-3xl border border-indigo-100">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-indigo-300 to-purple-300 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
@@ -275,7 +463,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
-                                <Sparkles size={14} className="animate-pulse" /> Tính năng AI Mới
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Tính năng AI Mới' : lang === 'ko' ? '새로운 AI 기능' : 'New AI Feature'}
                             </div>
                             <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featAiTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
@@ -326,7 +514,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 1: Finance */}
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <section id="finance" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-emerald-100 to-teal-100 rounded-3xl blur-xl opacity-70 group-hover:opacity-100 transition-opacity"></div>
@@ -363,7 +551,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 2: Schedule */}
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-gray-50/50 py-20 rounded-3xl">
+                <section id="schedule" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-gray-50/50 py-20 rounded-3xl">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div className="space-y-6">
                             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
@@ -392,8 +580,57 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     </div>
                 </section>
 
+                {/* Feature 2.25: Personal Journal (NEW) */}
+                <section id="journal" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-emerald-50/30 py-20 rounded-3xl border border-emerald-50">
+                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                        <div className="space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Tính năng mới nổi bật' : lang === 'ko' ? '주요 신기능' : 'Key New Feature'}
+                            </div>
+                            <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featJournalTitle}</h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {t.featJournalDesc}
+                            </p>
+                            <ul className="space-y-3 pt-2">
+                                {t.featJournalItems && t.featJournalItems.map((item: string, i: number) => (
+                                    <li key={i} className="flex items-center gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-emerald-50 shadow-sm">
+                                        <div className="bg-emerald-100 p-1.5 rounded-lg">
+                                            <BookOpen className="text-emerald-600" size={18} />
+                                        </div>
+                                        {item}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div className="relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-emerald-250 to-teal-200 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            {/* Image Composition: Main + 2 Overlapping cards */}
+                            <div className="relative pt-6 pb-8 px-4 sm:px-6">
+                                {/* Main Image: journey1.png */}
+                                <img
+                                    src="/journey1.png"
+                                    alt="SmartLife Journal Main"
+                                    className="relative rounded-2xl shadow-2xl border border-white/50 transform group-hover:scale-[1.02] transition-transform duration-500 z-10 w-full"
+                                />
+                                {/* Overlap Image 2: journey2.png (bottom right) */}
+                                <img
+                                    src="/journey2.png"
+                                    alt="SmartLife Journal Moods & Calendar"
+                                    className="absolute -bottom-6 -right-2 w-[42%] rounded-2xl shadow-2xl border-2 border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-emerald-200/50"
+                                />
+                                {/* Overlap Image 3: journey3.png (top left / floating) */}
+                                <img
+                                    src="/journey3.png"
+                                    alt="SmartLife Journal Prompts & Stats"
+                                    className="absolute -top-4 -left-4 w-[38%] rounded-2xl shadow-2xl border-2 border-white transform -rotate-6 group-hover:-rotate-12 group-hover:scale-110 group-hover:translate-y-1 transition-all duration-500 z-20 cursor-pointer hover:shadow-teal-200/50"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Feature 2.5: Focus & Music (NEW) */}
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-purple-50/30 py-20 rounded-3xl border border-purple-50">
+                <section id="focus-music" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-purple-50/30 py-20 rounded-3xl border border-purple-50">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-purple-200 to-pink-200 rounded-3xl blur-xl opacity-70 group-hover:opacity-100 transition-opacity"></div>
@@ -431,11 +668,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 2.75: Habit Tracker & Countdown (NEW) */}
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-orange-50/30 py-20 rounded-3xl border border-orange-50">
+                <section id="habit-tracker" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-orange-50/30 py-20 rounded-3xl border border-orange-50">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div className="space-y-6">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
-                                <Sparkles size={14} className="animate-pulse" /> Tính năng Mới
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Tính năng Mới' : lang === 'ko' ? '새로운 기능' : 'New Feature'}
                             </div>
                             <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featHabitTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
@@ -502,11 +739,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 4: GPA Tracker (NEW) */}
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-cyan-50/30 py-20 rounded-3xl border border-cyan-50 mb-20">
+                <section id="gpa-tracker" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-cyan-50/30 py-20 rounded-3xl border border-cyan-50 mb-20">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div className="space-y-6">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
-                                <Sparkles size={14} className="animate-pulse" /> Tính năng Mới
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Tính năng Mới' : lang === 'ko' ? '새로운 기능' : 'New Feature'}
                             </div>
                             <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featGpaTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
@@ -543,7 +780,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 5: My Spotify (NEW) */}
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-zinc-900 py-20 rounded-3xl border border-zinc-800 mb-20 shadow-2xl overflow-hidden relative">
+                <section id="spotify" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-zinc-900 py-20 rounded-3xl border border-zinc-800 mb-20 shadow-2xl overflow-hidden relative">
                     <div className="absolute top-0 right-0 -mr-40 -mt-40 w-96 h-96 bg-indigo-500 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
                     <div className="absolute bottom-0 left-0 -ml-40 -mb-40 w-96 h-96 bg-purple-500 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
 
@@ -566,7 +803,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-indigo-400 border border-white/10 text-xs font-bold uppercase tracking-wider mb-2 shadow-sm backdrop-blur-md">
-                                <Sparkles size={14} className="animate-pulse text-purple-400" /> Cập nhật Mới Nhất
+                                <Sparkles size={14} className="animate-pulse text-purple-400" /> {lang === 'vi' ? 'Cập nhật Mới Nhất' : lang === 'ko' ? '최신 업데이트' : 'Latest Update'}
                             </div>
                             <h2 className="text-4xl font-black text-white whitespace-pre-line leading-tight">{t.featSpotifyTitle}</h2>
                             <p className="text-gray-400 text-lg leading-relaxed">
@@ -587,7 +824,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Promo Banner: My Storage */}
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+                <section id="secure-storage" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
                     <div className="relative rounded-3xl overflow-hidden shadow-2xl group cursor-pointer bg-gradient-to-r from-blue-900 to-indigo-900" onClick={onLogin}>
                         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-overlay group-hover:scale-105 transition-transform duration-700" />
 
