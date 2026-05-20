@@ -12,7 +12,7 @@ const NOTIFICATION_SOUND = "data:audio/mp3;base64,SUQzBAAAAAABAFRYVFgAAAASAAADbW
 const playNotificationSound = () => {
     try {
         // Use a short, pleasant notification sound
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // "Bell notification"
+        const audio = new Audio('/notificationwwebapp.mp3');
         audio.volume = 0.7;
         audio.play().catch(e => console.warn("Audio play failed (user interaction needed first):", e));
     } catch (e) {
