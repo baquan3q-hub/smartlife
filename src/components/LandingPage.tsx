@@ -284,35 +284,35 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
 
             {/* Header */}
             <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-indigo-100 border border-gray-100">
+                        <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-indigo-100 border border-gray-100 shrink-0">
                             <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
                         </div>
-                        <span className="font-bold text-xl tracking-tight text-gray-800">SmartLife</span>
+                        <span className="font-bold text-lg sm:text-xl tracking-tight text-gray-800">SmartLife</span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 sm:gap-3">
                         {/* Language Toggle */}
                         <button
                             onClick={toggleLang}
-                            className="flex items-center gap-1.5 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-full transition-all font-medium text-sm"
+                            className="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-2 text-gray-600 hover:bg-gray-100 rounded-full transition-all font-medium text-xs sm:text-sm"
                             title="Switch Language"
                         >
-                            <Globe size={18} />
+                            <Globe size={16} className="sm:w-[18px] sm:h-[18px]" />
                             <span className="uppercase">{lang}</span>
                         </button>
 
                         <button
                             onClick={() => setIsInstallModalOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full font-bold hover:bg-indigo-100 transition-all text-sm"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-indigo-50 text-indigo-600 rounded-full font-bold hover:bg-indigo-100 transition-all text-xs sm:text-sm"
                             title={t.install}
                         >
-                            <Download size={18} />
+                            <Download size={16} className="sm:w-[18px] sm:h-[18px]" />
                             <span className="hidden sm:inline">{t.install}</span>
                         </button>
                         <button
                             onClick={onLogin}
-                            className="px-5 py-2.5 bg-gray-900 text-white rounded-full font-medium hover:bg-gray-800 transition-all text-sm"
+                            className="px-3.5 py-2 sm:px-5 sm:py-2.5 bg-gray-900 text-white rounded-full font-medium hover:bg-gray-800 transition-all text-xs sm:text-sm"
                         >
                             {t.login}
                         </button>
@@ -321,11 +321,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
             </header>
 
             {/* Hero Section */}
-            <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden min-h-[85vh] flex flex-col justify-center">
+            <section className="pt-28 pb-12 sm:pt-32 sm:pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden min-h-[80vh] sm:min-h-[85vh] flex flex-col justify-center">
                 {/* Background Animated Glows */}
-                <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-[120px] mix-blend-multiply animate-pulse" style={{ animationDuration: '4s' }}></div>
-                <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-[500px] h-[500px] bg-indigo-300/30 rounded-full blur-[120px] mix-blend-multiply animate-pulse" style={{ animationDuration: '6s', animationDelay: '1s' }}></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-pink-200/20 rounded-full blur-[150px] pointer-events-none"></div>
+                <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-purple-300/30 rounded-full blur-[80px] sm:blur-[120px] mix-blend-multiply animate-pulse" style={{ animationDuration: '4s' }}></div>
+                <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-indigo-300/30 rounded-full blur-[80px] sm:blur-[120px] mix-blend-multiply animate-pulse" style={{ animationDuration: '6s', animationDelay: '1s' }}></div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] sm:w-[800px] sm:h-[400px] bg-pink-200/20 rounded-full blur-[100px] sm:blur-[150px] pointer-events-none"></div>
 
                 {/* Floating Elements (Hidden on very small screens) */}
                 <div className="hidden md:block absolute inset-0 pointer-events-none z-0">
@@ -347,11 +347,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     </div>
                 </div>
 
-                <div className="max-w-5xl mx-auto text-center relative z-10">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-indigo-100 shadow-sm text-indigo-600 text-xs font-bold uppercase tracking-wider mb-8 animate-fade-in-up hover:scale-105 transition-transform cursor-default">
+                <div className="max-w-5xl mx-auto text-center relative z-10 w-full overflow-hidden">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white border border-indigo-100 shadow-sm text-indigo-600 text-xs font-bold uppercase tracking-wider mb-6 sm:mb-8 animate-fade-in-up hover:scale-105 transition-transform cursor-default">
                         <Zap size={14} className="text-yellow-500" /> {t.heroTag}
                     </div>
-                    <h1 className="text-5xl md:text-7xl font-extrabold text-gray-900 tracking-tight mb-6 leading-[1.1] animate-fade-in-up delay-100">
+                    <h1 className="text-2xl xs:text-4xl sm:text-5xl md:text-7xl font-extrabold text-gray-900 tracking-tight mb-6 leading-[1.15] md:leading-[1.1] animate-fade-in-up delay-100" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                         {t.heroTitle1} <br className="hidden md:block" />
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-[length:200%_auto] animate-pulse">
                             {t.heroTitle2}
@@ -359,9 +359,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     </h1>
 
                     {/* Infinite Scrolling Ticker of Features */}
-                    <div className="w-full py-2 mb-8 select-none relative overflow-hidden animate-fade-in-up delay-150">
-                        <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
-                        <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
+                    <div className="w-full max-w-full py-2 mb-6 sm:mb-8 select-none relative overflow-hidden animate-fade-in-up delay-150">
+                        <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-20 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
+                        <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-20 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
 
                         <div className="animate-marquee flex items-center gap-4 py-2">
                             {[...marqueeFeatures, ...marqueeFeatures].map((item, idx) => (
@@ -376,9 +376,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             ))}
                         </div>
                     </div>
-                    <div className="text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed animate-fade-in-up delay-200">
+                    <div className="text-gray-600 mb-8 sm:mb-10 max-w-full sm:max-w-3xl mx-auto leading-relaxed animate-fade-in-up delay-200 px-1">
                         {lang === 'vi' ? (
-                            <div className="text-base md:text-xl text-left md:text-center">
+                            <div className="text-sm sm:text-base md:text-xl text-center">
                                 SmartLife <strong>super tool</strong> dành cho sinh viên. It helps them về <strong>tài chính</strong>, <strong>lịch trình</strong>, <strong>todolist mục tiêu cá nhân</strong>, <strong>thói quen</strong>, <strong>countdown/up</strong> và cả <strong>Viết nhật kí</strong>.
                                 {isDescExpanded ? (
                                     <span>
@@ -392,7 +392,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 )}
                             </div>
                         ) : lang === 'ko' ? (
-                            <div className="text-base md:text-xl text-left md:text-center">
+                            <div className="text-sm sm:text-base md:text-xl text-center">
                                 SmartLife는 대학생을 위한 <strong>슈퍼 툴(Super Tool)</strong>입니다. <strong>자산 관리</strong>, <strong>일정 계획</strong>, <strong>목표 달성</strong>, <strong>습관 관리</strong>, <strong>카운트다운/업</strong>, 그리고 <strong>일기 기록</strong>까지 하나로 해결하세요.
                                 {isDescExpanded ? (
                                     <span>
@@ -406,7 +406,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 )}
                             </div>
                         ) : (
-                            <div className="text-base md:text-xl text-left md:text-center">
+                            <div className="text-sm sm:text-base md:text-xl text-center">
                                 SmartLife is a <strong>super tool</strong> designed for students. It helps them manage <strong>finances</strong>, <strong>schedules</strong>, <strong>personal goals</strong>, <strong>habits</strong>, <strong>countdowns/ups</strong>, and <strong>healing journals</strong>.
                                 {isDescExpanded ? (
                                     <span>
@@ -421,17 +421,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             </div>
                         )}
                     </div>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-300">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-300 w-full max-w-md sm:max-w-none mx-auto">
                         <div className="relative group w-full sm:w-auto">
                             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-60 transition duration-500"></div>
                             <button
                                 onClick={onLogin}
-                                className="relative w-full sm:w-auto px-8 py-4 bg-gray-900 text-white rounded-full font-bold text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-2"
+                                className="relative w-full sm:w-auto px-6 py-3.5 sm:px-8 sm:py-4 bg-gray-900 text-white rounded-full font-bold text-base sm:text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-2"
                             >
                                 {t.startNow} <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                             </button>
                         </div>
-                        <a href="#features" className="w-full sm:w-auto px-8 py-4 bg-white text-gray-700 border border-gray-200 shadow-sm rounded-full font-bold text-lg hover:bg-gray-50 hover:shadow-md transition-all flex items-center justify-center group">
+                        <a href="#features" className="w-full sm:w-auto px-6 py-3.5 sm:px-8 sm:py-4 bg-white text-gray-700 border border-gray-200 shadow-sm rounded-full font-bold text-base sm:text-lg hover:bg-gray-50 hover:shadow-md transition-all flex items-center justify-center group">
                             {t.learnMore}
                         </a>
                     </div>
@@ -439,10 +439,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
             </section>
 
             {/* Features Section */}
-            <div id="features" className="space-y-24 py-20 pb-0">
+            <div id="features" className="space-y-16 sm:space-y-24 py-12 sm:py-20 pb-0">
                 {/* Feature NEW: AI Advisor */}
-                <section id="ai-advisor" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 py-20 rounded-3xl border border-indigo-100">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                <section id="ai-advisor" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 py-12 sm:py-20 rounded-3xl border border-indigo-100">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-indigo-300 to-purple-300 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
                             {/* Image Composition: Main + Sub overlay */}
@@ -457,7 +457,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 <img
                                     src="/ai-feature-sub.png"
                                     alt="AI Charts"
-                                    className="absolute -bottom-6 -right-4 w-2/5 rounded-2xl shadow-2xl border-2 border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-indigo-200/50"
+                                    className="absolute -bottom-3 -right-2 sm:-bottom-6 sm:-right-4 w-2/5 rounded-2xl shadow-2xl border-2 border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-indigo-200/50"
                                 />
                             </div>
                         </div>
@@ -465,17 +465,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
                                 <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Tính năng AI Mới' : lang === 'ko' ? '새로운 AI 기능' : 'New AI Feature'}
                             </div>
-                            <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featAiTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featAiTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featAiDesc}
                             </p>
                             <ul className="space-y-4 pt-2">
                                 {t.featAiItems.map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-indigo-50 shadow-sm">
-                                        <div className="bg-indigo-100 p-1.5 rounded-lg">
+                                    <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-indigo-50 shadow-sm">
+                                        <div className="bg-indigo-100 p-1.5 rounded-lg shrink-0 mt-0.5">
                                             <Brain className="text-indigo-600" size={18} />
                                         </div>
-                                        {item}
+                                        <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -484,20 +484,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 0: Visual Board */}
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-indigo-50/30 py-20 rounded-3xl border border-indigo-50">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                <section className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-indigo-50/30 py-12 sm:py-20 rounded-3xl border border-indigo-50">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="space-y-6">
-                            <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-indigo-100 border border-indigo-50">
+                            <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-indigo-100 border border-indigo-50 shrink-0">
                                 <img src="/pwa-192x192.png" alt="Visual Board" className="w-full h-full object-cover" />
                             </div>
-                            <h2 className="text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featVisualTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featVisualTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featVisualDesc}
                             </p>
                             <ul className="space-y-3">
                                 {t.featVisualItems.map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-gray-700 font-medium">
-                                        <ShieldCheck className="text-indigo-500" size={20} /> {item}
+                                    <li key={i} className="flex items-start gap-3 text-gray-700 font-medium">
+                                        <ShieldCheck className="text-indigo-500 shrink-0 mt-1" size={20} />
+                                        <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -514,8 +515,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 1: Finance */}
-                <section id="finance" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                <section id="finance" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 py-8 sm:py-16">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-emerald-100 to-teal-100 rounded-3xl blur-xl opacity-70 group-hover:opacity-100 transition-opacity"></div>
                             <div className="relative">
@@ -527,22 +528,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 <img
                                     src="/finance_preview2.png"
                                     alt="Chi tiết Tài chính"
-                                    className="absolute -bottom-6 -left-4 w-2/5 rounded-2xl shadow-2xl border-2 border-white transform -rotate-3 group-hover:-rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-emerald-200/50"
+                                    className="absolute -bottom-3 -left-2 sm:-bottom-6 sm:-left-4 w-2/5 rounded-2xl shadow-2xl border-2 border-white transform -rotate-3 group-hover:-rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-emerald-200/50"
                                 />
                             </div>
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
-                            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
+                            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
                                 <Wallet size={28} />
                             </div>
-                            <h2 className="text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featFinanceTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featFinanceTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featFinanceDesc}
                             </p>
                             <ul className="space-y-3">
                                 {t.featFinanceItems.map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-gray-700 font-medium">
-                                        <ShieldCheck className="text-emerald-500" size={20} /> {item}
+                                    <li key={i} className="flex items-start gap-3 text-gray-700 font-medium">
+                                        <ShieldCheck className="text-emerald-500 shrink-0 mt-1" size={20} />
+                                        <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -551,20 +553,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 2: Schedule */}
-                <section id="schedule" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-gray-50/50 py-20 rounded-3xl">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                <section id="schedule" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gray-50/50 py-12 sm:py-20 rounded-3xl">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="space-y-6">
-                            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
+                            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
                                 <CalendarDays size={28} />
                             </div>
-                            <h2 className="text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featScheduleTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featScheduleTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featScheduleDesc}
                             </p>
                             <ul className="space-y-3">
                                 {t.featScheduleItems.map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-gray-700 font-medium">
-                                        <ShieldCheck className="text-blue-500" size={20} /> {item}
+                                    <li key={i} className="flex items-start gap-3 text-gray-700 font-medium">
+                                        <ShieldCheck className="text-blue-500 shrink-0 mt-1" size={20} />
+                                        <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -581,23 +584,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 2.25: Personal Journal (NEW) */}
-                <section id="journal" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-emerald-50/30 py-20 rounded-3xl border border-emerald-50">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                <section id="journal" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-emerald-50/30 py-12 sm:py-20 rounded-3xl border border-emerald-50">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="space-y-6">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
                                 <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Tính năng mới nổi bật' : lang === 'ko' ? '주요 신기능' : 'Key New Feature'}
                             </div>
-                            <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featJournalTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featJournalTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featJournalDesc}
                             </p>
                             <ul className="space-y-3 pt-2">
                                 {t.featJournalItems && t.featJournalItems.map((item: string, i: number) => (
-                                    <li key={i} className="flex items-center gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-emerald-50 shadow-sm">
-                                        <div className="bg-emerald-100 p-1.5 rounded-lg">
+                                    <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-emerald-50 shadow-sm">
+                                        <div className="bg-emerald-100 p-1.5 rounded-lg shrink-0 mt-0.5">
                                             <BookOpen className="text-emerald-600" size={18} />
                                         </div>
-                                        {item}
+                                        <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -616,13 +619,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 <img
                                     src="/journey2.png"
                                     alt="SmartLife Journal Moods & Calendar"
-                                    className="absolute -bottom-6 -right-2 w-[42%] rounded-2xl shadow-2xl border-2 border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-emerald-200/50"
+                                    className="absolute -bottom-3 -right-1 sm:-bottom-6 sm:-right-2 w-[42%] rounded-2xl shadow-2xl border border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-emerald-200/50"
                                 />
                                 {/* Overlap Image 3: journey3.png (top left / floating) */}
                                 <img
                                     src="/journey3.png"
                                     alt="SmartLife Journal Prompts & Stats"
-                                    className="absolute -top-4 -left-4 w-[38%] rounded-2xl shadow-2xl border-2 border-white transform -rotate-6 group-hover:-rotate-12 group-hover:scale-110 group-hover:translate-y-1 transition-all duration-500 z-20 cursor-pointer hover:shadow-teal-200/50"
+                                    className="absolute -top-2 -left-2 sm:-top-4 sm:-left-4 w-[38%] rounded-2xl shadow-2xl border border-white transform -rotate-6 group-hover:-rotate-12 group-hover:scale-110 group-hover:translate-y-1 transition-all duration-500 z-20 cursor-pointer hover:shadow-teal-200/50"
                                 />
                             </div>
                         </div>
@@ -630,8 +633,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 2.5: Focus & Music (NEW) */}
-                <section id="focus-music" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-purple-50/30 py-20 rounded-3xl border border-purple-50">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                <section id="focus-music" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-purple-50/30 py-12 sm:py-20 rounded-3xl border border-purple-50">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-purple-200 to-pink-200 rounded-3xl blur-xl opacity-70 group-hover:opacity-100 transition-opacity"></div>
                             {/* Image Composition */}
@@ -644,22 +647,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 <img
                                     src="/assets/focus_feature_1.png"
                                     alt="Music Player"
-                                    className="absolute -bottom-8 -right-4 w-2/5 rounded-2xl shadow-2xl border border-gray-100 transform rotate-3 group-hover:rotate-6 transition-transform duration-500 z-20"
+                                    className="absolute -bottom-3 -right-2 sm:-bottom-8 sm:-right-4 w-2/5 rounded-2xl shadow-2xl border border-gray-100 transform rotate-3 group-hover:rotate-6 transition-transform duration-500 z-20"
                                 />
                             </div>
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
-                            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 shrink-0">
                                 <Headphones size={28} />
                             </div>
-                            <h2 className="text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featFocusTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featFocusTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featFocusDesc}
                             </p>
                             <ul className="space-y-3">
                                 {t.featFocusItems && t.featFocusItems.map((item: string, i: number) => (
-                                    <li key={i} className="flex items-center gap-3 text-gray-700 font-medium">
-                                        <Zap className="text-purple-500" size={20} /> {item}
+                                    <li key={i} className="flex items-start gap-3 text-gray-700 font-medium">
+                                        <Zap className="text-purple-500 shrink-0 mt-1" size={20} />
+                                        <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -668,23 +672,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 2.75: Habit Tracker & Countdown (NEW) */}
-                <section id="habit-tracker" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-orange-50/30 py-20 rounded-3xl border border-orange-50">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                <section id="habit-tracker" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-orange-50/30 py-12 sm:py-20 rounded-3xl border border-orange-50">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="space-y-6">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
                                 <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Tính năng Mới' : lang === 'ko' ? '새로운 기능' : 'New Feature'}
                             </div>
-                            <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featHabitTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featHabitTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featHabitDesc}
                             </p>
                             <ul className="space-y-3 pt-2">
                                 {t.featHabitItems && t.featHabitItems.map((item: string, i: number) => (
-                                    <li key={i} className="flex items-center gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-orange-50 shadow-sm">
-                                        <div className="bg-orange-100 p-1.5 rounded-lg">
+                                    <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-orange-50 shadow-sm">
+                                        <div className="bg-orange-100 p-1.5 rounded-lg shrink-0 mt-0.5">
                                             <Flame className="text-orange-600" size={18} />
                                         </div>
-                                        {item}
+                                        <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -701,7 +705,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 <img
                                     src="/habitsecond.png"
                                     alt="Countdown & Count-up"
-                                    className="absolute -bottom-10 -right-8 w-[35%] rounded-2xl shadow-2xl border-2 border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-orange-200/50"
+                                    className="absolute -bottom-4 -right-3 sm:-bottom-10 sm:-right-8 w-[35%] rounded-2xl shadow-2xl border-2 border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-orange-200/50"
                                 />
                             </div>
                         </div>
@@ -709,8 +713,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 3: Goals */}
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                <section className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 py-8 sm:py-16">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-orange-100 to-amber-100 rounded-3xl blur-xl opacity-70 group-hover:opacity-100 transition-opacity"></div>
                             <img
@@ -720,17 +724,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             />
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
-                            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
+                            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 shrink-0">
                                 <Rocket size={28} />
                             </div>
-                            <h2 className="text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featGoalsTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featGoalsTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featGoalsDesc}
                             </p>
                             <ul className="space-y-3">
                                 {t.featGoalsItems.map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-gray-700 font-medium">
-                                        <ShieldCheck className="text-orange-500" size={20} /> {item}
+                                    <li key={i} className="flex items-start gap-3 text-gray-700 font-medium">
+                                        <ShieldCheck className="text-orange-500 shrink-0 mt-1" size={20} />
+                                        <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -739,23 +744,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 4: GPA Tracker (NEW) */}
-                <section id="gpa-tracker" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-cyan-50/30 py-20 rounded-3xl border border-cyan-50 mb-20">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                <section id="gpa-tracker" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-cyan-50/30 py-12 sm:py-20 rounded-3xl border border-cyan-50 mb-16 sm:mb-20">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="space-y-6">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
                                 <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Tính năng Mới' : lang === 'ko' ? '새로운 기능' : 'New Feature'}
                             </div>
-                            <h2 className="text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featGpaTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featGpaTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featGpaDesc}
                             </p>
                             <ul className="space-y-3 pt-2">
                                 {t.featGpaItems && t.featGpaItems.map((item: string, i: number) => (
-                                    <li key={i} className="flex items-center gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-cyan-50 shadow-sm">
-                                        <div className="bg-cyan-100 p-1.5 rounded-lg">
+                                    <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-cyan-50 shadow-sm">
+                                        <div className="bg-cyan-100 p-1.5 rounded-lg shrink-0 mt-0.5">
                                             <GraduationCap className="text-cyan-600" size={18} />
                                         </div>
-                                        {item}
+                                        <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -772,7 +777,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 <img
                                     src="/GPA2.png"
                                     alt="GPA Tracker Details"
-                                    className="absolute -bottom-8 -left-6 w-1/2 rounded-2xl shadow-2xl border-2 border-white transform -rotate-3 group-hover:-rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-cyan-200/50"
+                                    className="absolute -bottom-3 -left-2 sm:-bottom-8 sm:-left-6 w-1/2 rounded-2xl shadow-2xl border-2 border-white transform -rotate-3 group-hover:-rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-cyan-200/50"
                                 />
                             </div>
                         </div>
@@ -780,11 +785,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Feature 5: My Spotify (NEW) */}
-                <section id="spotify" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-zinc-900 py-20 rounded-3xl border border-zinc-800 mb-20 shadow-2xl overflow-hidden relative">
+                <section id="spotify" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-zinc-900 py-12 sm:py-20 rounded-3xl border border-zinc-800 mb-16 sm:mb-20 shadow-2xl overflow-hidden relative">
                     <div className="absolute top-0 right-0 -mr-40 -mt-40 w-96 h-96 bg-indigo-500 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
                     <div className="absolute bottom-0 left-0 -ml-40 -mb-40 w-96 h-96 bg-purple-500 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
 
-                    <div className="grid md:grid-cols-2 gap-12 items-center relative z-10">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center relative z-10">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
                             {/* Image Composition */}
@@ -797,7 +802,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 <img
                                     src="/assets/spotify_preview_1.png"
                                     alt="My Spotify Playlist"
-                                    className="absolute -bottom-6 -right-4 w-1/3 max-w-[160px] md:max-w-[180px] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-2 border-zinc-800 transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-3 transition-all duration-500 z-20 cursor-pointer hover:shadow-indigo-500/50"
+                                    className="absolute -bottom-3 -right-2 sm:-bottom-6 sm:-right-4 w-1/3 max-w-[160px] md:max-w-[180px] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-2 border-zinc-800 transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-3 transition-all duration-500 z-20 cursor-pointer hover:shadow-indigo-500/50"
                                 />
                             </div>
                         </div>
@@ -805,17 +810,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-indigo-400 border border-white/10 text-xs font-bold uppercase tracking-wider mb-2 shadow-sm backdrop-blur-md">
                                 <Sparkles size={14} className="animate-pulse text-purple-400" /> {lang === 'vi' ? 'Cập nhật Mới Nhất' : lang === 'ko' ? '최신 업데이트' : 'Latest Update'}
                             </div>
-                            <h2 className="text-4xl font-black text-white whitespace-pre-line leading-tight">{t.featSpotifyTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white whitespace-pre-line leading-tight">{t.featSpotifyTitle}</h2>
                             <p className="text-gray-400 text-lg leading-relaxed">
                                 {t.featSpotifyDesc}
                             </p>
                             <ul className="space-y-3 pt-2">
                                 {t.featSpotifyItems && t.featSpotifyItems.map((item: string, i: number) => (
-                                    <li key={i} className="flex items-center gap-3 text-gray-200 font-semibold bg-white/5 p-3 rounded-xl border border-white/10 shadow-sm backdrop-blur-sm">
-                                        <div className="bg-indigo-500/20 p-1.5 rounded-lg border border-indigo-500/30">
+                                    <li key={i} className="flex items-start gap-3 text-gray-200 font-semibold bg-white/5 p-3 rounded-xl border border-white/10 shadow-sm backdrop-blur-sm">
+                                        <div className="bg-indigo-500/20 p-1.5 rounded-lg border border-indigo-500/30 shrink-0 mt-0.5">
                                             <PlayCircle className="text-indigo-400" size={18} />
                                         </div>
-                                        {item}
+                                        <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -824,17 +829,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
 
                 {/* Promo Banner: My Storage */}
-                <section id="secure-storage" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+                <section id="secure-storage" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto pb-16 sm:pb-20">
                     <div className="relative rounded-3xl overflow-hidden shadow-2xl group cursor-pointer bg-gradient-to-r from-blue-900 to-indigo-900" onClick={onLogin}>
                         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-overlay group-hover:scale-105 transition-transform duration-700" />
 
-                        <div className="relative z-10 p-8 md:p-12 grid md:grid-cols-2 gap-12 items-center">
+                        <div className="relative z-10 p-6 sm:p-8 md:p-12 grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                             {/* Content */}
                             <div className="text-center md:text-left">
                                 <div className="inline-block px-4 py-1.5 rounded-full bg-blue-500/30 border border-blue-400/30 text-blue-200 text-xs font-bold uppercase tracking-wider mb-6">
                                     {t.promoTag}
                                 </div>
-                                <h2 className="text-3xl md:text-4xl font-black text-white mb-6 leading-tight">
+                                <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-4 sm:mb-6 leading-tight">
                                     {t.promoTitle}
                                 </h2>
                                 <p className="text-blue-100 text-lg mb-8 leading-relaxed">
@@ -844,11 +849,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 {/* Feature List */}
                                 <ul className="space-y-3 mb-8 text-left inline-block">
                                     {t.featStorageItems && t.featStorageItems.map((item: string, i: number) => (
-                                        <li key={i} className="flex items-center gap-3 text-blue-50 font-medium">
-                                            <div className="p-1 rounded-full bg-blue-500/20 text-blue-300">
+                                        <li key={i} className="flex items-start gap-3 text-blue-50 font-medium">
+                                            <div className="p-1 rounded-full bg-blue-500/20 text-blue-300 shrink-0 mt-1">
                                                 <ShieldCheck size={16} />
                                             </div>
-                                            {item}
+                                            <span>{item}</span>
                                         </li>
                                     ))}
                                 </ul>
@@ -862,9 +867,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             </div>
 
                             {/* Images Composition */}
-                            <div className="relative h-full min-h-[300px] flex items-center justify-center">
+                            <div className="relative h-full min-h-[220px] sm:min-h-[300px] flex items-center justify-center">
                                 {/* Back Image (Files/Images) */}
-                                <div className="absolute top-0 right-0 w-3/4 transform translate-x-4 -translate-y-4 rotate-3 group-hover:rotate-6 transition-transform duration-500">
+                                <div className="absolute top-0 right-0 w-3/4 transform translate-x-2 -translate-y-2 sm:translate-x-4 sm:-translate-y-4 rotate-3 group-hover:rotate-6 transition-transform duration-500">
                                     <img
                                         src="/assets/storage_feature_2.png"
                                         alt="My Storage Files"
@@ -873,7 +878,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 </div>
 
                                 {/* Front Image (Notes) */}
-                                <div className="absolute bottom-0 left-0 w-3/4 transform -translate-x-4 translate-y-4 -rotate-3 group-hover:-rotate-6 transition-transform duration-500 z-10">
+                                <div className="absolute bottom-0 left-0 w-3/4 transform -translate-x-2 translate-y-2 sm:-translate-x-4 sm:translate-y-4 -rotate-3 group-hover:-rotate-6 transition-transform duration-500 z-10">
                                     <img
                                         src="/assets/storage_feature_1.png"
                                         alt="My Storage Notes"
