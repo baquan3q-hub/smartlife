@@ -78,6 +78,9 @@ const JournalDashboard: React.FC<JournalDashboardProps> = ({ userId }) => {
   const [filterMood, setFilterMood] = useState<string>('all');
   const [filterTag, setFilterTag] = useState<string>('all');
   const [calendarDate, setCalendarDate] = useState<Date>(new Date());
+  
+  // State to track expanded timeline entries in review tab
+  const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
 
   // Ref to contentEditable editor div
   const editorRef = useRef<HTMLDivElement>(null);
@@ -1230,9 +1233,53 @@ const JournalDashboard: React.FC<JournalDashboardProps> = ({ userId }) => {
                         </div>
 
                         {/* Content text */}
-                        <div className="text-xs sm:text-sm text-gray-600 line-clamp-3 leading-relaxed whitespace-pre-wrap">
-                          {entry.content}
-                        </div>
+                        {(() => {
+                          const plainText = entry.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                          const isLong = plainText.length > 180;
+                          const isExpanded = !!expandedEntries[entry.id];
+
+                          if (!isLong) {
+                            return (
+                              <div 
+                                className="text-xs sm:text-sm text-gray-700 leading-relaxed break-words [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:text-base [&_h2]:font-medium [&_p]:my-1 font-medium"
+                                dangerouslySetInnerHTML={{ __html: entry.content }}
+                              />
+                            );
+                          }
+
+                          if (isExpanded) {
+                            return (
+                              <div className="space-y-1.5">
+                                <div 
+                                  className="text-xs sm:text-sm text-gray-700 leading-relaxed break-words [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:text-base [&_h2]:font-medium [&_p]:my-1 font-medium"
+                                  dangerouslySetInnerHTML={{ __html: entry.content }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedEntries(prev => ({ ...prev, [entry.id]: false }))}
+                                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline mt-1 focus:outline-none flex items-center gap-1"
+                                >
+                                  Thu gọn
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="space-y-1.5">
+                              <div className="text-xs sm:text-sm text-gray-600 line-clamp-3 leading-relaxed">
+                                {plainText}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedEntries(prev => ({ ...prev, [entry.id]: true }))}
+                                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline mt-1 focus:outline-none flex items-center gap-1"
+                              >
+                                Xem thêm
+                              </button>
+                            </div>
+                          );
+                        })()}
 
                         {/* Gratitude items in history */}
                         {entry.gratitude.length > 0 && (
