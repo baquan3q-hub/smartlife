@@ -700,54 +700,6 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                         )}
                     </div>
 
-                    {/* COUNTDOWNS */}
-                    {!loadingEvents && countdowns.length > 0 && (
-                        <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
-                                <Timer className="text-indigo-500" /> Sắp diễn ra
-                            </h3>
-                            <div className="space-y-3">
-                                {countdowns.slice(0, 3).map(c => {
-                                    const d = diffDays(c.target_date);
-                                    return (
-                                        <div key={c.id} className="flex items-center gap-4 bg-gray-50 rounded-2xl p-3">
-                                            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-2xl">{c.icon}</div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-bold text-gray-800 truncate">{c.title}</div>
-                                                <div className="text-xs text-gray-400">{new Date(c.target_date).toLocaleDateString('vi-VN')}</div>
-                                            </div>
-                                            <div className="text-xl font-black text-indigo-600">{d > 0 ? d : 0} <span className="text-xs font-normal text-gray-500">ngày</span></div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* COUNTUPS */}
-                    {!loadingEvents && countups.length > 0 && (
-                        <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
-                                <TrendingUp className="text-emerald-500" /> Đã trôi qua
-                            </h3>
-                            <div className="space-y-3">
-                                {countups.slice(0, 3).map(c => {
-                                    const d = diffDays(c.start_date, true);
-                                    return (
-                                        <div key={c.id} className="flex items-center gap-4 bg-gray-50 rounded-2xl p-3">
-                                            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-2xl">{c.icon}</div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-bold text-gray-800 truncate">{c.title}</div>
-                                                <div className="text-xs text-gray-400">{new Date(c.start_date).toLocaleDateString('vi-VN')}</div>
-                                            </div>
-                                            <div className="text-xl font-black text-emerald-600">{d > 0 ? d : 0} <span className="text-xs font-normal text-gray-500">ngày</span></div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
                     {/* Holidays Countdown */}
                     <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-4 md:p-6 shadow-sm border border-pink-100 h-auto transition-all duration-500">
                         <div className="flex items-center justify-between mb-4">
@@ -875,6 +827,30 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             {scheduleGoals.length === 0 && <div className="text-center text-gray-400 text-sm py-4">Chưa có mục tiêu lịch trình.</div>}
                         </div>
                     </div>
+
+                    {/* COUNTUPS */}
+                    {!loadingEvents && countups.length > 0 && (
+                        <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
+                                <TrendingUp className="text-emerald-500" /> Đã trôi qua
+                            </h3>
+                            <div className="space-y-3">
+                                {countups.slice(0, 3).map(c => {
+                                    const d = diffDays(c.start_date, true);
+                                    return (
+                                        <div key={c.id} className="flex items-center gap-4 bg-gray-50 rounded-2xl p-3">
+                                            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-2xl">{c.icon}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold text-gray-800 truncate">{c.title}</div>
+                                                <div className="text-xs text-gray-400">{new Date(c.start_date).toLocaleDateString('vi-VN')}</div>
+                                            </div>
+                                            <div className="text-xl font-black text-emerald-600">{d > 0 ? d : 0} <span className="text-xs font-normal text-gray-500">ngày</span></div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* COL 3: FINANCE SNAPSHOT & GOALS (Was Col 1) */}
@@ -1006,6 +982,30 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             </div>
                         </div>
                     </div>
+
+                    {/* COUNTDOWNS */}
+                    {!loadingEvents && countdowns.length > 0 && (
+                        <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
+                                <Timer className="text-indigo-500" /> Sắp diễn ra
+                            </h3>
+                            <div className="space-y-3">
+                                {countdowns.slice(0, 3).map(c => {
+                                    const d = diffDays(c.target_date);
+                                    return (
+                                        <div key={c.id} className="flex items-center gap-4 bg-gray-50 rounded-2xl p-3">
+                                            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-2xl">{c.icon}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold text-gray-800 truncate">{c.title}</div>
+                                                <div className="text-xs text-gray-400">{new Date(c.target_date).toLocaleDateString('vi-VN')}</div>
+                                            </div>
+                                            <div className="text-xl font-black text-indigo-600">{d > 0 ? d : 0} <span className="text-xs font-normal text-gray-500">ngày</span></div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                 </div>
 

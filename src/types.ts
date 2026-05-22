@@ -173,6 +173,7 @@ export interface Todo {
   priority: 'low' | 'medium' | 'high' | 'urgent' | 'focus' | 'chill' | 'temp';
   deadline?: string;
   sort_order?: number;
+  time_spent?: number; // Tổng thời gian đã dùng (seconds)
 }
 
 // Interface cho Ngân sách (Budget)
