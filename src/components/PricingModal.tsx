@@ -1,6 +1,6 @@
 // File: src/components/PricingModal.tsx
 import React, { useState } from 'react';
-import { X, Sparkles, CheckCircle, Zap, Brain, CalendarDays, LayoutDashboard, Crown, Star, Flame, Trophy, BarChart3, TrendingUp } from 'lucide-react';
+import { X, Sparkles, CheckCircle, Zap, Brain, CalendarDays, LayoutDashboard, Crown, Star, Flame, Trophy, BarChart3, TrendingUp, BookOpen } from 'lucide-react';
 import { SUBSCRIPTION_PLANS, PAYMENT_INFO } from '../services/subscriptionService';
 import { SubscriptionPlanDuration } from '../types';
 
@@ -26,6 +26,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
     { icon: <CalendarDays size={18} />, text: 'Lịch trình, Thời khóa biểu & Todo — quản lý deadline hiệu quả' },
     { icon: <Flame size={18} />, text: 'Habit Tracker — theo dõi thói quen với streak, countdown & count-up' },
     { icon: <Star size={18} />, text: 'StarBrain ⭐ — hệ thống sao thưởng & cửa hàng đổi quà khi hoàn thành thói quen' },
+    { icon: <BookOpen size={18} />, text: 'Nhật ký cá nhân — không gian chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
     { icon: <Brain size={18} />, text: 'AI Cố vấn riêng — phân tích & gợi ý cá nhân hóa' },
     { icon: <Zap size={18} />, text: 'Focus Timer & Lofi Music — chế độ tập trung tối đa' },
     { icon: <TrendingUp size={18} />, text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },

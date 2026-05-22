@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Pause, RotateCcw, Brain, Clock, Maximize2, Minimize2, Quote, Music, Timer as TimerIcon, Activity } from 'lucide-react';
+import { Play, Pause, RotateCcw, Brain, Clock, Maximize2, Minimize2, Quote, Music, Timer as TimerIcon, Activity, ExternalLink } from 'lucide-react';
 import { useFocusTimer, TimerStatus, TimerMode, Preset, PRESETS } from '../hooks/useFocusTimer';
 
 interface FocusTimerProps {
@@ -52,6 +52,15 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ timer, onOpenMusic }) => {
                     {isFullScreen ? 'SmartLife Focus' : 'Tập trung'}
                 </h3>
                 <div className="flex gap-2 z-20">
+                    {typeof window !== 'undefined' && 'documentPictureInPicture' in window && (
+                        <button 
+                            onClick={() => window.dispatchEvent(new CustomEvent('trigger-focus-pip'))}
+                            className={`p-2 rounded-lg transition-all ${isFullScreen ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-500'}`}
+                            title="Ghim ngoài màn hình (Luôn nổi)"
+                        >
+                            <ExternalLink size={isFullScreen ? 24 : 20} />
+                        </button>
+                    )}
                     <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-all text-gray-500">
                         {isFullScreen ? <Minimize2 size={24} className="text-white" /> : <Maximize2 size={20} />}
                     </button>

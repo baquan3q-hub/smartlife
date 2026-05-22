@@ -1,6 +1,6 @@
 // File: src/components/ProGateOverlay.tsx
 import React from 'react';
-import { Lock, Crown, Sparkles, CalendarDays, Brain, LayoutDashboard, Flame, Star, Zap, TrendingUp, Trophy } from 'lucide-react';
+import { Lock, Crown, Sparkles, CalendarDays, Brain, LayoutDashboard, Flame, Star, Zap, TrendingUp, Trophy, BookOpen } from 'lucide-react';
 
 interface ProGateOverlayProps {
   featureName: string;
@@ -69,6 +69,11 @@ const ProGateOverlay: React.FC<ProGateOverlayProps> = ({ featureName, featureIco
             <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
               <Star size={16} className="text-amber-500 shrink-0" />
               <span>StarBrain ⭐ (Hệ thống phần thưởng)</span>
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <BookOpen size={16} className="text-emerald-500 shrink-0" />
+              <span>Nhật ký cá nhân & Chữa lành</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">

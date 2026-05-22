@@ -25,7 +25,10 @@ interface ScheduleDashboardProps {
   onReorderTodos: (reordered: Todo[]) => void;
   initialFocusMode?: boolean;
   onResetFocusMode?: () => void;
+  activeTaskId?: string | null;
+  onStartTracking?: (todo: Todo) => void;
 }
+
 
 // --- Sortable Todo Item Component ---
 interface SortableTodoItemProps {
@@ -37,9 +40,13 @@ interface SortableTodoItemProps {
   onEdit: (todo: Todo) => void;
   onMoveToTop: (id: string) => void;
   onMoveToBottom: (id: string) => void;
+  isActive: boolean;
+  onStartTracking: (todo: Todo) => void;
 }
 
-const SortableTodoItem: React.FC<SortableTodoItemProps> = ({ todo, config, countdown, onToggle, onDelete, onEdit, onMoveToTop, onMoveToBottom }) => {
+const SortableTodoItem: React.FC<SortableTodoItemProps> = ({ 
+  todo, config, countdown, onToggle, onDelete, onEdit, onMoveToTop, onMoveToBottom, isActive, onStartTracking 
+}) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: todo.id });
 
   const style = {
@@ -49,8 +56,30 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = ({ todo, config, count
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const formatTimeSpent = (seconds?: number) => {
+    if (!seconds || seconds <= 0) return null;
+    const mins = Math.floor(seconds / 60);
+    const hrs = Math.floor(mins / 60);
+    if (hrs > 0) {
+      const remainingMins = mins % 60;
+      return `${hrs}h ${remainingMins}p`;
+    }
+    if (mins > 0) {
+      return `${mins} phút`;
+    }
+    return `${seconds}s`;
+  };
+
+  const borderClass = isActive
+    ? 'border-blue-500 ring-2 ring-blue-500/50 bg-blue-50/20 shadow-md animate-pulse-subtle'
+    : isDragging
+      ? 'shadow-2xl ring-2 ring-indigo-400 bg-indigo-50/80 scale-[1.02]'
+      : todo.is_completed
+        ? 'bg-gray-50 border-transparent opacity-60'
+        : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-md';
+
   return (
-    <div ref={setNodeRef} style={style} className={`group flex items-start gap-2 p-3.5 rounded-2xl border transition-all ${isDragging ? 'shadow-2xl ring-2 ring-indigo-400 bg-indigo-50/80 scale-[1.02]' : todo.is_completed ? 'bg-gray-50 border-transparent opacity-60' : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-md'}`}>
+    <div ref={setNodeRef} style={style} className={`group flex items-start gap-2 p-3.5 rounded-2xl border transition-all ${borderClass}`}>
       {/* Drag Handle */}
       <button
         {...attributes}
@@ -67,7 +96,11 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = ({ todo, config, count
       </button>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div 
+        onClick={() => !todo.is_completed && onStartTracking?.(todo)}
+        className={`flex-1 min-w-0 ${!todo.is_completed ? 'cursor-pointer hover:text-blue-600 transition-colors' : ''}`}
+        title={!todo.is_completed ? "Click để bắt đầu thực hiện việc này" : undefined}
+      >
         <div className="flex justify-between items-start gap-2">
           <p className={`text-sm font-medium leading-snug ${todo.is_completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{todo.content}</p>
         </div>
@@ -83,6 +116,11 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = ({ todo, config, count
           {countdown && !todo.is_completed && (
             <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-bold border flex items-center gap-0.5 ${countdown.color} ${countdown.isOverdue ? 'animate-pulse' : ''}`}>
               <Clock size={8} /> {countdown.text}
+            </span>
+          )}
+          {todo.time_spent !== undefined && todo.time_spent > 0 && (
+            <span className="text-[10px] px-2 py-0.5 rounded-md font-bold border flex items-center gap-1 w-fit text-blue-600 border-blue-100 bg-blue-50/50" title="Thời gian đã thực hiện">
+              ⏱ {formatTimeSpent(todo.time_spent)}
             </span>
           )}
         </div>
@@ -106,6 +144,7 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = ({ todo, config, count
     </div>
   );
 };
+
 
 // Reordered: Mon (1) -> Sat (6) -> Sun (0)
 const DISPLAY_DAYS = [
@@ -135,6 +174,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   onAddTodo, onUpdateTodo, onDeleteTodo, onReorderTodos,
   initialFocusMode = false, onResetFocusMode,
   onAddTimetable, onUpdateTimetable, onDeleteTimetable,
+  activeTaskId = null,
+  onStartTracking = () => {},
 }) => {
   const { timetable, goals, todos } = state;
   const { timer, onOpenMusic } = state as any;
@@ -740,6 +781,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                     onEdit={handleOpenEdit}
                     onMoveToTop={handleMoveToTop}
                     onMoveToBottom={handleMoveToBottom}
+                    isActive={t.id === activeTaskId}
+                    onStartTracking={onStartTracking}
                   />
                 );
               })}

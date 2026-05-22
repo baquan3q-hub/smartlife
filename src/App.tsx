@@ -35,6 +35,9 @@ import { messaging } from './services/firebase';
 import { getToken, onMessage } from "firebase/messaging";
 import { useFocusTimer } from './hooks/useFocusTimer';
 import { useProAccess } from './hooks/useProAccess';
+import { useTaskTracker } from './hooks/useTaskTracker';
+import { ActiveTaskWidget } from './components/ActiveTaskWidget';
+import { ActiveFocusWidget } from './components/ActiveFocusWidget';
 import { createSubscriptionOrder, setupTrialForNewUser, getLatestPendingOrder } from './services/subscriptionService';
 import { SubscriptionPlanDuration, SubscriptionOrder } from './types';
 import { Lang, t } from './i18n/i18n';
@@ -82,6 +85,23 @@ interface AuthenticatedAppProps {
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) => {
     const { user, signOut } = useAuth();
+
+    // App State - Khởi tạo dữ liệu mặc định
+    const [appState, setAppState] = useState<AppState>({
+        transactions: INITIAL_TRANSACTIONS,
+        budget: INITIAL_BUDGET,
+        budgets: [], // New Budget Configs
+        timetable: [], // Khởi tạo rỗng, sẽ fetch từ Supabase
+        todos: [],
+        goals: INITIAL_GOALS,
+        currentBalance: 0,
+        profile: null,
+        gpaSemesters: [], // GPA Module — khởi tạo rỗng, fetch từ Supabase
+        gpaTargetCredits: 135,
+        gpaTargetGPA: null,
+        gpaTargetSemesters: 4,
+    });
+
     const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal'>('visual');
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
@@ -117,6 +137,42 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     // Shared Focus Timer Engine
     const timer = useFocusTimer();
+
+    // Custom Event Listener to open music space from ActiveFocusWidget
+    useEffect(() => {
+        const handleOpenMusic = () => {
+            setStartInFocusMode(true);
+            setActiveTab('schedule');
+        };
+        window.addEventListener('open-music-space', handleOpenMusic);
+        return () => window.removeEventListener('open-music-space', handleOpenMusic);
+    }, []);
+
+    // Task Tracker Engine
+    const saveTimeSpent = (todoId: string, secondsSpent: number) => {
+        const todo = appState.todos.find(t => t.id === todoId);
+        if (todo) {
+            const currentSpent = todo.time_spent || 0;
+            const updatedTodo = {
+                ...todo,
+                time_spent: currentSpent + secondsSpent,
+                is_completed: true // Mark task completed when completed via widget controls
+            };
+            handleUpdateTodo(updatedTodo);
+        }
+    };
+
+    const taskTracker = useTaskTracker(saveTimeSpent);
+
+    // Sync task tracker's active task with state updates (e.g., if todo name is edited)
+    useEffect(() => {
+        if (taskTracker.activeTask) {
+            const currentTodo = appState.todos.find(t => t.id === taskTracker.activeTask?.id);
+            if (currentTodo && JSON.stringify(currentTodo) !== JSON.stringify(taskTracker.activeTask)) {
+                taskTracker.setActiveTask(currentTodo);
+            }
+        }
+    }, [appState.todos, taskTracker.activeTask, taskTracker.setActiveTask]);
 
     // Notification State
     const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
@@ -154,22 +210,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             signOut();
         }
     };
-
-    // App State - Khởi tạo dữ liệu mặc định
-    const [appState, setAppState] = useState<AppState>({
-        transactions: INITIAL_TRANSACTIONS,
-        budget: INITIAL_BUDGET,
-        budgets: [], // New Budget Configs
-        timetable: [], // Khởi tạo rỗng, sẽ fetch từ Supabase
-        todos: [],
-        goals: INITIAL_GOALS,
-        currentBalance: 0,
-        profile: null,
-        gpaSemesters: [], // GPA Module — khởi tạo rỗng, fetch từ Supabase
-        gpaTargetCredits: 135,
-        gpaTargetGPA: null,
-        gpaTargetSemesters: 4,
-    });
 
     // Pro Access (must be after appState declaration)
     const proAccess = useProAccess(appState.profile, user?.email || undefined);
@@ -702,7 +742,18 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             // Only send DB-safe fields
             const { id, user_id, created_at, ...updateFields } = item;
             const { error } = await supabase.from('todos').update(updateFields).eq('id', item.id);
-            if (error) throw error;
+            if (error) {
+                // If the error code indicates an undefined column, and 'time_spent' is present,
+                // retry the update without the 'time_spent' field.
+                if (error.code === '42703' && 'time_spent' in updateFields) {
+                    console.warn("[SmartLife] 'time_spent' column not found on Supabase todos table. Retrying update without it.");
+                    const { time_spent, ...fallbackFields } = updateFields;
+                    const { error: retryError } = await supabase.from('todos').update(fallbackFields).eq('id', item.id);
+                    if (retryError) throw retryError;
+                } else {
+                    throw error;
+                }
+            }
         } catch (error: any) {
             console.error(error);
             alert("Lỗi cập nhật việc: " + error.message);
@@ -1114,6 +1165,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onReorderTodos={handleReorderTodos}
                                 initialFocusMode={startInFocusMode}
                                 onResetFocusMode={() => setStartInFocusMode(false)}
+                                activeTaskId={taskTracker.activeTask?.id || null}
+                                onStartTracking={taskTracker.startTracking}
                             />
                         ) : (
                             <ProGateOverlay featureName="Lịch trình & Mục tiêu" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
@@ -1212,6 +1265,22 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             />
             <MySpotify isOpen={isSpotifyOpen} onClose={() => setIsSpotifyOpen(false)} userId={user?.id || ''} />
             <PWAInstallPrompt />
+
+            <ActiveTaskWidget
+                activeTask={taskTracker.activeTask}
+                status={taskTracker.status}
+                elapsedTime={taskTracker.elapsedTime}
+                isTracking={taskTracker.isTracking}
+                pauseTracking={taskTracker.pauseTracking}
+                resumeTracking={taskTracker.resumeTracking}
+                completeTracking={taskTracker.completeTracking}
+                cancelTracking={taskTracker.cancelTracking}
+            />
+
+            <ActiveFocusWidget
+                timer={timer}
+                activeTab={activeTab}
+            />
 
             {/* Global Lottie Overlay when data is initially loading */}
             {isLoadingData && <GlobalLoader />}
