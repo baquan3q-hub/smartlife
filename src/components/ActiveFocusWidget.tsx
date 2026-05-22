@@ -226,6 +226,8 @@ export const ActiveFocusWidget: React.FC<ActiveFocusWidgetProps> = ({ timer, act
             // Setup document body
             w.document.title = "SmartLife - Tập trung nổi";
             w.document.body.className = "bg-slate-900 text-white overflow-hidden m-0 p-0 font-sans select-none";
+            w.document.body.style.backgroundColor = '#0b0f19';
+            w.document.body.style.color = '#ffffff';
 
             // Add listener for PiP close
             w.addEventListener('pagehide', () => {
@@ -278,7 +280,10 @@ export const ActiveFocusWidget: React.FC<ActiveFocusWidgetProps> = ({ timer, act
     if (pipWindow) {
         // 1. Compact PiP Layout (Thanh nhỏ gọn)
         const compactPipContent = (
-            <div className="flex items-center justify-between h-screen w-screen bg-slate-950 px-3 py-2 font-sans text-white border border-white/10 box-border select-none">
+            <div 
+                style={{ backgroundColor: '#0b0f19', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.1)' }}
+                className="flex items-center justify-between h-screen w-screen px-3 py-2 font-sans border box-border select-none"
+            >
                 {/* Status Dot & Time */}
                 <div className="flex items-center gap-2">
                     <div className="relative flex h-2 w-2">
@@ -291,9 +296,10 @@ export const ActiveFocusWidget: React.FC<ActiveFocusWidgetProps> = ({ timer, act
                                 : 'bg-yellow-500'
                         }`}></span>
                     </div>
-                    <span className={`font-mono text-xs font-black tabular-nums leading-none ${
-                        isStopwatch ? 'text-orange-400' : (isBreak ? 'text-emerald-400' : 'text-indigo-400')
-                    }`}>
+                    <span 
+                        style={{ color: isStopwatch ? '#fb923c' : (isBreak ? '#34d399' : '#818cf8') }}
+                        className="font-mono text-xs font-black tabular-nums leading-none"
+                    >
                         {formatTime(timeLeft)}
                     </span>
                 </div>
@@ -336,12 +342,16 @@ export const ActiveFocusWidget: React.FC<ActiveFocusWidgetProps> = ({ timer, act
 
         // 2. Full Expanded PiP Layout
         const expandedPipContent = (
-            <div className="flex flex-col justify-between h-screen w-screen bg-slate-950 p-4 font-sans border border-white/10 box-border text-white select-none">
+            <div 
+                style={{ backgroundColor: '#0b0f19', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.1)' }}
+                className="flex flex-col justify-between h-screen w-screen p-4 font-sans border box-border select-none"
+            >
                 {/* Header */}
                 <div className="flex justify-between items-center pb-2 border-b border-white/10">
-                    <div className={`flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider ${
-                        isStopwatch ? 'text-orange-400' : (isBreak ? 'text-emerald-400' : 'text-indigo-400')
-                    }`}>
+                    <div 
+                        style={{ color: isStopwatch ? '#fb923c' : (isBreak ? '#34d399' : '#818cf8') }}
+                        className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider"
+                    >
                         <IconHeader size={12} className="animate-pulse" />
                         <span>{labelText}</span>
                     </div>
@@ -383,17 +393,22 @@ export const ActiveFocusWidget: React.FC<ActiveFocusWidgetProps> = ({ timer, act
 
                 {/* Time & Controls */}
                 <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                    <div className={`flex items-center gap-1.5 border rounded-xl px-2.5 py-1 ${
-                        isStopwatch 
-                            ? 'bg-orange-950/80 border-orange-900/50' 
-                            : (isBreak ? 'bg-emerald-950/80 border-emerald-900/50' : 'bg-indigo-950/80 border-indigo-900/50')
-                    }`}>
-                        <Clock size={13} className={`animate-pulse ${
-                            isStopwatch ? 'text-orange-400' : (isBreak ? 'text-emerald-400' : 'text-indigo-400')
-                        }`} />
-                        <span className={`font-mono text-xs font-black tabular-nums ${
-                            isStopwatch ? 'text-orange-300' : (isBreak ? 'text-emerald-300' : 'text-indigo-300')
-                        }`}>
+                    <div 
+                        style={{
+                            backgroundColor: isStopwatch 
+                                ? 'rgba(124, 45, 18, 0.4)' 
+                                : (isBreak ? 'rgba(6, 78, 59, 0.4)' : 'rgba(49, 46, 129, 0.4)'),
+                            borderColor: isStopwatch 
+                                ? 'rgba(154, 52, 18, 0.5)' 
+                                : (isBreak ? 'rgba(4, 120, 87, 0.5)' : 'rgba(67, 56, 202, 0.5)')
+                        }}
+                        className="flex items-center gap-1.5 border rounded-xl px-2.5 py-1"
+                    >
+                        <Clock size={13} style={{ color: isStopwatch ? '#fb923c' : (isBreak ? '#34d399' : '#818cf8') }} className="animate-pulse" />
+                        <span 
+                            style={{ color: isStopwatch ? '#fdba74' : (isBreak ? '#6ee7b7' : '#a5b4fc') }}
+                            className="font-mono text-xs font-black tabular-nums"
+                        >
                             {formatTime(timeLeft)}
                         </span>
                     </div>
