@@ -723,18 +723,16 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
           />
 
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Clock size={16} className="text-gray-400" />
-              </div>
-              <input
-                type="datetime-local"
-                value={newTodoDeadline}
-                onChange={(e) => setNewTodoDeadline(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 outline-none text-gray-600 font-medium"
-              />
+          <div className="relative w-full">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Clock size={16} className="text-gray-400" />
             </div>
+            <input
+              type="datetime-local"
+              value={newTodoDeadline}
+              onChange={(e) => setNewTodoDeadline(e.target.value)}
+              className="w-full bg-white border border-gray-200 rounded-xl pl-8 pr-2 py-2 text-xs focus:ring-2 focus:ring-emerald-500 outline-none text-gray-600 font-medium min-w-0"
+            />
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -842,7 +840,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                     type="datetime-local"
                     value={editDeadline}
                     onChange={e => setEditDeadline(e.target.value)}
-                    className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm focus:ring-2 focus:ring-indigo-500"
+                    className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm focus:ring-2 focus:ring-indigo-500 min-w-0"
                   />
                 </div>
 

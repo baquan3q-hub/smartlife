@@ -14,7 +14,7 @@ interface ActiveTaskWidgetProps {
     cancelTracking: () => void;
 }
 
-const PRIORITY_LIGHT: Record<string, { label: string; className: string }> = {
+const PRIORITY_LIGHT: Record<string, { label: string; className: string; style?: React.CSSProperties }> = {
     urgent: { label: 'Ưu tiên', className: 'bg-red-50 text-red-700 border-red-200' },
     high: { label: 'Ưu tiên', className: 'bg-red-50 text-red-700 border-red-200' },
     focus: { label: 'Tập trung', className: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -24,14 +24,14 @@ const PRIORITY_LIGHT: Record<string, { label: string; className: string }> = {
     temp: { label: 'Tạm thời', className: 'bg-gray-50 text-gray-700 border-gray-200' }
 };
 
-const PRIORITY_DARK: Record<string, { label: string; className: string }> = {
-    urgent: { label: 'Ưu tiên', className: 'bg-red-950/40 text-red-400 border-red-500/20' },
-    high: { label: 'Ưu tiên', className: 'bg-red-950/40 text-red-400 border-red-500/20' },
-    focus: { label: 'Tập trung', className: 'bg-blue-950/40 text-blue-400 border-blue-500/20' },
-    medium: { label: 'Tập trung', className: 'bg-blue-950/40 text-blue-400 border-blue-500/20' },
-    chill: { label: 'Chill', className: 'bg-purple-950/40 text-purple-400 border-purple-500/20' },
-    low: { label: 'Chill', className: 'bg-purple-950/40 text-purple-400 border-purple-500/20' },
-    temp: { label: 'Tạm thời', className: 'bg-slate-900/60 text-slate-400 border-slate-500/20' }
+const PRIORITY_DARK: Record<string, { label: string; className: string; style?: React.CSSProperties }> = {
+    urgent: { label: 'Ưu tiên', className: 'bg-red-950/40 text-red-400 border-red-500/20', style: { backgroundColor: 'rgba(127, 29, 29, 0.4)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.2)' } },
+    high: { label: 'Ưu tiên', className: 'bg-red-950/40 text-red-400 border-red-500/20', style: { backgroundColor: 'rgba(127, 29, 29, 0.4)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.2)' } },
+    focus: { label: 'Tập trung', className: 'bg-blue-950/40 text-blue-400 border-blue-500/20', style: { backgroundColor: 'rgba(30, 58, 138, 0.4)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.2)' } },
+    medium: { label: 'Tập trung', className: 'bg-blue-950/40 text-blue-400 border-blue-500/20', style: { backgroundColor: 'rgba(30, 58, 138, 0.4)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.2)' } },
+    chill: { label: 'Chill', className: 'bg-purple-950/40 text-purple-400 border-purple-500/20', style: { backgroundColor: 'rgba(88, 28, 135, 0.4)', color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.2)' } },
+    low: { label: 'Chill', className: 'bg-purple-950/40 text-purple-400 border-purple-500/20', style: { backgroundColor: 'rgba(88, 28, 135, 0.4)', color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.2)' } },
+    temp: { label: 'Tạm thời', className: 'bg-slate-900/60 text-slate-400 border-slate-500/20', style: { backgroundColor: 'rgba(15, 23, 42, 0.6)', color: '#94a3b8', borderColor: 'rgba(100, 116, 139, 0.2)' } }
 };
 
 const PriorityBadge: React.FC<{ priority: string; isDark?: boolean }> = ({ priority, isDark }) => {
@@ -44,12 +44,16 @@ const PriorityBadge: React.FC<{ priority: string; isDark?: boolean }> = ({ prior
     else if (priority === 'temp') Icon = Layers;
 
     return (
-        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide border w-fit ${config.className}`}>
+        <span 
+            style={config.style}
+            className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide border w-fit ${config.className}`}
+        >
             <Icon size={10} />
             <span>{config.label}</span>
         </span>
     );
 };
+
 
 export const ActiveTaskWidget: React.FC<ActiveTaskWidgetProps> = ({
     activeTask,
@@ -288,6 +292,8 @@ export const ActiveTaskWidget: React.FC<ActiveTaskWidgetProps> = ({
             // Setup document body
             w.document.title = "SmartLife - Cửa sổ đếm giờ";
             w.document.body.className = "bg-slate-900 text-white overflow-hidden m-0 p-0 font-sans select-none";
+            w.document.body.style.backgroundColor = '#0b0f19';
+            w.document.body.style.color = '#ffffff';
 
             // Add listener for PiP close
             w.addEventListener('pagehide', () => {
@@ -305,14 +311,20 @@ export const ActiveTaskWidget: React.FC<ActiveTaskWidgetProps> = ({
     if (pipWindow) {
         // 1. Compact PiP Layout (Thanh nhỏ gọn)
         const compactPipContent = (
-            <div className="flex items-center justify-between h-screen w-screen bg-slate-950 px-3 py-2 font-sans text-white border border-white/10 box-border select-none">
+            <div 
+                style={{ backgroundColor: '#0b0f19', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.1)' }}
+                className="flex items-center justify-between h-screen w-screen px-3 py-2 font-sans border box-border select-none"
+            >
                 {/* Status Dot & Time */}
                 <div className="flex items-center gap-2">
                     <div className="relative flex h-2 w-2">
                         <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75 ${status === 'RUNNING' ? '' : 'hidden'}`}></span>
                         <span className={`relative inline-flex rounded-full h-2 w-2 ${status === 'RUNNING' ? 'bg-blue-500' : 'bg-yellow-500'}`}></span>
                     </div>
-                    <span className="font-mono text-xs font-black text-blue-300 tabular-nums leading-none">
+                    <span 
+                        style={{ color: '#93c5fd' }}
+                        className="font-mono text-xs font-black tabular-nums leading-none"
+                    >
                         {formatTime(elapsedTime)}
                     </span>
                 </div>
@@ -355,10 +367,16 @@ export const ActiveTaskWidget: React.FC<ActiveTaskWidgetProps> = ({
 
         // 2. Full Expanded PiP Layout
         const expandedPipContent = (
-            <div className="flex flex-col justify-between h-screen w-screen bg-slate-950 p-4 font-sans border border-white/10 box-border text-white select-none">
+            <div 
+                style={{ backgroundColor: '#0b0f19', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.1)' }}
+                className="flex flex-col justify-between h-screen w-screen p-4 font-sans border box-border select-none"
+            >
                 {/* Header */}
                 <div className="flex justify-between items-center pb-2 border-b border-white/10">
-                    <div className="flex items-center gap-1.5 text-blue-400 font-bold text-xs uppercase tracking-wider">
+                    <div 
+                        style={{ color: '#60a5fa' }}
+                        className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider"
+                    >
                         <Sparkles size={12} className="animate-pulse" />
                         <span>Đang thực hiện</span>
                     </div>
@@ -399,14 +417,20 @@ export const ActiveTaskWidget: React.FC<ActiveTaskWidgetProps> = ({
                         <PriorityBadge priority={activeTask.priority} isDark={true} />
                         
                         {activeTask.deadline && (
-                            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-md font-bold border text-gray-300 border-white/10 bg-white/5 w-fit">
-                                <Calendar size={9} className="text-gray-400" />
+                            <span 
+                                style={{ color: '#d1d5db', borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.05)' }}
+                                className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-md font-bold border w-fit"
+                            >
+                                <Calendar size={9} style={{ color: '#9ca3af' }} />
                                 <span>{formatDeadline(activeTask.deadline)}</span>
                             </span>
                         )}
                         
                         {activeTask.time_spent !== undefined && activeTask.time_spent > 0 && (
-                            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-md font-bold border text-blue-300 border-blue-500/20 bg-blue-500/10 w-fit">
+                            <span 
+                                style={{ color: '#93c5fd', borderColor: 'rgba(59,130,246,0.2)', backgroundColor: 'rgba(59,130,246,0.1)' }}
+                                className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-md font-bold border w-fit"
+                            >
                                 <span>Tích lũy: {formatTotalTime(activeTask.time_spent)}</span>
                             </span>
                         )}
@@ -415,9 +439,15 @@ export const ActiveTaskWidget: React.FC<ActiveTaskWidgetProps> = ({
 
                 {/* Time & Controls */}
                 <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                    <div className="flex items-center gap-1.5 bg-blue-950/80 border border-blue-900/50 rounded-xl px-2.5 py-1">
-                        <Clock size={13} className={`text-blue-400 ${status === 'RUNNING' ? 'animate-pulse' : ''}`} />
-                        <span className="font-mono text-xs font-black text-blue-300 tabular-nums">
+                    <div 
+                        style={{ backgroundColor: 'rgba(30,58,138,0.4)', borderColor: 'rgba(30,58,138,0.5)' }}
+                        className="flex items-center gap-1.5 border rounded-xl px-2.5 py-1"
+                    >
+                        <Clock size={13} style={{ color: '#60a5fa' }} className={status === 'RUNNING' ? 'animate-pulse' : ''} />
+                        <span 
+                            style={{ color: '#93c5fd' }}
+                            className="font-mono text-xs font-black tabular-nums"
+                        >
                             {formatTime(elapsedTime)}
                         </span>
                     </div>
