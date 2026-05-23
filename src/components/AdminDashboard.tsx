@@ -22,6 +22,8 @@ interface AdminUser {
     plan: string | null;
     pro_expiry_date: string | null;
     trial_started_at: string | null;
+    journal_pin: string | null;
+    journal_pin_attempts: number;
 }
 
 type UserPlanFilter = 'all' | 'trial' | 'pro' | 'lifetime' | 'free';
@@ -162,6 +164,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
             log('❌ Error: ' + err.message);
         } finally {
             setConfirmingOrderId(null);
+        }
+    };
+
+    const handleResetUserPin = async (userId: string, displayName: string) => {
+        if (!window.confirm(`Bạn có chắc chắn muốn Reset PIN Nhật ký của "${displayName}" không? Việc này sẽ xóa mã PIN hiện tại và đưa số lần thử sai về 0.`)) return;
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ 
+                    journal_pin: null, 
+                    journal_pin_attempts: 0 
+                })
+                .eq('id', userId);
+
+            if (error) throw error;
+            log(`✅ Đã Reset PIN Nhật ký cho user: ${displayName}`);
+            alert(`Đã Reset PIN Nhật ký thành công cho ${displayName}!`);
+            fetchAdminData();
+        } catch (err: any) {
+            log(`❌ Reset PIN thất bại: ${err.message}`);
+            alert(`Lỗi Reset PIN: ${err.message}`);
         }
     };
 
@@ -397,19 +420,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
                                     <div className="flex items-center gap-1"><LogIn size={13}/> Đăng nhập cuối</div>
                                 </th>
                                 <th className="px-5 py-3">Lần cuối online</th>
+                                <th className="px-5 py-3 text-right">Mã PIN Nhật ký</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={5} className="text-center py-12 text-gray-400">
+                                    <td colSpan={6} className="text-center py-12 text-gray-400">
                                         <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-indigo-400" />
                                         Đang tải...
                                     </td>
                                 </tr>
                             ) : filteredUsers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="text-center py-12 text-gray-400">
+                                    <td colSpan={6} className="text-center py-12 text-gray-400">
                                         <p className="font-medium">Không có dữ liệu</p>
                                         <p className="text-xs mt-1">Chạy SQL bên dưới → đăng xuất → đăng nhập lại.</p>
                                     </td>
@@ -472,6 +496,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
                                             </div>
                                         ) : (
                                             <span className="text-xs text-gray-400 italic">Chưa ghi nhận</span>
+                                        )}
+                                    </td>
+                                    
+                                    {/* PIN Action */}
+                                    <td className="px-5 py-4 text-right">
+                                        {u.journal_pin ? (
+                                            <div className="flex items-center justify-end gap-2">
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${u.journal_pin_attempts >= 5 ? 'bg-red-50 text-red-650 border-red-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                                                    {u.journal_pin_attempts >= 5 ? 'Bị khóa (5/5)' : 'Đã cài PIN'}
+                                                </span>
+                                                <button
+                                                    onClick={() => handleResetUserPin(u.id, u.full_name || u.email || 'người dùng')}
+                                                    className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs font-bold rounded-lg border border-red-250 transition-colors"
+                                                >
+                                                    Reset PIN
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-gray-400 italic">Chưa cài PIN</span>
                                         )}
                                     </td>
                                 </tr>
@@ -619,10 +662,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail }) => {
                 <div className="px-6 pb-6">
                     <p className="text-sm text-slate-600 mb-3">Copy toàn bộ → Supabase → <strong>SQL Editor</strong> → Run → Phải thấy <strong className="text-green-700">Success</strong>.</p>
                     <pre className="bg-slate-800 text-slate-200 p-4 rounded-xl font-mono text-[11px] whitespace-pre-wrap overflow-x-auto leading-relaxed">
-{`-- 1. Thêm cột theo dõi
+{`-- 1. Thêm cột theo dõi & mã PIN Nhật ký
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS journal_pin TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS journal_pin_attempts INT DEFAULT 0;
 
--- 2. Hàm lấy dữ liệu user cho Admin (JOIN auth.users + plan info)
+-- 2. Hàm lấy dữ liệu user cho Admin (JOIN auth.users + plan info + PIN)
 DROP FUNCTION IF EXISTS get_admin_users();
 CREATE OR REPLACE FUNCTION get_admin_users()
 RETURNS TABLE (
@@ -637,7 +682,9 @@ RETURNS TABLE (
   last_sign_in_at TIMESTAMPTZ,
   plan TEXT,
   pro_expiry_date TIMESTAMPTZ,
-  trial_started_at TIMESTAMPTZ
+  trial_started_at TIMESTAMPTZ,
+  journal_pin TEXT,
+  journal_pin_attempts INT
 )
 SECURITY DEFINER
 SET search_path = public
@@ -660,7 +707,9 @@ BEGIN
     u.last_sign_in_at,
     p.plan,
     p.pro_expiry_date,
-    p.trial_started_at
+    p.trial_started_at,
+    p.journal_pin,
+    p.journal_pin_attempts
   FROM profiles p
   LEFT JOIN auth.users u ON p.id = u.id
   ORDER BY u.created_at DESC;
