@@ -14,6 +14,7 @@ import { processJournalReward } from '../services/starBrainService';
 import { JournalEntry, JournalStats, MoodLevel } from '../types';
 import { supabase } from '../services/supabase';
 import ConfirmModal from './ConfirmModal';
+import { JournalPinGuard } from './JournalPinGuard';
 
 // Cấu hình Emoji và màu sắc cho các cấp cảm xúc (Mood)
 export const MOOD_CONFIG: Record<MoodLevel, { emoji: string; label: string; color: string; bgClass: string; borderClass: string; textClass: string }> = {
@@ -345,7 +346,8 @@ const JournalDashboard: React.FC<JournalDashboardProps> = ({ userId }) => {
   }, [entries]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-6 pb-24 md:pb-8">
+    <JournalPinGuard userId={userId}>
+      <div className="w-full max-w-5xl mx-auto px-4 py-6 pb-24 md:pb-8">
       {/* 1. Header & Navigation tabs */}
       <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -1338,7 +1340,8 @@ const JournalDashboard: React.FC<JournalDashboardProps> = ({ userId }) => {
         confirmText="Xóa nhật ký"
         cancelText="Hủy"
       />
-    </div>
+      </div>
+    </JournalPinGuard>
   );
 };
 

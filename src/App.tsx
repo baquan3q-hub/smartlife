@@ -24,6 +24,7 @@ import { GlobalLoader } from './components/GlobalLoader';
 import MySpotify from './components/MySpotify';
 import HabitDashboard from './components/HabitDashboard';
 import JournalDashboard from './components/JournalDashboard';
+import ClickRippleEffect from './components/ClickRippleEffect';
 
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -1312,7 +1313,10 @@ const AppWrapper: React.FC = () => {
 };
 
 const App: React.FC = () => (
-    <AuthProvider><AppWrapper /></AuthProvider>
+    <AuthProvider>
+        <AppWrapper />
+        <ClickRippleEffect />
+    </AuthProvider>
 );
 
 export default App;
