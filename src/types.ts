@@ -475,3 +475,44 @@ export interface JournalStats {
   moodDistribution: Record<MoodLevel, number>;
   topTags: { tag: string; count: number }[];
 }
+
+// 12. Vị trí nghề nghiệp và Mục tiêu sự nghiệp / dài hạn
+export interface CareerPosition {
+  id: string;
+  user_id?: string;
+  title: string;
+  created_at?: string;
+}
+
+export type CareerGoalCategory = 'technical' | 'domain' | 'soft' | 'project' | 'tool' | 'certificate';
+export type CareerGoalPriority = 'high' | 'medium' | 'low';
+export type CareerGoalStatus = 'not_started' | 'in_progress' | 'completed' | 'overdue';
+
+export interface CareerGoal {
+  id: string;
+  user_id?: string;
+  position_id: string;
+  title: string;
+  description?: string;
+  link?: string;
+  category: CareerGoalCategory;
+  priority: CareerGoalPriority;
+  status: CareerGoalStatus;
+  start_date?: string;
+  deadline?: string;
+  progress: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LifeGoal {
+  id: string;
+  user_id?: string;
+  icon: string;
+  title: string;
+  target_year: number;
+  is_achieved: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}

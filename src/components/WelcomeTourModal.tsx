@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Sparkles, LayoutDashboard, BrainCircuit, Wallet, CalendarDays, Flame, Music, GraduationCap, Clock, Archive, BookOpen } from 'lucide-react';
+import { X, Sparkles, LayoutDashboard, BrainCircuit, Wallet, CalendarDays, Flame, Music, GraduationCap, Clock, Archive, BookOpen, Target } from 'lucide-react';
 
 interface WelcomeTourModalProps {
     isOpen: boolean;
@@ -13,6 +13,7 @@ const features = [
     { icon: <CalendarDays size={20} className="text-indigo-500" />, title: 'Lịch trình', desc: 'Sắp xếp thời gian, Todo list thông minh và đặt mục tiêu cá' },
     { icon: <Flame size={20} className="text-orange-500" />, title: 'Thói quen', desc: 'Hình thành habit bằng cơ chế đổi thưởng dopamine, countdown/up' },
     { icon: <BookOpen size={20} className="text-emerald-600" />, title: 'Nhật ký cá nhân', desc: 'Chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
+    { icon: <Target size={20} className="text-purple-600" />, title: 'Mục tiêu & Lộ trình', desc: 'Lập kế hoạch sự nghiệp, mục tiêu 5 năm & AI định hướng lộ trình' },
     { icon: <Clock size={20} className="text-rose-500" />, title: 'Pomodoro', desc: 'Tập trung cao độ với bộ đếm giờ' },
     { icon: <GraduationCap size={20} className="text-cyan-500" />, title: 'GPA Tracker', desc: 'Quản lý điểm số, đặt mục tiêu học tập' },
     { icon: <Music size={20} className="text-pink-500" />, title: 'My Spotify', desc: 'Nghe nhạc & Podcast không giới hạn' },

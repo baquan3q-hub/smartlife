@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen, Target, CheckCircle2, Star } from 'lucide-react';
 import InstallGuideModal from './InstallGuideModal';
 import { Lang } from '../i18n/i18n';
 
@@ -266,7 +266,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
             const headerOffset = 80;
             const elementPosition = element.getBoundingClientRect().top;
             const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-            
+
             window.scrollTo({
                 top: offsetPosition,
                 behavior: 'smooth'
@@ -379,7 +379,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     <div className="text-gray-600 mb-8 sm:mb-10 max-w-full sm:max-w-3xl mx-auto leading-relaxed animate-fade-in-up delay-200 px-1">
                         {lang === 'vi' ? (
                             <div className="text-sm sm:text-base md:text-xl text-center">
-                                SmartLife <strong>super tool</strong> dành cho sinh viên. It helps them về <strong>tài chính</strong>, <strong>lịch trình</strong>, <strong>todolist mục tiêu cá nhân</strong>, <strong>thói quen</strong>, <strong>countdown/up</strong> và cả <strong>Viết nhật kí</strong>.
+                                SmartLife <strong>super tool</strong> dành cho sinh viên. It helps them về <strong>tài chính</strong>, <strong>lịch trình</strong>, <strong>todolist mục tiêu cá nhân, mục tiêu nghề nghiệp dài hạn</strong>, <strong>thói quen</strong>, <strong>countdown/up</strong> và cả <strong>Viết nhật kí</strong>.
                                 {isDescExpanded ? (
                                     <span>
                                         {' '}Ngoài ra còn có <strong>GPA tracker</strong> cho sinh viên VNU, <strong>My spotify</strong> nghe nhạc và podcast mình tự thêm, <strong>Pomodoro</strong> và các phương pháp bấm giờ học tập, <strong>Không gian học</strong>, <strong>Kho lưu trữ tập trung</strong>. Đặc biệt là <strong>Own AI Advisor</strong> nó truy cập toàn bộ dữ liệu và action theo yêu cầu của người dùng một cách thông minh và cá nhân hóa. Tất cả các tính năng sinh viên cần đều trong Smartlife. Mọi thứ mượt và chi tiết thông minh + tối giản.
@@ -478,6 +478,107 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                         <span>{item}</span>
                                     </li>
                                 ))}
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature NEW: Career & Life Goals AI */}
+                <section id="career-life-goals" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gradient-to-br from-purple-50/50 via-indigo-50/50 to-pink-50/30 py-12 sm:py-20 rounded-3xl border border-purple-100/80 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-[-20%] right-[-20%] w-[50%] h-[50%] rounded-full bg-pink-400/5 blur-3xl pointer-events-none" />
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                        <div className="order-2 md:order-2 relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-purple-300 via-indigo-300 to-pink-300 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            {/* Image Composition: Main + Sub overlay */}
+                            <div className="relative">
+                                {/* Ảnh chính (lớn) - trung tâm */}
+                                <img
+                                    src="/goalscareer1.png"
+                                    alt="Mục tiêu nghề nghiệp & Lộ trình kỹ năng"
+                                    className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
+                                />
+                                {/* Ảnh phụ (nhỏ) - góc dưới bên trái */}
+                                <img
+                                    src="/goalscareer2.png"
+                                    alt="Mục tiêu dài hạn 5 năm"
+                                    className="absolute -bottom-3 -left-2 sm:-bottom-6 sm:-left-4 w-2/5 rounded-2xl shadow-2xl border-2 border-white transform -rotate-3 group-hover:-rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-purple-200/50"
+                                />
+                            </div>
+                        </div>
+                        <div className="order-1 md:order-1 space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Đột Phá Kỹ Năng' : lang === 'ko' ? '경력 개발 혁신' : 'Career Goal Breakthrough'}
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 leading-tight">
+                                {lang === 'vi' ? (
+                                    <>Lập Lộ Trình Sự Nghiệp & <br />Mục Tiêu Tầm Nhìn 5 Năm</>
+                                ) : lang === 'ko' ? (
+                                    <>경력 로드맵 구축 및 <br />5개년 장기 비전 목표 관리</>
+                                ) : (
+                                    <>Build Career Roadmap & <br />5-Year Long-Term Vision Goals</>
+                                )}
+                            </h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {lang === 'vi'
+                                    ? 'Định hình tương lai với bộ công cụ quản lý kỹ năng và mục tiêu dài hạn. Được chắp cánh bởi AI để phân tích bảng điểm GPA học tập, thiết kế lộ trình cá nhân hóa và đồng bộ liền mạch với lịch trình của bạn.'
+                                    : lang === 'ko'
+                                        ? '기술 관리 및 장기 목표 설정 도구로 미래를 정의하세요. 학업 성적 GPA와 연동하여 학습 격차를 분석하고 AI 기반 맞춤 로드맵을 자동으로 구축합니다.'
+                                        : 'Shape your future with comprehensive skill management and long-term targets. Powered by AI to analyze your GPA academic records, design personalized roadmaps, and sync flawlessly with your lifestyle.'
+                                }
+                            </p>
+                            <ul className="space-y-4 pt-2">
+                                <li className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-purple-50 shadow-sm">
+                                    <div className="bg-purple-100 p-1.5 rounded-lg shrink-0 mt-0.5">
+                                        <Sparkles className="text-purple-600" size={18} />
+                                    </div>
+                                    <span>
+                                        {lang === 'vi'
+                                            ? 'AI phân tích dữ liệu và hỗ trợ lộ trình nghề nghiệp cá nhân'
+                                            : lang === 'ko'
+                                                ? 'AI 데이터 분석 및 맞춤형 경력 개발 로드맵 지원'
+                                                : 'AI analyzes data & customizes personal career roadmap'
+                                        }
+                                    </span>
+                                </li>
+                                <li className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-indigo-50 shadow-sm">
+                                    <div className="bg-indigo-100 p-1.5 rounded-lg shrink-0 mt-0.5">
+                                        <Target className="text-indigo-600" size={18} />
+                                    </div>
+                                    <span>
+                                        {lang === 'vi'
+                                            ? 'Đặt ra mục tiêu nghề nghiệp các kiến thức kỹ năng và dự án'
+                                            : lang === 'ko'
+                                                ? '직무별 지식, 기술 습득 및 개인 포트폴리오 프로젝트 관리'
+                                                : 'Set career goals for domain knowledge, skills & projects'
+                                        }
+                                    </span>
+                                </li>
+                                <li className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-pink-50 shadow-sm">
+                                    <div className="bg-pink-100 p-1.5 rounded-lg shrink-0 mt-0.5">
+                                        <Star className="text-pink-600" size={18} />
+                                    </div>
+                                    <span>
+                                        {lang === 'vi'
+                                            ? 'Đặt ra mục tiêu dài hạn 5 năm'
+                                            : lang === 'ko'
+                                                ? '5개년 장기 인생 비전 목표 및 마일스톤 설정'
+                                                : 'Define 5-year long-term life vision and major milestones'
+                                        }
+                                    </span>
+                                </li>
+                                <li className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-slate-100 shadow-sm">
+                                    <div className="bg-slate-100 p-1.5 rounded-lg shrink-0 mt-0.5">
+                                        <CheckCircle2 className="text-slate-600" size={18} />
+                                    </div>
+                                    <span>
+                                        {lang === 'vi'
+                                            ? 'Theo dõi tổng thể đồng nhất với hệ sinh thái Smartlife'
+                                            : lang === 'ko'
+                                                ? 'SmartLife 스마트 셀프 매니지먼트 생태계와의 완벽한 통합'
+                                                : 'Holistic progress tracking synced with SmartLife ecosystem'
+                                        }
+                                    </span>
+                                </li>
                             </ul>
                         </div>
                     </div>
