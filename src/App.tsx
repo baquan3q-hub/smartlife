@@ -1,6 +1,6 @@
 // File: src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target } from 'lucide-react';
 
 // Import các Components (Đảm bảo bạn đã tạo file trong thư mục components)
 import FinanceDashboard from './components/FinanceDashboard';
@@ -25,6 +25,7 @@ import MySpotify from './components/MySpotify';
 import HabitDashboard from './components/HabitDashboard';
 import JournalDashboard from './components/JournalDashboard';
 import ClickRippleEffect from './components/ClickRippleEffect';
+import GoalsDashboard from './components/GoalsDashboard';
 
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -103,7 +104,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         gpaTargetSemesters: 4,
     });
 
-    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal'>('visual');
+    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals'>('visual');
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -1004,6 +1005,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     <button onClick={() => setActiveTab('gpa')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'gpa' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'GPA' : ''}>
                         <GraduationCap size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">GPA</span>}
                     </button>
+                    <button onClick={() => setActiveTab('goals')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'goals' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Mục tiêu' : ''}>
+                        <Target size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Mục tiêu</span>}
+                        {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
+                    </button>
 
                     {/* Admin Panel Toggle */}
                     {user?.email === 'baquan3q@gmail.com' && (
@@ -1065,6 +1070,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         <div className="flex gap-3 items-center">
                             <button onClick={() => setActiveTab('gpa')} className={`p-2 rounded-full transition-colors ${activeTab === 'gpa' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:bg-gray-100'}`} title="GPA">
                                 <GraduationCap size={20} />
+                            </button>
+                            <button onClick={() => setActiveTab('goals')} className={`p-2 rounded-full transition-colors ${activeTab === 'goals' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:bg-gray-100'}`} title="Mục tiêu">
+                                <Target size={20} />
                             </button>
                             {/* Admin Panel — mobile header */}
                             {user?.email === 'baquan3q@gmail.com' && (
@@ -1191,6 +1199,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             isLoading={isLoadingData}
                             lang={lang}
                         />
+                    )}
+                    {activeTab === 'goals' && (
+                        proAccess.hasAccess ? (
+                            <GoalsDashboard userId={user?.id || ''} />
+                        ) : (
+                            <ProGateOverlay featureName="Mục tiêu & Lộ trình" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
+                        )
                     )}
                     {activeTab === 'habit' && (
                         <HabitDashboard userId={user?.id || ''} onNavigateToSchedule={() => setActiveTab('schedule')} />

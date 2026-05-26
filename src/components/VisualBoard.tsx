@@ -14,7 +14,7 @@ interface VisualBoardProps {
     userName?: string;
     userId?: string;
     userEmail?: string;
-    onNavigate?: (tab: 'finance' | 'schedule' | 'music' | 'ai-advisor' | 'gpa' | 'habit' | 'journal') => void;
+    onNavigate?: (tab: 'finance' | 'schedule' | 'music' | 'ai-advisor' | 'gpa' | 'habit' | 'journal' | 'goals') => void;
     onUpgrade?: () => void;
     onOpenSpotify?: () => void;
     onUpdateGoal?: (goal: Goal) => void;
@@ -30,6 +30,9 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
     const [countdowns, setCountdowns] = useState<CountdownItem[]>([]);
     const [countups, setCountups] = useState<CountUpItem[]>([]);
+    const [careerGoals, setCareerGoals] = useState<any[]>([]);
+    const [lifeGoals, setLifeGoals] = useState<any[]>([]);
+    const [positions, setPositions] = useState<any[]>([]);
     const [loadingEvents, setLoadingEvents] = useState(true);
     const shareRef = useRef<HTMLDivElement>(null);
 
@@ -42,16 +45,22 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     useEffect(() => {
         if (!userId) return;
         const fetchEvents = async () => {
-            const [cdRes, cuRes, hRes, hlRes] = await Promise.all([
+            const [cdRes, cuRes, hRes, hlRes, cgRes, lgRes, cpRes] = await Promise.all([
                 supabase.from('countdown_items').select('*').eq('user_id', userId).order('target_date', { ascending: true }),
                 supabase.from('countup_items').select('*').eq('user_id', userId).order('start_date', { ascending: false }),
                 supabase.from('habits').select('*').eq('user_id', userId).eq('is_active', true),
-                supabase.from('habit_logs').select('*,habits!inner(user_id)').eq('habits.user_id', userId)
+                supabase.from('habit_logs').select('*,habits!inner(user_id)').eq('habits.user_id', userId),
+                supabase.from('career_goals').select('*').eq('user_id', userId),
+                supabase.from('life_goals').select('*').eq('user_id', userId).order('sort_order', { ascending: true }),
+                supabase.from('career_positions').select('*').eq('user_id', userId)
             ]);
             if (cdRes.data) setCountdowns(cdRes.data);
             if (cuRes.data) setCountups(cuRes.data);
             if (hRes.data) setHabits(hRes.data);
             if (hlRes.data) setHabitLogs(hlRes.data);
+            if (cgRes.data) setCareerGoals(cgRes.data);
+            if (lgRes.data) setLifeGoals(lgRes.data);
+            if (cpRes.data) setPositions(cpRes.data);
             setLoadingEvents(false);
         };
         fetchEvents();
@@ -733,6 +742,46 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             ))}
                         </div>
                     </div>
+
+                    {/* NEW: GPA Snapshot Card */}
+                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all overflow-hidden group relative">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 pointer-events-none"></div>
+                        
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                    <GraduationCap size={18} className="text-blue-500" /> Điểm Tích Lũy
+                                </h3>
+                                <button onClick={() => onNavigate?.('gpa')} className="text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors">
+                                    Chi tiết
+                                </button>
+                            </div>
+                            
+                            <div className="flex items-center gap-5">
+                                <div className="flex-1">
+                                    <div className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-800 mb-1">
+                                        {cumulativeGPA != null ? cumulativeGPA.toFixed(2) : '0.00'}
+                                    </div>
+                                    <div className="text-xs text-gray-400 font-medium">Trung bình Tích lũy (Hệ số 4)</div>
+                                </div>
+                                <div 
+                                    onClick={() => onNavigate?.('gpa')}
+                                    className="shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30 group-hover:-translate-y-1 cursor-pointer transition-all hover:scale-105"
+                                >
+                                    <ArrowUpRight size={20} />
+                                </div>
+                            </div>
+
+                            <div className="mt-5 pt-5 border-t border-gray-50">
+                                <button 
+                                    onClick={() => onNavigate?.('gpa')}
+                                    className="w-full py-2.5 bg-blue-50/50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                                >
+                                    Theo dõi quá trình học tập
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* COL 2: FOCUS ZONE & SCHEDULE GOALS */}
@@ -851,6 +900,30 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             </div>
                         </div>
                     )}
+
+                    {/* COUNTDOWNS */}
+                    {!loadingEvents && countdowns.length > 0 && (
+                        <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
+                                <Timer className="text-indigo-500" /> Sắp diễn ra
+                            </h3>
+                            <div className="space-y-3">
+                                {countdowns.slice(0, 3).map(c => {
+                                    const d = diffDays(c.target_date);
+                                    return (
+                                        <div key={c.id} className="flex items-center gap-4 bg-gray-50 rounded-2xl p-3">
+                                            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-2xl">{c.icon}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold text-gray-800 truncate">{c.title}</div>
+                                                <div className="text-xs text-gray-400">{new Date(c.target_date).toLocaleDateString('vi-VN')}</div>
+                                            </div>
+                                            <div className="text-xl font-black text-indigo-600">{d > 0 ? d : 0} <span className="text-xs font-normal text-gray-500">ngày</span></div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* COL 3: FINANCE SNAPSHOT & GOALS (Was Col 1) */}
@@ -920,6 +993,72 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                         </div>
                     </div>
 
+                    {/* NEW: CAREER & VISION WIDGET */}
+                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                <Target size={18} className="text-indigo-600" /> Định hướng & Tầm nhìn
+                            </h3>
+                            <button onClick={() => onNavigate?.('goals')} className="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors">
+                                Chi tiết
+                            </button>
+                        </div>
+
+                        {/* Section 1: Career Goals Progress */}
+                        <div className="space-y-3 mb-5 pb-5 border-b border-gray-100">
+                            <div className="text-xs text-gray-400 font-bold uppercase tracking-wider">Lộ trình nghề nghiệp</div>
+                            {positions.length > 0 ? (
+                                positions.slice(0, 1).map(pos => {
+                                    const posGoals = careerGoals.filter(g => g.position_id === pos.id);
+                                    const completed = posGoals.filter(g => g.status === 'completed' || g.progress === 100).length;
+                                    const total = posGoals.length;
+                                    const progress = total > 0 ? Math.round((posGoals.reduce((acc, curr) => acc + curr.progress, 0)) / total) : 0;
+                                    
+                                    return (
+                                        <div key={pos.id} className="bg-indigo-50/30 border border-indigo-100/40 rounded-2xl p-3">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="font-bold text-gray-800 text-sm">{pos.title}</span>
+                                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{completed}/{total} kỹ năng</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
+                                                <span>Tiến độ tổng:</span>
+                                                <span className="font-bold">{progress}%</span>
+                                            </div>
+                                            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                                                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-full rounded-full" style={{ width: `${progress}%` }}></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <p className="text-gray-400 text-xs italic">Chưa thiết lập vị trí mục tiêu.</p>
+                            )}
+                        </div>
+
+                        {/* Section 2: 5-Year Life Goals Snapshot */}
+                        <div className="space-y-3">
+                            <div className="text-xs text-gray-400 font-bold uppercase tracking-wider">Mục tiêu dài hạn 5 năm</div>
+                            {lifeGoals.length > 0 ? (
+                                <div className="space-y-2">
+                                    {lifeGoals.slice(0, 3).map(goal => (
+                                        <div key={goal.id} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded-xl">
+                                            <div className="flex items-center gap-2 truncate">
+                                                <span className="text-base">{goal.icon}</span>
+                                                <span className={`font-bold text-gray-700 truncate ${goal.is_achieved ? 'line-through text-gray-400' : ''}`}>{goal.title}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-full">{goal.target_year}</span>
+                                                {goal.is_achieved && <span className="text-emerald-500 font-bold">✓</span>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-gray-400 text-xs italic">Chưa thiết lập mục tiêu 5 năm.</p>
+                            )}
+                        </div>
+                    </div>
+
                     {/* NEW: MY SPOTIFY WIDGET */}
                     <div 
                         onClick={() => onOpenSpotify?.()}
@@ -941,71 +1080,6 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             </div>
                         </div>
                     </div>
-
-
-                    {/* NEW: GPA Snapshot Card */}
-                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all overflow-hidden group relative">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 pointer-events-none"></div>
-                        
-                        <div className="relative">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                    <GraduationCap size={18} className="text-blue-500" /> Điểm Tích Lũy
-                                </h3>
-                                <button onClick={() => onNavigate?.('gpa')} className="text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors">
-                                    Chi tiết
-                                </button>
-                            </div>
-                            
-                            <div className="flex items-center gap-5">
-                                <div className="flex-1">
-                                    <div className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-800 mb-1">
-                                        {cumulativeGPA != null ? cumulativeGPA.toFixed(2) : '0.00'}
-                                    </div>
-                                    <div className="text-xs text-gray-400 font-medium">Trung bình Tích lũy (Hệ số 4)</div>
-                                </div>
-                                <div 
-                                    onClick={() => onNavigate?.('gpa')}
-                                    className="shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30 group-hover:-translate-y-1 cursor-pointer transition-all hover:scale-105"
-                                >
-                                    <ArrowUpRight size={20} />
-                                </div>
-                            </div>
-
-                            <div className="mt-5 pt-5 border-t border-gray-50">
-                                <button 
-                                    onClick={() => onNavigate?.('gpa')}
-                                    className="w-full py-2.5 bg-blue-50/50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                                >
-                                    Theo dõi quá trình học tập
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* COUNTDOWNS */}
-                    {!loadingEvents && countdowns.length > 0 && (
-                        <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
-                                <Timer className="text-indigo-500" /> Sắp diễn ra
-                            </h3>
-                            <div className="space-y-3">
-                                {countdowns.slice(0, 3).map(c => {
-                                    const d = diffDays(c.target_date);
-                                    return (
-                                        <div key={c.id} className="flex items-center gap-4 bg-gray-50 rounded-2xl p-3">
-                                            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-2xl">{c.icon}</div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-bold text-gray-800 truncate">{c.title}</div>
-                                                <div className="text-xs text-gray-400">{new Date(c.target_date).toLocaleDateString('vi-VN')}</div>
-                                            </div>
-                                            <div className="text-xl font-black text-indigo-600">{d > 0 ? d : 0} <span className="text-xs font-normal text-gray-500">ngày</span></div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
 
                 </div>
 
