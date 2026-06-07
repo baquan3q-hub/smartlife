@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen, Target, CheckCircle2, Star, Facebook } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen, Target, CheckCircle2, Star, Facebook, FileText, Image, AudioLines, Users, ChevronUp } from 'lucide-react';
 import InstallGuideModal from './InstallGuideModal';
 import { Lang } from '../i18n/i18n';
 
@@ -18,15 +18,15 @@ const translations = {
         heroTitle2: 'Thông minh & Hiệu quả',
         heroDesc: 'SmartLife giúp bạn làm chủ tài chính, sắp xếp thời gian biểu và chinh phục mục tiêu cá nhân. Tất cả trong một ứng dụng duy nhất.',
         startNow: 'Bắt đầu miễn phí',
-        learnMore: 'Tìm hiểu thêm',
+        learnMore: 'Tìm hiểu ngay',
 
         featVisualTitle: 'Visualboard - Góc nhìn toàn cảnh,\nKiểm soát mọi thứ.',
         featVisualDesc: 'Theo dõi tổng quan lịch trình, mục tiêu và đếm ngược ngày lễ sắp tới. Nắm bắt bức tranh tài chính toàn diện với số liệu thu chi tổng hợp.',
         featVisualItems: ['Tổng quan lịch trình & Mục tiêu một cách trực quan hóa', 'Đếm ngược ngày lễ VN', 'Tổng quan tất cả mọi thứ trong app'],
 
-        featAiTitle: 'AI Financial Advisor,\nTư vấn thông minh.',
-        featAiDesc: 'Trợ lý AI phân tích dữ liệu tài chính của riêng bạn, đưa ra nhận xét, dự đoán xu hướng và đề xuất cách tiết kiệm hiệu quả.',
-        featAiItems: ['Phân tích chi tiêu chi tiết theo yêu cầu', 'Truy xuất toàn bộ dữ liệu để phản hồi cá nhân hóa', 'Thêm nhanh nhiều giao dịch thu chi cùng lúc bằng câu lệnh tự nhiên', 'Thêm và cập nhật lịch trình bằng ngôn ngữ đơn giản'],
+        featAiTitle: 'AI Your Own,\nTrợ lý AI cá nhân hóa.',
+        featAiDesc: 'Trợ lý AI đa năng phân tích dữ liệu cá nhân, đọc hiểu file/ảnh/audio, cá nhân hóa dựa trên tính cách MBTI & DISC và đưa ra lời khuyên thông minh.',
+        featAiItems: ['Phân tích chi tiêu chi tiết theo yêu cầu', 'Truy xuất toàn bộ dữ liệu để phản hồi cá nhân hóa', 'AI đọc và phân tích được file tài liệu đa định dạng', 'AI phân tích hình ảnh và nhận diện nội dung trực quan', 'AI xử lý và phân tích audio, ghi chú giọng nói', 'Cá nhân hóa dựa trên tính cách MBTI & DISC của người dùng', 'Thêm nhanh nhiều giao dịch thu chi cùng lúc bằng câu lệnh tự nhiên', 'Thêm và cập nhật lịch trình bằng ngôn ngữ đơn giản'],
 
         featFinanceTitle: 'Tài chính minh bạch,\nTiết kiệm tối đa.',
         featFinanceDesc: 'Theo dõi thu chi chi tiết, xem báo cáo trực quan và nhận phân tích thông minh từ AI để tối ưu hóa ngân sách của bạn.',
@@ -47,7 +47,7 @@ const translations = {
         ],
 
         featFocusTitle: 'Tập trung cao độ,\nThư giãn tuyệt đối.',
-        featFocusDesc: 'Chế độ Focus với bộ đếm giờ Pomodoro và kho nhạc Lofi chill giúp bạn duy trì sự tập trung và giảm căng thẳng khi học tập, làm việc.',
+        featFocusDesc: 'Chế độ Focus with bộ đếm giờ Pomodoro và kho nhạc Lofi chill giúp bạn duy trì sự tập trung và giảm căng thẳng khi học tập, làm việc.',
         featFocusItems: ['Bộ đếm giờ Pomodoro tùy chỉnh', 'Kho nhạc Lofi & Background Sounds', 'Thống kê thời gian tập trung'],
 
         featHabitTitle: 'Kỷ luật bản thân,\nHướng tới mục tiêu.',
@@ -90,18 +90,16 @@ const translations = {
         promoBtn: 'Trải nghiệm ngay',
         featStorageItems: ['Ghi chú đa phương tiện (Rich Text)', 'Lưu trữ & Xem trước Tệp tin/Media', 'Bảo mật tuyệt đối & Riêng tư'],
 
-        contactTitle: 'Kết nối với tôi',
-        contactDesc: 'Liên hệ để hợp tác hoặc đóng góp ý kiến phát triển ứng dụng.',
         footerBuilt: 'Được xây dựng với ❤️ và công nghệ AI tiên tiến.',
         langName: 'Tiếng Việt',
         footerLogoText: 'Hệ sinh thái học tập và quản lý cuộc sống thông minh dành cho sinh viên.',
         footerCol1Title: 'TÍNH NĂNG CHÍNH',
         footerCol2Title: 'TIỆN ÍCH MỞ RỘNG',
-        footerCol3Title: 'THÔNG TIN LIÊN HỆ',
+        footerCol3Title: 'LIÊN KẾT HỮU ÍCH',
         footerDev: 'Người phát triển',
         footerSupportEmail: 'Email hỗ trợ',
         footerPersonalPage: 'Trang cá nhân',
-        footerAIAdvisor: 'AI Advisor',
+        footerAIAdvisor: 'AI Your Own',
         footerCareer: 'Lộ trình sự nghiệp AI',
         footerFinance: 'Quản lý tài chính',
         footerJournal: 'Nhật ký chữa lành',
@@ -110,7 +108,8 @@ const translations = {
         footerHabit: 'Thói quen & D-Day',
         footerGPATracker: 'GPA Tracker (VNU)',
         footerSpotify: 'My Spotify',
-        footerStorage: 'My Storage (Bảo mật)'
+        footerStorage: 'My Storage (Bảo mật)',
+        footerCVBuilder: 'Xây dựng CV tự động'
     },
     en: {
         install: 'Install App',
@@ -126,9 +125,9 @@ const translations = {
         featVisualDesc: 'Get an overview of schedules, goals, and upcoming holiday countdowns. Master your financial picture with comprehensive income and expense data.',
         featVisualItems: ['Schedule & Goals Overview', 'Holiday Countdown', 'Comprehensive Financial Report'],
 
-        featAiTitle: 'AI Financial Advisor,\nSmart Consultation.',
-        featAiDesc: 'An AI assistant that analyzes your personal financial data, provides insights, predicts trends, and suggests effective ways to save.',
-        featAiItems: ['Detailed expense analysis', 'Budget prediction for next month', 'Personalized AI consultation', 'Batch add multiple transactions at once', 'Manage schedule using natural language'],
+        featAiTitle: 'AI Your Own,\nYour Personalized AI.',
+        featAiDesc: 'A versatile AI assistant that analyzes personal data, reads files/images/audio, personalizes advice based on your MBTI & DISC personality, and provides smart recommendations.',
+        featAiItems: ['Detailed expense analysis on demand', 'Full data retrieval for personalized feedback', 'AI reads & analyzes documents in multiple formats', 'AI analyzes images and recognizes visual content', 'AI processes and analyzes audio & voice notes', 'Personalized based on your MBTI & DISC personality type', 'Batch add multiple transactions via natural language', 'Manage schedule using simple language'],
 
         featFinanceTitle: 'Transparent Finance,\nMaximize Savings.',
         featFinanceDesc: 'Track expenses in detail, view visual reports, and get smart AI analysis to optimize your budget.',
@@ -192,18 +191,16 @@ const translations = {
         promoBtn: 'Experience Now',
         featStorageItems: ['Rich Text Multimedia Notes', 'Store & Preview Files/Media', 'Absolute Security & Privacy'],
 
-        contactTitle: 'Connect with Me',
-        contactDesc: 'Contact for collaboration or feedback on app development.',
         footerBuilt: 'Built with ❤️ and advanced AI technology.',
         langName: 'English',
         footerLogoText: 'A smart learning ecosystem and life management tool designed for students.',
         footerCol1Title: 'CORE FEATURES',
         footerCol2Title: 'EXPANDED UTILITIES',
-        footerCol3Title: 'CONTACT INFORMATION',
+        footerCol3Title: 'USEFUL LINKS',
         footerDev: 'Developer',
         footerSupportEmail: 'Support Email',
         footerPersonalPage: 'Personal Profile',
-        footerAIAdvisor: 'AI Advisor',
+        footerAIAdvisor: 'AI Your Own',
         footerCareer: 'AI Career Guidance',
         footerFinance: 'Personal Finance',
         footerJournal: 'Healing Journal',
@@ -212,7 +209,8 @@ const translations = {
         footerHabit: 'Habits & D-Day',
         footerGPATracker: 'GPA Tracker (VNU)',
         footerSpotify: 'My Spotify',
-        footerStorage: 'My Storage (Secure)'
+        footerStorage: 'My Storage (Secure)',
+        footerCVBuilder: 'Auto CV Builder'
     },
     ko: {
         install: '앱 설치',
@@ -228,9 +226,18 @@ const translations = {
         featVisualDesc: '전체 일정, 목표 및 다가오는 휴일 카운트다운을 모니터링합니다. 수입 및 지출 종합 데이터로 완벽한 재정 상태를 파악하세요.',
         featVisualItems: ['직관적으로 시각화된 일정 및 목표 요약', '공휴일 카운트다운', '앱 내 모든 기능 통합 개요'],
 
-        featAiTitle: 'AI 자산 관리자,\n스마트한 맞춤 상담.',
-        featAiDesc: 'AI 비서가 사용자의 재정 데이터를 분석하여 소중한 의견, 추세 예측 및 효율적인 저축 방법을 제시합니다.',
-        featAiItems: ['요청 시 상세 지출 분석', '맞춤 피드백을 위한 전반적인 데이터 검색', '자연어로 다수의 입출금 내역 빠르게 추가', '간단한 언어로 일정 관리 및 업데이트'],
+        featAiTitle: 'AI Your Own,\n개인화된 AI 비서.',
+        featAiDesc: '사용자의 개인 데이터를 분석하고 파일/이미지/오디오를 이해하며, MBTI & DISC 성격을 바탕으로 스마트하고 맞춤화된 조언을 주는 다재다능한 AI 비서입니다.',
+        featAiItems: [
+            '요청 시 상세 지출 및 자산 분석',
+            '맞춤형 피드백을 위한 전반적인 데이터 검색',
+            '다양한 포맷의 문서 파일 읽기 및 분석',
+            '이미지 분석 및 시각적 콘텐츠 인식',
+            '오디오 및 음성 메모 처리와 분석',
+            '사용자의 MBTI & DISC 성격 유형 기반 개인화',
+            '자연어로 여러 입출금 거래 내역 동시에 빠른 추가',
+            '간단한 대화로 일정 및 To-do 추가/업데이트'
+        ],
 
         featFinanceTitle: '투명한 자산 관리,\n최대 저축 실현.',
         featFinanceDesc: '상세 입출금 내역을 추적하고 직관적인 보고서를 보며, AI 분석을 통해 예산을 최적화하세요.',
@@ -305,7 +312,7 @@ const translations = {
         footerDev: '개발자',
         footerSupportEmail: '고객 지원 이메일',
         footerPersonalPage: '개인 프로필',
-        footerAIAdvisor: 'AI 금융 상담사',
+        footerAIAdvisor: 'AI Your Own',
         footerCareer: 'AI 진로 설계',
         footerFinance: '자산 관리',
         footerJournal: '힐링 다이어리',
@@ -314,7 +321,8 @@ const translations = {
         footerHabit: '습관 및 D-Day',
         footerGPATracker: 'GPA 트래커 (VNU)',
         footerSpotify: 'My Spotify 재생',
-        footerStorage: 'My Storage (보안)'
+        footerStorage: 'My Storage (보안)',
+        footerCVBuilder: '자동 이력서 빌더'
     }
 };
 
@@ -325,7 +333,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
     const t = translations[lang];
 
     const marqueeFeatures = lang === 'vi' ? [
-        { name: 'Cố vấn học tập AI 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'AI Your Own 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
         { name: 'Cố vấn sự nghiệp AI 💼', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
         { name: 'Xây dựng CV tự động 📄', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
         { name: 'Nhật ký chữa lành 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
@@ -338,7 +346,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
         { name: 'Lưu trữ Bảo mật 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
         { name: 'Đếm ngược Sự kiện 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
     ] : lang === 'ko' ? [
-        { name: 'AI 학습 멘토 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'AI Your Own 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
         { name: 'AI 커리어 상담사 💼', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
         { name: '자동 이력서 빌더 📄', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
         { name: '힐링 다이어리 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
@@ -351,7 +359,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
         { name: '안전한 보관소 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
         { name: '이벤트 카운트다운 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
     ] : [
-        { name: 'AI Study Advisor 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'AI Your Own 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
         { name: 'AI Career Guidance 💼', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
         { name: 'Auto CV Builder 📄', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
         { name: 'Healing Journal 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
@@ -536,9 +544,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                 {t.startNow} <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                             </button>
                         </div>
-                        <a href="#features" className="w-full xs:w-auto px-5 py-3 xs:px-8 xs:py-4 bg-white text-gray-700 border border-gray-200 shadow-sm rounded-full font-bold text-sm xs:text-base sm:text-lg hover:bg-gray-50 hover:shadow-md transition-all flex items-center justify-center group">
+                        <button onClick={() => scrollToSection('site-footer')} className="w-full xs:w-auto px-5 py-3 xs:px-8 xs:py-4 bg-white text-gray-700 border border-gray-200 shadow-sm rounded-full font-bold text-sm xs:text-base sm:text-lg hover:bg-gray-50 hover:shadow-md transition-all flex items-center justify-center group">
                             {t.learnMore}
-                        </a>
+                        </button>
                     </div>
                 </div>
             </section>
@@ -568,22 +576,126 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
-                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Tính năng AI Mới' : lang === 'ko' ? '새로운 AI 기능' : 'New AI Feature'}
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'AI Cá Nhân Hóa' : lang === 'ko' ? '맞춤형 AI' : 'Personalized AI'}
                             </div>
                             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featAiTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featAiDesc}
                             </p>
                             <ul className="space-y-4 pt-2">
-                                {t.featAiItems.map((item, i) => (
-                                    <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-indigo-50 shadow-sm">
-                                        <div className="bg-indigo-100 p-1.5 rounded-lg shrink-0 mt-0.5">
-                                            <Brain className="text-indigo-600" size={18} />
-                                        </div>
-                                        <span>{item}</span>
-                                    </li>
-                                ))}
+                                {t.featAiItems.map((item, i) => {
+                                    const aiIcons = [
+                                        <Wallet className="text-emerald-600" size={18} />,
+                                        <Brain className="text-indigo-600" size={18} />,
+                                        <FileText className="text-blue-600" size={18} />,
+                                        <Image className="text-pink-600" size={18} />,
+                                        <AudioLines className="text-violet-600" size={18} />,
+                                        <Users className="text-amber-600" size={18} />,
+                                        <Zap className="text-orange-600" size={18} />,
+                                        <CalendarDays className="text-cyan-600" size={18} />
+                                    ];
+                                    const aiIconBgs = [
+                                        'bg-emerald-100', 'bg-indigo-100', 'bg-blue-100', 'bg-pink-100',
+                                        'bg-violet-100', 'bg-amber-100', 'bg-orange-100', 'bg-cyan-100'
+                                    ];
+                                    return (
+                                        <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-indigo-50 shadow-sm">
+                                            <div className={`${aiIconBgs[i] || 'bg-indigo-100'} p-1.5 rounded-lg shrink-0 mt-0.5`}>
+                                                {aiIcons[i] || <Brain className="text-indigo-600" size={18} />}
+                                            </div>
+                                            <span>{item}</span>
+                                        </li>
+                                    );
+                                })}
                             </ul>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature 4.25: AI Career Counselor (NEW) */}
+                <section id="ai-career-advisor" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gradient-to-br from-indigo-50/20 via-cyan-50/15 to-purple-50/20 py-12 sm:py-20 rounded-3xl border border-indigo-100/50 mb-16 sm:mb-20">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                        <div className="order-2 md:order-1 relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-300/30 to-cyan-300/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            <img
+                                src="/career_advisor_mockup.png"
+                                alt="AI Career Counselor"
+                                className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
+                            />
+                        </div>
+                        <div className="order-1 md:order-2 space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-600 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Định Hướng Sự Nghiệp Pro' : lang === 'ko' ? 'AI 진로 네비게이터' : 'AI Career Path Finder'}
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featCareerTitle}</h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {t.featCareerDesc}
+                            </p>
+                            <ul className="space-y-3 pt-2">
+                                {t.featCareerItems && t.featCareerItems.map((item: string, i: number) => {
+                                    const careerIcons = [
+                                        <GraduationCap className="text-indigo-600" size={18} />,
+                                        <Users className="text-purple-600" size={18} />,
+                                        <Brain className="text-cyan-600" size={18} />,
+                                        <Target className="text-pink-600" size={18} />
+                                    ];
+                                    const careerIconBgs = [
+                                        'bg-indigo-100', 'bg-purple-100', 'bg-cyan-100', 'bg-pink-100'
+                                    ];
+                                    return (
+                                        <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-indigo-50/50 shadow-sm">
+                                            <div className={`${careerIconBgs[i] || 'bg-indigo-100'} p-1.5 rounded-lg shrink-0 mt-0.5`}>
+                                                {careerIcons[i] || <Target className="text-indigo-600" size={18} />}
+                                            </div>
+                                            <span>{item}</span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature 4.5: Auto CV Builder (NEW) */}
+                <section id="cv-builder" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gradient-to-br from-purple-50/20 via-pink-50/15 to-rose-50/20 py-12 sm:py-20 rounded-3xl border border-purple-150/50 mb-16 sm:mb-20">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                        <div className="space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Xây Dựng CV Chuyên Nghiệp' : lang === 'ko' ? '프로페셔널 이력서 빌더' : 'Professional CV Builder'}
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featCVTitle}</h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {t.featCVDesc}
+                            </p>
+                            <ul className="space-y-3 pt-2">
+                                {t.featCVItems && t.featCVItems.map((item: string, i: number) => {
+                                    const cvIcons = [
+                                        <Zap className="text-purple-600" size={18} />,
+                                        <FileText className="text-blue-600" size={18} />,
+                                        <Download className="text-emerald-600" size={18} />,
+                                        <ShieldCheck className="text-amber-600" size={18} />
+                                    ];
+                                    const cvIconBgs = [
+                                        'bg-purple-100', 'bg-blue-100', 'bg-emerald-100', 'bg-amber-100'
+                                    ];
+                                    return (
+                                        <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-purple-50/50 shadow-sm">
+                                            <div className={`${cvIconBgs[i] || 'bg-purple-100'} p-1.5 rounded-lg shrink-0 mt-0.5`}>
+                                                {cvIcons[i] || <CheckCircle2 className="text-purple-600" size={18} />}
+                                            </div>
+                                            <span>{item}</span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                        <div className="relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-purple-300/30 to-pink-300/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            <img
+                                src="/cv_builder_mockup.png"
+                                alt="Auto CV Builder"
+                                className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
+                            />
                         </div>
                     </div>
                 </section>
@@ -990,72 +1102,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     </div>
                 </section>
 
-                {/* Feature 4.25: AI Career Counselor (NEW) */}
-                <section id="ai-career-advisor" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gradient-to-br from-indigo-50/20 via-cyan-50/15 to-purple-50/20 py-12 sm:py-20 rounded-3xl border border-indigo-100/50 mb-16 sm:mb-20">
-                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-                        <div className="order-2 md:order-1 relative group">
-                            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-300/30 to-cyan-300/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
-                            <img
-                                src="/career_advisor_mockup.png"
-                                alt="AI Career Counselor"
-                                className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
-                            />
-                        </div>
-                        <div className="order-1 md:order-2 space-y-6">
-                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-600 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
-                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Định Hướng Sự Nghiệp Pro' : lang === 'ko' ? 'AI 진로 네비게이터' : 'AI Career Path Finder'}
-                            </div>
-                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featCareerTitle}</h2>
-                            <p className="text-gray-600 text-lg leading-relaxed">
-                                {t.featCareerDesc}
-                            </p>
-                            <ul className="space-y-3 pt-2">
-                                {t.featCareerItems && t.featCareerItems.map((item: string, i: number) => (
-                                    <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-indigo-50/50 shadow-sm">
-                                        <div className="bg-indigo-100 p-1.5 rounded-lg shrink-0 mt-0.5">
-                                            <Target className="text-indigo-600" size={18} />
-                                        </div>
-                                        <span>{item}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-                </section>
-
-                {/* Feature 4.5: Auto CV Builder (NEW) */}
-                <section id="cv-builder" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gradient-to-br from-purple-50/20 via-pink-50/15 to-rose-50/20 py-12 sm:py-20 rounded-3xl border border-purple-150/50 mb-16 sm:mb-20">
-                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-                        <div className="space-y-6">
-                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
-                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Xây Dựng CV Chuyên Nghiệp' : lang === 'ko' ? '프로페셔널 이력서 빌더' : 'Professional CV Builder'}
-                            </div>
-                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featCVTitle}</h2>
-                            <p className="text-gray-600 text-lg leading-relaxed">
-                                {t.featCVDesc}
-                            </p>
-                            <ul className="space-y-3 pt-2">
-                                {t.featCVItems && t.featCVItems.map((item: string, i: number) => (
-                                    <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-purple-50/50 shadow-sm">
-                                        <div className="bg-purple-100 p-1.5 rounded-lg shrink-0 mt-0.5">
-                                            <CheckCircle2 className="text-purple-600" size={18} />
-                                        </div>
-                                        <span>{item}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                        <div className="relative group">
-                            <div className="absolute -inset-4 bg-gradient-to-r from-purple-300/30 to-pink-300/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
-                            <img
-                                src="/cv_builder_mockup.png"
-                                alt="Auto CV Builder"
-                                className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
-                            />
-                        </div>
-                    </div>
-                </section>
-
                 {/* Feature 5: My Spotify (NEW) */}
                 <section id="spotify" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-zinc-900 py-12 sm:py-20 rounded-3xl border border-zinc-800 mb-16 sm:mb-20 shadow-2xl overflow-hidden relative">
                     <div className="absolute top-0 right-0 -mr-40 -mt-40 w-96 h-96 bg-indigo-500 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
@@ -1170,42 +1216,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </section>
             </div>
 
-            {/* Contact Section */}
-            <section className="py-12 bg-gray-900 text-white relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')] bg-cover bg-center opacity-10"></div>
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-                    <h2 className="text-2xl font-bold mb-3">{t.contactTitle}</h2>
-                    <p className="text-gray-400 mb-6 max-w-lg mx-auto text-sm">
-                        {t.contactDesc}
-                    </p>
-
-                    <div className="flex flex-wrap justify-center gap-4">
-                        <a href="https://beacons.ai/baquan3q" target="_blank" rel="noreferrer" className="flex items-center gap-2.5 px-5 py-3 bg-white/10 hover:bg-white/20 rounded-xl backdrop-blur-sm transition-all border border-white/5 hover:scale-105 group">
-                            <div className="bg-indigo-500/20 p-1.5 rounded-lg group-hover:bg-indigo-500/30 transition-colors">
-                                <User className="text-indigo-400" size={18} />
-                            </div>
-                            <div className="text-left">
-                                <div className="text-[10px] uppercase tracking-wide text-gray-400 font-bold">Profile</div>
-                                <div className="font-semibold text-sm">baquan3q</div>
-                            </div>
-                        </a>
-
-                        <a href="mailto:baquan3q@gmail.com" className="flex items-center gap-2.5 px-5 py-3 bg-white/10 hover:bg-white/20 rounded-xl backdrop-blur-sm transition-all border border-white/5 hover:scale-105 group">
-                            <div className="bg-pink-500/20 p-1.5 rounded-lg group-hover:bg-pink-500/30 transition-colors">
-                                <Mail className="text-pink-400" size={18} />
-                            </div>
-                            <div className="text-left">
-                                <div className="text-[10px] uppercase tracking-wide text-gray-400 font-bold">Email</div>
-                                <div className="font-semibold text-sm">baquan3q@gmail.com</div>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-            </section>
-
             {/* Footer */}
-            <footer className="bg-gray-900 border-t border-gray-800 text-gray-400 py-16">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <footer id="site-footer" className="bg-[#030712] border-t border-gray-800/60 text-gray-400 py-16 relative overflow-hidden">
+                <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/5 rounded-full blur-[120px] pointer-events-none" />
+                <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-[120px] pointer-events-none" />
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
                         {/* Column 1: SmartLife Info */}
                         <div className="space-y-4">
@@ -1218,17 +1233,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             <p className="text-sm leading-relaxed text-gray-400">
                                 {t.footerLogoText}
                             </p>
-                            <div className="flex items-center gap-2 pt-2">
-                                <a href="https://facebook.com/buianhquan06" target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all">
-                                    <Facebook size={18} />
-                                </a>
-                                <a href="https://beacons.ai/baquan3q" target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all">
-                                    <User size={18} />
-                                </a>
-                                <a href="mailto:baquan3q@gmail.com" className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all">
-                                    <Mail size={18} />
-                                </a>
-                            </div>
                         </div>
 
                         {/* Column 2: TÍNH NĂNG CHÍNH */}
@@ -1245,6 +1249,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                     <button onClick={() => scrollToSection('ai-career-advisor')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
                                         <Target size={16} className="text-purple-400 shrink-0" />
                                         <span>{t.footerCareer}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('cv-builder')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <FileText size={16} className="text-rose-400 shrink-0" />
+                                        <span>{t.footerCVBuilder}</span>
                                     </button>
                                 </li>
                                 <li>
@@ -1352,8 +1362,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             <p className="text-sm font-semibold text-gray-300">SmartLife Application © 2026</p>
                             <p className="text-xs text-gray-500 mt-0.5">All rights reserved.</p>
                         </div>
-                        <div className="text-xs text-gray-500 text-center md:text-right">
-                            {t.footerBuilt}
+                        <div className="flex items-center gap-4">
+                            <div className="text-xs text-gray-500 text-center md:text-right">
+                                {t.footerBuilt}
+                            </div>
+                            <button
+                                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                                className="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 text-gray-400 hover:text-white transition-all hover:scale-110 hover:-translate-y-1"
+                                title="Back to top"
+                            >
+                                <ChevronUp size={20} />
+                            </button>
                         </div>
                     </div>
                 </div>
