@@ -1,6 +1,6 @@
 // File: src/services/subscriptionService.ts
 import { supabase } from './supabase';
-import { SubscriptionOrder, SubscriptionPlan, SubscriptionPlanDuration } from '../types';
+import { SubscriptionOrder, SubscriptionPlan, SubscriptionPlanDuration, AdminGiftLog } from '../types';
 
 // ========== PLANS CONFIG ==========
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
@@ -319,3 +319,219 @@ export const revertOrder = async (orderId: string): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * [ADMIN] Tặng/Gia hạn X ngày Pro cho một user cụ thể (tối đa 365 ngày/lần)
+ */
+export const adminGiftDays = async (
+  adminId: string,
+  adminEmail: string,
+  targetUserId: string,
+  days: number,
+  note?: string
+): Promise<boolean> => {
+  if (days <= 0 || days > 365) {
+    console.error('Days granted must be between 1 and 365');
+    return false;
+  }
+
+  try {
+    // 1. Lấy thông tin plan hiện tại của user
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('plan, pro_expiry_date')
+      .eq('id', targetUserId)
+      .single();
+
+    if (profileError || !profile) throw new Error('User profile not found');
+
+    const now = new Date();
+    let baseDate = now;
+    const oldPlan = profile.plan || 'free';
+    const oldExpiry = profile.pro_expiry_date;
+
+    // Nếu user đang có Pro active thì cộng dồn từ ngày hết hạn cũ, ngược lại tính từ Now
+    if (oldPlan === 'pro' && oldExpiry) {
+      const currentExpiry = new Date(oldExpiry);
+      if (currentExpiry > now) {
+        baseDate = currentExpiry;
+      }
+    }
+
+    const newExpiryDate = new Date(baseDate);
+    newExpiryDate.setDate(newExpiryDate.getDate() + days);
+    const newExpiryStr = newExpiryDate.toISOString();
+
+    // 2. Cập nhật profile
+    const { error: updateProfileError } = await supabase
+      .from('profiles')
+      .update({
+        plan: 'pro',
+        pro_expiry_date: newExpiryStr,
+      })
+      .eq('id', targetUserId);
+
+    if (updateProfileError) throw updateProfileError;
+
+    // 3. Ghi log lịch sử tặng
+    const { error: logError } = await supabase
+      .from('admin_gift_logs')
+      .insert([{
+        admin_id: adminId,
+        admin_email: adminEmail,
+        target_user_id: targetUserId,
+        action_type: 'gift_pro',
+        days_granted: days,
+        old_plan: oldPlan,
+        new_plan: 'pro',
+        old_expiry: oldExpiry,
+        new_expiry: newExpiryStr,
+        note: note || '',
+      }]);
+
+    if (logError) {
+      console.warn('[Admin] Failed to write gift log:', logError);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[Admin] Gift days error:', error);
+    return false;
+  }
+};
+
+/**
+ * [ADMIN] Điều chỉnh trực tiếp plan của user (Free, Trial, Pro, Lifetime)
+ */
+export const adminSetUserPlan = async (
+  adminId: string,
+  adminEmail: string,
+  targetUserId: string,
+  newPlan: 'free' | 'trial' | 'pro' | 'lifetime',
+  days?: number,
+  note?: string
+): Promise<boolean> => {
+  try {
+    if (newPlan === 'pro' && days && (days <= 0 || days > 365)) {
+      console.error('Days granted must be between 1 and 365');
+      return false;
+    }
+
+    // 1. Lấy thông tin plan hiện tại
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('plan, pro_expiry_date')
+      .eq('id', targetUserId)
+      .single();
+
+    if (profileError || !profile) throw new Error('User profile not found');
+
+    const oldPlan = profile.plan || 'free';
+    const oldExpiry = profile.pro_expiry_date;
+
+    let newExpiryStr: string | null = null;
+    let actionType: 'extend_pro' | 'gift_trial' | 'gift_pro' | 'upgrade_lifetime' | 'downgrade_free' = 'gift_pro';
+
+    if (newPlan === 'pro') {
+      const grantDays = days || 30;
+      const now = new Date();
+      const newExpiryDate = new Date(now);
+      newExpiryDate.setDate(newExpiryDate.getDate() + grantDays);
+      newExpiryStr = newExpiryDate.toISOString();
+      actionType = 'gift_pro';
+    } else if (newPlan === 'lifetime') {
+      newExpiryStr = null;
+      actionType = 'upgrade_lifetime';
+    } else if (newPlan === 'trial') {
+      newExpiryStr = null;
+      actionType = 'gift_trial';
+    } else {
+      newExpiryStr = null;
+      actionType = 'downgrade_free';
+    }
+
+    // 2. Cập nhật profile
+    const updateData: any = {
+      plan: newPlan,
+      pro_expiry_date: newExpiryStr,
+    };
+    if (newPlan === 'trial') {
+      updateData.trial_started_at = new Date().toISOString();
+    }
+
+    const { error: updateProfileError } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .eq('id', targetUserId);
+
+    if (updateProfileError) throw updateProfileError;
+
+    // 3. Ghi log
+    const { error: logError } = await supabase
+      .from('admin_gift_logs')
+      .insert([{
+        admin_id: adminId,
+        admin_email: adminEmail,
+        target_user_id: targetUserId,
+        action_type: actionType,
+        days_granted: newPlan === 'pro' ? (days || 30) : null,
+        old_plan: oldPlan,
+        new_plan: newPlan,
+        old_expiry: oldExpiry,
+        new_expiry: newExpiryStr,
+        note: note || '',
+      }]);
+
+    if (logError) {
+      console.warn('[Admin] Failed to write gift log:', logError);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[Admin] Set user plan error:', error);
+    return false;
+  }
+};
+
+/**
+ * [ADMIN] Tặng hàng loạt Pro cho danh sách users
+ */
+export const adminBatchGiftDays = async (
+  adminId: string,
+  adminEmail: string,
+  targetUserIds: string[],
+  days: number,
+  note?: string
+): Promise<{ successCount: number; failedCount: number }> => {
+  let successCount = 0;
+  let failedCount = 0;
+
+  for (const userId of targetUserIds) {
+    const success = await adminGiftDays(adminId, adminEmail, userId, days, note);
+    if (success) {
+      successCount++;
+    } else {
+      failedCount++;
+    }
+  }
+
+  return { successCount, failedCount };
+};
+
+/**
+ * [ADMIN] Lấy lịch sử tặng gói Pro
+ */
+export const getAdminGiftLogs = async (limit = 100): Promise<AdminGiftLog[]> => {
+  const { data, error } = await supabase
+    .from('admin_gift_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('[Admin] Get gift logs error:', error);
+    return [];
+  }
+  return (data || []) as AdminGiftLog[];
+};
+

@@ -598,3 +598,32 @@ export interface CVData {
   updated_at?: string;
   expires_at?: string;        // Auto-expire sau 7 ngày
 }
+
+// 14. Admin Gift & Notifications
+export interface AdminGiftLog {
+  id: string;
+  admin_id: string;
+  admin_email: string;
+  target_user_id: string;
+  action_type: 'extend_pro' | 'gift_trial' | 'gift_pro' | 'upgrade_lifetime' | 'downgrade_free';
+  days_granted?: number;
+  old_plan?: string;
+  new_plan?: string;
+  old_expiry?: string;
+  new_expiry?: string;
+  note?: string;
+  created_at: string;
+}
+
+export type NotificationType = 'gift_pro' | 'extend_pro' | 'system' | 'promo';
+
+export interface UserNotification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  is_read: boolean;
+  metadata?: Record<string, any>;
+  created_at: string;
+}

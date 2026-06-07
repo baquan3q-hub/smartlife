@@ -1,6 +1,8 @@
 // File: src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target } from 'lucide-react';
+import { NotificationPopupModal } from './components/NotificationPopupModal';
+import { getUnreadCount, getUserNotifications } from './services/adminNotificationService';
 
 // Import các Components (Đảm bảo bạn đã tạo file trong thư mục components)
 import FinanceDashboard from './components/FinanceDashboard';
@@ -46,7 +48,7 @@ import { SubscriptionPlanDuration, SubscriptionOrder } from './types';
 import { Lang, t } from './i18n/i18n';
 
 // Types và Constants (Khớp với file đã sửa)
-import { AppState, Transaction, Todo, TaskPriority, SmartInsight, GPASemester, GPACourse, GPATemplateType } from './types';
+import { AppState, Transaction, Todo, TaskPriority, SmartInsight, GPASemester, GPACourse, GPATemplateType, UserNotification } from './types';
 import { INITIAL_BUDGET, INITIAL_GOALS, INITIAL_TRANSACTIONS, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './constants';
 
 const RealtimeClock: React.FC = () => {
@@ -88,6 +90,62 @@ interface AuthenticatedAppProps {
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) => {
     const { user, signOut } = useAuth();
+    
+    // Notifications State
+    const [unreadNotifications, setUnreadNotifications] = useState<UserNotification[]>([]);
+
+    // In-app notifications Realtime Subscription
+    useEffect(() => {
+        if (!user) return;
+
+        // Tải thông báo chưa đọc khi vào app
+        getUserNotifications(user.id).then(notifs => {
+            const unread = notifs.filter(n => !n.is_read);
+            if (unread.length > 0) {
+                setUnreadNotifications(unread);
+            }
+        });
+
+        const channel = supabase
+            .channel(`user-notifications-${user.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'user_notifications',
+                    filter: `user_id=eq.${user.id}`,
+                },
+                (payload) => {
+                    const newNotif = payload.new as UserNotification;
+                    console.log('Realtime notification received:', newNotif);
+                    
+                    // Thêm thông báo mới vào modal popup trong thời gian thực
+                    setUnreadNotifications(prev => {
+                        if (prev.some(n => n.id === newNotif.id)) return prev;
+                        return [newNotif, ...prev];
+                    });
+                    
+                    // Gửi push notification nếu được cấp quyền
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification(newNotif.title, {
+                            body: newNotif.message,
+                            icon: '/pwa-192x192.png'
+                        });
+                    }
+                    
+                    // Refresh data if subscription changes
+                    if (newNotif.type === 'gift_pro' || newNotif.type === 'extend_pro') {
+                        fetchData(true);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [user]);
 
     // App State - Khởi tạo dữ liệu mặc định
     const [appState, setAppState] = useState<AppState>({
@@ -1341,6 +1399,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             />
             <MySpotify isOpen={isSpotifyOpen} onClose={() => setIsSpotifyOpen(false)} userId={user?.id || ''} />
             <PWAInstallPrompt />
+            {unreadNotifications.length > 0 && user && (
+                <NotificationPopupModal
+                    userId={user.id}
+                    notifications={unreadNotifications}
+                    onClose={() => setUnreadNotifications([])}
+                />
+            )}
 
             <ActiveTaskWidget
                 activeTask={taskTracker.activeTask}
