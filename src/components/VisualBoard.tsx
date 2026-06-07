@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AppState, Goal, Todo, TimetableEvent, Habit, CountdownItem, CountUpItem, HabitLog, JournalEntry, MoodLevel } from '../types';
 import { calculateCumulativeGPA } from '../services/gpaCalculator';
-import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap, Crown, X, ShieldCheck, Flame, Timer, TrendingUp, Download, Share2, Edit2, BookOpen } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap, Crown, X, ShieldCheck, Flame, Timer, TrendingUp, Download, Share2, Edit2, BookOpen, Loader2, FileText } from 'lucide-react';
 import MyStorage from './MyStorage';
 import { useProAccess } from '../hooks/useProAccess';
 import { supabase } from '../services/supabase';
@@ -14,16 +14,65 @@ interface VisualBoardProps {
     userName?: string;
     userId?: string;
     userEmail?: string;
-    onNavigate?: (tab: 'finance' | 'schedule' | 'music' | 'ai-advisor' | 'gpa' | 'habit' | 'journal' | 'goals') => void;
+    onNavigate?: (tab: string) => void;
     onUpgrade?: () => void;
     onOpenSpotify?: () => void;
     onUpdateGoal?: (goal: Goal) => void;
+    onRefresh?: () => Promise<void>;
 }
 
-const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, userEmail, onNavigate, onUpgrade, onOpenSpotify, onUpdateGoal }) => {
+const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, userEmail, onNavigate, onUpgrade, onOpenSpotify, onUpdateGoal, onRefresh }) => {
     const [showAllHolidays, setShowAllHolidays] = useState(false);
     const [showStorage, setShowStorage] = useState(false);
     const [showStorageGate, setShowStorageGate] = useState(false);
+    
+    // Pull to Refresh state
+    const [pullDistance, setPullDistance] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const startY = useRef(0);
+    const isDragging = useRef(false);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        const container = e.currentTarget;
+        if (container.scrollTop === 0 && window.scrollY === 0) {
+            startY.current = e.touches[0].clientY;
+            isDragging.current = true;
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isDragging.current) return;
+        const currentY = e.touches[0].clientY;
+        const diff = currentY - startY.current;
+
+        if (diff > 0) {
+            const offset = Math.min(diff * 0.4, 90);
+            setPullDistance(offset);
+            if (diff > 10 && e.cancelable) {
+                e.preventDefault();
+            }
+        }
+    };
+
+    const handleTouchEnd = async () => {
+        if (!isDragging.current) return;
+        isDragging.current = false;
+
+        if (pullDistance > 55 && onRefresh) {
+            setIsRefreshing(true);
+            setPullDistance(60);
+            try {
+                await onRefresh();
+            } catch (err) {
+                console.error("Refresh error:", err);
+            } finally {
+                setIsRefreshing(false);
+                setPullDistance(0);
+            }
+        } else {
+            setPullDistance(0);
+        }
+    };
     
     // Habit & Event States
     const [habits, setHabits] = useState<Habit[]>([]);
@@ -372,7 +421,28 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const visibleHolidays = showAllHolidays ? holidays : holidays.slice(0, 4);
 
     return (
-        <div className="w-full h-full overflow-y-auto overflow-x-hidden pb-32 px-3 md:px-8 pt-4 md:pt-8">
+        <div 
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className="w-full h-full overflow-y-auto overflow-x-hidden pb-32 px-3 md:px-8 pt-4 md:pt-8 relative"
+        >
+            {/* Pull to Refresh Spinner */}
+            <div 
+                className="absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-200 z-[100]"
+                style={{ 
+                    top: `${pullDistance - 40}px`, 
+                    opacity: pullDistance > 10 ? Math.min(pullDistance / 50, 1) : 0 
+                }}
+            >
+                <div className="bg-white rounded-full p-2.5 shadow-lg border border-gray-100 flex items-center justify-center">
+                    <Loader2 
+                        className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`} 
+                        size={20} 
+                        style={{ transform: `rotate(${pullDistance * 4}deg)` }} 
+                    />
+                </div>
+            </div>
             {/* 1. Welcome Header */}
             <header className="mb-6">
                 <div className="text-sm text-gray-500 font-medium uppercase tracking-wider mb-1">
@@ -1076,6 +1146,50 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                 </div>
                             </div>
                             <div className="text-gray-500 group-hover:text-white transition-colors">
+                                <ArrowUpRight size={20} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* NEW: CAREER ORIENTATION AI WIDGET */}
+                    <div 
+                        onClick={() => onNavigate?.('gpa-career')}
+                        className="bg-gradient-to-br from-indigo-50/45 via-cyan-50/35 to-purple-50/45 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer border border-indigo-100/50 hover:border-indigo-200 group relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-200/20 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
+                        <div className="relative flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform">
+                                    <Bot size={22} className="text-white animate-pulse" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-800 text-lg">Cố vấn sự nghiệp AI</h3>
+                                    <p className="text-indigo-600 text-xs font-bold uppercase tracking-wider mt-0.5">Định hình tương lai</p>
+                                </div>
+                            </div>
+                            <div className="text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all">
+                                <ArrowUpRight size={20} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* NEW: AUTO CV BUILDER WIDGET */}
+                    <div 
+                        onClick={() => onNavigate?.('goals-cv')}
+                        className="bg-gradient-to-br from-purple-50/45 via-pink-50/35 to-rose-50/45 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer border border-purple-100/50 hover:border-purple-200 group relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-200/20 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
+                        <div className="relative flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20 group-hover:scale-110 transition-transform">
+                                    <FileText size={22} className="text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-800 text-lg">Xây dựng CV tự động</h3>
+                                    <p className="text-purple-600 text-xs font-bold uppercase tracking-wider mt-0.5">Ứng tuyển chuyên nghiệp</p>
+                                </div>
+                            </div>
+                            <div className="text-gray-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all">
                                 <ArrowUpRight size={20} />
                             </div>
                         </div>

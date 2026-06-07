@@ -10,6 +10,8 @@ import { cvService } from '../services/cvService';
 import { careerGoalService } from '../services/careerGoalService';
 import { CVData, Profile, CareerAnalysisResult } from '../types';
 import ProGateOverlay from './ProGateOverlay';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 interface CVBuilderProps {
   userId: string;
@@ -59,6 +61,18 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
   const [generatingObjective, setGeneratingObjective] = useState(false);
   const [autofilling, setAutofilling] = useState(false);
   const [renewing, setRenewing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [pdfDownloadUrl, setPdfDownloadUrl] = useState<string | null>(null);
+  const [pdfFilename, setPdfFilename] = useState<string>('');
+
+  // Clean up PDF object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (pdfDownloadUrl) {
+        URL.revokeObjectURL(pdfDownloadUrl);
+      }
+    };
+  }, [pdfDownloadUrl]);
 
   // Load Lang
   const lang = localStorage.getItem('smartlife_lang') || 'vi';
@@ -141,9 +155,12 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
         // Refresh local CV data state to pull updated expires_at
         const updated = await cvService.getCVData(userId);
         if (updated) setCvData(updated);
+      } else {
+        alert('Không thể lưu CV. Vui lòng thử lại sau.');
       }
     } catch (err) {
       console.error(err);
+      alert('Đã xảy ra lỗi khi lưu CV. Vui lòng thử lại.');
     } finally {
       setSaving(false);
     }
@@ -281,8 +298,157 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
     }
   };
 
-  const handleExportPDF = () => {
-    window.print();
+  const handleExportPDF = async () => {
+    if (!cvData) return;
+
+    const printEl = document.getElementById('cv-print-area');
+    if (!printEl) {
+      alert('Không tìm thấy vùng in CV. Vui lòng chuyển sang tab Xem trước.');
+      return;
+    }
+
+    setExporting(true);
+
+    // Revoke previous URL if any to free memory
+    if (pdfDownloadUrl) {
+      URL.revokeObjectURL(pdfDownloadUrl);
+      setPdfDownloadUrl(null);
+    }
+
+    try {
+      // 1. Try to pre-convert the avatar image to base64 using fetch with CORS.
+      let avatarBase64: string | null = null;
+      let avatarFetchFailed = false;
+
+      if (cvData.personal_info.avatar_url) {
+        if (cvData.personal_info.avatar_url.startsWith('data:')) {
+          avatarBase64 = cvData.personal_info.avatar_url;
+        } else {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+            const response = await fetch(cvData.personal_info.avatar_url, {
+              mode: 'cors',
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+              const blob = await response.blob();
+              avatarBase64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+            } else {
+              avatarFetchFailed = true;
+            }
+          } catch (e) {
+            console.warn('Failed to pre-fetch avatar image with CORS:', e);
+            avatarFetchFailed = true;
+          }
+        }
+      }
+
+      // A4 at 96 DPI = 794 x 1123 px
+      const A4_WIDTH_PX = 794;
+      const scale = 2; // 2x for sharp high-DPI text
+
+      // Capture using html2canvas's built-in onclone to preserve all CSS styles
+      const canvas = await html2canvas(printEl, {
+        scale: scale,
+        useCORS: true,
+        allowTaint: false,
+        logging: true,
+        backgroundColor: '#ffffff',
+        width: A4_WIDTH_PX,
+        windowWidth: A4_WIDTH_PX,
+        onclone: (clonedDoc: Document) => {
+          const clonedEl = clonedDoc.getElementById('cv-print-area');
+          if (clonedEl) {
+            clonedEl.style.width = `${A4_WIDTH_PX}px`;
+            clonedEl.style.maxWidth = `${A4_WIDTH_PX}px`;
+            clonedEl.style.minWidth = `${A4_WIDTH_PX}px`;
+            clonedEl.style.boxShadow = 'none';
+            clonedEl.style.border = 'none';
+            clonedEl.style.margin = '0';
+            clonedEl.style.overflow = 'visible';
+            clonedEl.style.contentVisibility = 'visible';
+
+            // Find avatar image in cloned element
+            const avatarImg = clonedEl.querySelector('img') as HTMLImageElement | null;
+            if (avatarImg) {
+              if (avatarBase64) {
+                avatarImg.src = avatarBase64;
+              } else if (avatarFetchFailed) {
+                // Replace with a simple SVG avatar placeholder to prevent canvas taint.
+                const parent = avatarImg.parentNode;
+                if (parent) {
+                  const placeholder = clonedDoc.createElement('div');
+                  placeholder.className = "w-24 h-24 rounded-full mx-auto bg-slate-700 flex items-center justify-center text-slate-400 border-2 border-slate-600 shadow-sm";
+                  placeholder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+                  parent.replaceChild(placeholder, avatarImg);
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Use JPEG with 0.95 quality - smaller size, faster, handles gradients, and has NO wrong PNG signature issues!
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+      // Create PDF in A4 format (210mm x 297mm)
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();   // 210
+      const pdfHeight = pdf.internal.pageSize.getHeight();  // 297
+
+      // Calculate the actual rendered height relative to A4 width
+      const renderedHeightMM = (canvas.height / canvas.width) * pdfWidth;
+
+      let remainingHeightMM = renderedHeightMM;
+      let positionY = 0;
+      let pageNum = 0;
+
+      // Slice the PDF vertically by adding pages and offsetting the full image.
+      // This is 100% bug-free and bypasses all canvas-slicing rounding issues.
+      while (remainingHeightMM > 0.5) { // 0.5mm threshold to avoid empty tail pages
+        if (pageNum > 0) {
+          pdf.addPage();
+        }
+
+        pdf.addImage(imgData, 'JPEG', 0, -positionY, pdfWidth, renderedHeightMM, undefined, 'FAST');
+
+        positionY += pdfHeight;
+        remainingHeightMM -= pdfHeight;
+        pageNum++;
+      }
+
+      const fullName = cvData.personal_info.full_name || 'SmartLife_CV';
+      const filename = `CV_${fullName.trim().replace(/\s+/g, '_')}.pdf`;
+
+      // Generate blob URL for the manual fallback download link
+      const blob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+      setPdfDownloadUrl(blobUrl);
+      setPdfFilename(filename);
+
+      // Try automatic download first
+      try {
+        pdf.save(filename);
+      } catch (saveError) {
+        console.warn('Standard pdf.save failed, relying on download toast fallback:', saveError);
+      }
+
+    } catch (err: any) {
+      console.error('Error generating PDF:', err);
+      alert('Không thể tạo file PDF: ' + (err?.message || err) + '. Đang chuyển sang chế độ in hệ thống.');
+      window.print();
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (loading) {
@@ -304,28 +470,74 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
       {/* CSS print override inline style block */}
       <style>{`
         @media print {
-          body * {
-            visibility: hidden;
-          }
-          #cv-print-area, #cv-print-area * {
-            visibility: visible;
-          }
-          #cv-print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 210mm;
-            min-height: 297mm;
-            box-shadow: none;
-            border: none;
-            background: white !important;
-            color: black !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-          .no-print {
+          /* Hide EVERYTHING inside root to prevent layout leak */
+          #root, .no-print {
             display: none !important;
           }
+
+          /* Display only our isolated temp print wrapper */
+          #cv-temp-print-wrapper {
+            display: block !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 210mm !important;
+            min-height: 297mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+
+          /* Force backgrounds to print on body, wrapper, and all child tags */
+          html.is-printing-cv, body.is-printing-cv, #cv-temp-print-wrapper, #cv-temp-print-wrapper * {
+            height: auto !important;
+            overflow: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* Reset specific print area containers */
+          #cv-temp-print-wrapper #cv-print-area {
+            display: grid !important; /* Keep grid structure intact */
+            width: 210mm !important;
+            min-height: 297mm !important;
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+
+          /* Keep left column dark background */
+          #cv-temp-print-wrapper #cv-print-area .bg-slate-800 {
+            background-color: #1e293b !important;
+          }
+          
+          /* Keep text colors visible on dark column */
+          #cv-temp-print-wrapper #cv-print-area .text-slate-100 {
+            color: #f1f5f9 !important;
+          }
+          #cv-temp-print-wrapper #cv-print-area .text-slate-200 {
+            color: #e2e8f0 !important;
+          }
+          #cv-temp-print-wrapper #cv-print-area .text-slate-300 {
+            color: #cbd5e1 !important;
+          }
+          #cv-temp-print-wrapper #cv-print-area .text-slate-400 {
+            color: #94a3b8 !important;
+          }
+          #cv-temp-print-wrapper #cv-print-area .text-teal-400 {
+            color: #2dd4bf !important;
+          }
+          #cv-temp-print-wrapper #cv-print-area .bg-slate-700\\/50 {
+            background-color: rgba(51, 65, 85, 0.5) !important;
+          }
+        }
+
+        /* Adjust page setup to target standard portrait A4 with zero default page margins */
+        @page {
+          size: A4 portrait;
+          margin: 0;
         }
       `}</style>
 
@@ -370,8 +582,8 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
             <button
               onClick={() => setMode('edit')}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${mode === 'edit'
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                ? 'bg-white text-indigo-700 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
                 }`}
             >
               <Edit3 size={14} /> Chỉnh sửa
@@ -379,8 +591,8 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
             <button
               onClick={() => setMode('preview')}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${mode === 'preview'
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                ? 'bg-white text-indigo-700 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
                 }`}
             >
               <Eye size={14} /> Xem trước & In
@@ -399,9 +611,11 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
           {mode === 'preview' && (
             <button
               onClick={handleExportPDF}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:opacity-95 text-white font-extrabold text-sm rounded-xl transition-all shadow-md shadow-teal-100 hover:scale-[1.02] active:scale-[0.98]"
+              disabled={exporting}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:opacity-95 disabled:opacity-75 text-white font-extrabold text-sm rounded-xl transition-all shadow-md shadow-teal-100 hover:scale-[1.02] active:scale-[0.98]"
             >
-              <Download size={14} /> Tải PDF
+              {exporting ? <RefreshCw className="animate-spin" size={14} /> : <Download size={14} />}
+              {exporting ? 'Đang tạo PDF...' : 'Tải PDF'}
             </button>
           )}
         </div>
@@ -459,9 +673,9 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
               <button
                 onClick={handleAutofill}
                 disabled={autofilling || expired}
-                className="px-4.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md shadow-emerald-200 shrink-0"
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm rounded-xl flex items-center gap-2 transition-all shadow-md shadow-emerald-200 shrink-0"
               >
-                {autofilling ? <RefreshCw className="animate-spin" size={14} /> : <Compass size={14} />}
+                {autofilling ? <RefreshCw className="animate-spin" size={16} /> : <Compass size={16} />}
                 Fill Profile-Goals
               </button>
             </div>
@@ -962,20 +1176,15 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
               </h4>
 
               {cvData.skills.map((cat, idx) => (
-                <div key={idx} className="space-y-2 bg-gray-50/50 p-3 rounded-2xl border border-gray-100/50">
-                  <span className="text-xs font-extrabold text-indigo-700 block uppercase tracking-wider">{cat.category}</span>
-                  <input
-                    type="text"
-                    value={cat.items.join(', ')}
-                    onChange={(e) => {
-                      const next = [...cvData.skills];
-                      next[idx].items = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-                      setCvData({ ...cvData, skills: next });
-                    }}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-gray-200 outline-none text-xs font-semibold"
-                    placeholder="Ví dụ: HTML, CSS, JavaScript"
-                  />
-                </div>
+                <SkillCategoryInput
+                  key={idx}
+                  cat={cat}
+                  onChange={(newItems) => {
+                    const next = [...cvData.skills];
+                    next[idx].items = newItems;
+                    setCvData({ ...cvData, skills: next });
+                  }}
+                />
               ))}
             </div>
 
@@ -1160,7 +1369,6 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
           <div
             id="cv-print-area"
             className="w-[210mm] min-h-[297mm] bg-white text-gray-800 shadow-xl border border-gray-200 grid grid-cols-3 overflow-hidden text-xs print:shadow-none"
-            style={{ contentVisibility: 'auto' }}
           >
             {/* Left Column (Dark Slate background) */}
             <div className="col-span-1 bg-slate-800 text-slate-100 p-6 flex flex-col space-y-6">
@@ -1170,6 +1378,7 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
                 {cvData.personal_info.avatar_url ? (
                   <img
                     src={cvData.personal_info.avatar_url}
+                    crossOrigin="anonymous"
                     alt="Avatar"
                     className="w-24 h-24 rounded-full mx-auto object-cover border-2 border-slate-700 bg-slate-700 shadow-sm"
                   />
@@ -1389,6 +1598,131 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
           </div>
         </div>
       )}
+
+      {/* PDF Ready Toast/Modal */}
+      {pdfDownloadUrl && (
+        <div className="no-print fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-3xl shadow-2xl z-50 flex flex-col gap-3 border border-slate-800 animate-bounce max-w-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-slate-800 text-teal-400 rounded-lg">
+                <Check size={16} />
+              </div>
+              <div>
+                <p className="font-extrabold text-sm text-slate-50">Đã tạo xong PDF!</p>
+                <p className="text-xs text-slate-300 mt-0.5">Nếu file không tự động tải xuống, bạn hãy tải thủ công dưới đây.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                URL.revokeObjectURL(pdfDownloadUrl);
+                setPdfDownloadUrl(null);
+              }}
+              className="text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              <span className="text-lg">×</span>
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <a
+              href={pdfDownloadUrl}
+              download={pdfFilename}
+              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-600 text-white text-xs font-black rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md shadow-teal-955/20 text-center text-indigo-50"
+              onClick={() => {
+                setTimeout(() => {
+                  if (pdfDownloadUrl) {
+                    URL.revokeObjectURL(pdfDownloadUrl);
+                    setPdfDownloadUrl(null);
+                  }
+                }, 1000);
+              }}
+            >
+              <Download size={12} /> Tải xuống trực tiếp
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Helper: get placeholder based on skill category
+const getSkillPlaceholder = (category: string): string => {
+  const lower = category.toLowerCase();
+  if (lower.includes('technical') || lower.includes('tech')) {
+    return '(VD: React, Python, Java...) rồi nhấn Enter';
+  }
+  if (lower.includes('soft')) {
+    return '(VD: Giao tiếp, Phản biện, Làm việc nhóm...) rồi nhấn Enter';
+  }
+  if (lower.includes('tool')) {
+    return '(VD: VS Code, Figma, Git...) rồi nhấn Enter';
+  }
+  return 'Nhập kỹ năng rồi nhấn Enter để thêm';
+};
+
+// Helper component to avoid React Hook inside map rules
+interface SkillCategoryInputProps {
+  cat: { category: string; items: string[] };
+  onChange: (items: string[]) => void;
+}
+
+const SkillCategoryInput: React.FC<SkillCategoryInputProps> = ({ cat, onChange }) => {
+  const [inputVal, setInputVal] = React.useState('');
+
+  const handleAddSkill = () => {
+    const trimmed = inputVal.trim();
+    if (trimmed && !cat.items.includes(trimmed)) {
+      onChange([...cat.items, trimmed]);
+    }
+    setInputVal('');
+  };
+
+  const handleRemoveSkill = (index: number) => {
+    const next = [...cat.items];
+    next.splice(index, 1);
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-2 bg-gray-50/50 p-3 rounded-2xl border border-gray-100/50">
+      <span className="text-xs font-extrabold text-indigo-700 block uppercase tracking-wider">{cat.category}</span>
+
+      {/* Tags display */}
+      {cat.items.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {cat.items.map((item, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg border border-indigo-100 group hover:bg-indigo-100 transition-colors"
+            >
+              {item}
+              <button
+                type="button"
+                onClick={() => handleRemoveSkill(i)}
+                className="text-indigo-400 hover:text-red-500 transition-colors ml-0.5"
+                title="Xóa"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Input */}
+      <input
+        type="text"
+        value={inputVal}
+        onChange={(e) => setInputVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddSkill();
+          }
+        }}
+        className="w-full px-3 py-2 rounded-xl bg-white border border-gray-200 outline-none text-xs font-semibold focus:border-indigo-300 focus:ring-2 focus:ring-indigo-50 transition-all"
+        placeholder={getSkillPlaceholder(cat.category)}
+      />
     </div>
   );
 };

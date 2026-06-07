@@ -106,7 +106,7 @@ src/
 │   ├── aiEngine.ts           # Bộ xử lý prompt thông minh cho tư vấn Tài chính & Sức khỏe tinh thần
 │   ├── careerGoalService.ts  # Bộ xử lý gợi ý công việc dựa trên khảo sát tính cách và GPA
 │   ├── cvService.ts          # Xử lý dữ liệu CV và xuất tệp tin
-│   ├── gpaCalculator.ts      # Logic quy đổi điểm và kịch bản mục tiêu GPA VNU
+│   ├── gpaCalculator.ts      # Bộ logic quy đổi điểm và kịch bản mục tiêu GPA VNU
 │   └── ...                   # Quản lý lịch trình, thông báo, nhật ký...
 │
 ├── hooks/              # Custom React hooks dùng chung

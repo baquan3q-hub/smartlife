@@ -747,9 +747,6 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <span className="flex items-center gap-2">
                                 <Lightbulb size={16} className="text-amber-500" /> Nhận xét nhanh
                             </span>
-                            {!quickInsight && !isLoadingInsight && (
-                                <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold uppercase">Local</span>
-                            )}
                         </h3>
                         {isLoadingInsight ? (
                             <div className="flex items-center gap-2 text-indigo-500 text-xs font-semibold py-2">

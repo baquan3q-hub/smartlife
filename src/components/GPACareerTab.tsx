@@ -37,7 +37,7 @@ const translations = {
     reAnalyzeBtn: "Phân tích lại",
     cachedAtLabel: "Kết quả lưu lúc:",
     daysLeft: "còn hạn",
-    resultsTitle: "🚀 Đề xuất Lĩnh vực sự nghiệp",
+    resultsTitle: "Đề xuất Lĩnh vực sự nghiệp",
     fitScore: "Độ phù hợp:",
     strengths: "Điểm mạnh",
     weaknesses: "Điểm yếu & Cải thiện",
@@ -143,7 +143,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
   onCreatePosition,
   lang = 'vi',
   isPro = false,
-  onUpgrade = () => {}
+  onUpgrade = () => { }
 }) => {
   const t = translations[lang] || translations.vi;
 
@@ -186,16 +186,16 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
       const expiresDate = new Date(cachedDate.getTime() + 24 * 60 * 60 * 1000);
       const now = new Date();
       const diffTime = expiresDate.getTime() - now.getTime();
-      
+
       if (diffTime <= 0) {
         setCooldownTimeStr('');
         return;
       }
-      
+
       const hours = Math.floor(diffTime / (1000 * 60 * 60));
       const minutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diffTime % (1000 * 60)) / 1000);
-      
+
       if (lang === 'vi') {
         if (hours > 0) {
           setCooldownTimeStr(`Phân tích lại sau ${hours} giờ ${minutes} phút`);
@@ -337,7 +337,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
       };
 
       const results = await careerGoalService.analyzeCareerDomains(analysisInput);
-      
+
       if (results && results.length > 0) {
         setAnalysisResults(results);
         await careerGoalService.cacheAnalysisResults(userId, results);
@@ -374,7 +374,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
     const now = new Date();
     const diffTime = expiresDate.getTime() - now.getTime();
     if (diffTime <= 0) return '';
-    
+
     const hours = Math.ceil(diffTime / (1000 * 60 * 60));
     if (lang === 'vi') {
       return `(còn ${hours} giờ)`;
@@ -424,7 +424,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          
+
           {/* Profile Details Sidebar */}
           <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-5">
             <h3 className="text-sm font-extrabold text-gray-800 uppercase tracking-wider border-b border-gray-100 pb-3 flex items-center gap-2">
@@ -513,11 +513,12 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
                 </div>
               )}
 
-              <div className="pt-2 flex items-center justify-between gap-2 border-t border-gray-100">
+              <div className="pt-3 flex items-center justify-between gap-2 border-t border-gray-100">
                 <button
                   onClick={handleSaveProfile}
-                  className="px-4 py-2 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 active:scale-95 transition-all rounded-xl"
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all rounded-xl shadow-sm shadow-indigo-100 flex items-center gap-1.5"
                 >
+                  <Check size={14} />
                   {t.saveProfileBtn}
                 </button>
                 {saveStatus && (
@@ -553,8 +554,8 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
                   {lang === 'vi'
                     ? `Tính năng phân tích AI đang trong thời gian giãn cách 24 giờ để tránh spam. Bạn có thể ${cooldownTimeStr.toLowerCase()}.`
                     : lang === 'ko'
-                    ? `AI 분석 기능은 스팸 방지를 위해 24시간 재대기 시간이 있습니다. ${cooldownTimeStr}.`
-                    : `AI analysis is on a 24-hour cooldown to prevent spam. You can ${cooldownTimeStr.toLowerCase()}.`}
+                      ? `AI 분석 기능은 스팸 방지를 위해 24시간 재대기 시간이 있습니다. ${cooldownTimeStr}.`
+                      : `AI analysis is on a 24-hour cooldown to prevent spam. You can ${cooldownTimeStr.toLowerCase()}.`}
                 </span>
               </div>
             )}
@@ -562,7 +563,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
 
           {/* AI Output Section */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Loading status indicator */}
             {isAnalyzing && (
               <div className="bg-white border border-gray-100 rounded-3xl p-10 shadow-sm flex flex-col items-center justify-center space-y-6 relative overflow-hidden">
@@ -574,7 +575,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
                     <Brain size={32} />
                   </div>
                 </div>
-                
+
                 <div className="text-center space-y-3 z-10">
                   <h4 className="text-lg font-extrabold text-gray-800">{getStepText(loadingStep)}</h4>
                   <div className="w-64 h-1.5 bg-gray-100 rounded-full overflow-hidden mx-auto">
@@ -613,7 +614,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {analysisResults.map((item, idx) => {
                     const isExpanded = expandedDomain === item.domain;
-                    
+
                     return (
                       <div
                         key={idx}
@@ -646,7 +647,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
                               ))}
                             </ul>
                           </div>
-                          
+
                           <div>
                             <span className="text-xs font-bold text-gray-400 uppercase tracking-wide block mb-1">{t.weaknesses}</span>
                             <ul className="space-y-1">

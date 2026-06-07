@@ -27,6 +27,7 @@
     "firebase": "^12.7.0",
     "html2canvas": "^1.4.1",
     "install": "^0.13.0",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.562.0",
     "lunar-javascript": "^1.7.7",
     "npm": "^11.7.0",
