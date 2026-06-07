@@ -22,18 +22,18 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
   };
 
   const features = [
-    { icon: <LayoutDashboard size={18} />, text: 'Visual Board — toàn cảnh cuộc sống đại học trong 1 giao diện' },
-    { icon: <CalendarDays size={18} />, text: 'Lịch trình, Thời khóa biểu & Todo — quản lý deadline hiệu quả' },
-    { icon: <Flame size={18} />, text: 'Habit Tracker — theo dõi thói quen với streak, countdown & count-up' },
-    { icon: <Star size={18} />, text: 'StarBrain ⭐ — hệ thống sao thưởng & cửa hàng đổi quà khi hoàn thành thói quen' },
-    { icon: <BookOpen size={18} />, text: 'Nhật ký cá nhân — không gian chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
-    { icon: <Brain size={18} />, text: 'AI Cố vấn riêng — phân tích & gợi ý cá nhân hóa' },
-    { icon: <Target size={18} />, text: 'Lộ trình Sự nghiệp & Mục tiêu 5 năm — AI cố vấn kỹ năng dựa trên GPA' },
-    { icon: <Zap size={18} />, text: 'Focus Timer & Lofi Music — chế độ tập trung tối đa' },
-    { icon: <TrendingUp size={18} />, text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },
-    { icon: <Trophy size={18} />, text: 'GPA Tracker — tính điểm, lộ trình học tập & mục tiêu tín chỉ' },
-    { icon: <Briefcase size={18} />, text: 'AI Career Analyzer — Phân tích ngành học & tính cách đề xuất nghề nghiệp' },
-    { icon: <FileText size={18} />, text: 'CV Builder — Tự động điền học vấn & kỹ năng, export PDF chuyên nghiệp' },
+    { icon: <LayoutDashboard size={18} />, color: 'text-indigo-600', bgColor: 'bg-indigo-50', text: 'Visual Board — toàn cảnh cuộc sống đại học trong 1 giao diện' },
+    { icon: <CalendarDays size={18} />, color: 'text-blue-600', bgColor: 'bg-blue-50', text: 'Lịch trình, Thời khóa biểu & Todo — quản lý deadline hiệu quả' },
+    { icon: <Flame size={18} />, color: 'text-orange-600', bgColor: 'bg-orange-50', text: 'Habit Tracker — theo dõi thói quen với streak, countdown & count-up' },
+    { icon: <Star size={18} />, color: 'text-amber-500', bgColor: 'bg-amber-50', text: 'StarBrain ⭐ — hệ thống sao thưởng & cửa hàng đổi quà khi hoàn thành thói quen' },
+    { icon: <BookOpen size={18} />, color: 'text-teal-600', bgColor: 'bg-teal-50', text: 'Nhật ký cá nhân — không gian chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
+    { icon: <Brain size={18} />, color: 'text-violet-600', bgColor: 'bg-violet-50', text: 'AI Cố vấn riêng — phân tích & gợi ý cá nhân hóa' },
+    { icon: <Target size={18} />, color: 'text-purple-600', bgColor: 'bg-purple-50', text: 'Lộ trình Sự nghiệp & Mục tiêu 5 năm — AI cố vấn kỹ năng dựa trên GPA' },
+    { icon: <Zap size={18} />, color: 'text-pink-600', bgColor: 'bg-pink-50', text: 'Focus Timer & Lofi Music — chế độ tập trung tối đa' },
+    { icon: <TrendingUp size={18} />, color: 'text-emerald-600', bgColor: 'bg-emerald-50', text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },
+    { icon: <Trophy size={18} />, color: 'text-cyan-600', bgColor: 'bg-cyan-50', text: 'GPA Tracker — tính điểm, lộ trình học tập & mục tiêu tín chỉ' },
+    { icon: <Briefcase size={18} />, color: 'text-rose-600', bgColor: 'bg-rose-50', text: 'AI Career Analyzer — Phân tích ngành học & tính cách đề xuất nghề nghiệp' },
+    { icon: <FileText size={18} />, color: 'text-sky-600', bgColor: 'bg-sky-50', text: 'CV Builder — Tự động điền học vấn & kỹ năng, export PDF chuyên nghiệp' },
   ];
 
   return (
@@ -42,7 +42,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-300">
+      <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto scrollbar-thin animate-in fade-in zoom-in-95 duration-300">
         {/* Close Button */}
         <button onClick={onClose} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors z-10">
           <X size={20} />
@@ -76,7 +76,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
           <div className="space-y-2.5">
             {features.map((f, i) => (
               <div key={i} className="flex items-center gap-3 text-sm text-gray-700">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                <div className={`w-8 h-8 rounded-lg ${f.bgColor} flex items-center justify-center ${f.color} shrink-0`}>
                   {f.icon}
                 </div>
                 <span>{f.text}</span>

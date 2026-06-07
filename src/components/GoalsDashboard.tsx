@@ -71,13 +71,17 @@ interface GoalsDashboardProps {
   isPro?: boolean;
   onUpgrade?: () => void;
   onNavigateToGPACareer?: () => void;
+  initialViewMode?: 'career' | 'life' | 'cv' | null;
+  onResetInitialView?: () => void;
 }
 
 const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
   userId,
   isPro = false,
   onUpgrade = () => {},
-  onNavigateToGPACareer
+  onNavigateToGPACareer,
+  initialViewMode,
+  onResetInitialView
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'career' | 'life' | 'cv'>('career');
 
@@ -185,6 +189,13 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
   useEffect(() => {
     fetchData();
   }, [userId]);
+
+  useEffect(() => {
+    if (initialViewMode) {
+      setActiveSubTab(initialViewMode);
+      onResetInitialView?.();
+    }
+  }, [initialViewMode, onResetInitialView]);
 
   useEffect(() => {
     if (aiLoading) {

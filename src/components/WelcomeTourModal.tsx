@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Sparkles, LayoutDashboard, BrainCircuit, Wallet, CalendarDays, Flame, Music, GraduationCap, Clock, Archive, BookOpen, Target } from 'lucide-react';
+import { X, Sparkles, LayoutDashboard, BrainCircuit, Wallet, CalendarDays, Flame, Music, GraduationCap, Clock, Archive, BookOpen, Target, FileText, Compass, ListChecks, UserCircle } from 'lucide-react';
 
 interface WelcomeTourModalProps {
     isOpen: boolean;
@@ -11,9 +11,13 @@ const features = [
     { icon: <BrainCircuit size={20} className="text-purple-500" />, title: 'AI Advisor', desc: 'Trợ lý thông minh hành động và phân tích all your data' },
     { icon: <Wallet size={20} className="text-emerald-500" />, title: 'Tài chính', desc: 'Kiểm soát thu chi, báo cáo trực quan' },
     { icon: <CalendarDays size={20} className="text-indigo-500" />, title: 'Lịch trình', desc: 'Sắp xếp thời gian, Todo list thông minh và đặt mục tiêu cá' },
+    { icon: <ListChecks size={20} className="text-lime-500" />, title: 'Todolist', desc: 'Quản lý công việc hàng ngày, ưu tiên task & check-in tiến độ' },
+    { icon: <UserCircle size={20} className="text-fuchsia-500" />, title: 'Profile cá nhân hóa', desc: 'MBTI, DISC & thông tin cá nhân giúp AI hiểu bạn hơn' },
     { icon: <Flame size={20} className="text-orange-500" />, title: 'Thói quen', desc: 'Hình thành habit bằng cơ chế đổi thưởng dopamine, countdown/up' },
     { icon: <BookOpen size={20} className="text-emerald-600" />, title: 'Nhật ký cá nhân', desc: 'Chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
     { icon: <Target size={20} className="text-purple-600" />, title: 'Mục tiêu & Lộ trình', desc: 'Lập kế hoạch sự nghiệp, mục tiêu 5 năm & AI định hướng lộ trình' },
+    { icon: <Compass size={20} className="text-teal-500" />, title: 'Định hướng nghề nghiệp', desc: 'AI phân tích năng lực & đề xuất lộ trình sự nghiệp phù hợp' },
+    { icon: <FileText size={20} className="text-sky-500" />, title: 'CV Builder', desc: 'Tạo CV chuyên nghiệp dựa trên mục tiêu & định hướng nghề nghiệp của bạn' },
     { icon: <Clock size={20} className="text-rose-500" />, title: 'Pomodoro', desc: 'Tập trung cao độ với bộ đếm giờ' },
     { icon: <GraduationCap size={20} className="text-cyan-500" />, title: 'GPA Tracker', desc: 'Quản lý điểm số, đặt mục tiêu học tập' },
     { icon: <Music size={20} className="text-pink-500" />, title: 'My Spotify', desc: 'Nghe nhạc & Podcast không giới hạn' },

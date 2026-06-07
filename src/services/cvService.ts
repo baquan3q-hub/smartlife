@@ -34,8 +34,10 @@ export const cvService = {
         .eq('user_id', userId)
         .single();
 
+      // Build payload, stripping empty/falsy id to let Supabase auto-generate
+      const { id, created_at, ...rest } = data as any;
       const payload = {
-        ...data,
+        ...rest,
         user_id: userId,
         updated_at: new Date().toISOString(),
         expires_at: expiresAt.toISOString()

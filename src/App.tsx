@@ -107,6 +107,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals'>('visual');
     const [gpaInitialView, setGpaInitialView] = useState<string | null>(null);
+    const [goalsInitialView, setGoalsInitialView] = useState<'career' | 'life' | 'cv' | null>(null);
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -202,10 +203,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     useEffect(() => {
         if (!user) return;
-        const tourKey = `smartlife_has_seen_tour_${user.id}`;
-        if (!localStorage.getItem(tourKey)) {
+        const tourKey = `smartlife_tour_shown_${user.id}`;
+        if (!sessionStorage.getItem(tourKey)) {
             setIsWelcomeTourOpen(true);
-            localStorage.setItem(tourKey, 'true');
+            sessionStorage.setItem(tourKey, 'true');
         }
     }, [user]);
 
@@ -299,6 +300,78 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     }, [user, appState.profile?.plan]);
 
     // Fetch Data từ Supabase khi user đăng nhập
+    const fetchData = async (silent = false) => {
+        if (!user) return;
+        if (!silent) setIsLoadingData(true);
+        try {
+            // Gọi song song 6 bảng dữ liệu (added calendar_events)
+            const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes, gpaSemRes, gpaCourseRes] = await Promise.all([
+                supabase.from('transactions').select('*').order('date', { ascending: false }),
+                supabase.from('goals').select('*').order('deadline', { ascending: true }),
+                supabase.from('timetable').select('*').order('start_time', { ascending: true }),
+                supabase.from('todos').select('*').order('created_at', { ascending: false }),
+                supabase.from('profiles').select('*').eq('id', user.id).single(),
+                supabase.from('calendar_events').select('*'),
+                supabase.from('budgets').select('*'),
+                supabase.from('gpa_semesters').select('*').order('academic_year', { ascending: true }),
+                supabase.from('gpa_courses').select('*').order('created_at', { ascending: true }),
+            ]);
+
+            if (txRes.error) throw txRes.error;
+
+            // Cập nhật State
+            setAppState((prev: AppState) => ({
+                ...prev,
+                transactions: txRes.data.map(t => ({
+                    id: t.id,
+                    user_id: t.user_id,
+                    amount: Number(t.amount),
+                    category: t.category,
+                    date: t.date,
+                    type: t.type,
+                    description: t.description || '',
+                    created_at: t.created_at
+                })),
+                goals: goalRes.data || [],
+                budgets: budgetRes.data || [],
+                timetable: timeRes.data || [],
+                todos: todoRes.data || [],
+                profile: profileRes.data || null,
+                // GPA: Combine semesters with their courses
+                gpaSemesters: (gpaSemRes.data || []).map((sem: any) => ({
+                    ...sem,
+                    courses: (gpaCourseRes.data || []).filter((c: any) => c.semester_id === sem.id),
+                })),
+                gpaTargetCredits: Number(localStorage.getItem(`gpaTargetCredits_${user.id}`)) || 135,
+                gpaTargetGPA: localStorage.getItem(`gpaTargetGPA_${user.id}`) ? Number(localStorage.getItem(`gpaTargetGPA_${user.id}`)) : null,
+                gpaTargetSemesters: Number(localStorage.getItem(`gpaTargetSemesters_${user.id}`)) || 4,
+            }));
+
+            // Parse Custom Categories from Profile
+            if (profileRes.data?.custom_categories) {
+                const customCats = profileRes.data.custom_categories;
+                if (customCats.expense) setCustomExpenseCats(customCats.expense);
+                if (customCats.income) setCustomIncomeCats(customCats.income);
+            } else {
+                if (profileRes.data && !profileRes.data.custom_categories) {
+                    await supabase.from('profiles').update({
+                        custom_categories: { expense: [], income: [] }
+                    }).eq('id', user.id);
+                }
+            }
+
+            if (eventsRes.data) {
+                setCalendarEvents(eventsRes.data);
+            }
+
+        } catch (error) {
+            console.error('Lỗi tải dữ liệu:', error);
+        } finally {
+            if (!silent) setIsLoadingData(false);
+        }
+    };
+
+    // Fetch Data từ Supabase khi user đăng nhập
     useEffect(() => {
         if (!user) return;
 
@@ -316,79 +389,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 else console.info('[SmartLife] ✅ last_active_at updated');
             });
 
-        const fetchData = async () => {
-            setIsLoadingData(true);
-            try {
-                // Gọi song song 6 bảng dữ liệu (added calendar_events)
-                const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes, gpaSemRes, gpaCourseRes] = await Promise.all([
-                    supabase.from('transactions').select('*').order('date', { ascending: false }),
-                    supabase.from('goals').select('*').order('deadline', { ascending: true }),
-                    supabase.from('timetable').select('*').order('start_time', { ascending: true }),
-                    supabase.from('todos').select('*').order('created_at', { ascending: false }),
-                    supabase.from('profiles').select('*').eq('id', user.id).single(),
-                    supabase.from('calendar_events').select('*'),
-                    supabase.from('budgets').select('*'),
-                    supabase.from('gpa_semesters').select('*').order('academic_year', { ascending: true }),
-                    supabase.from('gpa_courses').select('*').order('created_at', { ascending: true }),
-                ]);
-
-                if (txRes.error) throw txRes.error;
-
-                // Cập nhật State
-                setAppState((prev: AppState) => ({
-                    ...prev,
-                    transactions: txRes.data.map(t => ({
-                        id: t.id,
-                        user_id: t.user_id,
-                        amount: Number(t.amount),
-                        category: t.category,
-                        date: t.date,
-                        type: t.type,
-                        description: t.description || '',
-                        created_at: t.created_at
-                    })),
-                    goals: goalRes.data || [],
-                    budgets: budgetRes.data || [],
-                    timetable: timeRes.data || [],
-                    todos: todoRes.data || [],
-                    profile: profileRes.data || null,
-                    // GPA: Combine semesters with their courses
-                    gpaSemesters: (gpaSemRes.data || []).map((sem: any) => ({
-                        ...sem,
-                        courses: (gpaCourseRes.data || []).filter((c: any) => c.semester_id === sem.id),
-                    })),
-                    gpaTargetCredits: Number(localStorage.getItem(`gpaTargetCredits_${user.id}`)) || 135,
-                    gpaTargetGPA: localStorage.getItem(`gpaTargetGPA_${user.id}`) ? Number(localStorage.getItem(`gpaTargetGPA_${user.id}`)) : null,
-                    gpaTargetSemesters: Number(localStorage.getItem(`gpaTargetSemesters_${user.id}`)) || 4,
-                }));
-
-                // Parse Custom Categories from Profile
-                if (profileRes.data?.custom_categories) {
-                    const customCats = profileRes.data.custom_categories;
-                    if (customCats.expense) setCustomExpenseCats(customCats.expense);
-                    if (customCats.income) setCustomIncomeCats(customCats.income);
-                } else {
-                    if (profileRes.data && !profileRes.data.custom_categories) {
-                        await supabase.from('profiles').update({
-                            custom_categories: { expense: [], income: [] }
-                        }).eq('id', user.id);
-                    }
-                }
-
-                if (eventsRes.data) {
-                    setCalendarEvents(eventsRes.data);
-                }
-
-            } catch (error) {
-                console.error('Lỗi tải dữ liệu:', error);
-            } finally {
-                setIsLoadingData(false);
-            }
-        };
-
-        fetchData();
-
-
+        fetchData(false);
     }, [user]);
 
     // --- FIREBASE MESSAGING LOGIC ---
@@ -1101,10 +1102,16 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 if (tab === 'music') {
                                     setStartInFocusMode(true);
                                     setActiveTab('schedule');
+                                } else if (tab === 'gpa-career') {
+                                    setGpaInitialView('career');
+                                    setActiveTab('gpa');
+                                } else if (tab === 'goals-cv') {
+                                    setGoalsInitialView('cv');
+                                    setActiveTab('goals');
                                 } else {
-                                    setActiveTab(tab);
+                                    setActiveTab(tab as any);
                                 }
-                            }} />
+                            }} onRefresh={async () => { await fetchData(true); }} />
                         ) : (
                             <ProGateOverlay featureName="Visual Board" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
                         )
@@ -1139,6 +1146,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             }}
                             onNavigateToCashFlow={() => setActiveTab('cashflow')}
                             onNavigateToAI={() => setActiveTab('ai-advisor')}
+                            onRefresh={async () => { await fetchData(true); }}
                         />
                     )}
                     {activeTab === 'cashflow' && (
@@ -1178,6 +1186,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 onResetFocusMode={() => setStartInFocusMode(false)}
                                 activeTaskId={taskTracker.activeTask?.id || null}
                                 onStartTracking={taskTracker.startTracking}
+                                onRefresh={async () => { await fetchData(true); }}
                             />
                         ) : (
                             <ProGateOverlay featureName="Lịch trình & Mục tiêu" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
@@ -1222,6 +1231,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 setGpaInitialView('career');
                                 setActiveTab('gpa');
                             }}
+                            initialViewMode={goalsInitialView}
+                            onResetInitialView={() => setGoalsInitialView(null)}
                         />
                     )}
                     {activeTab === 'habit' && (

@@ -90,26 +90,26 @@ const translations = {
         promoBtn: 'Trải nghiệm ngay',
         featStorageItems: ['Ghi chú đa phương tiện (Rich Text)', 'Lưu trữ & Xem trước Tệp tin/Media', 'Bảo mật tuyệt đối & Riêng tư'],
 
-        footerBuilt: 'Được xây dựng với ❤️ và công nghệ AI tiên tiến.',
+        footerBuilt: 'By QuanBa',
         langName: 'Tiếng Việt',
         footerLogoText: 'Hệ sinh thái học tập và quản lý cuộc sống thông minh dành cho sinh viên.',
         footerCol1Title: 'TÍNH NĂNG CHÍNH',
-        footerCol2Title: 'TIỆN ÍCH MỞ RỘNG',
-        footerCol3Title: 'LIÊN KẾT HỮU ÍCH',
+        footerCol2Title: 'TÍNH NĂNG MỞ RỘNG',
+        footerCol3Title: 'THÔNG TIN LIÊN HỆ',
         footerDev: 'Người phát triển',
         footerSupportEmail: 'Email hỗ trợ',
-        footerPersonalPage: 'Trang cá nhân',
+        footerPersonalPage: 'Profile',
         footerAIAdvisor: 'AI Your Own',
         footerCareer: 'Lộ trình sự nghiệp AI',
         footerFinance: 'Quản lý tài chính',
         footerJournal: 'Nhật ký chữa lành',
         footerFocus: 'Tập trung & Nhạc Lofi',
         footerSchedule: 'Thời khóa biểu trực quan',
-        footerHabit: 'Thói quen & D-Day',
+        footerHabit: 'Thói quen & CountDown/CountUp',
         footerGPATracker: 'GPA Tracker (VNU)',
         footerSpotify: 'My Spotify',
         footerStorage: 'My Storage (Bảo mật)',
-        footerCVBuilder: 'Xây dựng CV tự động'
+        footerCVBuilder: 'Xây dựng CV'
     },
     en: {
         install: 'Install App',
@@ -473,9 +473,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
 
                     {/* Infinite Scrolling Ticker of Features */}
                     <div className="w-full max-w-full py-1 mb-3 sm:mb-4 select-none relative overflow-hidden animate-fade-in-up delay-150">
-                        <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-20 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
-                        <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-20 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
-
                         <div className="animate-marquee flex items-center gap-3 py-1">
                             {[...marqueeFeatures, ...marqueeFeatures].map((item, idx) => (
                                 <div
@@ -617,11 +614,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="order-2 md:order-1 relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-indigo-300/30 to-cyan-300/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
-                            <img
-                                src="/career_advisor_mockup.png"
-                                alt="AI Career Counselor"
-                                className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
-                            />
+                            <div className="relative">
+                                {/* Ảnh chính (lớn) */}
+                                <img
+                                    src="/covansunghiepAItt1.png"
+                                    alt="Cố vấn sự nghiệp AI"
+                                    className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
+                                />
+                                {/* Ảnh phụ (nhỏ) */}
+                                <img
+                                    src="/covansunghiepAItt2.png"
+                                    alt="Chi tiết Cố vấn sự nghiệp AI"
+                                    className="absolute -bottom-3 -right-2 sm:-bottom-6 sm:-right-4 w-2/5 rounded-2xl shadow-2xl border-2 border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-indigo-200/50"
+                                />
+                            </div>
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-600 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
@@ -691,11 +697,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                         </div>
                         <div className="relative group">
                             <div className="absolute -inset-4 bg-gradient-to-r from-purple-300/30 to-pink-300/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
-                            <img
-                                src="/cv_builder_mockup.png"
-                                alt="Auto CV Builder"
-                                className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
-                            />
+                            <div className="relative">
+                                {/* Ảnh chính (lớn) */}
+                                <img
+                                    src="/cvbuilder2.png"
+                                    alt="Xây dựng CV tự động"
+                                    className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
+                                />
+                                {/* Ảnh phụ (nhỏ) */}
+                                <img
+                                    src="/cvbuilder1%20(1).png"
+                                    alt="Chi tiết CV Builder"
+                                    className="absolute -bottom-3 -right-2 sm:-bottom-6 sm:-right-4 w-2/5 rounded-2xl shadow-2xl border-2 border-white transform rotate-3 group-hover:rotate-6 group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500 z-20 cursor-pointer hover:shadow-purple-200/50"
+                                />
+                            </div>
                         </div>
                     </div>
                 </section>

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, TransactionType, Transaction, Goal, BudgetConfig } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, LineChart, Line } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart, Loader2 } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
 import { Lang } from '../i18n/i18n';
@@ -25,6 +25,7 @@ interface FinanceDashboardProps {
     onAddBudget: (budget: Omit<BudgetConfig, 'id'>) => void;
     onUpdateBudget: (budget: BudgetConfig) => void;
     onDeleteBudget: (id: string) => void;
+    onRefresh?: () => Promise<void>;
 }
 
 const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#14B8A6', '#F97316', '#64748B'];
@@ -151,9 +152,57 @@ const formatCurrency = (amount: number, lang: Lang) => {
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay(); // 0 = Sunday
 
-const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, onNavigateToCashFlow, onNavigateToAI, isLoading, lang, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onAddBudget, onUpdateBudget, onDeleteBudget }) => {
+const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, onNavigateToCashFlow, onNavigateToAI, isLoading, lang, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onAddBudget, onUpdateBudget, onDeleteBudget, onRefresh }) => {
     const t = translations[lang];
     const { transactions } = state;
+
+    // Pull to Refresh state
+    const [pullDistance, setPullDistance] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const startY = React.useRef(0);
+    const isDragging = React.useRef(false);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        const container = e.currentTarget;
+        if (container.scrollTop === 0 && window.scrollY === 0) {
+            startY.current = e.touches[0].clientY;
+            isDragging.current = true;
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isDragging.current) return;
+        const currentY = e.touches[0].clientY;
+        const diff = currentY - startY.current;
+
+        if (diff > 0) {
+            const offset = Math.min(diff * 0.4, 90);
+            setPullDistance(offset);
+            if (diff > 10 && e.cancelable) {
+                e.preventDefault();
+            }
+        }
+    };
+
+    const handleTouchEnd = async () => {
+        if (!isDragging.current) return;
+        isDragging.current = false;
+
+        if (pullDistance > 55 && onRefresh) {
+            setIsRefreshing(true);
+            setPullDistance(60);
+            try {
+                await onRefresh();
+            } catch (err) {
+                console.error("Refresh error:", err);
+            } finally {
+                setIsRefreshing(false);
+                setPullDistance(0);
+            }
+        } else {
+            setPullDistance(0);
+        }
+    };
 
     // UI State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1186,7 +1235,28 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     )
 
     return (
-        <div className="space-y-4 md:space-y-6 animate-fade-in pb-20">
+        <div 
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className="space-y-4 md:space-y-6 animate-fade-in pb-20 relative min-h-[500px]"
+        >
+            {/* Pull to Refresh Spinner */}
+            <div 
+                className="absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-200 z-[100]"
+                style={{ 
+                    top: `${pullDistance - 40}px`, 
+                    opacity: pullDistance > 10 ? Math.min(pullDistance / 50, 1) : 0 
+                }}
+            >
+                <div className="bg-white rounded-full p-2.5 shadow-lg border border-gray-100 flex items-center justify-center">
+                    <Loader2 
+                        className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`} 
+                        size={20} 
+                        style={{ transform: `rotate(${pullDistance * 4}deg)` }} 
+                    />
+                </div>
+            </div>
             {/* Top Header & Actions */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
                 <div>

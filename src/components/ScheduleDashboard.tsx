@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AppState, TimetableEvent, Goal, Todo, TaskPriority } from '../types';
-import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Star, Download, Image as ImageIcon, GripVertical, ArrowUpToLine, ArrowDownToLine, Save } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Star, Download, Image as ImageIcon, GripVertical, ArrowUpToLine, ArrowDownToLine, Save, Loader2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import CalendarWidget from './CalendarWidget';
 import FocusTimer from './FocusTimer';
@@ -27,6 +27,7 @@ interface ScheduleDashboardProps {
   onResetFocusMode?: () => void;
   activeTaskId?: string | null;
   onStartTracking?: (todo: Todo) => void;
+  onRefresh?: () => Promise<void>;
 }
 
 
@@ -176,6 +177,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   onAddTimetable, onUpdateTimetable, onDeleteTimetable,
   activeTaskId = null,
   onStartTracking = () => {},
+  onRefresh,
 }) => {
   const { timetable, goals, todos } = state;
   const { timer, onOpenMusic } = state as any;
@@ -183,6 +185,54 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'calendar' | 'goals'>('calendar');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [todoFilter, setTodoFilter] = useState<'active' | 'completed'>('active');
+
+  // Pull to Refresh state
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const startY = React.useRef(0);
+  const isDragging = React.useRef(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const container = e.currentTarget;
+    if (container.scrollTop === 0 && window.scrollY === 0) {
+      startY.current = e.touches[0].clientY;
+      isDragging.current = true;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - startY.current;
+
+    if (diff > 0) {
+      const offset = Math.min(diff * 0.4, 90);
+      setPullDistance(offset);
+      if (diff > 10 && e.cancelable) {
+        e.preventDefault();
+      }
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+
+    if (pullDistance > 55 && onRefresh) {
+      setIsRefreshing(true);
+      setPullDistance(60);
+      try {
+        await onRefresh();
+      } catch (err) {
+        console.error("Refresh error:", err);
+      } finally {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }
+    } else {
+      setPullDistance(0);
+    }
+  };
 
 
   // Handle initial focus mode triggers (e.g. from Dashboard)
@@ -695,7 +745,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     ];
 
     return (
-      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 flex flex-col h-full">
+      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 flex flex-col">
         <div className="mb-4">
           <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-1">
             <CheckCircle2 size={24} className="text-emerald-500" />Todo list
@@ -951,7 +1001,28 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const [mobileTab, setMobileTab] = useState<'SCHEDULE' | 'GOALS'>('SCHEDULE');
 
   return (
-    <div className="animate-fade-in pb-20 relative">
+    <div 
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="animate-fade-in pb-20 relative min-h-[500px]"
+    >
+      {/* Pull to Refresh Spinner */}
+      <div 
+        className="absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-200 z-[100]"
+        style={{ 
+          top: `${pullDistance - 40}px`, 
+          opacity: pullDistance > 10 ? Math.min(pullDistance / 50, 1) : 0 
+        }}
+      >
+        <div className="bg-white rounded-full p-2.5 shadow-lg border border-gray-100 flex items-center justify-center">
+          <Loader2 
+            className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`} 
+            size={20} 
+            style={{ transform: `rotate(${pullDistance * 4}deg)` }} 
+          />
+        </div>
+      </div>
 
       {/* Motivational Toast */}
       {showMotivation && (
