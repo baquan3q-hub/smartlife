@@ -7,11 +7,13 @@ import {
     ArrowLeft, Send, Sparkles, Loader2, Bot, RefreshCw,
     TrendingDown, Target, ListChecks, BarChart3, Wallet,
     PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight,
-    CheckCircle2, AlertCircle, History, X, Plus, Trash2, GraduationCap
+    CheckCircle2, AlertCircle, History, X, Plus, Trash2, GraduationCap,
+    Heart, Pin
 } from 'lucide-react';
+
 import { AppState, TransactionType } from '../types';
 import { generateQuickInsight, getCurrentModel, type ChatMessage } from '../services/geminiService';
-import { chatWithAI, type ActionHandlers, type ChartData, type ActionResult } from '../services/aiEngine';
+import { chatWithAI, type ActionHandlers, type ChartData, type ActionResult, type AIAttachment } from '../services/aiEngine';
 import { chatHistoryService, type AIConversation, type AIMessage } from '../services/chatHistoryService';
 import { memoryService } from '../services/memoryService';
 import InlineChatChart from './InlineChatChart';
@@ -19,6 +21,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ConfirmModal from './ConfirmModal';
 import { Lang } from '../i18n/i18n';
+import * as XLSX from 'xlsx';
 
 // ────────────────────────────────────────
 // Types
@@ -38,6 +41,7 @@ interface UIMessage {
     content: string;
     charts?: ChartData[];
     actions?: ActionResult[];
+    files?: Array<{ name: string; type: string; size: number }>;
 }
 
 // ────────────────────────────────────────
@@ -51,6 +55,12 @@ interface Suggestion {
 }
 
 const SUGGESTIONS: Suggestion[] = [
+    {
+        icon: <Heart size={16} />,
+        label: 'Cuộc sống dạo này',
+        prompt: 'Hãy phân tích các nhật ký gần đây, tình hình chi tiêu tài chính và danh sách công việc (todo) của tôi để đưa ra nhận xét tổng quan về cuộc sống của tôi dạo này thế nào (sức khỏe tinh thần, mức độ cân bằng, áp lực công việc, quản lý tiền bạc) và cho tôi vài lời khuyên nhé.',
+        gradient: 'from-pink-500 to-rose-500',
+    },
     {
         icon: <BarChart3 size={16} />,
         label: 'Phân tích & Dự đoán',
@@ -102,6 +112,71 @@ function formatCurrency(amount: number): string {
     return amount.toLocaleString('vi-VN') + 'đ';
 }
 
+// Convert file to Base64
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const base64String = (reader.result as string).split(',')[1];
+            resolve(base64String);
+        };
+        reader.onerror = error => reject(error);
+    });
+};
+
+// Parse Excel workbook pages into CSV representation text
+const parseExcelToCSV = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(file);
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                let csvResult = '';
+                workbook.SheetNames.forEach(sheetName => {
+                    csvResult += `\n[Bảng tính Excel: ${file.name} - Trang: ${sheetName}]\n`;
+                    const sheet = workbook.Sheets[sheetName];
+                    const csv = XLSX.utils.sheet_to_csv(sheet);
+                    csvResult += csv + '\n';
+                });
+                resolve(csvResult);
+            } catch (err) {
+                reject(err);
+            }
+        };
+        reader.onerror = reject;
+    });
+};
+
+// Read plain text file content
+const readTextFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsText(file);
+    });
+};
+
+// Get mime type based on extension fallback
+const getMimeTypeFromExtension = (ext: string): string => {
+    switch (ext) {
+        case 'pdf': return 'application/pdf';
+        case 'png': return 'image/png';
+        case 'jpg':
+        case 'jpeg': return 'image/jpeg';
+        case 'webp': return 'image/webp';
+        case 'heic': return 'image/heic';
+        case 'mp3': return 'audio/mp3';
+        case 'wav': return 'audio/wav';
+        case 'm4a': return 'audio/m4a';
+        case 'aac': return 'audio/aac';
+        default: return 'application/octet-stream';
+    }
+};
+
 // ────────────────────────────────────────
 // Component
 // ────────────────────────────────────────
@@ -112,13 +187,74 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const [messages, setMessages] = useState<UIMessage[]>([
         {
             role: 'assistant',
-            content: '👋 Chào bạn! Mình là **SmartLife Advisor v2** — trợ lý AI thông minh.\n\n🆕 **Khả năng mới:**\n- 📊 **Truy vấn dữ liệu** trực tiếp từ database\n- 📈 **Bảng tính (table) & Dự đoán** chi tiêu\n- ✏️ **Thêm lịch trình, việc cần làm, giao dịch** bằng ngôn ngữ tự nhiên\n\n💡 **Thử hỏi mình:**\n- _"Đưa ra dự đoán chi tiêu tháng tới cho tôi"_\n- _"Lập bảng so sánh thu chi 3 tháng gần nhất"_\n- _"Thêm lịch học IELTS thứ 3, thứ 5 lúc 19h"_\n\nHoặc chọn gợi ý bên dưới! 👇'
+            content: '👋 Chào bạn! Mình là **SmartLife Advisor v2** — trợ lý AI thông minh.\n\n🆕 **Khả năng mới:**\n- 📊 **Truy vấn dữ liệu** trực tiếp từ database\n- 📈 **Bảng tính (table) & Dự đoán** chi tiêu\n- ✏️ **Thêm lịch trình, việc cần làm, giao dịch** bằng ngôn ngữ tự nhiên\n- 📎 **Phân tích tài liệu & hình ảnh**: Đọc hiểu ảnh thời khóa biểu, hóa đơn, file excel, csv, pdf, txt, hoặc âm thanh trực tiếp trong bộ nhớ tạm để xử lý nhanh chóng.\n\n💡 **Thử hỏi mình:**\n- _"Đưa ra dự đoán chi tiêu tháng tới cho tôi"_\n- _"Lập bảng so sánh thu chi 3 tháng gần nhất"_\n- _"Thêm lịch học IELTS thứ 3, thứ 5 lúc 19h"_\n\nHoặc chọn gợi ý bên dưới! 👇'
         }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [quickInsight, setQuickInsight] = useState<string | null>(null);
     const [isLoadingInsight, setIsLoadingInsight] = useState(false);
+
+    // Attached files state
+    const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [showUploadMenu, setShowUploadMenu] = useState(false);
+    const uploadMenuRef = useRef<HTMLDivElement>(null);
+
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files) return;
+        const newFiles = Array.from(files);
+
+        // Filter out files that exceed 15MB
+        const MAX_SIZE = 15 * 1024 * 1024;
+        const validFiles: File[] = [];
+        const oversizedFiles: string[] = [];
+
+        newFiles.forEach(file => {
+            if (file.size <= MAX_SIZE) {
+                validFiles.push(file);
+            } else {
+                oversizedFiles.push(file.name);
+            }
+        });
+
+        if (oversizedFiles.length > 0) {
+            alert(`Các tệp sau vượt quá giới hạn 15MB và không được đính kèm:\n- ${oversizedFiles.join('\n- ')}`);
+        }
+
+        setAttachedFiles(prev => [...prev, ...validFiles]);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''; // Reset input to allow choosing same file again
+        }
+    };
+
+    const triggerFileSelect = (type: 'image' | 'document' | 'audio') => {
+        if (!fileInputRef.current) return;
+        
+        if (type === 'image') {
+            fileInputRef.current.accept = 'image/*';
+        } else if (type === 'document') {
+            fileInputRef.current.accept = 'application/pdf,text/plain,text/csv,.csv,.xlsx,.xls,.json,.md';
+        } else if (type === 'audio') {
+            fileInputRef.current.accept = 'audio/*';
+        }
+        
+        fileInputRef.current.click();
+        setShowUploadMenu(false);
+    };
+
+    const handleTogglePinConversation = async (e: React.MouseEvent, convId: string, pin: boolean) => {
+        e.stopPropagation();
+        const success = await chatHistoryService.togglePinConversation(convId, pin);
+        if (success) {
+            setConversations(prev => prev.map(c => c.id === convId ? { ...c, is_pinned: pin } : c));
+        } else {
+            alert('Lỗi ghim cuộc trò chuyện. Hãy chắc chắn bạn đã chạy SQL migration.');
+        }
+    };
+
 
     // History and Memory State
     const [conversationId, setConversationId] = useState<string | null>(null);
@@ -167,22 +303,19 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         chatHistoryService.getConversations().then(setConversations);
     }, [conversationId]);
 
-    // Load quick insight — delayed 5s to avoid competing with chat for rate limit
-    useEffect(() => {
-        const timer = setTimeout(async () => {
-            setIsLoadingInsight(true);
-            try {
-                const insight = await generateQuickInsight(appState);
-                setQuickInsight(insight);
-            } catch (e) {
-                console.error('Quick insight error:', e);
-                setQuickInsight(null);
-            } finally {
-                setIsLoadingInsight(false);
-            }
-        }, 5000);
-        return () => clearTimeout(timer);
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Fetch AI Quick Insight manually on demand
+    const handleFetchAIInsight = async () => {
+        setIsLoadingInsight(true);
+        try {
+            const insight = await generateQuickInsight(appState);
+            setQuickInsight(insight);
+        } catch (e) {
+            console.error('Quick insight error:', e);
+            alert('Không thể kết nối AI. Vui lòng thử lại sau. 🔄');
+        } finally {
+            setIsLoadingInsight(false);
+        }
+    };
 
     // Load memory context on mount
     useEffect(() => {
@@ -190,6 +323,22 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             .then(setMemoryContext)
             .catch(console.error);
     }, []);
+
+    // Click outside upload menu handler
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (uploadMenuRef.current && !uploadMenuRef.current.contains(event.target as Node)) {
+                setShowUploadMenu(false);
+            }
+        };
+        if (showUploadMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showUploadMenu]);
+
 
     // Build chat history for Gemini (convert UIMessage → ChatMessage)
     const buildHistory = (msgs: UIMessage[]): ChatMessage[] => {
@@ -204,29 +353,86 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     // Send message — uses new aiEngine with function calling
     const handleSend = async (overrideMessage?: string) => {
         const msg = overrideMessage || input.trim();
-        if (!msg || isLoading) return;
+        if ((!msg && attachedFiles.length === 0) || isLoading) return;
 
         setInput('');
-        const newMessages: UIMessage[] = [...messages, { role: 'user', content: msg }];
-        setMessages(newMessages);
+
+        let finalUserMsg = msg;
+        if (!finalUserMsg && attachedFiles.length > 0) {
+            finalUserMsg = "Hãy phân tích dữ liệu từ các tệp tôi đã tải lên.";
+        }
+
         setIsLoading(true);
+        const attachmentsToSend: AIAttachment[] = [];
+        let promptExtension = '';
+
+        // Process files sequentially
+        for (const file of attachedFiles) {
+            const ext = file.name.split('.').pop()?.toLowerCase();
+            if (ext === 'xlsx' || ext === 'xls') {
+                try {
+                    const excelText = await parseExcelToCSV(file);
+                    promptExtension += `\n\n--- DỮ LIỆU ĐÍNH KÈM TỪ EXCEL (${file.name}) ---\n${excelText}\n--- HẾT DỮ LIỆU EXCEL ---`;
+                } catch (err: any) {
+                    console.error('Error parsing excel:', err);
+                    promptExtension += `\n\n[Lỗi đọc file Excel ${file.name}: ${err.message}]`;
+                }
+            } else if (['txt', 'csv', 'md', 'json', 'xml'].includes(ext || '')) {
+                try {
+                    const fileContent = await readTextFile(file);
+                    promptExtension += `\n\n--- NỘI DUNG TỆP ${file.name} ---\n${fileContent}\n--- HẾT NỘI DUNG TỆP ---`;
+                } catch (err: any) {
+                    console.error('Error reading text file:', err);
+                    promptExtension += `\n\n[Lỗi đọc file văn bản ${file.name}: ${err.message}]`;
+                }
+            } else {
+                try {
+                    const base64Data = await fileToBase64(file);
+                    attachmentsToSend.push({
+                        mimeType: file.type || getMimeTypeFromExtension(ext || ''),
+                        data: base64Data
+                    });
+                } catch (err: any) {
+                    console.error('Error converting file to base64:', err);
+                    alert(`Không thể đọc file ${file.name}: ${err.message}`);
+                }
+            }
+        }
+
+        // Save metadata of files for UI chat history rendering
+        const filesMetadata = attachedFiles.map(f => ({ name: f.name, type: f.type, size: f.size }));
+        setAttachedFiles([]);
+
+        // Text sent to database/UI includes file names for context
+        let visibleMessageContent = finalUserMsg;
+        if (filesMetadata.length > 0) {
+            visibleMessageContent += '\n\n' + filesMetadata.map(f => `📎 **${f.name}** (${(f.size / 1024).toFixed(1)} KB)`).join('\n');
+        }
+
+        const newMessages: UIMessage[] = [...messages, { role: 'user', content: visibleMessageContent, files: filesMetadata }];
+        setMessages(newMessages);
 
         try {
             // Save conversation & user message to DB
             let currentConvId = conversationId;
             if (!currentConvId) {
-                const conv = await chatHistoryService.createConversation(msg.substring(0, 50) + '...');
+                const conv = await chatHistoryService.createConversation((msg || "Phân tích tài liệu").substring(0, 50) + '...');
                 if (conv) {
                     currentConvId = conv.id;
                     setConversationId(currentConvId);
                 }
             }
             if (currentConvId) {
-                await chatHistoryService.saveMessage(currentConvId, 'user', msg);
+                await chatHistoryService.saveMessage(currentConvId, 'user', visibleMessageContent);
             }
 
             const history = buildHistory(newMessages);
-            const response = await chatWithAI(history, appState, actionHandlers, memoryContext);
+            // Replace the last history item's content with promptExtension to let Gemini see spreadsheet and text files directly
+            if (history.length > 0 && promptExtension) {
+                history[history.length - 1].parts = [{ text: finalUserMsg + promptExtension }];
+            }
+
+            const response = await chatWithAI(history, appState, actionHandlers, memoryContext, attachmentsToSend);
 
             // Save AI response to DB
             if (currentConvId) {
@@ -239,9 +445,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 );
             }
 
-            // Extract memories periodically (e.g. if conversation has grown)
+            // Extract memories periodically
             if (newMessages.length > 3 && newMessages.length % 4 === 1) {
-                // Run in background
                 const chatText = newMessages.map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
                 memoryService.extractMemoriesFromConversation(chatText).catch(console.error);
             }
@@ -366,26 +571,52 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             {conversations.length === 0 ? (
                                 <p className="text-center text-sm text-gray-400 mt-10">Chưa có lịch sử</p>
                             ) : (
-                                conversations.map(conv => (
-                                    <div
-                                        key={conv.id}
-                                        onClick={() => loadConversation(conv.id)}
-                                        className={`group px-3 py-3 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${conversationId === conv.id ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-gray-50 border border-transparent'}`}
-                                    >
-                                        <div className="flex-1 min-w-0 pr-2">
-                                            <p className={`text-sm truncate font-medium ${conversationId === conv.id ? 'text-indigo-700' : 'text-gray-700'}`}>{conv.title}</p>
-                                            <p className="text-[10px] text-gray-400 mt-0.5">{new Date(conv.updated_at).toLocaleDateString('vi-VN')}</p>
-                                        </div>
-                                        <button
-                                            onClick={(e) => handleDeleteConversation(e, conv.id)}
-                                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 hover:text-red-600 text-gray-400 rounded-lg transition-all"
-                                            title="Xóa"
+                                [...conversations]
+                                    .sort((a, b) => {
+                                        const pinA = a.is_pinned ? 1 : 0;
+                                        const pinB = b.is_pinned ? 1 : 0;
+                                        if (pinA !== pinB) return pinB - pinA;
+                                        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+                                    })
+                                    .map(conv => (
+                                        <div
+                                            key={conv.id}
+                                            onClick={() => loadConversation(conv.id)}
+                                            className={`group px-3 py-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all border ${conversationId === conv.id ? 'bg-indigo-50/80 border-indigo-100' : 'hover:bg-gray-50/50 border-transparent'} ${conv.is_pinned ? 'border-l-4 border-l-indigo-500 bg-slate-50/40 shadow-sm' : ''}`}
                                         >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                ))
+                                            <div className="flex-1 min-w-0 pr-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <p className={`text-sm truncate font-medium ${conversationId === conv.id ? 'text-indigo-700 font-semibold' : 'text-gray-700'}`}>{conv.title}</p>
+                                                    {conv.is_pinned && <Pin size={10} className="text-indigo-500 fill-indigo-500 shrink-0" />}
+                                                </div>
+                                                <p className="text-[10px] text-gray-400 mt-0.5">{new Date(conv.updated_at).toLocaleDateString('vi-VN')}</p>
+                                            </div>
+                                            <div className="flex items-center gap-0.5 shrink-0">
+                                                {/* Pin Toggle */}
+                                                <button
+                                                    onClick={(e) => handleTogglePinConversation(e, conv.id, !conv.is_pinned)}
+                                                    className={`p-1 rounded-lg transition-colors ${
+                                                        conv.is_pinned 
+                                                            ? 'text-indigo-600 bg-indigo-50 opacity-100' 
+                                                            : 'opacity-0 group-hover:opacity-100 text-gray-400 hover:bg-gray-150 hover:text-gray-600'
+                                                    }`}
+                                                    title={conv.is_pinned ? "Bỏ ghim" : "Ghim lên đầu"}
+                                                >
+                                                    <Pin size={13} className={conv.is_pinned ? "fill-indigo-500" : ""} />
+                                                </button>
+                                                {/* Delete */}
+                                                <button
+                                                    onClick={(e) => handleDeleteConversation(e, conv.id)}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 hover:text-red-600 text-gray-400 rounded-lg transition-colors"
+                                                    title="Xóa"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
                             )}
+
                         </div>
                     </div>
                 </div>
@@ -512,21 +743,45 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
                     {/* AI Quick Insight */}
                     <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-5">
-                        <h3 className="text-sm font-bold text-indigo-700 mb-3 flex items-center gap-2">
-                            <Lightbulb size={16} className="text-amber-500" /> Nhận xét nhanh
+                        <h3 className="text-sm font-bold text-indigo-700 mb-2.5 flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                                <Lightbulb size={16} className="text-amber-500" /> Nhận xét nhanh
+                            </span>
+                            {!quickInsight && !isLoadingInsight && (
+                                <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold uppercase">Local</span>
+                            )}
                         </h3>
                         {isLoadingInsight ? (
-                            <div className="flex items-center gap-2 text-indigo-400 text-sm">
-                                <Loader2 size={14} className="animate-spin" /> Đang phân tích...
+                            <div className="flex items-center gap-2 text-indigo-500 text-xs font-semibold py-2">
+                                <Loader2 size={14} className="animate-spin" /> Đang phân tích sâu...
                             </div>
                         ) : quickInsight ? (
-                            <div className="text-sm text-indigo-900/80 leading-relaxed prose prose-sm prose-p:my-1">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{quickInsight}</ReactMarkdown>
+                            <div className="space-y-3">
+                                <div className="text-xs text-indigo-900/80 leading-relaxed prose prose-sm prose-p:my-0.5">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{quickInsight}</ReactMarkdown>
+                                </div>
+                                <button
+                                    onClick={() => setQuickInsight(null)}
+                                    className="text-[11px] text-indigo-500 hover:text-indigo-700 font-bold hover:underline flex items-center gap-1 mt-1"
+                                >
+                                    Thu nhỏ ↩
+                                </button>
                             </div>
                         ) : (
-                            <p className="text-sm text-indigo-400">Không thể tải nhận xét. Hãy thử hỏi AI trực tiếp.</p>
+                            <div className="space-y-3">
+                                <p className="text-xs text-indigo-900/80 leading-relaxed font-medium">
+                                    Tháng {now.getMonth() + 1}: Thu nhập {formatCurrency(monthIncome)}, chi tiêu {formatCurrency(monthExpense)}. Còn lại: <strong className="text-indigo-700">{formatCurrency(monthIncome - monthExpense)}</strong> ({monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 100) : 0}%).
+                                </p>
+                                <button
+                                    onClick={handleFetchAIInsight}
+                                    className="w-full py-1.5 px-3 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-150 transition-colors flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+                                >
+                                    <Sparkles size={12} /> Phân tích sâu bằng AI ✨
+                                </button>
+                            </div>
                         )}
                     </div>
+
 
                     {/* Goals Summary */}
                     {appState.goals.length > 0 && (
@@ -606,6 +861,12 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
                                                 components={{
+                                                    p: ({ node, ...props }) => <p className="mb-3.5 leading-relaxed text-gray-700 last:mb-0" {...props} />,
+                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-3.5 space-y-1.5" {...props} />,
+                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-3.5 space-y-1.5" {...props} />,
+                                                    li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
+                                                    strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />,
                                                     table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
                                                     thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
                                                     th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
@@ -701,26 +962,95 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
                     {/* Input Area */}
                     <div className="p-3 md:p-4 bg-white border-t border-gray-100 shrink-0">
+                        {/* Attached Files Preview */}
+                        {attachedFiles.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2 p-2 bg-gray-50 rounded-xl border border-gray-100 max-h-32 overflow-y-auto custom-scrollbar">
+                                {attachedFiles.map((file, fIdx) => {
+                                    return (
+                                        <div key={fIdx} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white rounded-lg border border-gray-200 text-xs shadow-sm max-w-[200px] animate-fade-in">
+                                            <span className="truncate font-medium text-gray-700" title={file.name}>{file.name}</span>
+                                            <span className="text-[10px] text-gray-400 shrink-0">({(file.size / 1024).toFixed(0)}KB)</span>
+                                            <button
+                                                onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== fIdx))}
+                                                className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                         <div className="relative flex items-end gap-2 bg-gray-50 rounded-xl border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                            {/* Upload Popover Menu */}
+                            {showUploadMenu && (
+                                <div 
+                                    ref={uploadMenuRef}
+                                    className="absolute bottom-14 left-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-150 p-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col gap-0.5"
+                                >
+                                    <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tải lên tệp tin</div>
+                                    <button
+                                        type="button"
+                                        onClick={() => triggerFileSelect('image')}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors text-left"
+                                    >
+                                        <span className="text-base">🖼️</span> Hình ảnh (Ảnh chụp, TKB...)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => triggerFileSelect('document')}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors text-left"
+                                    >
+                                        <span className="text-base">📄</span> Tài liệu (PDF, Excel, TXT...)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => triggerFileSelect('audio')}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors text-left"
+                                    >
+                                        <span className="text-base">🎙️</span> Âm thanh (Audio, Ghi âm...)
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Hidden file input */}
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                className="hidden"
+                                multiple
+                                accept="image/*,audio/*,application/pdf,text/plain,text/csv,.csv,.xlsx,.xls,.json,.md"
+                            />
+                            {/* Attachment trigger button */}
+                            <button
+                                type="button"
+                                onClick={() => setShowUploadMenu(!showUploadMenu)}
+                                disabled={isLoading}
+                                className={`m-1 p-2 rounded-xl transition-all shrink-0 ${showUploadMenu ? 'bg-indigo-100 text-indigo-700' : 'text-gray-400 hover:text-indigo-600 hover:bg-gray-150'}`}
+                                title="Đính kèm tài liệu, ảnh hoặc âm thanh"
+                            >
+                                <Plus size={20} className={`transition-transform duration-200 ${showUploadMenu ? 'rotate-45' : ''}`} />
+                            </button>
                             <textarea
                                 ref={inputRef}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyPress}
-                                placeholder='Nhập đi bạn ơi ....'
-                                className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none resize-none max-h-28 min-h-[44px] placeholder:text-gray-400"
+                                placeholder='Nhập đi bạn ơi, hoặc đính kèm ảnh, âm thanh, tài liệu....'
+                                className="flex-1 bg-transparent px-1 py-2.5 text-sm outline-none resize-none max-h-28 min-h-[44px] placeholder:text-gray-400"
                                 rows={1}
                             />
                             <button
                                 onClick={() => handleSend()}
-                                disabled={!input.trim() || isLoading}
+                                disabled={(!input.trim() && attachedFiles.length === 0) || isLoading}
                                 className="m-1 p-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:shadow-indigo-200 disabled:opacity-40 disabled:hover:shadow-none transition-all shrink-0"
                             >
                                 {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                             </button>
                         </div>
                         <p className="text-[9px] text-center text-gray-400 mt-2">
-                            Powered by Gemini ({getCurrentModel().replace('gemini-', '')})
+                            Powered by Gemini ({getCurrentModel().replace('gemini-', '')}) · Tải lên tối đa 15MB/file, phân tích qua bộ nhớ RAM
                         </p>
                     </div>
                 </div>

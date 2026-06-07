@@ -1,6 +1,6 @@
 // File: src/services/careerGoalService.ts
 import { supabase } from './supabase';
-import { CareerPosition, CareerGoal, LifeGoal } from '../types';
+import { CareerPosition, CareerGoal, LifeGoal, CareerAnalysisInput, CareerAnalysisResult } from '../types';
 
 export const careerGoalService = {
   // --- CAREER POSITIONS ---
@@ -286,5 +286,155 @@ Mỗi kỹ năng trong mảng JSON phải tuân thủ cấu trúc sau:
       console.error('Error batch adding career goals:', err);
       return false;
     }
+  },
+
+  // --- AI CAREER INTELLIGENCE SYSTEM ---
+  async analyzeCareerDomains(input: CareerAnalysisInput): Promise<CareerAnalysisResult[]> {
+    try {
+      const coursesStr = input.courses && input.courses.length > 0
+        ? input.courses.map(c => `- Môn: ${c.name} (Điểm: ${c.grade}, Tín chỉ: ${c.credits})`).join('\n')
+        : 'Chưa có dữ liệu môn học';
+      
+      const prompt = `Bạn là Chuyên gia tư vấn sự nghiệp AI (AI Career Counselor) cao cấp với 30 năm kinh nghiệm.
+Nhiệm vụ của bạn là phân tích hồ sơ học tập và cá nhân của người học để đề xuất các lĩnh vực/ngành nghề (career domains) phù hợp nhất.
+
+Hồ sơ người dùng:
+- Trường Đại học: ${input.university || 'Chưa cập nhật'}
+- Ngành học: ${input.major || 'Chưa cập nhật'}
+- Điểm trung bình (GPA): ${input.gpa}
+- Danh sách môn học và kết quả:
+${coursesStr}
+- Tính cách MBTI: ${input.personality_mbti || 'Chưa kiểm tra'}
+- Tính cách DISC: ${input.personality_disc || 'Chưa kiểm tra'}
+- Sở thích: ${input.hobbies && input.hobbies.length > 0 ? input.hobbies.join(', ') : 'Chưa cập nhật'}
+- Định hướng nghề nghiệp cá nhân: ${input.career_objective || 'Chưa cập nhật'}
+
+Hãy phân tích kỹ lưỡng:
+1. Đối chiếu ngành học hiện tại và các môn học có kết quả tốt (điểm A, B) để xác định thế mạnh học thuật.
+2. Đối chiếu nhóm tính cách MBTI/DISC và sở thích với các yêu cầu đặc trưng của từng domain công việc.
+3. Chỉ ra điểm mạnh, điểm yếu cụ thể của người học đối với từng lĩnh vực được đề xuất.
+
+Đề xuất từ 3 đến 4 Lĩnh vực nghề nghiệp (Career Domains) phù hợp nhất.
+Trả về kết quả DƯỚI DẠNG MỘT MẢNG JSON HỢP LỆ. KHÔNG viết thêm bất kỳ từ giải thích nào trước hoặc sau khối JSON. KHÔNG đặt trong block markdown. Chỉ trả về chuỗi JSON thô.
+
+Mỗi lĩnh vực trong mảng JSON phải tuân thủ cấu trúc sau:
+{
+  "domain": "Tên lĩnh vực nghề nghiệp (VD: Software Engineering, Data Science, Product Management)",
+  "positions": ["Các vị trí công việc phù hợp 1 (VD: Backend Developer)", "Vị trí 2 (VD: Fullstack Developer)"],
+  "fit_score": số điểm phù hợp từ 0 đến 100 (phân tích kỹ lưỡng để đưa ra điểm số thực tế),
+  "strengths": ["Điểm mạnh 1 dựa trên điểm số/môn học/tính cách", "Điểm mạnh 2"],
+  "weaknesses": ["Điểm yếu/điểm cần cải thiện 1 so với yêu cầu của domain", "Điểm yếu 2"],
+  "personality_match": "Phân tích ngắn gọn tính cách MBTI/DISC của họ có phù hợp với domain này thế nào",
+  "recommended_skills": ["Kỹ năng/Công nghệ cần học 1", "Kỹ năng 2", "Kỹ năng 3"],
+  "career_path": "Lộ trình thăng tiến điển hình (VD: Junior Developer -> Senior Developer -> Tech Lead -> CTO)"
+}
+`;
+
+      const body = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, topP: 0.95, responseMimeType: "application/json" }
+      };
+
+      const { callGeminiRaw } = await import('./geminiService');
+      const data = await callGeminiRaw(body);
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+      
+      const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleanJson);
+    } catch (err) {
+      console.error('Error analyzing career domains:', err);
+      return [];
+    }
+  },
+
+  async cacheAnalysisResults(userId: string, results: CareerAnalysisResult[]): Promise<void> {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 1); // 1-day expiration
+    const cachedAt = new Date().toISOString();
+
+    // 1. Save to LocalStorage immediately as a fallback/instant load
+    try {
+      localStorage.setItem(`gpa_career_analysis_${userId}`, JSON.stringify({
+        results,
+        cachedAt,
+        expiresAt: expiresAt.toISOString()
+      }));
+    } catch (err) {
+      console.warn('Failed to save career analysis to localStorage:', err);
+    }
+
+    // 2. Save to Supabase DB
+    try {
+      // Clean up previous cache for this user
+      await supabase
+        .from('career_analysis_cache')
+        .delete()
+        .eq('user_id', userId);
+
+      const { error } = await supabase
+        .from('career_analysis_cache')
+        .insert([{
+          user_id: userId,
+          results,
+          input_hash: 'default',
+          expires_at: expiresAt.toISOString()
+        }]);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error caching career analysis in Supabase:', err);
+    }
+  },
+
+  async getCachedAnalysis(userId: string): Promise<{ results: CareerAnalysisResult[]; cachedAt: string } | null> {
+    // 1. Try fetching from Supabase DB
+    try {
+      const { data, error } = await supabase
+        .from('career_analysis_cache')
+        .select('results, created_at, expires_at')
+        .eq('user_id', userId)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        const results = data[0].results as CareerAnalysisResult[];
+        const cachedAt = data[0].created_at;
+
+        // Sync back to localStorage for instant subsequent loads
+        try {
+          localStorage.setItem(`gpa_career_analysis_${userId}`, JSON.stringify({
+            results,
+            cachedAt,
+            expiresAt: data[0].expires_at
+          }));
+        } catch (e) {
+          console.warn('Failed to sync to localStorage:', e);
+        }
+
+        return { results, cachedAt };
+      }
+    } catch (err) {
+      console.error('Error fetching cached career analysis from Supabase:', err);
+    }
+
+    // 2. Fallback to LocalStorage if Supabase failed/table is missing or slow
+    try {
+      const localDataStr = localStorage.getItem(`gpa_career_analysis_${userId}`);
+      if (localDataStr) {
+        const localObj = JSON.parse(localDataStr);
+        const expiresAt = new Date(localObj.expiresAt);
+        if (expiresAt.getTime() > Date.now()) {
+          return {
+            results: localObj.results,
+            cachedAt: localObj.cachedAt
+          };
+        }
+      }
+    } catch (err) {
+      console.error('Error reading career analysis from localStorage:', err);
+    }
+
+    return null;
   }
 };

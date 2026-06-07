@@ -8,6 +8,7 @@ export interface AIConversation {
     id: string;
     user_id: string;
     title: string;
+    is_pinned?: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -89,6 +90,17 @@ export const chatHistoryService = {
             .eq('id', id);
 
         return !error;
+    },
+
+    // Toggle ghim/pin cuộc trò chuyện
+    async togglePinConversation(id: string, isPinned: boolean): Promise<boolean> {
+        try {
+            const { error } = await supabase
+                .from('ai_conversations')
+                .update({ is_pinned: isPinned })
+                .eq('id', id);
+            return !error;
+        } catch { return false; }
     },
 
     // Lưu một tin nhắn

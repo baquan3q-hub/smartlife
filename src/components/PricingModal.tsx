@@ -1,6 +1,6 @@
 // File: src/components/PricingModal.tsx
 import React, { useState } from 'react';
-import { X, Sparkles, CheckCircle, Zap, Brain, CalendarDays, LayoutDashboard, Crown, Star, Flame, Trophy, BarChart3, TrendingUp, BookOpen, Target } from 'lucide-react';
+import { X, Sparkles, CheckCircle, Zap, Brain, CalendarDays, LayoutDashboard, Crown, Star, Flame, Trophy, BarChart3, TrendingUp, BookOpen, Target, Briefcase, FileText } from 'lucide-react';
 import { SUBSCRIPTION_PLANS, PAYMENT_INFO } from '../services/subscriptionService';
 import { SubscriptionPlanDuration } from '../types';
 
@@ -32,6 +32,8 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
     { icon: <Zap size={18} />, text: 'Focus Timer & Lofi Music — chế độ tập trung tối đa' },
     { icon: <TrendingUp size={18} />, text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },
     { icon: <Trophy size={18} />, text: 'GPA Tracker — tính điểm, lộ trình học tập & mục tiêu tín chỉ' },
+    { icon: <Briefcase size={18} />, text: 'AI Career Analyzer — Phân tích ngành học & tính cách đề xuất nghề nghiệp' },
+    { icon: <FileText size={18} />, text: 'CV Builder — Tự động điền học vấn & kỹ năng, export PDF chuyên nghiệp' },
   ];
 
   return (

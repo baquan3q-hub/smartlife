@@ -1,6 +1,6 @@
 // File: src/components/ProGateOverlay.tsx
 import React from 'react';
-import { Lock, Crown, Sparkles, CalendarDays, Brain, LayoutDashboard, Flame, Star, Zap, TrendingUp, Trophy, BookOpen } from 'lucide-react';
+import { Lock, Crown, Sparkles, CalendarDays, Brain, LayoutDashboard, Flame, Star, Zap, TrendingUp, Trophy, BookOpen, Briefcase, FileText } from 'lucide-react';
 
 interface ProGateOverlayProps {
   featureName: string;
@@ -94,6 +94,16 @@ const ProGateOverlay: React.FC<ProGateOverlayProps> = ({ featureName, featureIco
             <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
               <Trophy size={16} className="text-blue-500 shrink-0" />
               <span>GPA Tracker nâng cao</span>
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <Briefcase size={16} className="text-cyan-500 shrink-0" />
+              <span>AI Career Analyzer (Phân tích ngành học & tính cách)</span>
+              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <FileText size={16} className="text-teal-500 shrink-0" />
+              <span>CV Builder — Tạo & lưu trữ CV thông minh</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
           </div>

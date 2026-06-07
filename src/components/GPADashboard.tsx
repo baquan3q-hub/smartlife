@@ -7,8 +7,10 @@ import {
   Plus, Trash2, Edit2, ChevronDown, ChevronRight, GraduationCap,
   BookOpen, AlertTriangle, TrendingUp, Award, Calculator, Save,
   X, Check, BarChart3, Info, FileText, ChevronLeft, Download, Upload,
-  History, LineChart as LineChartIcon, Eye, Target, Zap, Star, ArrowRight
+  History, LineChart as LineChartIcon, Eye, Target, Zap, Star, ArrowRight,
+  Briefcase
 } from 'lucide-react';
+import { GPACareerTab } from './GPACareerTab';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, BarChart, Bar, Cell, ReferenceLine,
@@ -51,6 +53,12 @@ interface GPADashboardProps {
   onUpdateGPATarget?: (targetGPA: number | null, targetSemesters: number) => void;
   isLoading?: boolean;
   lang: Lang;
+  userId: string;
+  initialViewMode?: string | null;
+  onResetInitialView?: () => void;
+  onCreatePosition?: (domain: string, positions: string[]) => void;
+  isPro?: boolean;
+  onUpgrade?: () => void;
 }
 
 // ─── Helpers ───────────────────────────
@@ -79,15 +87,41 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
   targetCredits = 135, onUpdateTargetCredits,
   targetGPA: propTargetGPA, targetSemesters: propTargetSemesters = 4,
   onUpdateGPATarget,
-  isLoading, lang
+  isLoading, lang,
+  userId,
+  initialViewMode,
+  onResetInitialView,
+  onCreatePosition,
+  isPro = false,
+  onUpgrade = () => {}
 }) => {
   // ── State ──
   const [selectedSemesterId, setSelectedSemesterId] = useState<string | null>(null);
   const [showSemesterModal, setShowSemesterModal] = useState(false);
   const [editingSemester, setEditingSemester] = useState<GPASemester | null>(null);
   const [showMobileSemesterList, setShowMobileSemesterList] = useState(false);
-  const [viewMode, setViewMode] = useState<'dashboard' | 'history' | 'charts' | 'target'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'history' | 'charts' | 'target' | 'career'>('dashboard');
   const [expandedHistorySemId, setExpandedHistorySemId] = useState<string | null>(null);
+  const [isGPAPanelCollapsed, setIsGPAPanelCollapsed] = useState(false);
+
+  // Auto-collapse/expand GPA sidebar depending on viewMode
+  useEffect(() => {
+    if (viewMode === 'career') {
+      setIsGPAPanelCollapsed(true);
+    } else {
+      setIsGPAPanelCollapsed(false);
+    }
+  }, [viewMode]);
+
+  // Initial routing view check
+  useEffect(() => {
+    if (initialViewMode) {
+      setViewMode(initialViewMode as any);
+      if (onResetInitialView) {
+        onResetInitialView();
+      }
+    }
+  }, [initialViewMode, onResetInitialView]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [confirmDialog, setConfirmDialog] = useState({
@@ -468,6 +502,7 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
               { key: 'target' as const, label: 'Mục tiêu', icon: <Target size={14} /> },
               { key: 'charts' as const, label: 'Biểu đồ', icon: <LineChartIcon size={14} /> },
               { key: 'history' as const, label: 'Lịch sử', icon: <History size={14} /> },
+              { key: 'career' as const, label: 'Nghề nghiệp', icon: <Briefcase size={14} /> },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -493,14 +528,16 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
           <input ref={fileInputRef} type="file" accept=".xlsx, .xls" onChange={handleImport} className="hidden" />
 
           {/* Mobile semester toggle */}
-          <button
-            onClick={() => setShowMobileSemesterList(!showMobileSemesterList)}
-            className="md:hidden flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 shadow-sm"
-          >
-            <BookOpen size={16} />
-            {selectedSemester ? `${selectedSemester.name} — ${selectedSemester.academic_year}` : 'Chọn học kỳ'}
-            <ChevronDown size={14} />
-          </button>
+          {viewMode !== 'career' && (
+            <button
+              onClick={() => setShowMobileSemesterList(!showMobileSemesterList)}
+              className="md:hidden flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 shadow-sm"
+            >
+              <BookOpen size={16} />
+              {selectedSemester ? `${selectedSemester.name} — ${selectedSemester.academic_year}` : 'Chọn học kỳ'}
+              <ChevronDown size={14} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -539,104 +576,134 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
         </div>
       )}
 
-      <div className="flex gap-6">
+      <div className="flex gap-6 items-start">
         {/* ─── Desktop Sidebar ─── */}
-        <div className="hidden md:block w-64 shrink-0 space-y-4">
+        <div className={`hidden md:block transition-all duration-300 shrink-0 space-y-4 ${isGPAPanelCollapsed ? 'w-20' : 'w-64'}`}>
           {/* Cumulative GPA Card */}
-          <div className="bg-gradient-to-br from-cyan-500 via-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-xl shadow-blue-200/50">
-            <div className="text-xs font-medium text-white/70 uppercase tracking-wider">GPA Tích lũy</div>
-            <div className="text-4xl font-black mt-1 tracking-tight">
-              {cumulativeData.gpa != null ? cumulativeData.gpa.toFixed(2) : '—'}
-            </div>
-            <div className="text-sm text-white/80 mt-2">
-              {cumulativeData.academic_standing || 'Chưa có dữ liệu'}
-            </div>
-            <div className="mt-3 flex items-center gap-2 text-xs text-white/60">
-              <Award size={14} />
-              {isEditingCredits ? (
-                <div className="flex items-center gap-1">
-                  <span>{cumulativeData.credits_accumulated} / </span>
-                  <input
-                    type="number"
-                    value={tempCredits}
-                    onChange={e => setTempCredits(e.target.value)}
-                    className="w-12 bg-white/20 text-white border border-white/40 focus:border-white focus:bg-white/30 outline-none p-0.5 rounded text-xs no-arrows transition-all"
-                    autoFocus
-                  />
-                  <span> TC</span>
-                  <button onClick={() => {
-                      if (onUpdateTargetCredits) onUpdateTargetCredits(Number(tempCredits) || 120);
-                      setIsEditingCredits(false);
-                    }} className="ml-2 bg-emerald-500 text-white hover:bg-emerald-400 p-1 rounded transition-colors" title="Lưu">
-                    <Check size={12} strokeWidth={3} />
-                  </button>
-                  <button onClick={() => {
-                      setTempCredits(targetCredits.toString());
-                      setIsEditingCredits(false);
-                    }} className="bg-red-500/80 text-white hover:bg-red-400/80 p-1 rounded transition-colors" title="Hủy">
-                    <X size={12} strokeWidth={3} />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1">
-                  <span>{cumulativeData.credits_accumulated} / {cumulativeData.total_credits_required} TC</span>
-                  <button onClick={() => setIsEditingCredits(!isEditingCredits)} className="text-white/60 hover:text-white transition-colors ml-1" title="Sửa Tổng Tín Chỉ Mục Tiêu">
-                    <Edit2 size={12} />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Semester list */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <span className="text-sm font-bold text-gray-700">Học kỳ</span>
+          {isGPAPanelCollapsed ? (
+            <div className="bg-gradient-to-br from-cyan-500 via-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg flex flex-col items-center justify-center gap-1.5 animate-fade-in relative">
+              <div className="text-[10px] font-bold opacity-75 uppercase tracking-wider text-center">GPA</div>
+              <div className="text-2xl font-black tracking-tight">
+                {cumulativeData.gpa != null ? cumulativeData.gpa.toFixed(2) : '—'}
+              </div>
+              <div className="text-[9px] opacity-85 text-center font-medium">
+                {cumulativeData.credits_accumulated} TC
+              </div>
               <button
-                onClick={() => setShowSemesterModal(true)}
-                className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
+                onClick={() => setIsGPAPanelCollapsed(false)}
+                className="p-1.5 bg-white/20 hover:bg-white/30 rounded-xl transition-all mt-1 flex items-center justify-center active:scale-90"
+                title="Mở rộng GPA Sidebar"
               >
-                + Thêm
+                <ChevronRight size={14} />
               </button>
             </div>
-            <div className="max-h-[400px] overflow-y-auto">
-              {semestersByYear.map(({ yearLabel, sems, yearlyGPA }) => (
-                <div key={yearLabel}>
-                  <div className="px-4 py-2 flex justify-between items-center bg-gray-50 sticky top-0 z-10 border-y border-gray-100 shadow-sm">
-                    <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">{yearLabel}</span>
-                    {yearlyGPA != null && <span className="text-[10px] font-bold text-gray-500">GPA ĐẠT: {yearlyGPA.toFixed(2)}</span>}
-                  </div>
-                  {sems.map(sem => (
-                    <button
-                      key={sem.id}
-                      onClick={() => setSelectedSemesterId(sem.id)}
-                      className={`w-full text-left px-4 py-3 flex items-center justify-between transition-all border-l-3 ${
-                        selectedSemesterId === sem.id
-                          ? 'bg-indigo-50/80 border-l-indigo-500 text-indigo-700'
-                          : 'border-l-transparent text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {sem.is_current && (
-                          <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-                        )}
-                        <span className="text-sm font-medium">{sem.name}</span>
-                      </div>
-                      {sem.summary?.semester_gpa != null && (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          sem.summary.semester_gpa >= 3.2 ? 'bg-emerald-50 text-emerald-600' :
-                          sem.summary.semester_gpa >= 2.0 ? 'bg-blue-50 text-blue-600' :
-                          'bg-red-50 text-red-600'
-                        }`}>
-                          {sem.summary.semester_gpa.toFixed(2)}
-                        </span>
-                      )}
+          ) : (
+            <div className="bg-gradient-to-br from-cyan-500 via-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-xl shadow-blue-200/50 relative group">
+              {viewMode === 'career' && (
+                <button
+                  onClick={() => setIsGPAPanelCollapsed(true)}
+                  className="absolute right-3 top-3 p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Thu gọn GPA Sidebar"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+              )}
+              <div className="text-xs font-medium text-white/70 uppercase tracking-wider">GPA Tích lũy</div>
+              <div className="text-4xl font-black mt-1 tracking-tight">
+                {cumulativeData.gpa != null ? cumulativeData.gpa.toFixed(2) : '—'}
+              </div>
+              <div className="text-sm text-white/80 mt-2">
+                {cumulativeData.academic_standing || 'Chưa có dữ liệu'}
+              </div>
+              <div className="mt-3 flex items-center gap-2 text-xs text-white/60">
+                <Award size={14} />
+                {isEditingCredits ? (
+                  <div className="flex items-center gap-1">
+                    <span>{cumulativeData.credits_accumulated} / </span>
+                    <input
+                      type="number"
+                      value={tempCredits}
+                      onChange={e => setTempCredits(e.target.value)}
+                      className="w-12 bg-white/20 text-white border border-white/40 focus:border-white focus:bg-white/30 outline-none p-0.5 rounded text-xs no-arrows transition-all"
+                      autoFocus
+                    />
+                    <span> TC</span>
+                    <button onClick={() => {
+                        if (onUpdateTargetCredits) onUpdateTargetCredits(Number(tempCredits) || 120);
+                        setIsEditingCredits(false);
+                      }} className="ml-2 bg-emerald-500 text-white hover:bg-emerald-400 p-1 rounded transition-colors" title="Lưu">
+                      <Check size={12} strokeWidth={3} />
                     </button>
-                  ))}
-                </div>
-              ))}
+                    <button onClick={() => {
+                        setTempCredits(targetCredits.toString());
+                        setIsEditingCredits(false);
+                      }} className="bg-red-500/80 text-white hover:bg-red-400/80 p-1 rounded transition-colors" title="Hủy">
+                      <X size={12} strokeWidth={3} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <span>{cumulativeData.credits_accumulated} / {cumulativeData.total_credits_required} TC</span>
+                    <button onClick={() => setIsEditingCredits(!isEditingCredits)} className="text-white/60 hover:text-white transition-colors ml-1" title="Sửa Tổng Tín Chỉ Mục Tiêu">
+                      <Edit2 size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Semester list */}
+          {!isGPAPanelCollapsed && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-700">Học kỳ</span>
+                <button
+                  onClick={() => setShowSemesterModal(true)}
+                  className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
+                >
+                  + Thêm
+                </button>
+              </div>
+              <div className="max-h-[400px] overflow-y-auto">
+                {semestersByYear.map(({ yearLabel, sems, yearlyGPA }) => (
+                  <div key={yearLabel}>
+                    <div className="px-4 py-2 flex justify-between items-center bg-gray-50 sticky top-0 z-10 border-y border-gray-100 shadow-sm">
+                      <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">{yearLabel}</span>
+                      {yearlyGPA != null && <span className="text-[10px] font-bold text-gray-500">GPA ĐẠT: {yearlyGPA.toFixed(2)}</span>}
+                    </div>
+                    {sems.map(sem => (
+                      <button
+                        key={sem.id}
+                        onClick={() => setSelectedSemesterId(sem.id)}
+                        className={`w-full text-left px-4 py-3 flex items-center justify-between transition-all border-l-3 ${
+                          selectedSemesterId === sem.id
+                            ? 'bg-indigo-50/80 border-l-indigo-500 text-indigo-700'
+                            : 'border-l-transparent text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {sem.is_current && (
+                            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                          )}
+                          <span className="text-sm font-medium">{sem.name}</span>
+                        </div>
+                        {sem.summary?.semester_gpa != null && (
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                            sem.summary.semester_gpa >= 3.2 ? 'bg-emerald-50 text-emerald-600' :
+                            sem.summary.semester_gpa >= 2.0 ? 'bg-blue-50 text-blue-600' :
+                            'bg-red-50 text-red-600'
+                          }`}>
+                            {sem.summary.semester_gpa.toFixed(2)}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ─── Main Content ─── */}
@@ -1062,6 +1129,19 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
               propTargetGPA={propTargetGPA}
               propTargetSemesters={propTargetSemesters}
               onUpdateGPATarget={onUpdateGPATarget}
+              onUpdateTargetCredits={onUpdateTargetCredits}
+            />
+          )}
+
+          {/* ══════════ CAREER VIEW ══════════ */}
+          {viewMode === 'career' && (
+            <GPACareerTab
+              semesters={semesters}
+              userId={userId}
+              onCreatePosition={onCreatePosition}
+              lang={lang}
+              isPro={isPro}
+              onUpgrade={onUpgrade}
             />
           )}
         </div>
@@ -1581,10 +1661,15 @@ const GPATargetPanel: React.FC<{
   propTargetGPA?: number | null;
   propTargetSemesters: number;
   onUpdateGPATarget?: (targetGPA: number | null, targetSemesters: number) => void;
-}> = ({ semesters, cumulativeData, targetCredits, propTargetGPA, propTargetSemesters, onUpdateGPATarget }) => {
+  onUpdateTargetCredits?: (credits: number) => void;
+}> = ({ semesters, cumulativeData, targetCredits, propTargetGPA, propTargetSemesters, onUpdateGPATarget, onUpdateTargetCredits }) => {
+
+  const currentCredits = cumulativeData.credits_accumulated;
 
   const [localTargetGPA, setLocalTargetGPA] = useState<string>(propTargetGPA?.toString() || '');
-  const [localTargetSemesters, setLocalTargetSemesters] = useState<number>(propTargetSemesters);
+  const [localRemainingCredits, setLocalRemainingCredits] = useState<number>(
+    Math.max(targetCredits - currentCredits, 0)
+  );
   const [hasCalculated, setHasCalculated] = useState(propTargetGPA != null);
 
   // Sync from props
@@ -1596,8 +1681,12 @@ const GPATargetPanel: React.FC<{
   }, [propTargetGPA]);
 
   useEffect(() => {
-    setLocalTargetSemesters(propTargetSemesters);
-  }, [propTargetSemesters]);
+    setLocalRemainingCredits(Math.max(targetCredits - currentCredits, 0));
+  }, [targetCredits, currentCredits]);
+
+  // Calculate localTargetCredits and remainingSemesters on the fly
+  const localTargetCredits = currentCredits + localRemainingCredits;
+  const remainingSemesters = Math.max(Math.ceil(localRemainingCredits / 15), 1);
 
   const projection: GPAProjection | null = useMemo(() => {
     const gpa = parseFloat(localTargetGPA);
@@ -1608,8 +1697,8 @@ const GPATargetPanel: React.FC<{
       courses: computeAllCourses(s.courses),
     }));
 
-    return calculateGPAProjection(computedSemesters, gpa, targetCredits, localTargetSemesters);
-  }, [hasCalculated, localTargetGPA, localTargetSemesters, semesters, targetCredits]);
+    return calculateGPAProjection(computedSemesters, gpa, localTargetCredits, remainingSemesters);
+  }, [hasCalculated, localTargetGPA, localTargetCredits, remainingSemesters, semesters]);
 
   const handleCalculate = () => {
     const gpa = parseFloat(localTargetGPA);
@@ -1617,18 +1706,19 @@ const GPATargetPanel: React.FC<{
       alert('GPA mục tiêu phải từ 0.01 đến 4.00');
       return;
     }
-    if (localTargetSemesters < 1 || localTargetSemesters > 20) {
-      alert('Số kỳ còn lại phải từ 1 đến 20');
+    if (localTargetCredits < 1 || localTargetCredits > 300) {
+      alert('Tổng tín chỉ mục tiêu phải từ 1 đến 300');
       return;
     }
     setHasCalculated(true);
-    onUpdateGPATarget?.(gpa, localTargetSemesters);
+    onUpdateTargetCredits?.(localTargetCredits);
+    onUpdateGPATarget?.(gpa, remainingSemesters);
   };
 
   const handlePreset = (gpa: number) => {
     setLocalTargetGPA(gpa.toString());
     setHasCalculated(true);
-    onUpdateGPATarget?.(gpa, localTargetSemesters);
+    onUpdateGPATarget?.(gpa, remainingSemesters);
   };
 
   const handleReset = () => {
@@ -1729,13 +1819,13 @@ const GPATargetPanel: React.FC<{
               />
             </div>
             <div className="w-full sm:w-32">
-              <label className="block text-[10px] text-white/60 uppercase tracking-wider mb-1 font-semibold">Số kỳ còn lại</label>
+              <label className="block text-[10px] text-white/60 uppercase tracking-wider mb-1 font-semibold">Số tín còn lại</label>
               <input
                 type="number"
-                min="1"
-                max="20"
-                value={localTargetSemesters}
-                onChange={e => { setLocalTargetSemesters(parseInt(e.target.value) || 1); setHasCalculated(false); }}
+                min="0"
+                max="300"
+                value={localRemainingCredits}
+                onChange={e => { setLocalRemainingCredits(parseInt(e.target.value) || 0); setHasCalculated(false); }}
                 className="w-full px-4 py-2.5 bg-white/15 backdrop-blur-sm border border-white/25 rounded-xl text-white font-bold text-lg focus:ring-2 focus:ring-white/40 focus:border-white/50 outline-none transition-all"
               />
             </div>
