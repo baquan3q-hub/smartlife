@@ -47,8 +47,8 @@ const translations = {
         ],
 
         featFocusTitle: 'Tập trung cao độ,\nThư giãn tuyệt đối.',
-        featFocusDesc: 'Chế độ Focus with bộ đếm giờ Pomodoro và kho nhạc Lofi chill giúp bạn duy trì sự tập trung và giảm căng thẳng khi học tập, làm việc.',
-        featFocusItems: ['Bộ đếm giờ Pomodoro tùy chỉnh', 'Kho nhạc Lofi & Background Sounds', 'Thống kê thời gian tập trung'],
+        featFocusDesc: 'Chế độ học độc lập (Guest Mode) không cần đăng nhập qua link riêng biệt. Hỗ trợ tự phát nhạc cá nhân từ thiết bị (.mp3), bộ đếm giờ Pomodoro và lưu trữ việc cần làm (Todo) ngay trên trình duyệt.',
+        featFocusItems: ['Chế độ học thử không cần đăng nhập', 'Tự phát nhạc cá nhân từ thiết bị cá nhân', 'Lưu trữ Todo cục bộ và đồng bộ sau khi đăng nhập', 'Bộ đếm giờ Pomodoro & Bấm giờ tùy chỉnh'],
 
         featHabitTitle: 'Kỷ luật bản thân,\nHướng tới mục tiêu.',
         featHabitDesc: 'Xây dựng và duy trì thói quen tích cực với bộ đếm chuỗi (streak) theo cơ chế có sao thưởng để tăng. Đừng bỏ lỡ bất kỳ khoảnh khắc quan trọng nào với tính năng đếm ngược sự kiện và đếm tiến lưu giữ kỷ niệm.',
@@ -100,7 +100,7 @@ const translations = {
         footerSupportEmail: 'Email hỗ trợ',
         footerPersonalPage: 'Profile',
         footerAIAdvisor: 'AI Your Own',
-        footerCareer: 'Lộ trình sự nghiệp AI',
+        footerCareer: 'Lộ trình sự nghiệp',
         footerFinance: 'Quản lý tài chính',
         footerJournal: 'Nhật ký chữa lành',
         footerFocus: 'Tập trung & Nhạc Lofi',
@@ -148,8 +148,8 @@ const translations = {
         ],
 
         featFocusTitle: 'Deep Focus,\nAbsolute Relaxation.',
-        featFocusDesc: 'Focus mode with Pomodoro timer and chill Lofi music library helps you maintain concentration and reduce stress while studying or working.',
-        featFocusItems: ['Customizable Pomodoro Timer', 'Lofi Music & Background Sounds', 'Focus Time Statistics'],
+        featFocusDesc: 'Guest Mode allows direct standalone study access without login. Supports playing local audio files (.mp3), Pomodoro & Stopwatch timers, and localized todo management stored on your device.',
+        featFocusItems: ['Guest Mode for instant login-free access', 'Stream personal audio files from your device', 'Local Todo storage & auto-sync after logging in', 'Custom Pomodoro & Stopwatch timers'],
 
         featHabitTitle: 'Self-Discipline,\nGoal Oriented.',
         featHabitDesc: 'Build and maintain positive habits with streak tracking. Never miss an important moment with event countdowns and milestone count-ups for your memories.',
@@ -258,8 +258,8 @@ const translations = {
         ],
 
         featFocusTitle: '깊은 집중,\n완벽한 휴식.',
-        featFocusDesc: '시간 맞춤형 뽀모도로 타이머와 힐링 로파이(Lofi) 음악 라이브러리로 학업 및 업무 집중도를 높입니다.',
-        featFocusItems: ['사용자 맞춤형 뽀모도로 타이머', '로파이 음악 및 배경 자연음 사운드', '집중 시간 통계 보고'],
+        featFocusDesc: '로그인 없이 단독 링크(Guest Mode)로 즉시 입장. 개인 기기의 오디오 파일(.mp3) 재생 지원, 뽀모도로 및 스톱워치 타이머, 브라우저 로컬 할일(Todo) 저장 및 자동 동기화.',
+        featFocusItems: ['로그인 없는 비회원 게스트 모드 지원', '내 기기의 음악 및 학습용 음원 직접 재생', '로컬 Todo 저장 및 로그인 후 자동 클라우드 연동', '맞춤형 뽀모도로 및 스톱워치 탑재'],
 
         featHabitTitle: '스스로의 룰,\n목표를 향해 나아가다.',
         featHabitDesc: '보상형 별점(Streak) 기반 습관 형성을 시각화합니다. 디데이 카운트다운과 추억 기념일을 놓치지 마세요.',
@@ -489,10 +489,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     <div className="text-gray-600 mb-5 sm:mb-6 max-w-full sm:max-w-3xl mx-auto leading-relaxed animate-fade-in-up delay-200 px-1">
                         {lang === 'vi' ? (
                             <div className="text-sm sm:text-base md:text-xl text-center">
-                                SmartLife <strong>super tool</strong> dành cho sinh viên. It helps them về <strong>tài chính</strong>, <strong>lịch trình</strong>, <strong>todolist mục tiêu cá nhân, mục tiêu nghề nghiệp dài hạn</strong>, <strong>thói quen</strong>, <strong>countdown/up</strong> và cả <strong>Viết nhật kí</strong>.
+                                SmartLife <strong>super tools</strong> dành cho sinh viên. Tools giúp user về việc quản trị cuộc sống như : <strong>tài chính</strong>, <strong>lịch trình</strong>, <strong>todolist mục tiêu cá nhân, mục tiêu nghề nghiệp dài hạn</strong>, <strong>thói quen</strong>, <strong>countdown/up</strong> và cả <strong>Viết nhật kí</strong>.
                                 {isDescExpanded ? (
                                     <span>
-                                        {' '}Ngoài ra còn có <strong>GPA tracker</strong> cho sinh viên VNU, <strong>My spotify</strong> nghe nhạc và podcast mình tự thêm, <strong>Pomodoro</strong> và các phương pháp bấm giờ học tập, <strong>Không gian học</strong>, <strong>Kho lưu trữ tập trung</strong>. Đặc biệt là <strong>Own AI Advisor</strong> nó truy cập toàn bộ dữ liệu và action theo yêu cầu của người dùng một cách thông minh và cá nhân hóa. Tất cả các tính năng sinh viên cần đều trong Smartlife. Mọi thứ mượt và chi tiết thông minh + tối giản.
+                                        {' '}Ngoài ra còn có <strong>GPA tracker</strong> cho sinh viên VNU, Và CV Builder cùng với AI phân tích cá nhân hóa thêm <strong>DISC và MBTI</strong> để đề xuất nghề nghiệp phù hợp, <strong>My spotify</strong> nghe nhạc và podcast mình tự thêm, <strong>Pomodoro</strong> và các phương pháp bấm giờ học tập, <strong>Không gian học</strong>, <strong>Kho lưu trữ tập trung</strong>. Đặc biệt là <strong>Own AI Advisor</strong> nó truy cập toàn bộ dữ liệu cũng như phân tích ảnh,file,audio để có thể  action theo yêu cầu của người dùng một cách thông minh và cá nhân hóa. Tất cả các tính năng sinh viên cần đều trong Smartlife. Mọi thứ mượt và chi tiết thông minh + tối giản, Trải nghiệm nagy để quản trị cuộc sống SMART hơn nhé... Tks
                                         <button onClick={() => setIsDescExpanded(false)} className="text-indigo-600 font-semibold hover:underline ml-2 text-sm md:text-base whitespace-nowrap">Ẩn bớt</button>
                                     </span>
                                 ) : (
@@ -1000,6 +1000,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                                     </li>
                                 ))}
                             </ul>
+                            <div className="pt-4">
+                                <a
+                                    href="#/focus"
+                                    className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-full font-bold text-sm shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                >
+                                    <span>Vào học thử ngay (Không cần đăng nhập)</span>
+                                    <ArrowRight size={16} />
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </section>

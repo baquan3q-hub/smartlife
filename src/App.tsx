@@ -389,6 +389,38 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 else console.info('[SmartLife] ✅ last_active_at updated');
             });
 
+        // Sync guest todos from localStorage to Supabase
+        const guestTodosStr = localStorage.getItem('smartlife_guest_todos');
+        if (guestTodosStr) {
+            try {
+                const guestTodos = JSON.parse(guestTodosStr);
+                if (Array.isArray(guestTodos) && guestTodos.length > 0) {
+                    const todosToInsert = guestTodos.map(todo => ({
+                        user_id: user.id,
+                        content: todo.content,
+                        priority: todo.priority === 'focus' ? 'medium' : (['high', 'medium', 'low', 'urgent', 'chill', 'temp'].includes(todo.priority) ? todo.priority : 'medium'),
+                        is_completed: todo.is_completed || false,
+                        deadline: todo.deadline || null
+                    }));
+                    
+                    supabase.from('todos').insert(todosToInsert).then(({ error }) => {
+                        if (error) {
+                            console.error('[SmartLife] Error syncing guest todos:', error);
+                        } else {
+                            console.info('[SmartLife] ✅ Guest todos synced successfully');
+                            localStorage.removeItem('smartlife_guest_todos');
+                            fetchData(true);
+                        }
+                    });
+                } else {
+                    localStorage.removeItem('smartlife_guest_todos');
+                }
+            } catch (e) {
+                console.error('[SmartLife] Error parsing guest todos:', e);
+                localStorage.removeItem('smartlife_guest_todos');
+            }
+        }
+
         fetchData(false);
     }, [user]);
 
@@ -1342,11 +1374,47 @@ const AppWrapper: React.FC = () => {
         return (saved === 'vi' || saved === 'en' || saved === 'ko') ? saved : 'vi';
     });
 
+    const [hash, setHash] = useState(window.location.hash);
+    const timer = useFocusTimer();
+
+    useEffect(() => {
+        const handleHashChange = () => {
+            setHash(window.location.hash);
+        };
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
+
     useEffect(() => {
         localStorage.setItem('smartlife_lang', lang);
     }, [lang]);
 
+    const formatTime = (s: number) => {
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = s % 60;
+        if (h > 0) {
+            return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        }
+        return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+    };
+
     if (loading) return <GlobalLoader />;
+
+    if (hash === '#/focus' || hash === '#/study') {
+        return (
+            <MusicSpace
+                timer={timer}
+                onBack={() => { window.location.hash = ''; }}
+                formatTime={formatTime}
+                isStandalone={true}
+                onLoginRedirect={() => {
+                    setShowLogin(true);
+                    window.location.hash = '';
+                }}
+            />
+        );
+    }
 
     if (user) return <AuthenticatedApp lang={lang} setLang={setLang} />;
 

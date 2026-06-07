@@ -1082,6 +1082,11 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 }
                 return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
               }}
+              todos={todos}
+              activeTaskId={activeTaskId}
+              onUpdateTodo={onUpdateTodo}
+              onStartTracking={onStartTracking}
+              onAddTodo={onAddTodo}
             />
           )}
 

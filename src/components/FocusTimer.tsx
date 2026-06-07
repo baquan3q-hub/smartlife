@@ -25,7 +25,6 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ timer, onOpenMusic }) => {
     } = timer;
 
     const [customMinutes, setCustomMinutes] = useState(30);
-    const [isFullScreen, setIsFullScreen] = useState(false);
     const [quote] = useState(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
 
     const formatTime = (seconds: number) => {
@@ -34,41 +33,43 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ timer, onOpenMusic }) => {
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    const containerClasses = isFullScreen
-        ? "fixed inset-0 z-[100] bg-gray-900 text-white flex flex-col items-center justify-center p-4 sm:p-8 transition-all duration-300 pointer-events-auto"
-        : "bg-white rounded-3xl shadow-lg border border-gray-100 p-4 xs:p-5 sm:p-6 mb-6 relative overflow-hidden transition-all duration-300 flex flex-col items-center";
+    const containerClasses = "bg-white rounded-3xl shadow-lg border border-gray-100 p-4 xs:p-5 sm:p-6 mb-6 relative overflow-hidden transition-all duration-300 flex flex-col items-center";
 
     return (
         <div className={containerClasses}>
-            {!isFullScreen && (
-                <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full opacity-10 transition-colors
-          ${engineMode === 'STOPWATCH' ? 'bg-orange-500' : (mode === 'WORK' ? (status === 'RUNNING' ? 'bg-indigo-500' : 'bg-gray-200') : 'bg-emerald-500')}
-        `}></div>
-            )}
+            <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full opacity-10 transition-colors
+      ${engineMode === 'STOPWATCH' ? 'bg-orange-500' : (mode === 'WORK' ? (status === 'RUNNING' ? 'bg-indigo-500' : 'bg-gray-200') : 'bg-emerald-500')}
+    `}></div>
 
-            <div className={`flex justify-between items-center w-full mb-3 sm:mb-4 ${isFullScreen ? 'absolute top-4 sm:top-6 px-4 sm:px-8' : ''}`}>
-                <h3 className={`text-base sm:text-xl font-extrabold flex items-center gap-1.5 sm:gap-2 relative z-10 ${isFullScreen ? 'text-white' : 'text-gray-800'}`}>
-                    <Clock size={20} className={`sm:w-6 sm:h-6 ${isFullScreen ? 'text-indigo-400' : 'text-indigo-600'}`} />
-                    {isFullScreen ? 'SmartLife Focus' : 'Tập trung'}
+            <div className="flex justify-between items-center w-full mb-3 sm:mb-4">
+                <h3 className="text-base sm:text-xl font-extrabold flex items-center gap-1.5 sm:gap-2 relative z-10 text-gray-800">
+                    <Clock size={20} className="sm:w-6 sm:h-6 text-indigo-600" />
+                    Tập trung
                 </h3>
                 <div className="flex gap-2 z-20">
                     {typeof window !== 'undefined' && 'documentPictureInPicture' in window && (
                         <button 
                             onClick={() => window.dispatchEvent(new CustomEvent('trigger-focus-pip'))}
-                            className={`p-2 rounded-lg transition-all ${isFullScreen ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-500'}`}
+                            className="p-2 rounded-lg transition-all bg-gray-100 hover:bg-gray-200 text-gray-500"
                             title="Ghim ngoài màn hình (Luôn nổi)"
                         >
-                            <ExternalLink size={isFullScreen ? 24 : 20} />
+                            <ExternalLink size={20} />
                         </button>
                     )}
-                    <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-all text-gray-500">
-                        {isFullScreen ? <Minimize2 size={24} className="text-white" /> : <Maximize2 size={20} />}
-                    </button>
+                    {onOpenMusic && (
+                        <button 
+                            onClick={onOpenMusic}
+                            className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-all text-gray-500"
+                            title="Mở rộng không gian học tập"
+                        >
+                            <Maximize2 size={20} />
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Mode Switcher in Dashboard */}
-            <div className={`flex bg-gray-50 rounded-xl p-1 mb-4 sm:mb-6 relative z-10 w-full max-w-xs transition-opacity ${isFullScreen ? 'sm:scale-125 mb-8 sm:mb-12 bg-white/5 border border-white/10' : ''}`}>
+            <div className="flex bg-gray-50 rounded-xl p-1 mb-4 sm:mb-6 relative z-10 w-full max-w-xs transition-opacity">
                 <button
                     onClick={() => switchEngineMode('TIMER')}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all ${engineMode === 'TIMER' ? 'bg-white shadow text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
@@ -86,30 +87,22 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ timer, onOpenMusic }) => {
             </div>
 
             <div className="flex flex-col items-center mb-4 sm:mb-6 relative z-10 w-full max-w-md">
-                <div className={`font-mono font-black tracking-tighter mb-2 transition-all duration-300 flex items-center justify-center
-          ${isFullScreen ? 'text-[5rem] xs:text-[7rem] sm:text-[10rem] md:text-[12rem] leading-none mb-4 sm:mb-8' : 'text-5xl xs:text-6xl sm:text-7xl text-indigo-600'}
-          ${engineMode === 'STOPWATCH' ? 'text-orange-600' : (mode === 'BREAK' && !isFullScreen ? 'text-emerald-600' : '')}
+                <div className={`font-mono font-black tracking-tighter mb-2 transition-all duration-300 flex items-center justify-center text-5xl xs:text-6xl sm:text-7xl text-indigo-600
+          ${engineMode === 'STOPWATCH' ? 'text-orange-600' : (mode === 'BREAK' ? 'text-emerald-600' : '')}
         `}>
                     {formatTime(timeLeft)}
                 </div>
 
                 <div className="flex items-center gap-1.5 sm:gap-2 text-[9px] xs:text-[10px] font-black uppercase tracking-widest mb-3 sm:mb-4">
-                    <span className={isFullScreen ? 'text-base sm:text-xl text-white/50' : 'text-gray-400'}>
+                    <span className="text-gray-400">
                         {engineMode === 'STOPWATCH' ? 'Đã học được' : (mode === 'WORK' ? 'Đang học' : 'Đang nghỉ')}
                     </span>
-                    <span className={`px-1.5 sm:px-2 py-0.5 rounded text-white text-[8px] xs:text-[10px] font-bold ${status === 'RUNNING' ? 'bg-green-500' : 'bg-gray-400'} ${isFullScreen ? 'sm:scale-150 sm:ml-6 ml-2' : ''}`}>
+                    <span className={`px-1.5 sm:px-2 py-0.5 rounded text-white text-[8px] xs:text-[10px] font-bold ${status === 'RUNNING' ? 'bg-green-500' : 'bg-gray-400'}`}>
                         {status === 'IDLE' ? 'SẴN SÀNG' : status === 'RUNNING' ? 'CHẠY' : 'DỪNG'}
                     </span>
                 </div>
 
-                {isFullScreen && mode === 'WORK' && engineMode === 'TIMER' && (
-                    <div className="text-center animate-fade-in mt-4 sm:mt-8 p-4 sm:p-8 bg-white/5 rounded-2xl sm:rounded-3xl border border-white/10 max-w-2xl mx-4">
-                        <Quote size={28} className="sm:w-10 sm:h-10 text-indigo-400 mb-2 sm:mb-4 mx-auto opacity-30" />
-                        <p className="text-lg sm:text-2xl md:text-3xl font-bold text-indigo-100 italic">"{quote}"</p>
-                    </div>
-                )}
-
-                {engineMode === 'TIMER' && !isFullScreen && (
+                {engineMode === 'TIMER' && (
                     <div className="w-full h-1.5 bg-gray-100 rounded-full mt-4 overflow-hidden">
                         <div
                             className={`h-full transition-all duration-1000 ${mode === 'WORK' ? 'bg-indigo-500' : 'bg-emerald-500'}`}
@@ -119,27 +112,18 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ timer, onOpenMusic }) => {
                 )}
             </div>
 
-            <div className={`flex justify-center gap-4 sm:gap-6 mb-6 sm:mb-8 relative z-10 ${isFullScreen ? 'sm:scale-150 scale-110 mt-6 sm:mt-12' : ''}`}>
+            <div className="flex justify-center gap-4 sm:gap-6 mb-6 sm:mb-8 relative z-10">
                 <button onClick={toggleTimer} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl text-white shadow-xl transition-all hover:scale-110 active:scale-95 flex items-center justify-center
-          ${status === 'RUNNING' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}
+          ${status === 'RUNNING' ? 'bg-amber-50 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}
         `}>
                     {status === 'RUNNING' ? <Pause size={24} fill="currentColor" className="sm:w-7 sm:h-7" /> : <Play size={24} fill="currentColor" className="ml-1 sm:w-7 sm:h-7" />}
                 </button>
                 <button onClick={resetTimer} className="w-12 h-12 sm:w-14 sm:h-14 bg-gray-100 text-gray-500 rounded-2xl hover:bg-gray-200 transition-all flex items-center justify-center shadow-md">
                     <RotateCcw size={20} className="sm:w-6 sm:h-6" />
                 </button>
-                {onOpenMusic && (
-                    <button
-                        onClick={onOpenMusic}
-                        className="w-12 h-12 sm:w-14 sm:h-14 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 transition-all flex items-center justify-center group shadow-md"
-                        title="Mở không gian nhạc chill"
-                    >
-                        <Music size={20} className="sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" />
-                    </button>
-                )}
             </div>
 
-            {engineMode === 'TIMER' && !isFullScreen && (
+            {engineMode === 'TIMER' && (
                 <div className="grid grid-cols-2 gap-1.5 xs:gap-2 relative z-10 w-full mb-3 sm:mb-4">
                     {PRESETS.map(p => {
                         const isActive = currentPreset.id === p.id;
@@ -159,7 +143,7 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ timer, onOpenMusic }) => {
                 </div>
             )}
 
-            {engineMode === 'TIMER' && !isFullScreen && (
+            {engineMode === 'TIMER' && (
                 <div className="pt-3 sm:pt-4 border-t border-gray-100 flex flex-wrap xs:flex-nowrap gap-2 items-center relative z-10 w-full">
                     <div className="flex items-center gap-2 shrink-0">
                         <input
