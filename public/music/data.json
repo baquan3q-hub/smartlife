@@ -1,0 +1,242 @@
+{
+  "alpha": {
+    "minFrequency": 8,
+    "maxFrequency": 12,
+    "pure": [
+      {
+        "frequency": 12,
+        "effects": [
+          "Centering, mental stability"
+        ],
+        "name": "Alpha_12_Hz.mp3",
+        "duration": 5
+      }
+    ],
+    "solfeggio": [
+      {
+        "binauralBeatFrequency": 12,
+        "solfeggioFrequency": 396,
+        "effects": [
+          "Designed to ease you into a state of mental awareness"
+        ],
+        "name": "Alpha_12_Hz_Solfeggio_396_Hz.mp3",
+        "duration": 900
+      }
+    ],
+    "isochronic": [
+      {
+        "frequency": 10,
+        "effects": [
+          "More intense meditation"
+        ],
+        "name": "Alpha_10_Hz_Isochronic Pulses.mp3",
+        "duration": 5
+      }
+    ],
+    "explanation": "Alpha brainwaves are considered relaxed brainwave activity. Alpha brainwaves are brainwaves that cycle within the range of 8 Hz to 12 Hz and are usually generated in the brain's right hemisphere or in a synchronized pattern between both the right and left hemispheres. Alpha waves kick in when our mind and body are completely relaxed and free of stress. Alpha is generally thought of as the normal brainwave that is dominant in people who are relaxed, creative, and have a clear mind. Alpha is considered the \"normal\" brainwave pattern and is dominant when people close their eyes. Children tend to have much higher levels of alpha brainwaves than adults. Alpha brainwaves are considered the healthiest brainwave range, and 10 Hz has widely been accepted as the \"safest\" brainwave frequency to train. Most children and younger teenagers have a dominant alpha rhythm. There isn't a single brain wave pattern that is better than the others, so don't think alpha brainwaves are a \"cure all\". If your brain is deficient in the alpha brainwave pattern, increasing it can feel awesome!",
+    "benefits": [
+      "Relaxed body and mind",
+      "Higher levels of creativity",
+      "Improved ability to problem-solve",
+      "Balanced mood (emotional stability)",
+      "Peak performance",
+      "Lowered levels of stress & anxiety",
+      "Flow state of consciousness",
+      "\"Super learning\" ability",
+      "Boosted immune system",
+      "Increased levels of \"serotonin\""
+    ]
+  },
+  "beta": {
+    "minFrequency": 13,
+    "maxFrequency": 30,
+    "pure": [
+      {
+        "frequency": 20,
+        "effects": [
+          "Promotes focused attention towards external stimuli",
+          "Problem solving, conscious thinking",
+          "Euphoria; can result in headaches, anxiety"
+        ],
+        "name": "Beta_20_Hz.mp3",
+        "duration": 5
+      }
+    ],
+    "explanation": "Beta brainwaves are considered \"fast brainwave\" activity. Beta brainwaves are brainwaves that cycle within the range of 12 Hz to 38 Hz and are usually generated in the brain's left hemisphere. Beta waves kick in when thinking logically, feeling stressed, and feeling tense. Beta is generally thought of as a \"normal\" rhythm and is dominant in people who are alert, anxious, or have their eyes open. Beta brainwaves are considered to be the normal brainwave pattern in healthy adults. Most children and teenagers have dominant theta and alpha brainwave patterns. There isn't a single brain wave pattern that is better than the others, so don't think that beta brainwaves are some sort of miracle that your children need! If you happen to be deficient in the beta brainwave range, increasing them may feel like a miracle! Just like anything else, too much beta activity can be a bad thing. By no means would it be a good idea for you to increase a brainwave that you already have high levels of. In fact, there is a real possibility you may experience the negative effects of beta brainwaves, as they can cause anxiety, muscle tension, paranoia, and other related \"stressful\" effects.",
+    "benefits": [
+      "Ability to think quickly",
+      "Highest levels of focus",
+      "Goal oriented",
+      "Increase in I.Q.",
+      "Become more social",
+      "More energy"
+    ]
+  },
+  "delta": {
+    "minFrequency": 0.5,
+    "maxFrequency": 4,
+    "pure": [
+      {
+        "frequency": 0.9,
+        "effects": [
+          "Euphoric feeling"
+        ],
+        "name": "Delta_0.9_Hz.mp3",
+        "duration": 9
+      },
+      {
+        "frequency": 3,
+        "effects": [
+          "Profound relaxation, restorative sleep",
+          "Tranquility and peace"
+        ],
+        "name": "Delta_3_Hz.mp3",
+        "duration": 5
+      }
+    ],
+    "solfeggio": [
+      {
+        "binauralBeatFrequency": 3,
+        "solfeggioFrequency": 741,
+        "effects": [
+          "This is designed to gently ease you into a deep state of relaxation. Both of the frequencies were chosen to help aid in the exploration and reconnecting of the unconscious mind."
+        ],
+        "name": "Delta_3_Hz_Solfeggio_741_Hz.mp3",
+        "duration": 900
+      },
+      {
+        "binauralBeatFrequency": 4,
+        "solfeggioFrequency": 528,
+        "effects": [
+          "This is designed for deep healing. 528hz Solfeggio is the frequency scientists use to repair DNA. This is paired it with a 4 Hz Delta Binaural Beat. In essence, this will bring your body and mind to a deep state of relaxation while the vibrations heal your body."
+        ],
+        "name": "Delta_4_Hz_Solfeggio_528_Hz.mp3",
+        "duration": 900
+      }
+    ],
+    "isochronic": [
+      {
+        "frequency": 4,
+        "effects": [
+          "More intense meditation"
+        ],
+        "name": "Delta_4_Hz_Isochronic_Pulses.mp3",
+        "duration": 5
+      }
+    ],
+    "explanation": "Delta brainwaves are considered the most relaxing brainwave frequency range. Delta brainwaves are commonly associated with the deepest sleep (stages 3 & 4), and a state of unconscious awareness. Delta brainwaves are the lowest in brainwave frequency, ranging from 0 Hz to 4 Hz, but are the highest in amplitude. Delta brainwaves, like other slower brainwave patterns, are generated in the right hemisphere, though they may be observed in widespread patterns throughout various parts of the brain. The delta brainwave range is associated with empathy, the unconscious mind, and a decreased sense of awareness.",
+    "benefits": [
+      "Extreme bliss",
+      "Advanced healing of body and mind",
+      "Connection with unconscious mind",
+      "Deepest possible level of mind/body relaxation",
+      "Perfect intuition",
+      "Connecting with the spiritual body",
+      "Related to O.O.B.E, astral travel, ESP, and other phenomenon",
+      "Boosted immune system",
+      "Release of anti-aging hormones"
+    ]
+  },
+  "gamma": {
+    "minFrequency": 40,
+    "maxFrequency": 70,
+    "pure": [
+      {
+        "frequency": 40,
+        "name": "Gamma_40_Hz.mp3",
+        "duration": 5
+      }
+    ],
+    "isochronic": [
+      {
+        "frequency": 40,
+        "name": "Gamma_40_Hz_Isochronic_Pulses.mp3",
+        "duration": 900
+      }
+    ],
+    "explanation": "They are associated with peak performance and high cognitive functioning. Those who have a gamma brainwave deficiency tend to experience difficulties with learning and mental processing. Those who would benefit from an increase in their gamma brainwave frequencies with gamma binaural beats are those who are currently having difficulty remembering information like dates, names or events; feel their mental processing may be a little slow; feel their five senses may not be working as they should and would like to experience a far richer sensory processing experience; or are suffering from feelings of depression and unhappiness.",
+    "benefits": [
+      "Having a great memory",
+      "Ability to vividly recall past experiences",
+      "A boost in your perception of reality through your five senses – powerful smells, better vision, heightened hearing, stronger tastes",
+      "Having high levels of intelligence",
+      "The ability to combine a memory with your five senses – recalling a memorable day or night will allow you to experience a very rich sensory memory",
+      "Having great feelings of natural happiness",
+      "Ability to process large amounts of information in a fairly small amount of time",
+      "Having strong feelings and being very compassionate",
+      "Having high amounts of self-control"
+    ]
+  },
+  "theta": {
+    "minFrequency": 4,
+    "maxFrequency": 8,
+    "pure": [
+      {
+        "frequency": 7,
+        "effects": [
+          "Deep relaxation, meditation",
+          "Lucid dreaming",
+          "Increased memory, focus, creativity"
+        ],
+        "name": "Theta_7_Hz.mp3",
+        "duration": 5
+      }
+    ],
+    "solfeggio": [
+      {
+        "binauralBeatFrequency": 6,
+        "solfeggioFrequency": 639,
+        "effects": [
+          "This is designed to gently ease you into a state of deep relaxation. Both of the frequencies were chosen to help aid you in the meditation of healing, allowing you to reflect and focus on ones spiritual self, along with healing of the mind."
+        ],
+        "name": "Theta_6_Hz_Solfeggio_639_Hz.mp3",
+        "duration": 900
+      },
+      {
+        "binauralBeatFrequency": 7,
+        "solfeggioFrequency": 852,
+        "effects": [
+          "This is designed to gently ease you into a state of deep relaxation. Both of the frequencies were chosen to help aid you in the meditation of healing, allowing you to reflect and focus on ones spiritual self, along with healing of the mind."
+        ],
+        "name": "Theta_7_Hz_Solfeggio_852_Hz.mp3",
+        "duration": 900
+      },
+      {
+        "binauralBeatFrequency": 5,
+        "solfeggioFrequency": 417,
+        "effects": [
+          "This is designed to gently ease you into a state of deep relaxation. Both of the frequencies were chosen to help aid you in the meditation of healing; allowing you to reflect and focus on ones spiritual self, along with the healing of the mind."
+        ],
+        "name": "Theta_5_Hz_Solfeggio_417_Hz.mp3",
+        "duration": 900
+      }
+    ],
+    "isochronic": [
+      {
+        "frequency": 6,
+        "effects": [
+          "More intense meditation"
+        ],
+        "name": "Theta_6_Hz_Isochronic_Pulses.mp3",
+        "duration": 5
+      }
+    ],
+    "explanation": "Theta brainwaves are considered to be extremely relaxing brainwave activity that is commonly associated with sleep and dreaming. Theta brainwaves are high in amplitude and cycle within the range of 4 Hz to 8 Hz and are usually generated in the brain's right hemisphere. Theta waves kick in when we feel emotional, relaxed, day-dreamy, unfocused, or are asleep. Theta brainwaves are generally thought of as the brainwaves that are dominant in people with A.D.D., high levels of relaxation, high levels of creativity, and random thinking. The theta brainwave is considered the brainwave pattern that is dominant in deeply relaxed, and dream sleep. Theta brainwaves typically range from 4 Hz to 8 Hz. Theta brainwaves are associated with the \"subconscious mind\" and are usually produced in the right-hemisphere of the brain - as opposed to beta brainwaves, which are produced in the left-hemisphere and are associated with the \"conscious mind\". The brain creates theta brainwave rhythms each time you are in \"dream sleep\". Also, during R.E.M. (rapid-eye movement) sleep, the brain is full of theta brainwave activity. Nearly three-fifths of your entire time spent sleeping at night involves the production of theta brainwaves in your brain. Many individuals also are able to access theta brainwaves when they are driving for a long stretch on the highway, practicing their meditation routine, using a self-hypnosis recording, or practicing other forms of deep relaxation. When you are able to consciously access the alpha brainwaves state, you are just one step away from accessing the depths of theta. What's cool about theta brainwaves is the fact that they allow you to connect with your \"subconscious mind\". The subconscious mind is the place where all experiences, long-term memories, natural creativity, powerful emotions, spiritual connections, and inspiration are stored. Think of the \"subconscious mind\" as one big, infinite storage space for \"everything\" in your life. The theta brainwaves are extremely helpful for healing the body of injury, and the mind of diseased-states.",
+    "benefits": [
+      "Deep levels of relaxation",
+      "Bridges the spiritual connection",
+      "O.O.B.E., astral projection, ESP, other related phenomenon",
+      "Advanced intuition",
+      "Subconscious connection",
+      "Ability to program subconscious mind",
+      "Emotional connection",
+      "Peak levels of creativity",
+      "Advanced problem solving skills",
+      "Large boost in learning ability",
+      "Improved long-term memory",
+      "Ability to hyperfocus",
+      "Lower anxiety, stress, and neurosis",
+      "Healing of body and mind"
+    ]
+  }
+}
