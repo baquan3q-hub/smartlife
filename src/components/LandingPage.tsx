@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen, Target, CheckCircle2, Star } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen, Target, CheckCircle2, Star, Facebook } from 'lucide-react';
 import InstallGuideModal from './InstallGuideModal';
 import { Lang } from '../i18n/i18n';
 
@@ -62,6 +62,24 @@ const translations = {
         featGpaDesc: 'Công cụ tính toán GPA cá nhân hóa. Đặt mục tiêu tín chỉ, theo dõi tiến độ học tập từng kỳ và tự động tính toán tổng kết điểm chính xác.',
         featGpaItems: ['Mục tiêu tín chỉ linh hoạt', 'Quản lý lộ trình học tập', 'Giao diện trực quan, dễ dùng'],
 
+        featCareerTitle: 'Cố vấn sự nghiệp AI,\nĐịnh hình tương lai.',
+        featCareerDesc: 'Phân tích kết quả học tập từ GPA Tracker, tính cách MBTI/DISC và sở thích cá nhân để định hướng lĩnh vực nghề nghiệp phù hợp, vạch ra lộ trình thăng tiến chi tiết.',
+        featCareerItems: [
+            'Phân tích GPA & thế mạnh học thuật chuyên ngành',
+            'Đối chiếu tính cách MBTI & DISC với các nhóm công việc',
+            'Gợi ý các lĩnh vực/ngành nghề & công nghệ cần học tập',
+            'Lộ trình thăng tiến chi tiết (Career Growth Path)'
+        ],
+
+        featCVTitle: 'Xây dựng CV tự động,\nỨng tuyển chuyên nghiệp.',
+        featCVDesc: 'Tự động trích xuất thông tin học thuật từ GPA Tracker, các kỹ năng, dự án cá nhân và chứng chỉ từ Goals để hoàn thiện CV chuẩn mực trong vài giây. Hỗ trợ xuất file PDF in ấn sắc nét.',
+        featCVItems: [
+            'Tự động điền (Autofill) từ kết quả học tập & mục tiêu',
+            'Trình soạn thảo trực quan, sắp xếp bố cục chuẩn mực',
+            'Xuất file PDF & xem trước A4 trực tiếp trên trình duyệt',
+            'Chính sách Pro vĩnh viễn và Free trải nghiệm gia hạn 7 ngày'
+        ],
+
         featSpotifyTitle: 'My Spotify,\nÂm nhạc không giới hạn.',
         featSpotifyDesc: 'Nghe nhạc mọi lúc mọi nơi mà không cần đăng ký mua tài khoản Spotify. Trải nghiệm âm nhạc tuyệt đỉnh ngay trên ứng dụng, vô tư nghe khi đi đường.',
         featSpotifyItems: ['Nghe nhạc không cần tài khoản Spotify', 'Chế độ nghe lặp lại siêu mượt', 'Tạo và chia playlist theo sở thích cá nhân'],
@@ -75,7 +93,24 @@ const translations = {
         contactTitle: 'Kết nối với tôi',
         contactDesc: 'Liên hệ để hợp tác hoặc đóng góp ý kiến phát triển ứng dụng.',
         footerBuilt: 'Được xây dựng với ❤️ và công nghệ AI tiên tiến.',
-        langName: 'Tiếng Việt'
+        langName: 'Tiếng Việt',
+        footerLogoText: 'Hệ sinh thái học tập và quản lý cuộc sống thông minh dành cho sinh viên.',
+        footerCol1Title: 'TÍNH NĂNG CHÍNH',
+        footerCol2Title: 'TIỆN ÍCH MỞ RỘNG',
+        footerCol3Title: 'THÔNG TIN LIÊN HỆ',
+        footerDev: 'Người phát triển',
+        footerSupportEmail: 'Email hỗ trợ',
+        footerPersonalPage: 'Trang cá nhân',
+        footerAIAdvisor: 'AI Advisor',
+        footerCareer: 'Lộ trình sự nghiệp AI',
+        footerFinance: 'Quản lý tài chính',
+        footerJournal: 'Nhật ký chữa lành',
+        footerFocus: 'Tập trung & Nhạc Lofi',
+        footerSchedule: 'Thời khóa biểu trực quan',
+        footerHabit: 'Thói quen & D-Day',
+        footerGPATracker: 'GPA Tracker (VNU)',
+        footerSpotify: 'My Spotify',
+        footerStorage: 'My Storage (Bảo mật)'
     },
     en: {
         install: 'Install App',
@@ -129,6 +164,24 @@ const translations = {
         featGpaDesc: 'Personalized GPA calculation tool. Set credit goals, track your academic progress every semester, and accurately calculate your overall score.',
         featGpaItems: ['Flexible credit targets', 'Academic roadmap management', 'Intuitive and easy-to-use interface'],
 
+        featCareerTitle: 'AI Career Advisor,\nShape Your Future.',
+        featCareerDesc: 'Analyzes GPA academic records, MBTI/DISC personality types, and personal interests to recommend matching career domains and build a detailed path.',
+        featCareerItems: [
+            'Analyze GPA & academic strengths in specific courses',
+            'Match MBTI & DISC personality with job categories',
+            'Recommend career domains & technologies to learn',
+            'Detailed career roadmap (Career Growth Path)'
+        ],
+
+        featCVTitle: 'Auto CV Builder,\nLand Your Dream Job.',
+        featCVDesc: 'Automatically extract credentials, skills, certificates, and projects from GPA and Goals to compile a professional resume in seconds. Print to crisp PDF formats.',
+        featCVItems: [
+            'Autofill credentials directly from GPA and Goals trackers',
+            'Interactive editor with standard professional resume format',
+            'Print to PDF and live A4 preview inside the browser',
+            'Permanent access for Pro users, 7-day renewal policy for Free users'
+        ],
+
         featSpotifyTitle: 'My Spotify,\nUnlimited Music.',
         featSpotifyDesc: 'Listen to music anywhere without buying a premium Spotify account. Experience ultimate music streaming right in the app, perfect for on-the-go.',
         featSpotifyItems: ['Listen without Spotify account', 'Seamless repeat playback mode', 'Create and share custom playlists'],
@@ -142,7 +195,24 @@ const translations = {
         contactTitle: 'Connect with Me',
         contactDesc: 'Contact for collaboration or feedback on app development.',
         footerBuilt: 'Built with ❤️ and advanced AI technology.',
-        langName: 'English'
+        langName: 'English',
+        footerLogoText: 'A smart learning ecosystem and life management tool designed for students.',
+        footerCol1Title: 'CORE FEATURES',
+        footerCol2Title: 'EXPANDED UTILITIES',
+        footerCol3Title: 'CONTACT INFORMATION',
+        footerDev: 'Developer',
+        footerSupportEmail: 'Support Email',
+        footerPersonalPage: 'Personal Profile',
+        footerAIAdvisor: 'AI Advisor',
+        footerCareer: 'AI Career Guidance',
+        footerFinance: 'Personal Finance',
+        footerJournal: 'Healing Journal',
+        footerFocus: 'Focus & Lofi Music',
+        footerSchedule: 'Visual Timetable',
+        footerHabit: 'Habits & D-Day',
+        footerGPATracker: 'GPA Tracker (VNU)',
+        footerSpotify: 'My Spotify',
+        footerStorage: 'My Storage (Secure)'
     },
     ko: {
         install: '앱 설치',
@@ -196,6 +266,24 @@ const translations = {
         featGpaDesc: '맞춤형 학점 관리 도구. 학기별 이수 목표를 설정하고 평점을 자동 정밀 산출합니다.',
         featGpaItems: ['유연한 목표 학점 설정', '학업 로드맵 이력 관리', '쉽고 단순한 성적 대시보드'],
 
+        featCareerTitle: 'AI 진로 상담사,\n미래를 설계하다.',
+        featCareerDesc: 'GPA 성적, MBTI/DISC 성격 유형 및 취미를 AI로 정밀 분석하여 나에게 가장 적합한 경력 분야와 상세한 커리어 로드맵을 제안합니다.',
+        featCareerItems: [
+            'GPA 성적 및 학업적 강점 분석',
+            'MBTI & DISC 성격 기반 직무 매칭',
+            '추천 커리어 도메인 및 학습 필요 기술 제안',
+            '단계별 커리어 로드맵 (Career Growth Path)'
+        ],
+
+        featCVTitle: '자동 이력서 작성기,\n완벽한 커리어의 시작.',
+        featCVDesc: 'GPA 성적 및 Goals 대시보드의 자격증, 프로젝트, 스킬 정보를 이력서에 자동으로 연동하여 단 몇 초 만에 고품질 CV를 완성하고 PDF로 저장합니다.',
+        featCVItems: [
+            '학업 성적 및 활동 기록 자동 입력 (Autofill)',
+            '표준 이력서 레이아웃의 실시간 직관적 에디터',
+            'A4 인쇄용 PDF 즉시 인쇄 및 브라우저 미리보기',
+            'Pro 요금제 영구 제공 및 Free 요금제 7일 연장 정책'
+        ],
+
         featSpotifyTitle: 'My Spotify,\n한계 없는 음악 스트리밍.',
         featSpotifyDesc: '유료 멤버십 없이 언제 어디서나 스포티파이 음원 재생. 나만의 취향 플레이리스트로 백그라운드 재생까지 완벽.',
         featSpotifyItems: ['스포티파이 계정 없이 즉시 감상', '반복 및 셔플 무제한 스트리밍', '취향 저격 플레이리스트 빌더'],
@@ -209,7 +297,24 @@ const translations = {
         contactTitle: '문의 및 제안',
         contactDesc: '앱 제휴 협력 및 발전을 위한 소중한 피드백을 기다립니다.',
         footerBuilt: '❤️와 스마트 AI 융합 기술로 제작되었습니다.',
-        langName: '한국어'
+        langName: '한국어',
+        footerLogoText: '학생들을 위해 디자인된 스마트 학업 생태계 및 라이프 관리 시스템.',
+        footerCol1Title: '주요 기능',
+        footerCol2Title: '확장 도구',
+        footerCol3Title: '연락처 정보',
+        footerDev: '개발자',
+        footerSupportEmail: '고객 지원 이메일',
+        footerPersonalPage: '개인 프로필',
+        footerAIAdvisor: 'AI 금융 상담사',
+        footerCareer: 'AI 진로 설계',
+        footerFinance: '자산 관리',
+        footerJournal: '힐링 다이어리',
+        footerFocus: '집중 & 로파이 음악',
+        footerSchedule: '일정표 개요',
+        footerHabit: '습관 및 D-Day',
+        footerGPATracker: 'GPA 트래커 (VNU)',
+        footerSpotify: 'My Spotify 재생',
+        footerStorage: 'My Storage (보안)'
     }
 };
 
@@ -221,6 +326,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
 
     const marqueeFeatures = lang === 'vi' ? [
         { name: 'Cố vấn học tập AI 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'Cố vấn sự nghiệp AI 💼', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
+        { name: 'Xây dựng CV tự động 📄', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
         { name: 'Nhật ký chữa lành 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
         { name: 'GPA Tracker VNU 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
         { name: 'Nghe nhạc Spotify 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
@@ -229,11 +336,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
         { name: 'Quản lý Tài chính 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-250', targetId: 'finance' },
         { name: 'Thời khóa biểu 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
         { name: 'Lưu trữ Bảo mật 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
-        { name: 'Đếm ngược Sự kiện 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' },
-        { name: 'Thưởng Sao StarBrain ⚡', icon: '⭐', color: 'from-yellow-500/10 to-orange-500/10 text-amber-800 border-yellow-300', targetId: 'journal' },
-        { name: 'To-do List thông minh 📋', icon: '📝', color: 'from-violet-500/10 to-purple-500/10 text-violet-700 border-violet-200', targetId: 'schedule' }
+        { name: 'Đếm ngược Sự kiện 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
     ] : lang === 'ko' ? [
         { name: 'AI 학습 멘토 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'AI 커리어 상담사 💼', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
+        { name: '자동 이력서 빌더 📄', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
         { name: '힐링 다이어리 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
         { name: 'GPA 트래커 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
         { name: '스포티파이 음악 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
@@ -242,11 +349,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
         { name: '자산 관리 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
         { name: '시각적 일정표 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
         { name: '안전한 보관소 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
-        { name: '이벤트 카운트다운 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' },
-        { name: 'StarBrain 리워드 ⚡', icon: '⭐', color: 'from-yellow-500/10 to-orange-500/10 text-amber-800 border-yellow-300', targetId: 'journal' },
-        { name: '스마트 할일 목록 📋', icon: '📝', color: 'from-violet-500/10 to-purple-500/10 text-violet-700 border-violet-200', targetId: 'schedule' }
+        { name: '이벤트 카운트다운 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
     ] : [
         { name: 'AI Study Advisor 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'AI Career Guidance 💼', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
+        { name: 'Auto CV Builder 📄', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
         { name: 'Healing Journal 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
         { name: 'GPA Tracker 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
         { name: 'Spotify Music Player 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
@@ -255,9 +362,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
         { name: 'Finance Manager 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
         { name: 'Visual Schedule 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
         { name: 'Secure Storage 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
-        { name: 'Event Countdown 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' },
-        { name: 'StarBrain Rewards ⚡', icon: '⭐', color: 'from-yellow-500/10 to-orange-500/10 text-amber-800 border-yellow-300', targetId: 'journal' },
-        { name: 'Smart To-do List 📋', icon: '📝', color: 'from-violet-500/10 to-purple-500/10 text-violet-700 border-violet-200', targetId: 'schedule' }
+        { name: 'Event Countdown 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
     ];
 
     const scrollToSection = (id: string) => {
@@ -283,28 +388,28 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
             <InstallGuideModal isOpen={isInstallModalOpen} onClose={() => setIsInstallModalOpen(false)} />
 
             {/* Header */}
-            <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-indigo-100 border border-gray-100 shrink-0">
+            <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100/80 transition-all duration-300">
+                <div className="w-full px-4 xs:px-6 sm:px-8 lg:px-12 h-16 sm:h-[72px] flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 sm:gap-3 hover:opacity-90 transition-opacity cursor-pointer animate-fade-in" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden shadow-md shadow-indigo-100 border border-gray-100 shrink-0">
                             <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
                         </div>
-                        <span className="font-bold text-lg sm:text-xl tracking-tight text-gray-800">SmartLife</span>
+                        <span className="font-extrabold text-base xs:text-lg sm:text-xl tracking-tight bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">SmartLife</span>
                     </div>
-                    <div className="flex items-center gap-1.5 sm:gap-3">
+                    <div className="flex items-center gap-2 xs:gap-3 sm:gap-4">
                         {/* Language Toggle */}
                         <button
                             onClick={toggleLang}
-                            className="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-2 text-gray-600 hover:bg-gray-100 rounded-full transition-all font-medium text-xs sm:text-sm"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 xs:px-3 xs:py-2 text-gray-600 hover:bg-gray-100/80 rounded-full transition-all font-semibold text-xs sm:text-sm"
                             title="Switch Language"
                         >
-                            <Globe size={16} className="sm:w-[18px] sm:h-[18px]" />
-                            <span className="uppercase">{lang}</span>
+                            <Globe size={16} className="sm:w-[18px] sm:h-[18px] text-gray-500" />
+                            <span className="uppercase tracking-wider font-semibold">{lang}</span>
                         </button>
 
                         <button
                             onClick={() => setIsInstallModalOpen(true)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-indigo-50 text-indigo-600 rounded-full font-bold hover:bg-indigo-100 transition-all text-xs sm:text-sm"
+                            className="flex items-center gap-1.5 px-3 py-1.5 xs:px-4 xs:py-2 bg-indigo-50 text-indigo-600 rounded-full font-bold hover:bg-indigo-100 transition-all text-xs sm:text-sm border border-indigo-100/50 shadow-sm"
                             title={t.install}
                         >
                             <Download size={16} className="sm:w-[18px] sm:h-[18px]" />
@@ -312,7 +417,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                         </button>
                         <button
                             onClick={onLogin}
-                            className="px-3.5 py-2 sm:px-5 sm:py-2.5 bg-gray-900 text-white rounded-full font-medium hover:bg-gray-800 transition-all text-xs sm:text-sm"
+                            className="px-4 py-2 xs:px-5 xs:py-2.5 bg-gray-900 text-white rounded-full font-bold hover:bg-gray-800 transition-all text-xs sm:text-sm shadow-md shadow-gray-200/50"
                         >
                             {t.login}
                         </button>
@@ -321,7 +426,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
             </header>
 
             {/* Hero Section */}
-            <section className="pt-28 pb-12 sm:pt-32 sm:pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden min-h-[80vh] sm:min-h-[85vh] flex flex-col justify-center">
+            <section className="pt-[76px] pb-6 sm:pt-[92px] sm:pb-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden flex flex-col justify-center">
                 {/* Background Animated Glows */}
                 <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-purple-300/30 rounded-full blur-[80px] sm:blur-[120px] mix-blend-multiply animate-pulse" style={{ animationDuration: '4s' }}></div>
                 <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-indigo-300/30 rounded-full blur-[80px] sm:blur-[120px] mix-blend-multiply animate-pulse" style={{ animationDuration: '6s', animationDelay: '1s' }}></div>
@@ -348,10 +453,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                 </div>
 
                 <div className="max-w-5xl mx-auto text-center relative z-10 w-full overflow-hidden">
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white border border-indigo-100 shadow-sm text-indigo-600 text-xs font-bold uppercase tracking-wider mb-6 sm:mb-8 animate-fade-in-up hover:scale-105 transition-transform cursor-default">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white border border-indigo-100 shadow-sm text-indigo-600 text-xs font-bold uppercase tracking-wider mb-3 sm:mb-4 animate-fade-in-up hover:scale-105 transition-transform cursor-default">
                         <Zap size={14} className="text-yellow-500" /> {t.heroTag}
                     </div>
-                    <h1 className="text-2xl xs:text-4xl sm:text-5xl md:text-7xl font-extrabold text-gray-900 tracking-tight mb-6 leading-[1.15] md:leading-[1.1] animate-fade-in-up delay-100" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                    <h1 className="text-2xl xs:text-4xl sm:text-5xl md:text-7xl font-extrabold text-gray-900 tracking-tight mb-3 sm:mb-4 leading-[1.15] md:leading-[1.1] animate-fade-in-up delay-100" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                         {t.heroTitle1} <br className="hidden md:block" />
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-[length:200%_auto] animate-pulse">
                             {t.heroTitle2}
@@ -359,16 +464,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     </h1>
 
                     {/* Infinite Scrolling Ticker of Features */}
-                    <div className="w-full max-w-full py-2 mb-6 sm:mb-8 select-none relative overflow-hidden animate-fade-in-up delay-150">
+                    <div className="w-full max-w-full py-1 mb-3 sm:mb-4 select-none relative overflow-hidden animate-fade-in-up delay-150">
                         <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-20 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
                         <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-20 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
 
-                        <div className="animate-marquee flex items-center gap-4 py-2">
+                        <div className="animate-marquee flex items-center gap-3 py-1">
                             {[...marqueeFeatures, ...marqueeFeatures].map((item, idx) => (
                                 <div
                                     key={idx}
                                     onClick={() => scrollToSection(item.targetId)}
-                                    className={`flex items-center gap-2.5 px-6 py-3 bg-gradient-to-r ${item.color} border border-white/45 rounded-full font-bold text-sm shadow-[0_2px_10px_rgba(0,0,0,0.02)] whitespace-nowrap hover:scale-105 hover:-translate-y-0.5 hover:shadow-md active:scale-95 transition-all duration-300 cursor-pointer`}
+                                    className={`flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r ${item.color} border border-white/45 rounded-full font-bold text-sm shadow-[0_2px_10px_rgba(0,0,0,0.02)] whitespace-nowrap hover:scale-105 hover:-translate-y-0.5 hover:shadow-md active:scale-95 transition-all duration-300 cursor-pointer`}
                                 >
                                     <span className="text-xl">{item.icon}</span>
                                     <span>{item.name}</span>
@@ -376,7 +481,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             ))}
                         </div>
                     </div>
-                    <div className="text-gray-600 mb-8 sm:mb-10 max-w-full sm:max-w-3xl mx-auto leading-relaxed animate-fade-in-up delay-200 px-1">
+                    <div className="text-gray-600 mb-5 sm:mb-6 max-w-full sm:max-w-3xl mx-auto leading-relaxed animate-fade-in-up delay-200 px-1">
                         {lang === 'vi' ? (
                             <div className="text-sm sm:text-base md:text-xl text-center">
                                 SmartLife <strong>super tool</strong> dành cho sinh viên. It helps them về <strong>tài chính</strong>, <strong>lịch trình</strong>, <strong>todolist mục tiêu cá nhân, mục tiêu nghề nghiệp dài hạn</strong>, <strong>thói quen</strong>, <strong>countdown/up</strong> và cả <strong>Viết nhật kí</strong>.
@@ -421,17 +526,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             </div>
                         )}
                     </div>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-300 w-full max-w-md sm:max-w-none mx-auto">
-                        <div className="relative group w-full sm:w-auto">
+                    <div className="flex flex-col xs:flex-row items-center justify-center gap-3 sm:gap-4 animate-fade-in-up delay-300 w-full max-w-md sm:max-w-none mx-auto pb-2">
+                        <div className="relative group w-full xs:w-auto">
                             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-60 transition duration-500"></div>
                             <button
                                 onClick={onLogin}
-                                className="relative w-full sm:w-auto px-6 py-3.5 sm:px-8 sm:py-4 bg-gray-900 text-white rounded-full font-bold text-base sm:text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-2"
+                                className="relative w-full xs:w-auto px-5 py-3 xs:px-8 xs:py-4 bg-gray-900 text-white rounded-full font-bold text-sm xs:text-base sm:text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-2"
                             >
                                 {t.startNow} <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                             </button>
                         </div>
-                        <a href="#features" className="w-full sm:w-auto px-6 py-3.5 sm:px-8 sm:py-4 bg-white text-gray-700 border border-gray-200 shadow-sm rounded-full font-bold text-base sm:text-lg hover:bg-gray-50 hover:shadow-md transition-all flex items-center justify-center group">
+                        <a href="#features" className="w-full xs:w-auto px-5 py-3 xs:px-8 xs:py-4 bg-white text-gray-700 border border-gray-200 shadow-sm rounded-full font-bold text-sm xs:text-base sm:text-lg hover:bg-gray-50 hover:shadow-md transition-all flex items-center justify-center group">
                             {t.learnMore}
                         </a>
                     </div>
@@ -885,6 +990,72 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                     </div>
                 </section>
 
+                {/* Feature 4.25: AI Career Counselor (NEW) */}
+                <section id="ai-career-advisor" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gradient-to-br from-indigo-50/20 via-cyan-50/15 to-purple-50/20 py-12 sm:py-20 rounded-3xl border border-indigo-100/50 mb-16 sm:mb-20">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                        <div className="order-2 md:order-1 relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-300/30 to-cyan-300/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            <img
+                                src="/career_advisor_mockup.png"
+                                alt="AI Career Counselor"
+                                className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
+                            />
+                        </div>
+                        <div className="order-1 md:order-2 space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-600 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Định Hướng Sự Nghiệp Pro' : lang === 'ko' ? 'AI 진로 네비게이터' : 'AI Career Path Finder'}
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featCareerTitle}</h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {t.featCareerDesc}
+                            </p>
+                            <ul className="space-y-3 pt-2">
+                                {t.featCareerItems && t.featCareerItems.map((item: string, i: number) => (
+                                    <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-indigo-50/50 shadow-sm">
+                                        <div className="bg-indigo-100 p-1.5 rounded-lg shrink-0 mt-0.5">
+                                            <Target className="text-indigo-600" size={18} />
+                                        </div>
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature 4.5: Auto CV Builder (NEW) */}
+                <section id="cv-builder" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gradient-to-br from-purple-50/20 via-pink-50/15 to-rose-50/20 py-12 sm:py-20 rounded-3xl border border-purple-150/50 mb-16 sm:mb-20">
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                        <div className="space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Xây Dựng CV Chuyên Nghiệp' : lang === 'ko' ? '프로페셔널 이력서 빌더' : 'Professional CV Builder'}
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featCVTitle}</h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {t.featCVDesc}
+                            </p>
+                            <ul className="space-y-3 pt-2">
+                                {t.featCVItems && t.featCVItems.map((item: string, i: number) => (
+                                    <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/60 p-3 rounded-xl border border-purple-50/50 shadow-sm">
+                                        <div className="bg-purple-100 p-1.5 rounded-lg shrink-0 mt-0.5">
+                                            <CheckCircle2 className="text-purple-600" size={18} />
+                                        </div>
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div className="relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-purple-300/30 to-pink-300/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            <img
+                                src="/cv_builder_mockup.png"
+                                alt="Auto CV Builder"
+                                className="relative rounded-2xl shadow-2xl border border-white/50 w-full transform group-hover:scale-[1.02] transition-transform duration-500 z-10"
+                            />
+                        </div>
+                    </div>
+                </section>
+
                 {/* Feature 5: My Spotify (NEW) */}
                 <section id="spotify" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-zinc-900 py-12 sm:py-20 rounded-3xl border border-zinc-800 mb-16 sm:mb-20 shadow-2xl overflow-hidden relative">
                     <div className="absolute top-0 right-0 -mr-40 -mt-40 w-96 h-96 bg-indigo-500 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
@@ -1033,10 +1204,158 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
             </section>
 
             {/* Footer */}
-            <footer className="bg-white border-t border-gray-100 py-10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
-                    <p className="mb-2 font-medium">SmartLife Application © 2026</p>
-                    <p className="text-sm">{t.footerBuilt}</p>
+            <footer className="bg-gray-900 border-t border-gray-800 text-gray-400 py-16">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+                        {/* Column 1: SmartLife Info */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 rounded-xl overflow-hidden border border-gray-800 shadow-md">
+                                    <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
+                                </div>
+                                <span className="font-extrabold text-xl text-white tracking-tight">SmartLife</span>
+                            </div>
+                            <p className="text-sm leading-relaxed text-gray-400">
+                                {t.footerLogoText}
+                            </p>
+                            <div className="flex items-center gap-2 pt-2">
+                                <a href="https://facebook.com/buianhquan06" target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all">
+                                    <Facebook size={18} />
+                                </a>
+                                <a href="https://beacons.ai/baquan3q" target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all">
+                                    <User size={18} />
+                                </a>
+                                <a href="mailto:baquan3q@gmail.com" className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all">
+                                    <Mail size={18} />
+                                </a>
+                            </div>
+                        </div>
+
+                        {/* Column 2: TÍNH NĂNG CHÍNH */}
+                        <div>
+                            <h4 className="text-white font-bold text-sm tracking-wider uppercase mb-5">{t.footerCol1Title}</h4>
+                            <ul className="space-y-3.5 text-sm">
+                                <li>
+                                    <button onClick={() => scrollToSection('ai-advisor')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <Brain size={16} className="text-blue-400 shrink-0" />
+                                        <span>{t.footerAIAdvisor}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('ai-career-advisor')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <Target size={16} className="text-purple-400 shrink-0" />
+                                        <span>{t.footerCareer}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('finance')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <Wallet size={16} className="text-emerald-400 shrink-0" />
+                                        <span>{t.footerFinance}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('journal')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <BookOpen size={16} className="text-teal-400 shrink-0" />
+                                        <span>{t.footerJournal}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('focus-music')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <Headphones size={16} className="text-pink-400 shrink-0" />
+                                        <span>{t.footerFocus}</span>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+
+                        {/* Column 3: TIỆN ÍCH MỞ RỘNG */}
+                        <div>
+                            <h4 className="text-white font-bold text-sm tracking-wider uppercase mb-5">{t.footerCol2Title}</h4>
+                            <ul className="space-y-3.5 text-sm">
+                                <li>
+                                    <button onClick={() => scrollToSection('schedule')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <CalendarDays size={16} className="text-indigo-400 shrink-0" />
+                                        <span>{t.footerSchedule}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('habit-tracker')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <Flame size={16} className="text-orange-400 shrink-0" />
+                                        <span>{t.footerHabit}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('gpa-tracker')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <GraduationCap size={16} className="text-cyan-400 shrink-0" />
+                                        <span>{t.footerGPATracker}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('spotify')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <Music size={16} className="text-green-400 shrink-0" />
+                                        <span>{t.footerSpotify}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('secure-storage')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                        <LockKeyhole size={16} className="text-zinc-400 shrink-0" />
+                                        <span>{t.footerStorage}</span>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+
+                        {/* Column 4: THÔNG TIN LIÊN HỆ */}
+                        <div>
+                            <h4 className="text-white font-bold text-sm tracking-wider uppercase mb-5">{t.footerCol3Title}</h4>
+                            <ul className="space-y-4 text-sm">
+                                <li className="flex items-start gap-2.5">
+                                    <User size={16} className="text-indigo-400 shrink-0 mt-1" />
+                                    <div>
+                                        <div className="text-xs text-gray-500 font-bold uppercase">{t.footerDev}</div>
+                                        <div className="text-white font-medium">Bùi Anh Quân (baquan3q)</div>
+                                    </div>
+                                </li>
+                                <li className="flex items-start gap-2.5">
+                                    <Facebook size={16} className="text-blue-400 shrink-0 mt-1" />
+                                    <div>
+                                        <div className="text-xs text-gray-500 font-bold uppercase">Facebook</div>
+                                        <a href="https://facebook.com/buianhquan06" target="_blank" rel="noreferrer" className="text-gray-400 hover:text-white transition-colors font-medium break-all">
+                                            facebook.com/buianhquan06
+                                        </a>
+                                    </div>
+                                </li>
+                                <li className="flex items-start gap-2.5">
+                                    <Mail size={16} className="text-pink-400 shrink-0 mt-1" />
+                                    <div>
+                                        <div className="text-xs text-gray-500 font-bold uppercase">{t.footerSupportEmail}</div>
+                                        <a href="mailto:baquan3q@gmail.com" className="text-gray-400 hover:text-white transition-colors font-medium break-all">
+                                            baquan3q@gmail.com
+                                        </a>
+                                    </div>
+                                </li>
+                                <li className="flex items-start gap-2.5">
+                                    <Globe size={16} className="text-teal-400 shrink-0 mt-1" />
+                                    <div>
+                                        <div className="text-xs text-gray-500 font-bold uppercase">{t.footerPersonalPage}</div>
+                                        <a href="https://beacons.ai/baquan3q" target="_blank" rel="noreferrer" className="text-gray-400 hover:text-white transition-colors font-medium break-all">
+                                            beacons.ai/baquan3q
+                                        </a>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div className="border-t border-gray-800/80 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="text-left">
+                            <p className="text-sm font-semibold text-gray-300">SmartLife Application © 2026</p>
+                            <p className="text-xs text-gray-500 mt-0.5">All rights reserved.</p>
+                        </div>
+                        <div className="text-xs text-gray-500 text-center md:text-right">
+                            {t.footerBuilt}
+                        </div>
+                    </div>
                 </div>
             </footer>
         </div>

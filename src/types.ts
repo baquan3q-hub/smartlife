@@ -223,6 +223,13 @@ export interface Profile {
   last_active_at?: string;
   workplace?: string; // Tên công ty hoặc trường học
   updated_at?: string;
+  university?: string;
+  major?: string;           // Ngành học (VD: "Công nghệ thông tin")
+  career_objective?: string;
+  personality_mbti?: string; // INTJ, ENFP...
+  personality_disc?: string; // D, I, S, C
+  hobbies?: string[];
+  life_motto?: string;
 }
 
 // Interface cho Smart Backend
@@ -515,4 +522,79 @@ export interface LifeGoal {
   sort_order: number;
   created_at?: string;
   updated_at?: string;
+}
+
+// 13. Interface cho Career Intelligence & CV Builder
+export interface CareerAnalysisInput {
+  university: string;
+  major: string;
+  courses: { name: string; grade: string; credits: number }[];
+  gpa: number;
+  personality_mbti?: string;
+  personality_disc?: string;
+  hobbies?: string[];
+  career_objective?: string;
+}
+
+export interface CareerAnalysisResult {
+  domain: string;                    // "Software Engineering"
+  positions: string[];               // ["Backend Dev", "Fullstack Dev"]
+  fit_score: number;                 // 0-100
+  strengths: string[];
+  weaknesses: string[];
+  personality_match: string;
+  recommended_skills: string[];
+  career_path: string;
+}
+
+export interface CVData {
+  id: string;
+  user_id: string;
+  personal_info: {
+    full_name: string;
+    email: string;
+    phone?: string;
+    linkedin?: string;
+    github?: string;
+    portfolio?: string;
+    avatar_url?: string;
+  };
+  objective: string;
+  education: {
+    university: string;
+    major: string;
+    gpa?: number;
+    graduation_year?: number;
+    top_courses?: string[];
+  }[];
+  experience: {
+    position: string;
+    company: string;
+    start_date: string;
+    end_date?: string;
+    description: string;
+  }[];
+  projects: {
+    title: string;
+    description: string;
+    technologies?: string;
+    link?: string;
+  }[];
+  skills: {
+    category: string;       // "Technical", "Soft Skills", "Tools"
+    items: string[];
+  }[];
+  certificates: {
+    title: string;
+    issuer?: string;
+    date?: string;
+  }[];
+  activities: {
+    title: string;
+    organization?: string;
+    description?: string;
+  }[];
+  created_at?: string;
+  updated_at?: string;
+  expires_at?: string;        // Auto-expire sau 7 ngày
 }

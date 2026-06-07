@@ -44,6 +44,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const [tempVisibleTabs, setTempVisibleTabs] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [hobbiesInput, setHobbiesInput] = useState('');
 
     useEffect(() => {
         if (isOpen) {
@@ -61,6 +62,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             setTempVisibleTabs([...visibleMobileTabs]);
         }
     }, [isOpen, userId, visibleMobileTabs]);
+
+    useEffect(() => {
+        if (profile) {
+            setHobbiesInput(profile.hobbies?.join(', ') || '');
+        } else {
+            setHobbiesInput('');
+        }
+    }, [profile?.id]);
+
 
     const fetchProfile = async () => {
         setLoading(true);
@@ -100,6 +110,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         });
     };
 
+    const toggleDisc = (char: string) => {
+        setProfile(prev => {
+            if (!prev) return null;
+            const currentStr = prev.personality_disc || '';
+            const current = currentStr.split('').filter(c => ['D', 'I', 'S', 'C'].includes(c));
+            let updated: string[];
+            if (current.includes(char)) {
+                updated = current.filter(c => c !== char);
+            } else {
+                if (current.length >= 2) {
+                    updated = [current[1], char];
+                } else {
+                    updated = [...current, char];
+                }
+            }
+            return {
+                ...prev,
+                personality_disc: updated.join('') || null
+            };
+        });
+    };
+
+
     const handleSave = async () => {
         setSaving(true);
         try {
@@ -115,6 +148,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     workplace: profile.workplace,
                     currency: profile.currency,
                     avatar_url: profile.avatar_url,
+                    university: profile.university || null,
+                    major: profile.major || null,
+                    career_objective: profile.career_objective || null,
+                    personality_mbti: profile.personality_mbti || null,
+                    personality_disc: profile.personality_disc || null,
+                    hobbies: hobbiesInput.split(',').map(s => s.trim()).filter(Boolean),
+                    life_motto: profile.life_motto || null,
                     updated_at: new Date().toISOString(),
                 };
                 const { error } = await supabase.from('profiles').upsert(updates);
@@ -158,7 +198,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Tabs */}
-                <div className="flex px-5 pt-2 gap-4 border-b border-gray-50 bg-gray-50/30 overflow-x-auto scrollbar-none">
+                <div className="flex px-5 pt-3 gap-4 border-b border-gray-50 bg-gray-50/30 overflow-x-auto scrollbar-hide">
                     <button
                         onClick={() => setActiveTab('profile')}
                         className={`py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-all shrink-0 ${activeTab === 'profile' ? 'text-indigo-600 border-indigo-600' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
@@ -297,9 +337,145 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                             type="text"
                                             value={profile?.avatar_url || ''}
                                             onChange={(e) => setProfile(prev => prev ? { ...prev, avatar_url: e.target.value } : null)}
-                                            className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50/50 outline-none font-medium transition-all text-sm text-gray-600"
+                                            className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50/50 outline-none font-medium transition-all text-sm text-gray-600 mb-4"
                                             placeholder={t('settings.avatar_url_placeholder', lang)}
                                         />
+                                    </div>
+
+                                    {/* AI Personalization Fields */}
+                                    <div className="pt-4 border-t border-gray-150 space-y-4">
+                                        <h3 className="text-sm font-bold text-indigo-600 flex items-center gap-2">
+                                            <Sparkles size={16} /> Cá nhân hóa AI Advisor
+                                        </h3>
+                                        <p className="text-[11px] text-gray-400 font-medium">
+                                            Cung cấp thông tin để trợ lý AI thấu hiểu tính cách, bối cảnh và tư vấn chính xác nhất cho bạn.
+                                        </p>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Tính cách MBTI</label>
+                                                <select
+                                                    value={profile?.personality_mbti || ''}
+                                                    onChange={(e) => setProfile(prev => prev ? { ...prev, personality_mbti: e.target.value } : null)}
+                                                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50/50 outline-none font-medium transition-all text-sm"
+                                                >
+                                                    <option value="">Chưa xác định</option>
+                                                    <option value="INTJ">INTJ - Nhà hoạch định</option>
+                                                    <option value="INTP">INTP - Nhà tư duy</option>
+                                                    <option value="ENTJ">ENTJ - Nhà điều hành</option>
+                                                    <option value="ENTP">ENTP - Người đổi mới</option>
+                                                    <option value="INFJ">INFJ - Nhà bảo vệ</option>
+                                                    <option value="INFP">INFP - Người hòa giải</option>
+                                                    <option value="ENFJ">ENFJ - Nhà truyền cảm hứng</option>
+                                                    <option value="ENFP">ENFP - Người truyền tin</option>
+                                                    <option value="ISTJ">ISTJ - Nhà quản lý</option>
+                                                    <option value="ISFJ">ISFJ - Người nuôi dưỡng</option>
+                                                    <option value="ESTJ">ESTJ - Người giám sát</option>
+                                                    <option value="ESFJ">ESFJ - Người quan tâm</option>
+                                                    <option value="ISTP">ISTP - Nhà kỹ thuật</option>
+                                                    <option value="ISFP">ISFP - Người nghệ sĩ</option>
+                                                    <option value="ESTP">ESTP - Người thực thi</option>
+                                                    <option value="ESFP">ESFP - Người trình diễn</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block">
+                                                Nhóm tính cách DISC (Chọn tối đa 2 nhóm đặc trưng)
+                                            </label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                {[
+                                                    { id: 'D', label: 'D - Thống trị', desc: 'Quyết đoán, mạnh mẽ, tập trung kết quả', activeClass: 'border-rose-500 bg-rose-50/70 text-rose-700 ring-rose-100 ring-2' },
+                                                    { id: 'I', label: 'I - Ảnh hưởng', desc: 'Năng động, thích giao tiếp, truyền cảm hứng', activeClass: 'border-amber-500 bg-amber-50/70 text-amber-700 ring-amber-100 ring-2' },
+                                                    { id: 'S', label: 'S - Kiên định', desc: 'Kiên nhẫn, điềm đạm, thích ổn định & hỗ trợ', activeClass: 'border-emerald-500 bg-emerald-50/70 text-emerald-700 ring-emerald-100 ring-2' },
+                                                    { id: 'C', label: 'C - Tuân thủ', desc: 'Kỷ luật, chính xác, thích số liệu logic', activeClass: 'border-indigo-500 bg-indigo-50/70 text-indigo-700 ring-indigo-100 ring-2' }
+                                                ].map(type => {
+                                                    const discVal = profile?.personality_disc || '';
+                                                    const isSelected = discVal.includes(type.id);
+                                                    const order = discVal.indexOf(type.id);
+                                                    return (
+                                                        <button
+                                                            key={type.id}
+                                                            type="button"
+                                                            onClick={() => toggleDisc(type.id)}
+                                                            className={`text-left p-3.5 rounded-2xl border transition-all select-none flex flex-col justify-between min-h-[90px] ${
+                                                                isSelected 
+                                                                    ? type.activeClass 
+                                                                    : 'border-gray-200 bg-gray-50/50 hover:bg-gray-100/50 text-gray-600'
+                                                            }`}
+                                                        >
+                                                            <div className="flex justify-between items-center w-full">
+                                                                <span className="font-bold text-sm">{type.label}</span>
+                                                                {isSelected && (
+                                                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-white font-extrabold shadow-sm border border-gray-100 uppercase shrink-0">
+                                                                        {order === 0 ? 'Chính' : 'Phụ'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-[11px] opacity-75 mt-1.5 leading-normal">
+                                                                {type.desc}
+                                                            </p>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Trường Đại học</label>
+                                                <input
+                                                    type="text"
+                                                    value={profile?.university || ''}
+                                                    onChange={(e) => setProfile(prev => prev ? { ...prev, university: e.target.value } : null)}
+                                                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50/50 outline-none font-medium transition-all text-sm"
+                                                    placeholder="Ví dụ: ĐHQGHN"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Ngành học</label>
+                                                <input
+                                                    type="text"
+                                                    value={profile?.major || ''}
+                                                    onChange={(e) => setProfile(prev => prev ? { ...prev, major: e.target.value } : null)}
+                                                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50/50 outline-none font-medium transition-all text-sm"
+                                                    placeholder="Ví dụ: Công nghệ thông tin"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Định hướng nghề nghiệp</label>
+                                                <input
+                                                    type="text"
+                                                    value={profile?.career_objective || ''}
+                                                    onChange={(e) => setProfile(prev => prev ? { ...prev, career_objective: e.target.value } : null)}
+                                                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50/50 outline-none font-medium transition-all text-sm"
+                                                    placeholder="Ví dụ: Kỹ sư phần mềm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Sở thích (Ngăn cách bằng dấu phẩy)</label>
+                                            <input
+                                                type="text"
+                                                value={hobbiesInput}
+                                                onChange={(e) => setHobbiesInput(e.target.value)}
+                                                className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50/50 outline-none font-medium transition-all text-sm"
+                                                placeholder="Ví dụ: Đọc sách, Chạy bộ, Code"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Châm ngôn sống</label>
+                                            <input
+                                                type="text"
+                                                value={profile?.life_motto || ''}
+                                                onChange={(e) => setProfile(prev => prev ? { ...prev, life_motto: e.target.value } : null)}
+                                                className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-4 focus:ring-indigo-50/50 outline-none font-medium transition-all text-sm"
+                                                placeholder="Ví dụ: Sống hết mình mỗi ngày."
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>

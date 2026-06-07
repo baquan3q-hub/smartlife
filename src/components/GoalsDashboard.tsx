@@ -2,21 +2,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { careerGoalService } from '../services/careerGoalService';
-import { 
-  CareerPosition, 
-  CareerGoal, 
-  LifeGoal, 
-  CareerGoalCategory, 
-  CareerGoalPriority, 
-  CareerGoalStatus 
+import {
+  CareerPosition,
+  CareerGoal,
+  LifeGoal,
+  CareerGoalCategory,
+  CareerGoalPriority,
+  CareerGoalStatus
 } from '../types';
-import { 
-  Target, Plus, Trash2, Edit3, ExternalLink, Calendar, 
-  ArrowUpDown, Settings, X, CheckCircle2, ChevronRight, 
+import {
+  Target, Plus, Trash2, Edit3, ExternalLink, Calendar,
+  ArrowUpDown, Settings, X, CheckCircle2, ChevronRight,
   AlertCircle, Star, Move, ArrowUp, ArrowDown, Sparkles, CheckSquare, Square,
-  Loader2
+  Loader2, FileText, Compass
 } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
+import { CVBuilder } from './CVBuilder.tsx'; // Named import from CVBuilder.tsx
 
 // Category color mappings
 const CATEGORY_MAP: Record<CareerGoalCategory, { label: string; bg: string; text: string; border: string }> = {
@@ -45,7 +46,7 @@ const STATUS_MAP: Record<CareerGoalStatus, { label: string; color: string; bg: s
 
 // Fixed Icon Set (Option B)
 const LIFE_GOAL_ICONS = [
-  '🚗', '💍', '💰', '🏠', '✈️', '🎓', '💪', '🌍', '📱', '🏆', 
+  '🚗', '💍', '💰', '🏠', '✈️', '🎓', '💪', '🌍', '📱', '🏆',
   '👨‍👩‍👧', '🐕', '🎨', '📚', '💻', '💼', '🌴', '👶', '🏢', '❤️',
   '🚲', '🛥️', '🧗‍♂️', '🍕', '🎸', '🌟', '🌳', '🔑', '📈', '🩺'
 ];
@@ -53,13 +54,13 @@ const LIFE_GOAL_ICONS = [
 const getDaysRemainingText = (deadlineStr?: string) => {
   if (!deadlineStr) return '';
   const now = new Date();
-  now.setHours(0,0,0,0);
+  now.setHours(0, 0, 0, 0);
   const target = new Date(deadlineStr);
-  target.setHours(0,0,0,0);
-  
+  target.setHours(0, 0, 0, 0);
+
   const diffTime = target.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays === 0) return ' (Hôm nay)';
   if (diffDays < 0) return ` (Quá hạn ${Math.abs(diffDays)} ngày)`;
   return ` (Còn ${diffDays} ngày)`;
@@ -67,24 +68,32 @@ const getDaysRemainingText = (deadlineStr?: string) => {
 
 interface GoalsDashboardProps {
   userId: string;
+  isPro?: boolean;
+  onUpgrade?: () => void;
+  onNavigateToGPACareer?: () => void;
 }
 
-const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'career' | 'life'>('career');
-  
+const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
+  userId,
+  isPro = false,
+  onUpgrade = () => {},
+  onNavigateToGPACareer
+}) => {
+  const [activeSubTab, setActiveSubTab] = useState<'career' | 'life' | 'cv'>('career');
+
   // State lists
   const [positions, setPositions] = useState<CareerPosition[]>([]);
   const [selectedPositionId, setSelectedPositionId] = useState<string>('');
   const [careerGoals, setCareerGoals] = useState<CareerGoal[]>([]);
   const [lifeGoals, setLifeGoals] = useState<LifeGoal[]>([]);
-  
+
   // Modals state
   const [showGoalModal, setShowGoalModal] = useState<boolean>(false);
   const [editingGoal, setEditingGoal] = useState<CareerGoal | null>(null);
-  
+
   const [showLifeModal, setShowLifeModal] = useState<boolean>(false);
   const [editingLifeGoal, setEditingLifeGoal] = useState<LifeGoal | null>(null);
-  
+
   const [showPositionModal, setShowPositionModal] = useState<boolean>(false);
 
   // AI Recommendations State
@@ -93,13 +102,13 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
   const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
   const [selectedRecommendIndexes, setSelectedRecommendIndexes] = useState<number[]>([]);
   const [loadingStep, setLoadingStep] = useState<number>(0);
-  
+
   // Filters & Sorting state
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'deadline' | 'priority' | 'status' | 'category'>('deadline');
   const [sortAsc, setSortAsc] = useState<boolean>(true);
-  
+
   const [loading, setLoading] = useState<boolean>(true);
 
   // Form states - Career Goal
@@ -136,7 +145,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: () => {}
+    onConfirm: () => { }
   });
 
   // Drag and drop state for Life Goals
@@ -201,13 +210,13 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
     const goalsForPosition = careerGoals.filter(g => g.position_id === selectedPositionId);
     const total = goalsForPosition.length;
     if (total === 0) return { total, completed: 0, progress: 0 };
-    
+
     const completed = goalsForPosition.filter(g => g.status === 'completed' || g.progress === 100).length;
-    
+
     // Average progress
     const sumProgress = goalsForPosition.reduce((acc, curr) => acc + curr.progress, 0);
     const avgProgress = Math.round(sumProgress / total);
-    
+
     return {
       total,
       completed,
@@ -383,7 +392,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
   };
 
   // --- LIFE GOALS LOGIC ---
-  
+
   // Open Life Goal Modal
   const openLifeModal = (goal: LifeGoal | null = null) => {
     if (goal) {
@@ -487,7 +496,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
     const draggedItem = newList[draggedIndex];
     newList.splice(draggedIndex, 1);
     newList.splice(index, 0, draggedItem);
-    
+
     setLifeGoals(newList);
     setDraggedIndex(index);
   };
@@ -500,33 +509,33 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
   // --- AI RECOMMENDATIONS FUNCTIONS ---
   const triggerAIRecommendations = async () => {
     if (!currentPosition) return;
-    
+
     setShowAIModal(true);
     setAiLoading(true);
     setAiRecommendations([]);
     setSelectedRecommendIndexes([]);
-    
+
     try {
       // 1. Fetch current skills under this position
       const currentSkills = careerGoals
         .filter(g => g.position_id === selectedPositionId)
         .map(g => g.title);
-        
+
       // 2. Fetch GPA courses
       const { data: gpaCoursesData, error: gpaError } = await supabase
         .from('gpa_courses')
         .select('name')
         .eq('user_id', userId);
-        
+
       const gpaCourses = gpaError ? [] : (gpaCoursesData || []).map(c => c.name);
-      
+
       // 3. Call service to get recommendations
       const recommendations = await careerGoalService.getAIRecommendations(
         currentPosition.title,
         currentSkills,
         gpaCourses
       );
-      
+
       setAiRecommendations(recommendations);
       // By default, select all recommendations
       setSelectedRecommendIndexes(recommendations.map((_, idx) => idx));
@@ -539,9 +548,9 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
 
   const handleAddAIRecommendations = async () => {
     if (selectedRecommendIndexes.length === 0 || !selectedPositionId) return;
-    
+
     const selectedSkills = aiRecommendations.filter((_, idx) => selectedRecommendIndexes.includes(idx));
-    
+
     try {
       const success = await careerGoalService.addCareerGoalsBatch(userId, selectedPositionId, selectedSkills);
       if (success) {
@@ -567,30 +576,38 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      
+
       {/* Tab Switcher */}
       <div className="flex justify-between items-center flex-wrap gap-4 border-b border-gray-200 pb-3">
         <div className="flex gap-4">
           <button
             onClick={() => setActiveSubTab('career')}
-            className={`flex items-center gap-2 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1 ${
-              activeSubTab === 'career' 
-                ? 'border-indigo-600 text-indigo-600' 
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex items-center gap-2 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1 ${activeSubTab === 'career'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
           >
             <Target size={20} /> Mục tiêu Nghề nghiệp
           </button>
-          
+
           <button
             onClick={() => setActiveSubTab('life')}
-            className={`flex items-center gap-2 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1 ${
-              activeSubTab === 'life' 
-                ? 'border-indigo-600 text-indigo-600' 
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex items-center gap-2 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1 ${activeSubTab === 'life'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
           >
             <Star size={20} /> Mục tiêu 5 năm
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('cv')}
+            className={`flex items-center gap-2 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1 ${activeSubTab === 'cv'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            <FileText size={20} /> CV Builder
           </button>
         </div>
 
@@ -601,7 +618,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
               onClick={triggerAIRecommendations}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-indigo-100 hover:scale-105 active:scale-95 animate-in slide-in-from-right duration-300"
             >
-              <Sparkles size={16} className="animate-pulse" /> ✨ Gợi ý lộ trình bằng AI
+              <Sparkles size={16} className="animate-pulse" /> Make a Roadmap by AI
             </button>
             <button
               onClick={() => openGoalModal()}
@@ -625,11 +642,11 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
       {/* --- SUB-TAB: CAREER GOALS --- */}
       {activeSubTab === 'career' && (
         <div className="space-y-6">
-          
+
           {/* Position Selector & Overall Stats */}
           <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 md:p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              
+
               {/* Vị trí mục tiêu dropdown */}
               <div className="flex items-center gap-2 flex-1 max-w-md">
                 <span className="text-gray-600 font-bold shrink-0 text-sm md:text-base">🎯 Vị trí mục tiêu:</span>
@@ -652,9 +669,9 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                       title="Gợi ý lộ trình bằng AI"
                     >
                       <Sparkles size={14} className="text-purple-600 animate-pulse" />
-                      <span className="hidden sm:inline">Gợi ý AI</span>
+                      <span className="hidden sm:inline">Suggest AI</span>
                     </button>
-                    
+
                     {/* Quản lý vị trí */}
                     <button
                       onClick={() => setShowPositionModal(true)}
@@ -665,12 +682,23 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setShowPositionModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-xl hover:bg-indigo-100 transition-colors"
-                  >
-                    <Plus size={14} /> Thêm vị trí đầu tiên
-                  </button>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => setShowPositionModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-xl hover:bg-indigo-100 transition-colors"
+                    >
+                      <Plus size={14} /> Thêm vị trí đầu tiên
+                    </button>
+                    {onNavigateToGPACareer && (
+                      <button
+                        onClick={onNavigateToGPACareer}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-100 font-bold text-xs rounded-xl hover:from-emerald-100 hover:to-teal-100 transition-all shadow-sm"
+                      >
+                        <Compass size={14} className="animate-pulse" />
+                        Khám phá ngành nghề bằng AI
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -683,8 +711,8 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                       <span className="text-indigo-600">{careerStats.progress}%</span>
                     </div>
                     <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                      <div 
-                        className="bg-gradient-to-r from-indigo-500 to-purple-600 h-full rounded-full transition-all duration-500" 
+                      <div
+                        className="bg-gradient-to-r from-indigo-500 to-purple-600 h-full rounded-full transition-all duration-500"
                         style={{ width: `${careerStats.progress}%` }}
                       />
                     </div>
@@ -698,19 +726,31 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
             <div className="bg-white rounded-2xl border border-dashed border-gray-200 py-16 px-4 text-center">
               <Target size={48} className="mx-auto text-gray-300 mb-4" />
               <p className="text-gray-600 font-bold">Chưa có vị trí nghề nghiệp nào</p>
-              <p className="text-gray-400 text-sm mt-1 mb-6">Hãy xác định vị trí bạn đang theo đuổi (ví dụ: ITBA, Product Manager...) để lập lộ trình học tập.</p>
-              <button
-                onClick={() => setShowPositionModal(true)}
-                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all"
-              >
-                + Bắt đầu ngay
-              </button>
+              <p className="text-gray-400 text-sm mt-1 mb-6 max-w-md mx-auto">
+                Hãy xác định vị trí bạn đang theo đuổi để lập lộ trình học tập, hoặc sử dụng AI để phân tích GPA và tính cách để gợi ý cho bạn.
+              </p>
+              <div className="flex gap-3 justify-center flex-wrap">
+                <button
+                  onClick={() => setShowPositionModal(true)}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all hover:scale-105 active:scale-95 shadow-sm"
+                >
+                  + Bắt đầu thủ công
+                </button>
+                {onNavigateToGPACareer && (
+                  <button
+                    onClick={onNavigateToGPACareer}
+                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-95 text-white font-bold rounded-xl text-sm transition-all hover:scale-105 active:scale-95 shadow-md shadow-emerald-100"
+                  >
+                    🧭 Gợi ý ngành nghề bằng AI
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <>
               {/* Filter and Sorting Row */}
               <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50/70 border border-gray-100 p-3 rounded-2xl">
-                
+
                 {/* Filters */}
                 <div className="flex flex-wrap gap-2">
                   {/* Category Filter */}
@@ -784,11 +824,10 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                     const isDone = goal.status === 'completed' || goal.progress === 100;
 
                     return (
-                      <div 
-                        key={goal.id} 
-                        className={`bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 group flex flex-col justify-between relative overflow-hidden ${
-                          isDone ? 'border-emerald-100 bg-emerald-50/5' : 'border-gray-100'
-                        }`}
+                      <div
+                        key={goal.id}
+                        className={`bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 group flex flex-col justify-between relative overflow-hidden ${isDone ? 'border-emerald-100 bg-emerald-50/5' : 'border-gray-100'
+                          }`}
                       >
                         <div>
                           {/* Card Header (Category & Priority) */}
@@ -815,10 +854,10 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
 
                           {/* External Link */}
                           {goal.link && (
-                            <a 
-                              href={goal.link} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
+                            <a
+                              href={goal.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors mt-3 bg-indigo-50/40 px-2 py-1 rounded-lg"
                             >
                               <ExternalLink size={12} /> Tài liệu / Github
@@ -828,7 +867,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
 
                         {/* Card Footer (Progress & Timeline) */}
                         <div className="mt-5 pt-4 border-t border-gray-100 space-y-3">
-                          
+
                           {/* Progress slider / display */}
                           <div>
                             <div className="flex justify-between text-[11px] font-bold text-gray-500 mb-1">
@@ -836,10 +875,9 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                               <span className={isDone ? 'text-emerald-600' : 'text-indigo-600'}>{goal.progress}%</span>
                             </div>
                             <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-300 ${
-                                  isDone ? 'bg-emerald-500' : 'bg-indigo-500'
-                                }`}
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${isDone ? 'bg-emerald-500' : 'bg-indigo-500'
+                                  }`}
                                 style={{ width: `${goal.progress}%` }}
                               />
                             </div>
@@ -849,8 +887,8 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                           <div className="flex items-center justify-between text-[11px] font-semibold text-gray-400">
                             <span className="flex items-center gap-1">
                               <Calendar size={12} />
-                              {goal.deadline 
-                                ? `${new Date(goal.deadline).toLocaleDateString('vi-VN')}${getDaysRemainingText(goal.deadline)}` 
+                              {goal.deadline
+                                ? `${new Date(goal.deadline).toLocaleDateString('vi-VN')}${getDaysRemainingText(goal.deadline)}`
                                 : 'Không có deadline'}
                             </span>
 
@@ -863,11 +901,10 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                               {/* Toggle complete button */}
                               <button
                                 onClick={() => handleToggleGoalComplete(goal)}
-                                className={`p-1.5 rounded-lg border transition-all ${
-                                  isDone 
-                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100' 
-                                    : 'bg-white border-gray-200 text-gray-400 hover:border-indigo-200 hover:text-indigo-600'
-                                }`}
+                                className={`p-1.5 rounded-lg border transition-all ${isDone
+                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
+                                  : 'bg-white border-gray-200 text-gray-400 hover:border-indigo-200 hover:text-indigo-600'
+                                  }`}
                                 title={isDone ? "Đánh dấu chưa hoàn thành" : "Đánh dấu hoàn thành"}
                               >
                                 <CheckCircle2 size={13} fill={isDone ? "currentColor" : "none"} />
@@ -906,7 +943,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
       {/* --- SUB-TAB: LIFE GOALS (5 YEARS) --- */}
       {activeSubTab === 'life' && (
         <div className="space-y-6 max-w-2xl mx-auto">
-          
+
           {/* Header */}
           <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-5 md:p-6 text-center shadow-sm">
             <h3 className="text-indigo-900 font-black text-lg md:text-xl flex items-center justify-center gap-2">
@@ -942,14 +979,13 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`bg-white border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-4 group cursor-grab active:cursor-grabbing ${
-                      goal.is_achieved ? 'border-emerald-100 bg-emerald-50/5' : 'border-gray-100'
-                    } ${isDragTarget ? 'opacity-50 border-indigo-400 ring-2 ring-indigo-100' : ''}`}
+                    className={`bg-white border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-4 group cursor-grab active:cursor-grabbing ${goal.is_achieved ? 'border-emerald-100 bg-emerald-50/5' : 'border-gray-100'
+                      } ${isDragTarget ? 'opacity-50 border-indigo-400 ring-2 ring-indigo-100' : ''}`}
                   >
-                    
+
                     {/* Left: Drag Handle & Checkbox & Icon */}
                     <div className="flex items-center gap-3 min-w-0">
-                      
+
                       {/* Drag Handle Icon (visible on hover / active) */}
                       <div className="text-gray-300 hover:text-gray-500 cursor-grab shrink-0 hidden md:block">
                         <Move size={16} />
@@ -958,9 +994,8 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                       {/* Tick Checkbox */}
                       <button
                         onClick={() => handleToggleLifeAchieved(goal)}
-                        className={`shrink-0 transition-colors ${
-                          goal.is_achieved ? 'text-emerald-500' : 'text-gray-300 hover:text-gray-400'
-                        }`}
+                        className={`shrink-0 transition-colors ${goal.is_achieved ? 'text-emerald-500' : 'text-gray-300 hover:text-gray-400'
+                          }`}
                       >
                         {goal.is_achieved ? (
                           <CheckSquare size={20} className="fill-emerald-50" />
@@ -976,12 +1011,11 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
 
                       {/* Title */}
                       <div className="min-w-0">
-                        <span className={`font-bold text-gray-800 text-sm md:text-base ${
-                          goal.is_achieved ? 'line-through text-gray-400 font-medium' : ''
-                        }`}>
+                        <span className={`font-bold text-gray-800 text-sm md:text-base ${goal.is_achieved ? 'line-through text-gray-400 font-medium' : ''
+                          }`}>
                           {goal.title}
                         </span>
-                        
+
                         {/* Target Year label */}
                         <span className="block text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full w-fit mt-1">
                           Năm dự kiến: {goal.target_year}
@@ -992,7 +1026,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-2">
-                      
+
                       {/* Manual Mobile Sort Buttons */}
                       <div className="flex flex-col md:hidden shrink-0">
                         <button
@@ -1038,17 +1072,22 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
         </div>
       )}
 
+      {/* --- SUB-TAB: CV BUILDER --- */}
+      {activeSubTab === 'cv' && (
+        <CVBuilder userId={userId} isPro={isPro} onUpgrade={onUpgrade} />
+      )}
+
       {/* --- MODAL: CAREER GOAL ADD/EDIT --- */}
       {showGoalModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-            
+
             {/* Modal Header */}
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-gray-900 font-black text-lg">
                 {editingGoal ? '✏️ Sửa mục tiêu nghề nghiệp' : '🎯 Thêm mục tiêu nghề nghiệp'}
               </h3>
-              <button 
+              <button
                 onClick={() => setShowGoalModal(false)}
                 className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
               >
@@ -1058,7 +1097,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
 
             {/* Modal Form */}
             <form onSubmit={handleSaveGoal} className="p-5 space-y-4 overflow-y-auto flex-1">
-              
+
               {/* Title */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Tên mục tiêu *</label>
@@ -1186,7 +1225,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                       if (newProg === 100) newStatus = 'completed';
                       else if (newProg === 0) newStatus = 'not_started';
                       else if (goalForm.status === 'completed' || goalForm.status === 'not_started') newStatus = 'in_progress';
-                      
+
                       setGoalForm({ ...goalForm, progress: newProg, status: newStatus });
                     }}
                     className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
@@ -1220,13 +1259,13 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
       {showLifeModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
-            
+
             {/* Modal Header */}
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-gray-900 font-black text-lg">
                 {editingLifeGoal ? '✏️ Sửa mục tiêu 5 năm' : '🌟 Thêm mục tiêu 5 năm'}
               </h3>
-              <button 
+              <button
                 onClick={() => setShowLifeModal(false)}
                 className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
               >
@@ -1236,7 +1275,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
 
             {/* Modal Form */}
             <form onSubmit={handleSaveLifeGoal} className="p-5 space-y-4">
-              
+
               {/* Icon Picker (Option B) */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Chọn Icon đại diện *</label>
@@ -1246,11 +1285,10 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                       key={ic}
                       type="button"
                       onClick={() => setLifeForm({ ...lifeForm, icon: ic })}
-                      className={`text-xl p-2 rounded-xl transition-all ${
-                        lifeForm.icon === ic 
-                          ? 'bg-indigo-600 shadow-md scale-110' 
-                          : 'hover:bg-gray-200/70'
-                      }`}
+                      className={`text-xl p-2 rounded-xl transition-all ${lifeForm.icon === ic
+                        ? 'bg-indigo-600 shadow-md scale-110'
+                        : 'hover:bg-gray-200/70'
+                        }`}
                     >
                       {ic}
                     </button>
@@ -1323,11 +1361,11 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
       {showPositionModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
-            
+
             {/* Modal Header */}
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-gray-900 font-black text-lg">💼 Quản lý Vị trí Mục tiêu</h3>
-              <button 
+              <button
                 onClick={() => setShowPositionModal(false)}
                 className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
               >
@@ -1337,7 +1375,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
 
             {/* Modal Body */}
             <div className="p-5 overflow-y-auto space-y-4">
-              
+
               {/* Add position inline input */}
               <div className="flex gap-2">
                 <input
@@ -1398,11 +1436,11 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
       {showAIModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-indigo-100 overflow-hidden flex flex-col max-h-[90vh] transition-all relative">
-            
+
             {/* Ambient Background Glowing Orbs */}
             <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-indigo-400/10 blur-3xl pointer-events-none" />
             <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-purple-400/10 blur-3xl pointer-events-none" />
-            
+
             {/* Modal Header */}
             <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 p-6 text-white relative z-10 flex items-center justify-between shrink-0">
               <div>
@@ -1414,7 +1452,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                   Đồng bộ & tối ưu hóa lộ trình phát triển cho vị trí <strong>{currentPosition?.title}</strong> dựa trên bảng điểm GPA
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => setShowAIModal(false)}
                 className="p-1.5 hover:bg-white/10 rounded-xl text-white/90 hover:text-white transition-colors shrink-0 self-start"
               >
@@ -1462,7 +1500,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                   <div className="bg-indigo-50/50 border border-indigo-100/50 rounded-2xl p-4 text-xs text-indigo-800 leading-relaxed">
                     🚀 <strong>Phân tích khoảng trống tri thức:</strong> Trợ lý AI đã đối chiếu bảng điểm GPA của bạn để loại bỏ lý thuyết suông và tập trung vào các kỹ năng thực chiến, công cụ tiên tiến và dự án cá nhân thực tế cần có để đạt được vị trí <strong>{currentPosition?.title}</strong>.
                   </div>
-                  
+
                   <div className="space-y-3">
                     {aiRecommendations.map((rec, index) => {
                       const isSelected = selectedRecommendIndexes.includes(index);
@@ -1479,16 +1517,14 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({ userId }) => {
                               setSelectedRecommendIndexes(prev => [...prev, index]);
                             }
                           }}
-                          className={`border rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200 cursor-pointer flex items-start gap-3 select-none ${
-                            isSelected 
-                              ? 'border-indigo-200 bg-indigo-50/10' 
-                              : 'border-gray-100 bg-white'
-                          }`}
+                          className={`border rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200 cursor-pointer flex items-start gap-3 select-none ${isSelected
+                            ? 'border-indigo-200 bg-indigo-50/10'
+                            : 'border-gray-100 bg-white'
+                            }`}
                         >
                           {/* Checkbox */}
-                          <div className={`mt-1.5 shrink-0 transition-colors ${
-                            isSelected ? 'text-indigo-600' : 'text-gray-300'
-                          }`}>
+                          <div className={`mt-1.5 shrink-0 transition-colors ${isSelected ? 'text-indigo-600' : 'text-gray-300'
+                            }`}>
                             {isSelected ? (
                               <CheckSquare size={18} className="fill-indigo-50" />
                             ) : (

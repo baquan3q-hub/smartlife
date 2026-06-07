@@ -26,6 +26,7 @@ import HabitDashboard from './components/HabitDashboard';
 import JournalDashboard from './components/JournalDashboard';
 import ClickRippleEffect from './components/ClickRippleEffect';
 import GoalsDashboard from './components/GoalsDashboard';
+import { careerGoalService } from './services/careerGoalService';
 
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -105,6 +106,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     });
 
     const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals'>('visual');
+    const [gpaInitialView, setGpaInitialView] = useState<string | null>(null);
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -1198,14 +1200,29 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             onUpdateGPATarget={handleUpdateGPATarget}
                             isLoading={isLoadingData}
                             lang={lang}
+                            userId={user?.id || ''}
+                            initialViewMode={gpaInitialView}
+                            onResetInitialView={() => setGpaInitialView(null)}
+                            onCreatePosition={async (domain) => {
+                                if (user?.id) {
+                                    await careerGoalService.addPosition(user.id, domain);
+                                    setActiveTab('goals');
+                                }
+                            }}
+                            isPro={proAccess.hasAccess}
+                            onUpgrade={handleOpenPricing}
                         />
                     )}
                     {activeTab === 'goals' && (
-                        proAccess.hasAccess ? (
-                            <GoalsDashboard userId={user?.id || ''} />
-                        ) : (
-                            <ProGateOverlay featureName="Mục tiêu & Lộ trình" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
-                        )
+                        <GoalsDashboard
+                            userId={user?.id || ''}
+                            isPro={proAccess.hasAccess}
+                            onUpgrade={handleOpenPricing}
+                            onNavigateToGPACareer={() => {
+                                setGpaInitialView('career');
+                                setActiveTab('gpa');
+                            }}
+                        />
                     )}
                     {activeTab === 'habit' && (
                         <HabitDashboard userId={user?.id || ''} onNavigateToSchedule={() => setActiveTab('schedule')} />

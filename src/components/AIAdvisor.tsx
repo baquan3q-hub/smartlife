@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Send, Sparkles, Loader2, Bot, Maximize2, Minimize2, GripHorizontal, TrendingDown, Target, ListChecks, BarChart3, RefreshCw } from 'lucide-react';
+import { X, Send, Sparkles, Loader2, Bot, Maximize2, Minimize2, GripHorizontal, TrendingDown, Target, ListChecks, BarChart3, RefreshCw, Heart } from 'lucide-react';
 import { aiService } from '../services/aiService';
 import { AppState } from '../types';
 import ReactMarkdown from 'react-markdown';
@@ -21,6 +21,12 @@ interface SuggestionChip {
 }
 
 const SUGGESTIONS: SuggestionChip[] = [
+    {
+        icon: <Heart size={14} />,
+        label: 'Cuộc sống dạo này',
+        prompt: 'Hãy phân tích các nhật ký gần đây, tình hình chi tiêu tài chính và danh sách công việc (todo) của tôi để đưa ra nhận xét tổng quan về cuộc sống của tôi dạo này thế nào (sức khỏe tinh thần, mức độ cân bằng, áp lực công việc, quản lý tiền bạc) và cho tôi vài lời khuyên nhé.',
+        color: 'from-pink-500 to-rose-500',
+    },
     {
         icon: <BarChart3 size={14} />,
         label: 'Phân tích chi tiêu',
@@ -244,7 +250,18 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ appState }) => {
                                             : 'bg-white text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-indigo-700'}`}
                                     >
                                         {msg.role === 'assistant' ? (
-                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                            <ReactMarkdown
+                                                components={{
+                                                    p: ({ node, ...props }) => <p className="mb-3.5 leading-relaxed text-gray-700 last:mb-0" {...props} />,
+                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-3.5 space-y-1.5" {...props} />,
+                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-3.5 space-y-1.5" {...props} />,
+                                                    li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
+                                                    strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />
+                                                }}
+                                            >
+                                                {msg.content}
+                                            </ReactMarkdown>
                                         ) : (
                                             msg.content
                                         )}

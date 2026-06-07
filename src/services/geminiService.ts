@@ -57,7 +57,8 @@ export interface ChatMessage {
 export type MessagePart =
     | { text: string }
     | { functionCall: { name: string; args: Record<string, any> } }
-    | { functionResponse: { name: string; response: { result: any } } };
+    | { functionResponse: { name: string; response: { result: any } } }
+    | { inlineData: { mimeType: string; data: string } };
 
 export interface ToolDeclaration {
     name: string;
@@ -203,6 +204,12 @@ function buildProfileContext(state: AppState): string {
     if (profile.job) ctx += `  - Nghề nghiệp: ${profile.job}\n`;
     if (profile.monthly_salary) ctx += `  - Thu nhập hàng tháng: ${formatCurrency(profile.monthly_salary)}\n`;
     if (profile.savings_goal) ctx += `  - Mục tiêu tiết kiệm: ${formatCurrency(profile.savings_goal)}\n`;
+    if (profile.university) ctx += `  - Trường học: ${profile.university}\n`;
+    if (profile.career_objective) ctx += `  - Định hướng nghề nghiệp: ${profile.career_objective}\n`;
+    if (profile.personality_mbti) ctx += `  - Tính cách MBTI: ${profile.personality_mbti}\n`;
+    if (profile.personality_disc) ctx += `  - Tính cách DISC: ${profile.personality_disc}\n`;
+    if (profile.hobbies && profile.hobbies.length > 0) ctx += `  - Sở thích: ${profile.hobbies.join(', ')}\n`;
+    if (profile.life_motto) ctx += `  - Châm ngôn sống: "${profile.life_motto}"\n`;
     return ctx;
 }
 
@@ -471,7 +478,20 @@ Khi tư vấn GPA:
 - Tính chính xác điểm cần bao nhiêu cuối kỳ để đạt hạng mong muốn.
 - Phân tích môn nào nên tập trung cải thiện (dựa trên tín chỉ và khả năng tăng điểm).
 - Cảnh báo nếu sinh viên gần ngưỡng cảnh báo học vụ.
-- Dùng tool \`calculate_needed_gpa\` và \`simulate_gpa\` khi cần tính toán.`;
+- Dùng tool \`calculate_needed_gpa\` và \`simulate_gpa\` khi cần tính toán.
+
+🧠 CÁ NHÂN HÓA PHONG CÁCH GIAO TIẾP (MBTI & DISC):
+Hãy đọc thông tin "Tính cách MBTI" và "Tính cách DISC" của người dùng trong phần "👤 HỒ SƠ NGƯỜI DÙNG" và thay đổi phong cách phản hồi cho phù hợp:
+1. ĐỊNH HÌNH TÔNG GIỌNG GIAO TIẾP theo nhóm DISC:
+   - Nhóm D (Thống trị): Trả lời cực kỳ ngắn gọn, trực diện, tập trung vào kết quả và số liệu. Tránh nói dông dài, hạn chế tối đa emoji.
+   - Nhóm I (Ảnh hưởng): Tràn đầy năng lượng, tích cực, sử dụng nhiều emoji, thường xuyên đưa ra lời khen và khích lệ người dùng.
+   - Nhóm S (Kiên định): Văn phong nhẹ nhàng, điềm đạm, ấm áp, kiên nhẫn hướng dẫn từng bước một để tạo cảm giác an tâm.
+   - Nhóm C (Tuân thủ): Chuyên nghiệp, nghiêm túc, tập trung vào số liệu chính xác, phân tích logic và ƯU TIÊN dùng bảng biểu so sánh dữ liệu.
+   * LƯU Ý HỖN HỢP: Nếu người dùng có 2 chữ cái DISC (ví dụ: "DI", "SC"), hãy khéo léo kết hợp cả hai phong cách giao tiếp, với chữ cái đầu tiên đóng vai trò chủ đạo và chữ cái thứ hai bổ trợ thêm. Nếu không chọn DISC (rỗng), hãy dùng giọng văn tiêu chuẩn, thân thiện và lịch sự.
+2. ĐỊNH HÌNH PHƯƠNG PHÁP TƯ VẤN theo nhóm MBTI:
+   - Lý trí (T) vs Cảm xúc (F): Người T cần các phân tích logic, thẳng thắn, không cảm tính. Người F cần sự thấu cảm, khích lệ và xem xét tác động cảm xúc.
+   - Nguyên tắc (J) vs Linh hoạt (P): Người J thích các kế hoạch chi tiết, check-list, Pomodoro cứng. Người P thích gợi ý linh hoạt, thời gian biểu dạng Timeblocking có khoảng đệm trống.
+   - Trực giác (N) vs Thực tế (S): Người N thích thảo luận về định hướng lâu dài, tầm nhìn mục tiêu sự nghiệp 5 năm. Người S thích giải quyết công việc và số dư chi tiêu trước mắt ngay hôm nay.`;
 
 // ────────────────────────────────────────
 // Core API Call — single model, but cycles API keys on 429

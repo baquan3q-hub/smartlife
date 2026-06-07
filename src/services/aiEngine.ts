@@ -360,6 +360,18 @@ async function executeAddTransaction(
 // ────────────────────────────────────────
 // Batch Transaction Executor
 // ────────────────────────────────────────
+export interface AIAttachment {
+    mimeType: string;
+    data: string; // Base64 representation of the file
+}
+
+// Action handlers passed from App.tsx
+export interface ActionHandlers {
+    onAddTimetable?: (item: any) => Promise<void>;
+    onAddTodo?: (content: string, priority: string, deadline?: string) => Promise<void>;
+    onAddTransaction?: (tx: any) => Promise<void>;
+}
+
 async function executeBatchAddTransactions(
     args: any,
     handlers: ActionHandlers
@@ -411,7 +423,8 @@ export async function chatWithAI(
     history: ChatMessage[],
     appState: AppState,
     handlers: ActionHandlers = {},
-    memoryContext: string = ''
+    memoryContext: string = '',
+    attachments?: AIAttachment[]
 ): Promise<AIResponse> {
     const contextText = await buildFullContextAsync(appState);
     const fullSystemPrompt = SYSTEM_INSTRUCTION
@@ -440,8 +453,22 @@ export async function chatWithAI(
         // Convert to Gemini format (only user/model roles, skip function roles for initial)
         let contents = history.map(m => ({
             role: m.role === 'function' ? 'function' : m.role,
-            parts: m.parts
+            parts: [...m.parts] // shallow copy to preserve original history parts
         }));
+
+        // Attach Base64 files to the very last message in the conversation contents, if it is a user message
+        if (attachments && attachments.length > 0 && contents.length > 0) {
+            const lastMsg = contents[contents.length - 1];
+            if (lastMsg.role === 'user') {
+                const fileParts = attachments.map(att => ({
+                    inlineData: {
+                        mimeType: att.mimeType,
+                        data: att.data
+                    }
+                }));
+                lastMsg.parts = [...fileParts, ...lastMsg.parts];
+            }
+        }
 
         let toolCallCount = 0;
 
