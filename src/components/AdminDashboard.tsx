@@ -322,34 +322,71 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail, admi
   const pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
 
   const getUserPlanStatus = (u: AdminUser) => {
+    // Admin email bypass
+    if (u.email === 'baquan3q@gmail.com') {
+      return { label: 'Admin', color: 'bg-green-100 text-green-700 border-green-250', days: Infinity, hasAccess: true, plan: 'lifetime' };
+    }
+
     const now = new Date();
-    if (u.plan === 'lifetime') return { label: 'Vĩnh viễn', color: 'bg-purple-100 text-purple-700 border-purple-200', days: Infinity };
+
+    // 1. Lifetime
+    if (u.plan === 'lifetime') {
+      return { label: 'Vĩnh viễn', color: 'bg-purple-100 text-purple-700 border-purple-200', days: Infinity, hasAccess: true, plan: 'lifetime' };
+    }
+
+    // 2. Pro
     if (u.plan === 'pro' && u.pro_expiry_date) {
       const expiry = new Date(u.pro_expiry_date);
-      const days = Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      if (days > 0) return { label: `Pro (${days}d)`, color: 'bg-amber-100 text-amber-700 border-amber-200', days };
-      return { label: 'Pro hết hạn', color: 'bg-red-100 text-red-650 border-red-200', days: 0 };
+      const graceEnd = new Date(expiry);
+      graceEnd.setDate(graceEnd.getDate() + 3); // 3 days grace
+
+      const msRemaining = expiry.getTime() - now.getTime();
+      const days = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+
+      if (now < expiry) {
+        return { label: `Pro (${days}d)`, color: 'bg-amber-100 text-amber-700 border-amber-200', days, hasAccess: true, plan: 'pro' };
+      } else if (now < graceEnd) {
+        const graceRemainingMs = graceEnd.getTime() - now.getTime();
+        const graceDays = Math.max(0, Math.ceil(graceRemainingMs / (1000 * 60 * 60 * 24)));
+        return { label: `Pro (Gia hạn ${graceDays}d)`, color: 'bg-yellow-100 text-yellow-700 border-yellow-250', days: 0, hasAccess: true, plan: 'pro' };
+      }
+      return { label: 'Pro hết hạn', color: 'bg-red-100 text-red-650 border-red-200', days: 0, hasAccess: false, plan: 'pro' };
     }
+
+    // 3. Trial
     if (u.plan === 'trial' && u.trial_started_at) {
       const start = new Date(u.trial_started_at);
-      const end = new Date(start); end.setDate(end.getDate() + 7); // Trial 7 days
-      const days = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      if (days > 0) return { label: `Trial (${days}d)`, color: 'bg-blue-100 text-blue-700 border-blue-200', days };
-      return { label: 'Trial hết hạn', color: 'bg-red-100 text-red-650 border-red-200', days: 0 };
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7); // Trial 7 days
+
+      const graceEnd = new Date(end);
+      graceEnd.setDate(graceEnd.getDate() + 3); // 3 days grace
+
+      const msRemaining = end.getTime() - now.getTime();
+      const days = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+
+      if (now < end) {
+        return { label: `Trial (${days}d)`, color: 'bg-blue-100 text-blue-700 border-blue-200', days, hasAccess: true, plan: 'trial' };
+      } else if (now < graceEnd) {
+        const graceRemainingMs = graceEnd.getTime() - now.getTime();
+        const graceDays = Math.max(0, Math.ceil(graceRemainingMs / (1000 * 60 * 60 * 24)));
+        return { label: `Trial (Gia hạn ${graceDays}d)`, color: 'bg-yellow-100 text-yellow-700 border-yellow-250', days: 0, hasAccess: true, plan: 'trial' };
+      }
+      return { label: 'Trial hết hạn', color: 'bg-red-100 text-red-650 border-red-200', days: 0, hasAccess: false, plan: 'trial' };
     }
-    return { label: 'Free', color: 'bg-gray-100 text-gray-500 border-gray-200', days: 0 };
+
+    // 4. Free
+    return { label: 'Free', color: 'bg-gray-100 text-gray-500 border-gray-200', days: 0, hasAccess: false, plan: 'free' };
   };
 
   const filterUsersByGroup = (group: 'all' | 'free' | 'trial' | 'pro' | 'lifetime') => {
     return users.filter(u => {
+      const status = getUserPlanStatus(u);
       if (group === 'all') return true;
-      if (group === 'trial') return u.plan === 'trial' && getUserPlanStatus(u).days > 0;
-      if (group === 'pro') return u.plan === 'pro' && getUserPlanStatus(u).days > 0;
-      if (group === 'lifetime') return u.plan === 'lifetime';
-      if (group === 'free') {
-        const status = getUserPlanStatus(u);
-        return !u.plan || u.plan === 'free' || status.days === 0;
-      }
+      if (group === 'trial') return status.plan === 'trial' && status.hasAccess;
+      if (group === 'pro') return status.plan === 'pro' && status.hasAccess;
+      if (group === 'lifetime') return status.plan === 'lifetime';
+      if (group === 'free') return !status.hasAccess;
       return true;
     });
   };
@@ -366,19 +403,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail, admi
 
     // 2. Plan filter
     if (planFilter === 'all') return true;
-    if (planFilter === 'trial') return u.plan === 'trial' && getUserPlanStatus(u).days > 0;
-    if (planFilter === 'pro') return u.plan === 'pro' && getUserPlanStatus(u).days > 0;
-    if (planFilter === 'lifetime') return u.plan === 'lifetime';
-    if (planFilter === 'free') {
-      const status = getUserPlanStatus(u);
-      return !u.plan || u.plan === 'free' || status.days === 0;
-    }
+    const status = getUserPlanStatus(u);
+    if (planFilter === 'trial') return status.plan === 'trial' && status.hasAccess;
+    if (planFilter === 'pro') return status.plan === 'pro' && status.hasAccess;
+    if (planFilter === 'lifetime') return status.plan === 'lifetime';
+    if (planFilter === 'free') return !status.hasAccess;
     return true;
   });
 
-  const proCount = users.filter(u => u.plan === 'pro' && getUserPlanStatus(u).days > 0).length;
-  const trialCount = users.filter(u => u.plan === 'trial' && getUserPlanStatus(u).days > 0).length;
-  const lifetimeCount = users.filter(u => u.plan === 'lifetime').length;
+  const proCount = users.filter(u => {
+    const s = getUserPlanStatus(u);
+    return s.plan === 'pro' && s.hasAccess;
+  }).length;
+  const trialCount = users.filter(u => {
+    const s = getUserPlanStatus(u);
+    return s.plan === 'trial' && s.hasAccess;
+  }).length;
+  const lifetimeCount = users.filter(u => {
+    const s = getUserPlanStatus(u);
+    return s.plan === 'lifetime';
+  }).length;
 
   const now = new Date();
   const ms24h = 24 * 60 * 60 * 1000;

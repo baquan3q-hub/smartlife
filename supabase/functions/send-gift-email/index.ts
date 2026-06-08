@@ -22,9 +22,14 @@ serve(async (req: Request) => {
     const body = await req.json();
     const { to, toBatch, subject, html, userName, giftType, days, expiryDate, planName, note } = body;
 
-    const emailList = toBatch || (to ? [to] : []);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const rawEmails = toBatch || (to ? [to] : []);
+    const emailList = rawEmails
+      .map((email: string) => email.trim())
+      .filter((email: string) => emailRegex.test(email));
+
     if (emailList.length === 0) {
-      throw new Error("No recipients specified");
+      throw new Error("No valid recipients specified");
     }
 
     // Construct default HTML if not provided directly
@@ -111,9 +116,10 @@ serve(async (req: Request) => {
       }
     }
 
-    // Call Resend API for each recipient
-    const sendPromises = emailList.map((recipient: string) => {
-      return fetch("https://api.resend.com/emails", {
+    // Call Resend API: Use Batch API if there are multiple recipients, or single email API if only one.
+    const results = [];
+    if (emailList.length === 1) {
+      const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -121,27 +127,83 @@ serve(async (req: Request) => {
         },
         body: JSON.stringify({
           from: "SmartLife <baquan@smartlife.courses>",
-          to: recipient,
+          to: emailList[0],
           subject: subject || "Thông báo từ SmartLife",
           html: finalHtml,
         }),
       });
-    });
+      results.push(response);
+    } else {
+      // Chunk recipients into batches of 100 (Resend limit)
+      const chunkSize = 100;
+      for (let i = 0; i < emailList.length; i += chunkSize) {
+        const chunk = emailList.slice(i, i + chunkSize);
+        const batchPayload = chunk.map((recipient: string) => ({
+          from: "SmartLife <baquan@smartlife.courses>",
+          to: recipient,
+          subject: subject || "Thông báo từ SmartLife",
+          html: finalHtml,
+        }));
 
-    const results = await Promise.all(sendPromises);
-    const failed = results.filter((r) => !r.ok);
+        const response = await fetch("https://api.resend.com/emails/batch", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+            "batch-validation": "permissive",
+            "batchValidation": "permissive",
+          },
+          body: JSON.stringify(batchPayload),
+        });
+
+        results.push(response);
+
+        // Sleep 200ms between batches to avoid hitting Resend rate limit limits
+        if (i + chunkSize < emailList.length) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+      }
+    }
+
+    const failed = [];
+    const successDetails = [];
+    const validationErrors = [];
+
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (!r.ok) {
+        const errText = await r.text();
+        failed.push({ index: i, status: r.status, details: errText });
+      } else {
+        try {
+          const resBody = await r.json();
+          if (resBody.errors && resBody.errors.length > 0) {
+            validationErrors.push(...resBody.errors);
+          }
+          if (resBody.data) {
+            successDetails.push(...resBody.data);
+          }
+        } catch (_) {
+          // Response body was not JSON or failed to parse
+        }
+      }
+    }
 
     if (failed.length > 0) {
-      const errTexts = await Promise.all(failed.map((r) => r.text()));
-      console.error("Resend API errors:", errTexts);
+      console.error("Resend API hard errors:", failed);
       return new Response(
-        JSON.stringify({ error: "Failed to send some or all emails", details: errTexts }),
+        JSON.stringify({ error: "Failed to send some or all email batches", details: failed }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     return new Response(
-      JSON.stringify({ message: "Emails sent successfully!" }),
+      JSON.stringify({
+        message: "Emails processed successfully!",
+        successCount: successDetails.length,
+        validationErrorsCount: validationErrors.length,
+        validationErrors: validationErrors
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
