@@ -1,37 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Save, Loader2, Bell, Calendar, Clock, Target, Moon, Zap, Sparkles, LogOut, Smartphone, Lock, Camera, QrCode, CreditCard, Contact, Trash2, Music, Flame } from 'lucide-react';
+import { X, User, Save, Loader2, Bell, Calendar, Clock, Target, Moon, Zap, Sparkles, LogOut, Smartphone, Lock, Camera, QrCode, CreditCard, Contact, Trash2, Music, Flame, Plus, Eye } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { Profile } from '../types';
 import { Lang, t } from '../i18n/i18n';
 
 const DocumentCard: React.FC<{
     title: string;
-    imageUrl?: string;
+    hasImages: boolean;
+    count: number;
     icon: React.ReactNode;
     onClick: () => void;
-}> = ({ title, imageUrl, icon, onClick }) => {
+}> = ({ title, hasImages, count, icon, onClick }) => {
     return (
         <button
             type="button"
             onClick={onClick}
             className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all duration-200 relative overflow-hidden aspect-video select-none group/card
-                ${imageUrl
-                    ? 'border-indigo-100 bg-white hover:border-indigo-300 shadow-sm'
+                ${hasImages
+                    ? 'border-blue-500 bg-blue-50/20 text-blue-600 shadow-sm shadow-blue-100/30'
                     : 'border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-100 hover:border-gray-300 text-gray-400 hover:text-gray-500'}`}
         >
-            {imageUrl ? (
-                <>
-                    <img src={imageUrl} alt={title} className="absolute inset-0 w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-200" />
-                    <div className="absolute inset-0 bg-black/45 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity">
-                        <span className="text-white text-[10px] font-black uppercase tracking-widest">Xem thẻ</span>
-                    </div>
-                </>
-            ) : (
-                <div className="flex flex-col items-center gap-1 text-center">
-                    <span className="text-gray-400 group-hover/card:text-indigo-500 transition-colors">{icon}</span>
-                    <span className="text-[10px] font-extrabold tracking-wide mt-0.5">{title}</span>
-                </div>
-            )}
+            <div className="flex flex-col items-center gap-1.5 text-center">
+                <span className={`${hasImages ? 'text-blue-500' : 'text-gray-400 group-hover/card:text-indigo-500'} transition-colors`}>{icon}</span>
+                <span className={`text-[10px] font-extrabold tracking-wide mt-0.5 ${hasImages ? 'text-blue-700' : ''}`}>
+                    {title} {hasImages && `(${count}/2)`}
+                </span>
+            </div>
         </button>
     );
 };
@@ -77,7 +71,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [hobbiesInput, setHobbiesInput] = useState('');
-    const [activeLightbox, setActiveLightbox] = useState<{ field: 'qr_code_url' | 'student_card_url' | 'citizen_card_url', url: string } | null>(null);
+    const [activeLightboxField, setActiveLightboxField] = useState<'qr_code_url' | 'student_card_url' | 'citizen_card_url' | null>(null);
+    const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+    const getDocImages = (field: 'qr_code_url' | 'student_card_url' | 'citizen_card_url') => {
+        const val = profile?.[field];
+        if (!val) return [];
+        if (val.startsWith('[')) {
+            try {
+                return JSON.parse(val) as string[];
+            } catch (e) {
+                return [val];
+            }
+        }
+        return [val];
+    };
+
+    const handleCardClick = (field: 'qr_code_url' | 'student_card_url' | 'citizen_card_url', uploadId: string) => {
+        const images = getDocImages(field);
+        if (images.length > 0) {
+            setActiveLightboxField(field);
+        } else {
+            document.getElementById(uploadId)?.click();
+        }
+    };
 
     const compressImageToBase64 = (file: File, maxWidth = 800, quality = 0.7): Promise<string> => {
         return new Promise((resolve, reject) => {
@@ -131,13 +148,25 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         if (!file) return;
         try {
             const compressed = await compressImageToBase64(file, 800, 0.75);
-            setProfile(prev => prev ? { ...prev, [field]: compressed } : null);
-            if (activeLightbox && activeLightbox.field === field) {
-                setActiveLightbox({ field, url: compressed });
-            }
+            const currentImages = getDocImages(field);
+            const updatedImages = [...currentImages, compressed].slice(0, 2);
+            const updatedVal = JSON.stringify(updatedImages);
+            setProfile(prev => prev ? { ...prev, [field]: updatedVal } : null);
         } catch (err) {
             console.error(`Error uploading ${field}:`, err);
             alert("Không thể tải lên ảnh tài liệu.");
+        }
+    };
+
+    const handleDocumentDelete = (field: 'qr_code_url' | 'student_card_url' | 'citizen_card_url', index: number) => {
+        if (window.confirm('Bạn có chắc chắn muốn xóa ảnh này?')) {
+            const currentImages = getDocImages(field);
+            const updatedImages = currentImages.filter((_, i) => i !== index);
+            const updatedVal = updatedImages.length > 0 ? JSON.stringify(updatedImages) : null;
+            setProfile(prev => prev ? { ...prev, [field]: updatedVal } : null);
+            if (updatedImages.length === 0) {
+                setActiveLightboxField(null);
+            }
         }
     };
 
@@ -408,43 +437,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                             {/* QR Card */}
                                             <DocumentCard
                                                 title="Mã QR"
-                                                imageUrl={profile?.qr_code_url}
+                                                hasImages={getDocImages('qr_code_url').length > 0}
+                                                count={getDocImages('qr_code_url').length}
                                                 icon={<QrCode size={18} />}
-                                                onClick={() => {
-                                                    if (profile?.qr_code_url) {
-                                                        setActiveLightbox({ field: 'qr_code_url', url: profile.qr_code_url });
-                                                    } else {
-                                                        document.getElementById('qr-upload-input')?.click();
-                                                    }
-                                                }}
+                                                onClick={() => handleCardClick('qr_code_url', 'qr-upload-input')}
                                             />
 
                                             {/* Student Card */}
                                             <DocumentCard
                                                 title="Thẻ SV"
-                                                imageUrl={profile?.student_card_url}
+                                                hasImages={getDocImages('student_card_url').length > 0}
+                                                count={getDocImages('student_card_url').length}
                                                 icon={<CreditCard size={18} />}
-                                                onClick={() => {
-                                                    if (profile?.student_card_url) {
-                                                        setActiveLightbox({ field: 'student_card_url', url: profile.student_card_url });
-                                                    } else {
-                                                        document.getElementById('student-upload-input')?.click();
-                                                    }
-                                                }}
+                                                onClick={() => handleCardClick('student_card_url', 'student-upload-input')}
                                             />
 
                                             {/* Citizen Card */}
                                             <DocumentCard
                                                 title="CCCD"
-                                                imageUrl={profile?.citizen_card_url}
+                                                hasImages={getDocImages('citizen_card_url').length > 0}
+                                                count={getDocImages('citizen_card_url').length}
                                                 icon={<Contact size={18} />}
-                                                onClick={() => {
-                                                    if (profile?.citizen_card_url) {
-                                                        setActiveLightbox({ field: 'citizen_card_url', url: profile.citizen_card_url });
-                                                    } else {
-                                                        document.getElementById('citizen-upload-input')?.click();
-                                                    }
-                                                }}
+                                                onClick={() => handleCardClick('citizen_card_url', 'citizen-upload-input')}
                                             />
                                         </div>
                                     </div>
@@ -896,74 +910,98 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             {/* Document Lightbox Modal */}
-            {activeLightbox && (
+            {activeLightboxField && (
                 <div className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-white rounded-[28px] overflow-hidden max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] relative animate-in zoom-in-95 duration-200">
                         {/* Header */}
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                            <span className="font-extrabold text-gray-800 text-sm">{getFieldNameVi(activeLightbox.field)}</span>
+                            <span className="font-extrabold text-gray-800 text-sm">
+                                {getFieldNameVi(activeLightboxField)} ({getDocImages(activeLightboxField).length}/2)
+                            </span>
                             <button
-                                onClick={() => setActiveLightbox(null)}
+                                onClick={() => setActiveLightboxField(null)}
                                 className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
-                        {/* Image View */}
-                        <div className="p-5 flex-1 overflow-y-auto flex items-center justify-center bg-gray-50/50 min-h-[300px]">
-                            <img
-                                src={activeLightbox.url}
-                                alt="Document full resolution"
-                                className="max-w-full max-h-[50vh] object-contain rounded-xl shadow-md border border-gray-150"
-                            />
-                        </div>
-
-                        {/* Actions Footer */}
-                        <div className="p-4 border-t border-gray-100 flex gap-2 justify-between bg-gray-50/20">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const confirmDelete = window.confirm(`Bạn có chắc chắn muốn xóa ${getFieldNameVi(activeLightbox.field)}?`);
-                                    if (confirmDelete) {
-                                        setProfile(prev => {
-                                            if (!prev) return null;
-                                            const updated = { ...prev };
-                                            delete updated[activeLightbox.field];
-                                            return updated;
-                                        });
-                                        setActiveLightbox(null);
-                                    }
-                                }}
-                                className="px-4 py-2 rounded-xl text-red-500 hover:bg-red-55 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95"
-                            >
-                                <Trash2 size={14} /> Xóa ảnh
-                            </button>
-                            <div className="flex gap-2">
+                        {/* Image list / upload slot */}
+                        <div className="p-5 flex-1 overflow-y-auto flex flex-col gap-4 bg-gray-50/50 min-h-[300px] max-h-[60vh] scrollbar-thin">
+                            {getDocImages(activeLightboxField).map((url, index) => (
+                                <div key={index} className="relative group/img bg-white p-3 rounded-2xl border border-gray-150 shadow-sm flex flex-col items-center gap-2.5">
+                                    <div 
+                                        onClick={() => setZoomedImage(url)}
+                                        className="relative cursor-zoom-in overflow-hidden rounded-xl w-full h-[200px] flex items-center justify-center bg-gray-100/40"
+                                    >
+                                        <img
+                                            src={url}
+                                            alt={`Ảnh ${index + 1}`}
+                                            className="max-w-full max-h-full object-contain hover:scale-[1.02] transition-transform duration-200"
+                                        />
+                                        <div className="absolute inset-0 bg-black/25 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                            <Eye size={20} className="text-white" />
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDocumentDelete(activeLightboxField, index)}
+                                        className="w-full py-2 rounded-xl text-red-500 bg-red-50/60 hover:bg-red-50 hover:text-red-600 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                                    >
+                                        <Trash2 size={13} /> Xóa ảnh {getDocImages(activeLightboxField).length > 1 ? index + 1 : ''}
+                                    </button>
+                                </div>
+                            ))}
+                            
+                            {getDocImages(activeLightboxField).length < 2 && (
                                 <button
-                                    type="button"
                                     onClick={() => {
-                                        const inputId = activeLightbox.field === 'qr_code_url'
+                                        const inputId = activeLightboxField === 'qr_code_url'
                                             ? 'qr-upload-input'
-                                            : activeLightbox.field === 'student_card_url'
+                                            : activeLightboxField === 'student_card_url'
                                                 ? 'student-upload-input'
                                                 : 'citizen-upload-input';
                                         document.getElementById(inputId)?.click();
                                     }}
-                                    className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95"
+                                    className="w-full aspect-video min-h-[140px] rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/20 flex flex-col items-center justify-center text-indigo-500 hover:bg-indigo-50/50 hover:text-indigo-600 transition-all font-black text-xs gap-2 py-4 cursor-pointer active:scale-95"
                                 >
-                                    Thay đổi
+                                    <Plus size={22} className="stroke-[2.5]" />
+                                    Tải lên ảnh thứ 2
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveLightbox(null)}
-                                    className="px-5 py-2 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-xs transition-all active:scale-95"
-                                >
-                                    Đóng
-                                </button>
-                            </div>
+                            )}
+                        </div>
+
+                        {/* Actions Footer */}
+                        <div className="p-4 border-t border-gray-100 flex gap-2 justify-end bg-gray-50/20">
+                            <button
+                                type="button"
+                                onClick={() => setActiveLightboxField(null)}
+                                className="px-5 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-xs transition-all active:scale-95"
+                            >
+                                Đóng
+                            </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Fullscreen Zoom Overlay */}
+            {zoomedImage && (
+                <div 
+                    onClick={() => setZoomedImage(null)}
+                    className="fixed inset-0 bg-black/95 z-[110] flex items-center justify-center p-4 backdrop-blur-lg animate-in fade-in duration-200 cursor-zoom-out"
+                >
+                    <button 
+                        onClick={() => setZoomedImage(null)}
+                        className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                    >
+                        <X size={20} />
+                    </button>
+                    <img 
+                        src={zoomedImage} 
+                        alt="Zoomed document" 
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+                    />
                 </div>
             )}
         </div>

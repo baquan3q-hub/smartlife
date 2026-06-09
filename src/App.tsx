@@ -164,6 +164,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     });
 
     const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals' | 'expand'>('visual');
+    const deferredTab = React.useDeferredValue(activeTab);
     const [gpaInitialView, setGpaInitialView] = useState<string | null>(null);
     const [goalsInitialView, setGoalsInitialView] = useState<'career' | 'life' | 'cv' | null>(null);
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
@@ -1196,7 +1197,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 </header>}
 
                 <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative'}`}> {/* AI Advisor gets full screen, others get dynamic fluid layout */}
-                    {activeTab === 'visual' && (
+                    {deferredTab === 'visual' && (
                         proAccess.hasAccess ? (
                             <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
                                 if (tab === 'music') {
@@ -1216,7 +1217,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             <ProGateOverlay featureName="Visual Board" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
                         )
                     )}
-                    {activeTab === 'finance' && (
+                    {deferredTab === 'finance' && (
                         <FinanceDashboard
                             state={appState}
                             onAddTransaction={handleAddTransaction}
@@ -1249,14 +1250,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             onRefresh={async () => { await fetchData(true); }}
                         />
                     )}
-                    {activeTab === 'cashflow' && (
+                    {deferredTab === 'cashflow' && (
                         <CashFlowDashboard
                             state={appState}
                             lang={lang}
                             onBack={() => setActiveTab('finance')}
                         />
                     )}
-                    {activeTab === 'ai-advisor' && (
+                    {deferredTab === 'ai-advisor' && (
                         proAccess.hasAccess ? (
                             <AIAdvisorPage
                                 appState={appState}
@@ -1272,10 +1273,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             </div>
                         )
                     )}
-                    {activeTab === 'admin' && user?.email === 'baquan3q@gmail.com' && (
+                    {deferredTab === 'admin' && user?.email === 'baquan3q@gmail.com' && (
                         <AdminDashboard adminEmail={user.email} />
                     )}
-                    {activeTab === 'schedule' && (
+                    {deferredTab === 'schedule' && (
                         proAccess.hasAccess ? (
                             <ScheduleDashboard
                                 state={{ ...appState, timer, onOpenMusic: () => setActiveTab('music') } as any}
@@ -1292,7 +1293,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             <ProGateOverlay featureName="Lịch trình" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
                         )
                     )}
-                    {activeTab === 'gpa' && (
+                    {deferredTab === 'gpa' && (
                         <GPADashboard
                             semesters={appState.gpaSemesters}
                             onAddSemester={handleAddGPASemester}
@@ -1322,7 +1323,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             onUpgrade={handleOpenPricing}
                         />
                     )}
-                    {activeTab === 'goals' && (
+                    {deferredTab === 'goals' && (
                         <GoalsDashboard
                             userId={user?.id || ''}
                             isPro={proAccess.hasAccess}
@@ -1335,13 +1336,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             onResetInitialView={() => setGoalsInitialView(null)}
                         />
                     )}
-                    {activeTab === 'habit' && (
+                    {deferredTab === 'habit' && (
                         <HabitDashboard userId={user?.id || ''} onNavigateToSchedule={() => setActiveTab('schedule')} />
                     )}
-                    {activeTab === 'journal' && (
+                    {deferredTab === 'journal' && (
                         <JournalDashboard userId={user?.id || ''} />
                     )}
-                    {activeTab === 'expand' && (
+                    {deferredTab === 'expand' && (
                         <ExpandSection
                             userId={user?.id || ''}
                             profile={appState.profile}
@@ -1364,7 +1365,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
             {/* Mobile Bottom Nav — Fixed 4 items */}
             {activeTab !== 'ai-advisor' && (
-                <div className="md:hidden fixed bottom-safe-dock left-4 right-4 z-40 max-w-lg mx-auto">
+                <div className="md:hidden fixed bottom-safe-dock left-4 right-4 z-50 max-w-lg mx-auto transform-gpu">
                     <nav className="bg-white/90 backdrop-blur-xl border border-gray-100/80 flex justify-between items-center rounded-full h-[62px] shadow-[0_12px_36px_-4px_rgba(16,24,40,0.08)] px-2 py-1">
                         {MOBILE_NAV_TABS.map(tab => {
                             const IconComponent = tab.icon;
@@ -1377,15 +1378,15 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 <button
                                     key={tab.id}
                                     onClick={() => { setActiveTab(tab.id as any); }}
-                                    className={`flex items-center justify-center rounded-full h-11 transition-all duration-300 ease-out active:scale-95 ${
+                                    className={`flex items-center justify-center rounded-full h-11 transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) active:scale-95 ${
                                         isActive
                                             ? `px-4 py-2.5 ${activeBgClass} ${activeColorClass} shadow-sm shadow-indigo-100/10`
-                                            : 'px-3 py-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50/50'
+                                            : 'px-3 py-2 text-gray-400 active:text-gray-600 active:bg-gray-50/20'
                                     }`}
                                 >
-                                    <IconComponent size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 transition-transform duration-300 ${isActive && tab.id === 'expand' ? 'rotate-90' : ''}`} />
+                                    <IconComponent size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 transition-transform duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) ${isActive && tab.id === 'expand' ? 'rotate-90' : ''}`} />
                                     <span
-                                        className={`text-[11px] font-bold tracking-tight transition-all duration-300 ease-out overflow-hidden whitespace-nowrap ${
+                                        className={`text-[11px] font-bold tracking-tight transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) overflow-hidden whitespace-nowrap ${
                                             isActive ? 'max-w-[100px] opacity-100 ml-1.5' : 'max-w-0 opacity-0 ml-0'
                                         }`}
                                     >
