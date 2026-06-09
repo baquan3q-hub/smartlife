@@ -264,10 +264,40 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     useEffect(() => {
         if (!user) return;
-        const tourKey = `smartlife_tour_shown_${user.id}`;
-        if (!sessionStorage.getItem(tourKey)) {
+        
+        const tourLastShownKey = `smartlife_tour_last_shown_${user.id}`;
+        const lastActiveKey = `smartlife_last_active_time_${user.id}`;
+        const logoutFlagKey = `smartlife_logged_out_flag`;
+
+        const now = Date.now();
+        const lastShown = localStorage.getItem(tourLastShownKey);
+        const prevLastActive = localStorage.getItem(lastActiveKey);
+        const wasLoggedOut = localStorage.getItem(logoutFlagKey) === 'true';
+
+        // Update the last active time to now (recorded for this session entry)
+        localStorage.setItem(lastActiveKey, now.toString());
+
+        let shouldShowTour = false;
+
+        if (!lastShown) {
+            // New user (never shown the tour on this account/device)
+            shouldShowTour = true;
+        } else if (wasLoggedOut) {
+            // Logged out and logged back in
+            shouldShowTour = true;
+            localStorage.removeItem(logoutFlagKey);
+        } else if (prevLastActive) {
+            // Checked if they haven't opened the app for a week (7 days)
+            const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+            const timeDiff = now - Number(prevLastActive);
+            if (timeDiff >= oneWeekMs) {
+                shouldShowTour = true;
+            }
+        }
+
+        if (shouldShowTour) {
             setIsWelcomeTourOpen(true);
-            sessionStorage.setItem(tourKey, 'true');
+            localStorage.setItem(tourLastShownKey, now.toString());
         }
     }, [user]);
 
