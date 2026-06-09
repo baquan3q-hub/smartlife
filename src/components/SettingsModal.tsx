@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Save, Loader2, Bell, Calendar, Clock, Target, Moon, Zap, Sparkles, LogOut, Smartphone, Lock, Camera, QrCode, CreditCard, Contact, Trash2, Music, Flame, Plus, Eye } from 'lucide-react';
+import { X, User, Save, Loader2, Bell, Calendar, Clock, Target, Moon, Zap, Sparkles, LogOut, Smartphone, Lock, Camera, QrCode, CreditCard, Contact, Trash2, Music, Flame, Plus, Eye, Sun, Monitor } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { Profile } from '../types';
 import { Lang, t } from '../i18n/i18n';
+import { ThemeMode, getSavedTheme, saveTheme } from '../utils/theme';
 
 const DocumentCard: React.FC<{
     title: string;
@@ -49,7 +50,8 @@ const DEFAULT_NOTI_SETTINGS = {
     calendar_lunar: true,
     calendar_holiday: true,
     focus_timer: true,
-    goals_remind: true
+    goals_remind: true,
+    todo_remind: true
 };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -68,6 +70,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const [profile, setProfile] = useState<Profile | null>(null);
     const [notiSettings, setNotiSettings] = useState(DEFAULT_NOTI_SETTINGS);
     const [tempHeaderShortcuts, setTempHeaderShortcuts] = useState<{ spotify: boolean; habit: boolean }>({ spotify: true, habit: true });
+    const [tempTheme, setTempTheme] = useState<ThemeMode>('system');
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [hobbiesInput, setHobbiesInput] = useState('');
@@ -191,6 +194,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             }
             // Sync header shortcuts temp state
             setTempHeaderShortcuts({ ...headerShortcuts });
+            // Load theme setting
+            setTempTheme(getSavedTheme());
         }
     }, [isOpen, userId, headerShortcuts]);
 
@@ -290,6 +295,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             // 3. Save Header Shortcuts
             localStorage.setItem(`smartlife_header_shortcuts_${userId}`, JSON.stringify(tempHeaderShortcuts));
             onUpdateHeaderShortcuts(tempHeaderShortcuts);
+
+            // 4. Save Theme Setting
+            saveTheme(tempTheme);
 
             // Dispatch event so other components can pick up changes immediately
             window.dispatchEvent(new Event('storage'));
@@ -782,6 +790,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         checked={notiSettings.goals_remind}
                                         onChange={() => toggleSetting('goals_remind')}
                                     />
+                                    <div className="h-px bg-gray-200 my-1 mx-4"></div>
+                                    <SwitchItem
+                                        label={t('settings.todo_remind', lang)}
+                                        desc={t('settings.todo_remind_desc', lang)}
+                                        checked={notiSettings.todo_remind || false}
+                                        onChange={() => toggleSetting('todo_remind')}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -801,6 +816,43 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 <p className="text-indigo-100 text-xs opacity-90 leading-relaxed">
                                     {t('settings.navbar_desc', lang)}
                                 </p>
+                            </div>
+
+                            {/* Theme/Appearance Section */}
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                                    <Moon size={14} />
+                                    {t('settings.theme_title', lang)}
+                                </h4>
+                                <p className="text-xs text-gray-400 font-medium -mt-1">
+                                    {t('settings.theme_desc', lang)}
+                                </p>
+
+                                <div className="bg-gray-50 rounded-2xl p-2.5 border border-gray-100">
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[
+                                            { id: 'light', label: t('settings.theme_light', lang), icon: <Sun size={16} />, activeBg: 'bg-white text-amber-500 shadow-sm border border-amber-100/50' },
+                                            { id: 'dark', label: t('settings.theme_dark', lang), icon: <Moon size={16} />, activeBg: 'bg-white text-indigo-500 shadow-sm border border-indigo-100/50' },
+                                            { id: 'system', label: t('settings.theme_system', lang), icon: <Monitor size={16} />, activeBg: 'bg-white text-emerald-500 shadow-sm border border-emerald-100/50' }
+                                        ].map((item) => {
+                                            const isActive = tempTheme === item.id;
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    onClick={() => setTempTheme(item.id as ThemeMode)}
+                                                    className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-xs font-bold transition-all duration-200 select-none gap-1.5 border border-transparent
+                                                        ${isActive
+                                                            ? item.activeBg
+                                                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200/50 hover:text-gray-600'}`}
+                                                >
+                                                    {item.icon}
+                                                    <span>{item.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Header Shortcuts Section */}

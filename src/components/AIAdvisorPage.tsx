@@ -190,6 +190,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             content: '👋 Chào bạn! Mình là **SmartLife Advisor v2** — trợ lý AI thông minh.\n\n🆕 **Khả năng mới:**\n- 📊 **Truy vấn dữ liệu** trực tiếp từ database\n- 📈 **Bảng tính (table) & Dự đoán** chi tiêu\n- ✏️ **Thêm lịch trình, việc cần làm, giao dịch** bằng ngôn ngữ tự nhiên\n- 📎 **Phân tích tài liệu & hình ảnh**: Đọc hiểu ảnh thời khóa biểu, hóa đơn, file excel, csv, pdf, txt, hoặc âm thanh trực tiếp trong bộ nhớ tạm để xử lý nhanh chóng.\n\n💡 **Thử hỏi mình:**\n- _"Đưa ra dự đoán chi tiêu tháng tới cho tôi"_\n- _"Lập bảng so sánh thu chi 3 tháng gần nhất"_\n- _"Thêm lịch học IELTS thứ 3, thứ 5 lúc 19h"_\n\nHoặc chọn gợi ý bên dưới! 👇'
         }
     ]);
+    const [geminiChatHistory, setGeminiChatHistory] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [activeArtifact, setActiveArtifact] = useState<{ title: string; content: string } | null>(null);
@@ -258,7 +259,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         const newFiles = Array.from(files);
 
         // Filter out files that exceed 15MB
-        const MAX_SIZE = 15 * 1024 * 1024;
+        const MAX_SIZE = 30 * 1024 * 1024;
         const validFiles: File[] = [];
         const oversizedFiles: string[] = [];
 
@@ -282,7 +283,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
     const triggerFileSelect = (type: 'image' | 'document' | 'audio') => {
         if (!fileInputRef.current) return;
-        
+
         if (type === 'image') {
             fileInputRef.current.accept = 'image/*';
         } else if (type === 'document') {
@@ -290,7 +291,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         } else if (type === 'audio') {
             fileInputRef.current.accept = 'audio/*';
         }
-        
+
         fileInputRef.current.click();
         setShowUploadMenu(false);
     };
@@ -420,16 +421,6 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     }, [showUploadMenu, showWidgetMenu]);
 
 
-    // Build chat history for Gemini (convert UIMessage → ChatMessage)
-    const buildHistory = (msgs: UIMessage[]): ChatMessage[] => {
-        return msgs
-            .filter(m => m.role !== 'assistant' || msgs.indexOf(m) > 0) // skip initial greeting
-            .map(m => ({
-                role: m.role === 'user' ? 'user' as const : 'model' as const,
-                parts: [{ text: m.content }]
-            }));
-    };
-
     // Send message — uses new aiEngine with function calling
     const handleSend = async (overrideMessage?: string) => {
         const msg = overrideMessage || input.trim();
@@ -506,13 +497,15 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 await chatHistoryService.saveMessage(currentConvId, 'user', visibleMessageContent);
             }
 
-            const history = buildHistory(newMessages);
-            // Replace the last history item's content with promptExtension to let Gemini see spreadsheet and text files directly
-            if (history.length > 0 && promptExtension) {
-                history[history.length - 1].parts = [{ text: finalUserMsg + promptExtension }];
-            }
+            // Construct new user ChatMessage for Gemini history
+            const userPartText = finalUserMsg + promptExtension;
+            const newUserMsg: ChatMessage = {
+                role: 'user',
+                parts: [{ text: userPartText }]
+            };
+            const historyToSend = [...geminiChatHistory, newUserMsg];
 
-            const response = await chatWithAI(history, appState, actionHandlers, memoryContext, attachmentsToSend);
+            const response = await chatWithAI(historyToSend, appState, actionHandlers, memoryContext, attachmentsToSend);
 
             // Save AI response to DB
             if (currentConvId) {
@@ -523,6 +516,13 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     response.charts.length > 0 ? response.charts : undefined,
                     response.actions.length > 0 ? response.actions : undefined
                 );
+            }
+
+            // Update Gemini Chat History state
+            if (response.updatedHistory) {
+                setGeminiChatHistory(response.updatedHistory);
+            } else {
+                setGeminiChatHistory([...historyToSend, { role: 'model', parts: [{ text: response.text }] }]);
             }
 
             // Extract memories periodically
@@ -571,6 +571,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             role: 'assistant',
             content: '🔄 Cuộc trò chuyện đã được làm mới! Mình sẵn sàng phân tích dữ liệu cho bạn. 🌱'
         }]);
+        setGeminiChatHistory([]);
         setShowHistory(false);
     };
 
@@ -589,6 +590,18 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 role: 'assistant',
                 content: 'Cuộc trò chuyện này trống. Hãy bắt đầu hỏi gì đó!'
             }]);
+
+            // Reconstruct the Gemini Chat History from loaded database messages
+            const loadedHistory: ChatMessage[] = msgs.map(m => ({
+                role: m.role === 'user' ? 'user' as const : 'model' as const,
+                parts: [{ text: m.content }]
+            }));
+            // Shift the first message if it is from model to satisfy Gemini's alternating role constraint
+            if (loadedHistory.length > 0 && loadedHistory[0].role === 'model') {
+                loadedHistory.shift();
+            }
+            setGeminiChatHistory(loadedHistory);
+
             setConversationId(convId);
             setShowHistory(false);
         } catch (e) {
@@ -686,11 +699,10 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                 {/* Pin Toggle */}
                                                 <button
                                                     onClick={(e) => handleTogglePinConversation(e, conv.id, !conv.is_pinned)}
-                                                    className={`p-1 rounded-lg transition-colors ${
-                                                        conv.is_pinned 
-                                                            ? 'text-indigo-600 bg-indigo-50 opacity-100' 
+                                                    className={`p-1 rounded-lg transition-colors ${conv.is_pinned
+                                                            ? 'text-indigo-600 bg-indigo-50 opacity-100'
                                                             : 'opacity-0 group-hover:opacity-100 text-gray-400 hover:bg-gray-150 hover:text-gray-600'
-                                                    }`}
+                                                        }`}
                                                     title={conv.is_pinned ? "Bỏ ghim" : "Ghim lên đầu"}
                                                 >
                                                     <Pin size={13} className={conv.is_pinned ? "fill-indigo-500" : ""} />
@@ -748,7 +760,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <Lightbulb size={16} />
                             <span className="hidden sm:inline">Gợi ý lệnh</span>
                         </button>
-                        
+
                         {(isStatsHidden || isInsightHidden || isGoalsHidden) && (
                             <div className="relative" ref={widgetMenuRef}>
                                 <button
@@ -843,225 +855,225 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 {/* ── Sidebar (Desktop only) ── */}
                 {!(isStatsHidden && isInsightHidden && isGoalsHidden) && (
                     <div className={`hidden lg:flex flex-col w-80 shrink-0 gap-4 overflow-y-auto pb-6 pr-2 custom-scrollbar ${activeArtifact && !isDesktop ? 'lg:hidden' : ''}`}>
-                    {/* Quick Stats */}
-                    {!isStatsHidden && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 transition-all duration-300">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                    <Wallet size={16} className="text-indigo-500" /> Tóm tắt T{now.getMonth() + 1}
-                                </h3>
-                                <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                        onClick={() => setIsStatsCollapsed(!isStatsCollapsed)}
-                                        className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
-                                        title={isStatsCollapsed ? "Mở rộng" : "Thu gọn"}
-                                    >
-                                        {isStatsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                                    </button>
-                                    <button
-                                        onClick={() => setIsStatsHidden(true)}
-                                        className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
-                                        title="Tắt/Ẩn thẻ"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            {!isStatsCollapsed && (
-                                <div className="space-y-3 animate-fade-in">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs text-gray-500">Số dư</span>
-                                        <span className="font-bold text-gray-800 text-sm">{formatCurrency(totalBalance)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs text-gray-500">Thu nhập</span>
-                                        <span className="font-semibold text-emerald-600 text-sm">+{formatCurrency(monthIncome)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs text-gray-500">Chi tiêu</span>
-                                        <span className="font-semibold text-red-500 text-sm">-{formatCurrency(monthExpense)}</span>
-                                    </div>
-                                    <div className="pt-2 border-t border-gray-50">
-                                        <div className="flex justify-between items-center mb-1.5">
-                                            <span className="text-xs text-gray-500">Tổng quỹ tiết kiệm</span>
-                                            <span className="font-bold text-sm text-indigo-600">{formatCurrency(totalSavings)}</span>
-                                        </div>
-                                        <div className="w-full bg-gray-100 rounded-full h-2">
-                                            <div
-                                                className="h-2 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all duration-700 max-w-full"
-                                                style={{ width: `${Math.max(Math.min(savingsPercentOfIncome, 100), 5)}%` }}
-                                            />
-                                        </div>
+                        {/* Quick Stats */}
+                        {!isStatsHidden && (
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 transition-all duration-300">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                        <Wallet size={16} className="text-indigo-500" /> Tóm tắt T{now.getMonth() + 1}
+                                    </h3>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={() => setIsStatsCollapsed(!isStatsCollapsed)}
+                                            className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+                                            title={isStatsCollapsed ? "Mở rộng" : "Thu gọn"}
+                                        >
+                                            {isStatsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                                        </button>
+                                        <button
+                                            onClick={() => setIsStatsHidden(true)}
+                                            className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                                            title="Tắt/Ẩn thẻ"
+                                        >
+                                            <X size={14} />
+                                        </button>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    )}
 
-                    {/* AI Quick Insight */}
-                    {!isInsightHidden && (
-                        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-5 transition-all duration-300">
-                            <div className="flex items-center justify-between mb-2.5">
-                                <h3 className="text-sm font-bold text-indigo-700 flex items-center gap-2">
-                                    <Lightbulb size={16} className="text-amber-500" /> Nhận xét nhanh
-                                </h3>
-                                <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                        onClick={() => setIsInsightCollapsed(!isInsightCollapsed)}
-                                        className="p-1 hover:bg-indigo-100/50 rounded-lg text-indigo-400 hover:text-indigo-700 transition-colors"
-                                        title={isInsightCollapsed ? "Mở rộng" : "Thu gọn"}
-                                    >
-                                        {isInsightCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                                    </button>
-                                    <button
-                                        onClick={() => setIsInsightHidden(true)}
-                                        className="p-1 hover:bg-indigo-100/50 rounded-lg text-indigo-400 hover:text-red-500 transition-colors"
-                                        title="Tắt/Ẩn thẻ"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            {!isInsightCollapsed && (
-                                <div className="animate-fade-in">
-                                    {isLoadingInsight ? (
-                                        <div className="flex items-center gap-2 text-indigo-500 text-xs font-semibold py-2">
-                                            <Loader2 size={14} className="animate-spin" /> Đang phân tích sâu...
+                                {!isStatsCollapsed && (
+                                    <div className="space-y-3 animate-fade-in">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-gray-500">Số dư</span>
+                                            <span className="font-bold text-gray-800 text-sm">{formatCurrency(totalBalance)}</span>
                                         </div>
-                                    ) : quickInsight ? (
-                                        <div className="space-y-3">
-                                            <div className="text-xs text-indigo-900/80 leading-relaxed prose prose-sm prose-p:my-0.5">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{quickInsight}</ReactMarkdown>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-gray-500">Thu nhập</span>
+                                            <span className="font-semibold text-emerald-600 text-sm">+{formatCurrency(monthIncome)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-gray-500">Chi tiêu</span>
+                                            <span className="font-semibold text-red-500 text-sm">-{formatCurrency(monthExpense)}</span>
+                                        </div>
+                                        <div className="pt-2 border-t border-gray-50">
+                                            <div className="flex justify-between items-center mb-1.5">
+                                                <span className="text-xs text-gray-500">Tổng quỹ tiết kiệm</span>
+                                                <span className="font-bold text-sm text-indigo-600">{formatCurrency(totalSavings)}</span>
                                             </div>
-                                            <button
-                                                onClick={() => setQuickInsight(null)}
-                                                className="text-[11px] text-indigo-500 hover:text-indigo-700 font-bold hover:underline flex items-center gap-1 mt-1"
-                                            >
-                                                Thu nhỏ ↩
-                                            </button>
+                                            <div className="w-full bg-gray-100 rounded-full h-2">
+                                                <div
+                                                    className="h-2 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all duration-700 max-w-full"
+                                                    style={{ width: `${Math.max(Math.min(savingsPercentOfIncome, 100), 5)}%` }}
+                                                />
+                                            </div>
                                         </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            <p className="text-xs text-indigo-900/80 leading-relaxed font-medium">
-                                                Tháng {now.getMonth() + 1}: Thu nhập {formatCurrency(monthIncome)}, chi tiêu {formatCurrency(monthExpense)}. Còn lại: <strong className="text-indigo-700">{formatCurrency(monthIncome - monthExpense)}</strong> ({monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 100) : 0}%).
-                                            </p>
-                                            <button
-                                                onClick={handleFetchAIInsight}
-                                                className="w-full py-1.5 px-3 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-150 transition-colors flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
-                                            >
-                                                <Sparkles size={12} /> Phân tích sâu bằng AI ✨
-                                            </button>
-                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* AI Quick Insight */}
+                        {!isInsightHidden && (
+                            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-5 transition-all duration-300">
+                                <div className="flex items-center justify-between mb-2.5">
+                                    <h3 className="text-sm font-bold text-indigo-700 flex items-center gap-2">
+                                        <Lightbulb size={16} className="text-amber-500" /> Nhận xét nhanh
+                                    </h3>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={() => setIsInsightCollapsed(!isInsightCollapsed)}
+                                            className="p-1 hover:bg-indigo-100/50 rounded-lg text-indigo-400 hover:text-indigo-700 transition-colors"
+                                            title={isInsightCollapsed ? "Mở rộng" : "Thu gọn"}
+                                        >
+                                            {isInsightCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                                        </button>
+                                        <button
+                                            onClick={() => setIsInsightHidden(true)}
+                                            className="p-1 hover:bg-indigo-100/50 rounded-lg text-indigo-400 hover:text-red-500 transition-colors"
+                                            title="Tắt/Ẩn thẻ"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {!isInsightCollapsed && (
+                                    <div className="animate-fade-in">
+                                        {isLoadingInsight ? (
+                                            <div className="flex items-center gap-2 text-indigo-500 text-xs font-semibold py-2">
+                                                <Loader2 size={14} className="animate-spin" /> Đang phân tích sâu...
+                                            </div>
+                                        ) : quickInsight ? (
+                                            <div className="space-y-3">
+                                                <div className="text-xs text-indigo-900/80 leading-relaxed prose prose-sm prose-p:my-0.5">
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{quickInsight}</ReactMarkdown>
+                                                </div>
+                                                <button
+                                                    onClick={() => setQuickInsight(null)}
+                                                    className="text-[11px] text-indigo-500 hover:text-indigo-700 font-bold hover:underline flex items-center gap-1 mt-1"
+                                                >
+                                                    Thu nhỏ ↩
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <p className="text-xs text-indigo-900/80 leading-relaxed font-medium">
+                                                    Tháng {now.getMonth() + 1}: Thu nhập {formatCurrency(monthIncome)}, chi tiêu {formatCurrency(monthExpense)}. Còn lại: <strong className="text-indigo-700">{formatCurrency(monthIncome - monthExpense)}</strong> ({monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 100) : 0}%).
+                                                </p>
+                                                <button
+                                                    onClick={handleFetchAIInsight}
+                                                    className="w-full py-1.5 px-3 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-150 transition-colors flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+                                                >
+                                                    <Sparkles size={12} /> Phân tích sâu bằng AI ✨
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Goals Summary */}
+                        {appState.goals.length > 0 && !isGoalsHidden && (
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 transition-all duration-300">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                        <Target size={16} className="text-purple-500" /> Mục tiêu ({appState.goals.length})
+                                    </h3>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={() => setIsGoalsCollapsed(!isGoalsCollapsed)}
+                                            className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+                                            title={isGoalsCollapsed ? "Mở rộng" : "Thu gọn"}
+                                        >
+                                            {isGoalsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                                        </button>
+                                        <button
+                                            onClick={() => setIsGoalsHidden(true)}
+                                            className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                                            title="Tắt/Ẩn thẻ"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {!isGoalsCollapsed && (
+                                    <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1 animate-fade-in">
+                                        {appState.goals.map(g => {
+                                            let pct = 0;
+                                            let subLabel = '';
+
+                                            if (g.target_amount && g.target_amount > 0) {
+                                                pct = Math.min(100, Math.round(((g.current_amount || 0) / g.target_amount) * 100));
+                                                subLabel = `${formatCurrency(g.current_amount || 0)} / ${formatCurrency(g.target_amount)}`;
+                                            } else if (g.progress != null) {
+                                                pct = g.progress;
+                                            } else if (g.created_at && g.deadline) {
+                                                const start = new Date(g.created_at).getTime();
+                                                const end = new Date(g.deadline).getTime();
+                                                const now = Date.now();
+                                                if (end > start) {
+                                                    pct = Math.min(100, Math.max(0, Math.round(((now - start) / (end - start)) * 100)));
+                                                }
+                                            }
+
+                                            return (
+                                                <div key={g.id}>
+                                                    <div className="flex justify-between text-xs mb-1">
+                                                        <span className="font-medium text-gray-700 truncate">{g.title}</span>
+                                                        <span className="text-gray-400 ml-2 shrink-0">{pct}%</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-100 rounded-full h-2 relative overflow-hidden">
+                                                        <div
+                                                            className="h-full rounded-full bg-gradient-to-r from-purple-400 to-pink-500 transition-all duration-500"
+                                                            style={{ width: `${Math.max(pct, 2)}%` }}
+                                                        />
+                                                    </div>
+                                                    {subLabel && (
+                                                        <p className="text-[10px] text-gray-400 mt-0.5 text-right">{subLabel}</p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Hidden Widgets Restore Bar */}
+                        {(isStatsHidden || isInsightHidden || isGoalsHidden) && (
+                            <div className="bg-slate-50/50 rounded-2xl border border-dashed border-gray-200 p-4 mt-auto">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Thẻ đã ẩn</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {isStatsHidden && (
+                                        <button
+                                            onClick={() => setIsStatsHidden(false)}
+                                            className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
+                                        >
+                                            + Tóm tắt
+                                        </button>
+                                    )}
+                                    {isInsightHidden && (
+                                        <button
+                                            onClick={() => setIsInsightHidden(false)}
+                                            className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
+                                        >
+                                            + Nhận xét
+                                        </button>
+                                    )}
+                                    {isGoalsHidden && (
+                                        <button
+                                            onClick={() => setIsGoalsHidden(false)}
+                                            className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
+                                        >
+                                            + Mục tiêu
+                                        </button>
                                     )}
                                 </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Goals Summary */}
-                    {appState.goals.length > 0 && !isGoalsHidden && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 transition-all duration-300">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                    <Target size={16} className="text-purple-500" /> Mục tiêu ({appState.goals.length})
-                                </h3>
-                                <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                        onClick={() => setIsGoalsCollapsed(!isGoalsCollapsed)}
-                                        className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
-                                        title={isGoalsCollapsed ? "Mở rộng" : "Thu gọn"}
-                                    >
-                                        {isGoalsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                                    </button>
-                                    <button
-                                        onClick={() => setIsGoalsHidden(true)}
-                                        className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
-                                        title="Tắt/Ẩn thẻ"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
                             </div>
-
-                            {!isGoalsCollapsed && (
-                                <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1 animate-fade-in">
-                                    {appState.goals.map(g => {
-                                        let pct = 0;
-                                        let subLabel = '';
-
-                                        if (g.target_amount && g.target_amount > 0) {
-                                            pct = Math.min(100, Math.round(((g.current_amount || 0) / g.target_amount) * 100));
-                                            subLabel = `${formatCurrency(g.current_amount || 0)} / ${formatCurrency(g.target_amount)}`;
-                                        } else if (g.progress != null) {
-                                            pct = g.progress;
-                                        } else if (g.created_at && g.deadline) {
-                                            const start = new Date(g.created_at).getTime();
-                                            const end = new Date(g.deadline).getTime();
-                                            const now = Date.now();
-                                            if (end > start) {
-                                                pct = Math.min(100, Math.max(0, Math.round(((now - start) / (end - start)) * 100)));
-                                            }
-                                        }
-
-                                        return (
-                                            <div key={g.id}>
-                                                <div className="flex justify-between text-xs mb-1">
-                                                    <span className="font-medium text-gray-700 truncate">{g.title}</span>
-                                                    <span className="text-gray-400 ml-2 shrink-0">{pct}%</span>
-                                                </div>
-                                                <div className="w-full bg-gray-100 rounded-full h-2 relative overflow-hidden">
-                                                    <div
-                                                        className="h-full rounded-full bg-gradient-to-r from-purple-400 to-pink-500 transition-all duration-500"
-                                                        style={{ width: `${Math.max(pct, 2)}%` }}
-                                                    />
-                                                </div>
-                                                {subLabel && (
-                                                    <p className="text-[10px] text-gray-400 mt-0.5 text-right">{subLabel}</p>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Hidden Widgets Restore Bar */}
-                    {(isStatsHidden || isInsightHidden || isGoalsHidden) && (
-                        <div className="bg-slate-50/50 rounded-2xl border border-dashed border-gray-200 p-4 mt-auto">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Thẻ đã ẩn</p>
-                            <div className="flex flex-wrap gap-1.5">
-                                {isStatsHidden && (
-                                    <button
-                                        onClick={() => setIsStatsHidden(false)}
-                                        className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
-                                    >
-                                        + Tóm tắt
-                                    </button>
-                                )}
-                                {isInsightHidden && (
-                                    <button
-                                        onClick={() => setIsInsightHidden(false)}
-                                        className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
-                                    >
-                                        + Nhận xét
-                                    </button>
-                                )}
-                                {isGoalsHidden && (
-                                    <button
-                                        onClick={() => setIsGoalsHidden(false)}
-                                        className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
-                                    >
-                                        + Mục tiêu
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+                        )}
+                    </div>
+                )}
 
                 {/* ── Chat Area ── */}
                 <div className="flex-1 flex flex-col min-h-0 bg-white lg:rounded-t-2xl lg:border lg:border-gray-100 lg:shadow-sm overflow-hidden">
@@ -1069,10 +1081,10 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
                         {messages.map((msg, idx) => {
                             const parsedArtifactData = msg.role === 'assistant' ? parseArtifact(msg.content) : null;
-                            const displayContent = parsedArtifactData 
-                                ? (parsedArtifactData.cleanContent || `📊 AI đã lập báo cáo **${parsedArtifactData.title}**`) 
+                            const displayContent = parsedArtifactData
+                                ? (parsedArtifactData.cleanContent || `📊 AI đã lập báo cáo **${parsedArtifactData.title}**`)
                                 : msg.content;
-                            
+
                             return (
                                 <div key={idx} className={`flex items-end gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in`}>
                                     {/* Avatar */}
@@ -1236,7 +1248,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         <div className="relative flex items-end gap-2 bg-gray-50 rounded-xl border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
                             {/* Upload Popover Menu */}
                             {showUploadMenu && (
-                                <div 
+                                <div
                                     ref={uploadMenuRef}
                                     className="absolute bottom-14 left-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-150 p-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col gap-0.5"
                                 >
@@ -1306,13 +1318,13 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         </p>
                     </div>
                 </div>
-                
+
                 {/* ── Artifact Pane (Desktop side column, Mobile drawer) ── */}
                 {activeArtifact && (
-                        <>
-                            {/* Desktop Side Column */}
-                            {!isDesktop && (
-                                <div className="hidden lg:flex flex-col w-[45%] lg:max-w-2xl shrink-0 bg-white border border-gray-100 rounded-t-2xl shadow-sm overflow-hidden animate-fade-in-left">
+                    <>
+                        {/* Desktop Side Column */}
+                        {!isDesktop && (
+                            <div className="hidden lg:flex flex-col w-[45%] lg:max-w-2xl shrink-0 bg-white border border-gray-100 rounded-t-2xl shadow-sm overflow-hidden animate-fade-in-left">
                                 <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
                                     <div className="flex items-center gap-2 min-w-0">
                                         <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0">
@@ -1379,75 +1391,75 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                     })()}
                                 </div>
                             </div>
-                            )}
+                        )}
 
-                            {/* Mobile Slide-up Fullscreen Drawer */}
-                            <div className="lg:hidden fixed inset-0 z-[100] flex flex-col bg-white animate-fade-in-up">
-                                <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-                                            <FileText size={14} className="bg-transparent text-indigo-650" />
-                                        </div>
-                                        <h2 className="font-bold text-gray-800 text-sm truncate" title={activeArtifact.title}>
-                                            {activeArtifact.title}
-                                        </h2>
+                        {/* Mobile Slide-up Fullscreen Drawer */}
+                        <div className="lg:hidden fixed inset-0 z-[100] flex flex-col bg-white animate-fade-in-up">
+                            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+                                        <FileText size={14} className="bg-transparent text-indigo-650" />
                                     </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        <button
-                                            onClick={handleCopyArtifact}
-                                            className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1 bg-transparent"
-                                        >
-                                            {copied ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
-                                        </button>
-                                        <button
-                                            onClick={handleDownloadArtifact}
-                                            className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors bg-transparent"
-                                        >
-                                            <Download size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveArtifact(null)}
-                                            className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors bg-transparent"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
+                                    <h2 className="font-bold text-gray-800 text-sm truncate" title={activeArtifact.title}>
+                                        {activeArtifact.title}
+                                    </h2>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-5 prose prose-sm md:prose-base custom-scrollbar pb-10">
-                                    {(() => {
-                                        const chart = getParsedChart(activeArtifact.content);
-                                        if (chart) {
-                                            return (
-                                                <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-sm max-w-full overflow-hidden">
-                                                    <InlineChatChart chart={chart} />
-                                                </div>
-                                            );
-                                        }
-                                        return (
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                components={{
-                                                    p: ({ node, ...props }) => <p className="mb-4 leading-relaxed text-gray-700 last:mb-0" {...props} />,
-                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
-                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
-                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
-                                                    li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
-                                                    strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />,
-                                                    table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
-                                                    thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
-                                                    th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
-                                                    td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
-                                                    tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
-                                                }}
-                                            >
-                                                {activeArtifact.content}
-                                            </ReactMarkdown>
-                                        );
-                                    })()}
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={handleCopyArtifact}
+                                        className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1 bg-transparent"
+                                    >
+                                        {copied ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                                    </button>
+                                    <button
+                                        onClick={handleDownloadArtifact}
+                                        className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors bg-transparent"
+                                    >
+                                        <Download size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveArtifact(null)}
+                                        className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors bg-transparent"
+                                    >
+                                        <X size={18} />
+                                    </button>
                                 </div>
                             </div>
-                        </>
-                    )}
+                            <div className="flex-1 overflow-y-auto p-5 prose prose-sm md:prose-base custom-scrollbar pb-10">
+                                {(() => {
+                                    const chart = getParsedChart(activeArtifact.content);
+                                    if (chart) {
+                                        return (
+                                            <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-sm max-w-full overflow-hidden">
+                                                <InlineChatChart chart={chart} />
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                p: ({ node, ...props }) => <p className="mb-4 leading-relaxed text-gray-700 last:mb-0" {...props} />,
+                                                h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
+                                                ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
+                                                ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
+                                                li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
+                                                strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />,
+                                                table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
+                                                thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
+                                                th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
+                                                td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
+                                                tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
+                                            }}
+                                        >
+                                            {activeArtifact.content}
+                                        </ReactMarkdown>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
             <ConfirmModal
                 isOpen={confirmDialog.isOpen}

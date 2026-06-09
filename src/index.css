@@ -183,3 +183,190 @@ body {
     transform: scale(1) translateY(0);
   }
 }
+
+/* ==========================================================================
+   PREMIUM DARK THEME GLOBAL OVERRIDES (for .dark class)
+   ========================================================================== */
+html.dark,
+html.dark body {
+  background-color: #0B0F19 !important;
+  color: #E2E8F0 !important;
+}
+
+/* Background overrides */
+html.dark .bg-white {
+  background-color: #111827 !important;
+}
+
+html.dark .bg-gray-50 {
+  background-color: #1F2937 !important;
+}
+
+html.dark .bg-gray-100 {
+  background-color: #1F2937 !important;
+}
+
+html.dark .bg-gray-150\/50 {
+  background-color: rgba(31, 41, 55, 0.5) !important;
+}
+
+html.dark .bg-\[\#F8F9FC\] {
+  background-color: #0B0F19 !important;
+}
+
+/* Borders */
+html.dark .border-gray-100,
+html.dark .border-gray-150,
+html.dark .border-gray-200,
+html.dark .border-gray-300,
+html.dark .border-dashed {
+  border-color: #1F2937 !important;
+}
+
+/* Texts */
+html.dark .text-gray-900 {
+  color: #F9FAFB !important;
+}
+
+html.dark .text-gray-800 {
+  color: #F3F4F6 !important;
+}
+
+html.dark .text-gray-700 {
+  color: #E5E7EB !important;
+}
+
+html.dark .text-gray-650 {
+  color: #D1D5DB !important;
+}
+
+html.dark .text-gray-600 {
+  color: #9CA3AF !important;
+}
+
+html.dark .text-gray-500 {
+  color: #9CA3AF !important;
+}
+
+html.dark .text-gray-400 {
+  color: #6B7280 !important;
+}
+
+/* Navigation items & Hover overrides */
+html.dark .hover\:bg-gray-50:hover {
+  background-color: #1F2937 !important;
+}
+
+html.dark .hover\:bg-gray-100:hover {
+  background-color: #1F2937 !important;
+}
+
+/* Sidebar and active menu buttons */
+html.dark .bg-indigo-50 {
+  background-color: rgba(49, 46, 129, 0.4) !important;
+  color: #818CF8 !important;
+}
+
+html.dark .text-indigo-700 {
+  color: #818CF8 !important;
+}
+
+html.dark .bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.4) !important;
+  color: #34D399 !important;
+}
+
+html.dark .text-emerald-700 {
+  color: #34D399 !important;
+}
+
+html.dark .bg-orange-50 {
+  background-color: rgba(120, 53, 4, 0.4) !important;
+  color: #FDBA74 !important;
+}
+
+html.dark .text-orange-700 {
+  color: #FDBA74 !important;
+}
+
+html.dark .bg-sky-50 {
+  background-color: rgba(12, 74, 96, 0.4) !important;
+  color: #7DD3FC !important;
+}
+
+html.dark .text-sky-700 {
+  color: #7DD3FC !important;
+}
+
+html.dark .bg-violet-50 {
+  background-color: rgba(76, 29, 149, 0.4) !important;
+  color: #C084FC !important;
+}
+
+html.dark .text-violet-700 {
+  color: #C084FC !important;
+}
+
+/* Inputs and select controls */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #1F2937 !important;
+  color: #F3F4F6 !important;
+  border-color: #374151 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #6B7280 !important;
+}
+
+/* Modals, Headers & Navbars overrides */
+html.dark .bg-white\/50,
+html.dark .bg-white\/80,
+html.dark .bg-white\/90,
+html.dark .bg-white\/95,
+html.dark header,
+html.dark nav {
+  background-color: rgba(17, 24, 39, 0.95) !important;
+  border-color: #1F2937 !important;
+}
+
+html.dark .border-gray-100\/80 {
+  border-color: #1F2937 !important;
+}
+
+html.dark .text-indigo-600 {
+  color: #818CF8 !important;
+}
+
+html.dark .text-sky-600 {
+  color: #7DD3FC !important;
+}
+
+html.dark .text-emerald-600 {
+  color: #34D399 !important;
+}
+
+html.dark .text-violet-600 {
+  color: #C084FC !important;
+}
+
+html.dark .bg-indigo-50\/50 {
+  background-color: rgba(49, 46, 129, 0.2) !important;
+  border-color: rgba(99, 102, 241, 0.2) !important;
+}
+
+html.dark .bg-white.rounded-3xl {
+  background-color: #111827 !important;
+}
+
+/* Custom scrollbars for dark mode */
+html.dark .scrollbar-thin::-webkit-scrollbar-thumb,
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.2);
+}
+
+html.dark .scrollbar-thin {
+  scrollbar-color: rgba(156, 163, 175, 0.2) transparent;
+}

@@ -33,7 +33,7 @@ import { careerGoalService } from './services/careerGoalService';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { supabase } from './services/supabase';
-import { requestNotificationPermission, checkAndNotify, checkCalendarAndNotify, checkGoalsAndNotify, checkCustomEventsAndNotify, checkHabitsFromDBAndNotify } from './services/notificationService';
+import { requestNotificationPermission, checkAndNotify, checkCalendarAndNotify, checkGoalsAndNotify, checkCustomEventsAndNotify, checkHabitsFromDBAndNotify, checkTodosAndNotify } from './services/notificationService';
 import { generateInsights } from './services/smartEngine';
 import InsightCard from './components/InsightCard';
 import { messaging } from './services/firebase';
@@ -46,6 +46,7 @@ import { ActiveFocusWidget } from './components/ActiveFocusWidget';
 import { createSubscriptionOrder, setupTrialForNewUser, getLatestPendingOrder } from './services/subscriptionService';
 import { SubscriptionPlanDuration, SubscriptionOrder } from './types';
 import { Lang, t } from './i18n/i18n';
+import { useTheme } from './utils/theme';
 
 // Types và Constants (Khớp với file đã sửa)
 import { AppState, Transaction, Todo, TaskPriority, SmartInsight, GPASemester, GPACourse, GPATemplateType, UserNotification } from './types';
@@ -541,18 +542,20 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (appState.goals.length) checkGoalsAndNotify(appState.goals);
             if (calendarEvents.length) checkCustomEventsAndNotify(calendarEvents);
             if (user?.id) checkHabitsFromDBAndNotify(user.id);
+            checkTodosAndNotify(appState.todos);
         }, 60000);
 
-        if (notificationsEnabled && (appState.timetable.length || calendarEvents.length)) {
-            checkAndNotify(appState.timetable);
+        if (notificationsEnabled) {
+            if (appState.timetable.length) checkAndNotify(appState.timetable);
             checkCalendarAndNotify();
             if (appState.goals.length) checkGoalsAndNotify(appState.goals);
             if (calendarEvents.length) checkCustomEventsAndNotify(calendarEvents);
             if (user?.id) checkHabitsFromDBAndNotify(user.id);
+            checkTodosAndNotify(appState.todos);
         }
 
         return () => clearInterval(interval);
-    }, [appState.timetable, appState.goals, calendarEvents]);
+    }, [appState.timetable, appState.goals, calendarEvents, appState.todos]);
 
     // Confirm close app
     useEffect(() => {
@@ -1365,8 +1368,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
             {/* Mobile Bottom Nav — Fixed 4 items */}
             {activeTab !== 'ai-advisor' && (
-                <div className="md:hidden fixed bottom-safe-dock left-4 right-4 z-50 max-w-lg mx-auto transform-gpu">
-                    <nav className="bg-white/90 backdrop-blur-xl border border-gray-100/80 flex justify-between items-center rounded-full h-[62px] shadow-[0_12px_36px_-4px_rgba(16,24,40,0.08)] px-2 py-1">
+                <div className="md:hidden fixed bottom-safe-dock left-6 right-6 z-50 max-w-lg mx-auto transform-gpu">
+                    <nav className="bg-white/90 backdrop-blur-xl border border-gray-100/80 flex justify-between items-center rounded-full h-[68px] shadow-[0_10px_35px_rgba(56,189,248,0.3)] px-3 py-1.5">
                         {MOBILE_NAV_TABS.map(tab => {
                             const IconComponent = tab.icon;
                             const isActive = activeTab === tab.id;
@@ -1378,16 +1381,16 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 <button
                                     key={tab.id}
                                     onClick={() => { setActiveTab(tab.id as any); }}
-                                    className={`flex items-center justify-center rounded-full h-11 transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) active:scale-95 ${
+                                    className={`flex items-center justify-center rounded-full h-12 shrink-0 transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) active:scale-95 ${
                                         isActive
-                                            ? `px-4 py-2.5 ${activeBgClass} ${activeColorClass} shadow-sm shadow-indigo-100/10`
+                                            ? `px-5 py-2.5 ${activeBgClass} ${activeColorClass} shadow-sm shadow-indigo-100/10`
                                             : 'px-3 py-2 text-gray-400 active:text-gray-600 active:bg-gray-50/20'
                                     }`}
                                 >
-                                    <IconComponent size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 transition-transform duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) ${isActive && tab.id === 'expand' ? 'rotate-90' : ''}`} />
+                                    <IconComponent size={22} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 transition-transform duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) ${isActive && tab.id === 'expand' ? 'rotate-90' : ''}`} />
                                     <span
-                                        className={`text-[11px] font-bold tracking-tight transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) overflow-hidden whitespace-nowrap ${
-                                            isActive ? 'max-w-[100px] opacity-100 ml-1.5' : 'max-w-0 opacity-0 ml-0'
+                                        className={`text-[12px] font-bold tracking-tight transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) overflow-hidden whitespace-nowrap ${
+                                            isActive ? 'max-w-[100px] opacity-100 ml-2.5' : 'max-w-0 opacity-0 ml-0'
                                         }`}
                                     >
                                         {label}
@@ -1462,6 +1465,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 import LandingPage from './components/LandingPage';
 
 const AppWrapper: React.FC = () => {
+    useTheme();
     const { user, loading } = useAuth();
     const [showLogin, setShowLogin] = useState(false);
     const [lang, setLang] = useState<Lang>(() => {

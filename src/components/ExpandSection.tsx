@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
     GraduationCap, Target, Music, BookOpen, Flame, Settings, 
-    QrCode, CreditCard, Contact, Camera, Trash2, X, Sparkles, Plus, Eye 
+    QrCode, CreditCard, Contact, Camera, Trash2, X, Sparkles, Plus, Eye, Loader2
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { Profile } from '../types';
@@ -21,10 +21,10 @@ const EXPAND_ITEMS = [
         label: 'Điểm GPA',
         desc: 'Theo dõi điểm số & kế hoạch học tập',
         icon: GraduationCap,
-        gradient: 'from-purple-500 to-violet-600',
-        bg: 'bg-purple-50',
-        iconColor: 'text-purple-600',
-        shadowColor: 'shadow-purple-200/60',
+        gradient: 'from-blue-500 to-indigo-600',
+        bg: 'bg-blue-50',
+        iconColor: 'text-blue-600',
+        shadowColor: 'shadow-blue-200/60',
         action: 'navigate',
     },
     {
@@ -32,10 +32,10 @@ const EXPAND_ITEMS = [
         label: 'Mục tiêu',
         desc: 'Quản lý mục tiêu & lộ trình sự nghiệp',
         icon: Target,
-        gradient: 'from-blue-500 to-indigo-600',
-        bg: 'bg-blue-50',
-        iconColor: 'text-blue-600',
-        shadowColor: 'shadow-blue-200/60',
+        gradient: 'from-purple-500 to-violet-600',
+        bg: 'bg-purple-50',
+        iconColor: 'text-purple-600',
+        shadowColor: 'shadow-purple-200/60',
         action: 'navigate',
     },
     {
@@ -94,6 +94,61 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
 }) => {
     const [activeLightboxField, setActiveLightboxField] = useState<'qr_code_url' | 'student_card_url' | 'citizen_card_url' | null>(null);
     const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+    // Pull-to-refresh state & refs
+    const [pullDistance, setPullDistance] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const startY = React.useRef(0);
+    const isDragging = React.useRef(false);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        // Only trigger if no modal/lightbox is active
+        if (activeLightboxField || zoomedImage) return;
+        
+        const mainScroll = document.querySelector('main');
+        const isAtTop = !mainScroll || mainScroll.scrollTop === 0;
+        if (isAtTop && window.scrollY === 0) {
+            startY.current = e.touches[0].clientY;
+            isDragging.current = true;
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isDragging.current) return;
+        const currentY = e.touches[0].clientY;
+        const diff = currentY - startY.current;
+
+        if (diff > 0) {
+            // Apply spring resistance damping for longer/smoother pull-down
+            const offset = Math.min(diff * 0.45, 130);
+            setPullDistance(offset);
+            
+            // Critical: prevent page rubber-banding on body scroll
+            if (diff > 10 && e.cancelable) {
+                e.preventDefault();
+            }
+        }
+    };
+
+    const handleTouchEnd = async () => {
+        if (!isDragging.current) return;
+        isDragging.current = false;
+
+        if (pullDistance > 85 && onRefreshProfile) {
+            setIsRefreshing(true);
+            setPullDistance(90);
+            try {
+                await onRefreshProfile();
+            } catch (err) {
+                console.error("Refresh error:", err);
+            } finally {
+                setIsRefreshing(false);
+                setPullDistance(0);
+            }
+        } else {
+            setPullDistance(0);
+        }
+    };
 
     const getDocImages = (field: 'qr_code_url' | 'student_card_url' | 'citizen_card_url') => {
         const val = profile?.[field];
@@ -219,7 +274,41 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
     };
 
     return (
-        <div className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="relative w-full overflow-hidden min-h-full">
+            {/* Fixed background pull-to-refresh indicator */}
+            <div 
+                className="absolute left-0 right-0 top-0 flex justify-center items-center pointer-events-none z-0"
+                style={{ 
+                    height: '80px', 
+                    opacity: Math.min(pullDistance / 85, 1),
+                    transform: `scale(${Math.min(pullDistance / 85, 1)})`,
+                    transition: isDragging.current ? 'none' : 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+            >
+                <div className="bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-full border border-indigo-100 shadow-[0_8px_30px_rgba(99,102,241,0.15)] flex items-center justify-center gap-2">
+                    <Loader2 
+                        className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`} 
+                        size={18} 
+                        style={{ transform: !isRefreshing ? `rotate(${pullDistance * 3}deg)` : 'none' }}
+                    />
+                    <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest pr-1">
+                        {isRefreshing ? 'Đang cập nhật...' : 'Kéo thêm để reset'}
+                    </span>
+                </div>
+            </div>
+
+            {/* Main content with touch handlers & GPU acceleration */}
+            <div 
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 relative z-10 bg-[#F8F9FC] transform-gpu"
+                style={{
+                    transform: pullDistance > 0 ? `translate3d(0, ${pullDistance}px, 0)` : 'none',
+                    transition: isDragging.current ? 'none' : 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+                    willChange: 'transform'
+                }}
+            >
             {/* Hidden Document Inputs */}
             <input type="file" id="expand-qr-upload" accept="image/*" className="hidden" onChange={(e) => handleDocUpload(e, 'qr_code_url')} />
             <input type="file" id="expand-student-upload" accept="image/*" className="hidden" onChange={(e) => handleDocUpload(e, 'student_card_url')} />
@@ -439,6 +528,7 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
                     />
                 </div>
             )}
+            </div>
         </div>
     );
 };

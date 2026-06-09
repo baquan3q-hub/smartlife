@@ -1,4 +1,4 @@
-import { TimetableEvent, Goal } from "../types";
+import { TimetableEvent, Goal, Todo } from "../types";
 // @ts-ignore
 import { Solar, Lunar } from "lunar-javascript";
 import { supabase } from "./supabase";
@@ -53,7 +53,8 @@ const getSettings = () => {
             calendar_lunar: true,
             calendar_holiday: true,
             focus_timer: true,
-            goals_remind: true
+            goals_remind: true,
+            todo_remind: true
         };
     } catch {
         return {
@@ -62,7 +63,8 @@ const getSettings = () => {
             calendar_lunar: true,
             calendar_holiday: true,
             focus_timer: true,
-            goals_remind: true
+            goals_remind: true,
+            todo_remind: true
         };
     }
 };
@@ -335,4 +337,45 @@ const sendNotification = (title: string, options?: NotificationOptions) => {
         silent: false, // We played sound manually, but keeping this doesn't hurt
         ...options
     });
+};
+
+export const checkTodosAndNotify = (todos: Todo[]) => {
+    if (Notification.permission !== "granted") return;
+    const settings = getSettings();
+    if (!settings.todo_remind) return;
+
+    const now = new Date();
+    const h = now.getHours();
+    let slot = '';
+    let dateStr = now.toDateString();
+
+    if (h >= 12 && h < 20) {
+        slot = '12';
+    } else {
+        slot = '20';
+        if (h < 12) {
+            const yesterday = new Date(now);
+            yesterday.setDate(now.getDate() - 1);
+            dateStr = yesterday.toDateString();
+        }
+    }
+
+    const tag = `todo-remind-${slot}-${dateStr}`;
+    if (hasNotifiedRecently(tag)) return;
+
+    const pendingTodos = todos.filter(t => !t.is_completed);
+
+    if (pendingTodos.length > 0) {
+        sendNotification("📝 Nhắc nhở Todo List", {
+            body: `Bạn còn ${pendingTodos.length} nhiệm vụ chưa làm xong (ví dụ: "${pendingTodos[0].content}"). Nhấn để hoàn thành ngay nhé! 💪`,
+            tag
+        });
+        markNotified(tag);
+    } else if (todos.length === 0) {
+        sendNotification("📝 Lên kế hoạch học tập", {
+            body: "Bạn chưa tạo danh sách việc cần làm hôm nay. Hãy lên Todo List ngay để học tập hiệu quả nhé! 🚀",
+            tag
+        });
+        markNotified(tag);
+    }
 };
