@@ -19,7 +19,7 @@ const API_KEYS = envKeys.split(',').map((k: string) => k.trim()).filter(Boolean)
 let currentKeyIndex = 0;
 
 // Model thống nhất duy nhất
-const MODEL = 'gemini-flash-latest';
+const MODEL = 'gemini-2.5-flash';
 
 function getGeminiUrl(): string {
     const key = API_KEYS[currentKeyIndex % API_KEYS.length] || '';
@@ -77,7 +77,7 @@ function formatCurrency(amount: number): string {
     return amount.toLocaleString('vi-VN') + 'đ';
 }
 
-function buildFinanceContext(state: AppState): string {
+export function buildFinanceContext(state: AppState): string {
     const { transactions, budgets } = state;
     const totalIncomeAll = transactions.filter(t => t.type === TransactionType.INCOME).reduce((s, t) => s + t.amount, 0);
     const totalExpenseAll = transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
@@ -143,7 +143,7 @@ ${monthlyTrend.join('\n')}
 ${recentTx || '  (Chưa có giao dịch)'}`;
 }
 
-function buildGoalsContext(state: AppState): string {
+export function buildGoalsContext(state: AppState): string {
     const { goals } = state;
     if (!goals || goals.length === 0) return '\n🎯 MỤC TIÊU: Chưa thiết lập';
 
@@ -171,7 +171,7 @@ function buildGoalsContext(state: AppState): string {
     return ctx;
 }
 
-function buildScheduleContext(state: AppState): string {
+export function buildScheduleContext(state: AppState): string {
     const { todos, timetable } = state;
     let ctx = '';
     const pending = (todos || []).filter(t => !t.is_completed);
@@ -195,7 +195,7 @@ function buildScheduleContext(state: AppState): string {
     return ctx || '\n📋 LỊCH TRÌNH: Chưa có dữ liệu';
 }
 
-function buildProfileContext(state: AppState): string {
+export function buildProfileContext(state: AppState): string {
     const { profile } = state;
     if (!profile) return '';
     let ctx = '\n👤 HỒ SƠ NGƯỜI DÙNG:\n';
@@ -213,7 +213,7 @@ function buildProfileContext(state: AppState): string {
     return ctx;
 }
 
-function buildGPAContext(state: AppState): string {
+export function buildGPAContext(state: AppState): string {
     const { gpaSemesters, gpaTargetCredits } = state;
     if (!gpaSemesters || gpaSemesters.length === 0) return '\n🎓 GPA: Chưa có dữ liệu học kỳ';
 
@@ -260,7 +260,7 @@ function buildGPAContext(state: AppState): string {
     return ctx;
 }
 
-async function buildHabitContext(): Promise<string> {
+export async function buildHabitContext(): Promise<string> {
     try {
         const { data: userData } = await supabase.auth.getUser();
         const uid = userData?.user?.id;
@@ -315,7 +315,7 @@ async function buildHabitContext(): Promise<string> {
     }
 }
 
-async function buildCountdownContext(): Promise<string> {
+export async function buildCountdownContext(): Promise<string> {
     try {
         const { data: userData } = await supabase.auth.getUser();
         const uid = userData?.user?.id;
@@ -363,7 +363,7 @@ async function buildCountdownContext(): Promise<string> {
     }
 }
 
-async function buildJournalContext(): Promise<string> {
+export async function buildJournalContext(): Promise<string> {
     try {
         const { data: userData } = await supabase.auth.getUser();
         const uid = userData?.user?.id;
@@ -441,27 +441,41 @@ export function buildFullContext(state: AppState): string {
 // ────────────────────────────────────────
 export const SYSTEM_INSTRUCTION = `Bạn là **SmartLife Advisor** — trợ lý AI chuyên tư vấn tài chính cá nhân, quản lý cuộc sống, và **tư vấn học vụ GPA cho sinh viên ĐHQGHN**.
 
-NGUYÊN TẮC:
-1. Luôn phân tích dựa trên DỮ LIỆU THỰC của người dùng (được cung cấp bên dưới hoặc qua tool query_database).
+QUY TẮC BẢO MẬT & TIẾT KIỆM TOKEN:
+- Để tiết kiệm token và bảo mật, bạn KHÔNG được cung cấp sẵn toàn bộ dữ liệu người dùng trong prompt hệ thống.
+- Hãy chủ động gọi các công cụ truy vấn (Function Calling) tương ứng dưới đây khi cần dữ liệu để trả lời người dùng:
+  • Gọi \`get_user_profile\` khi hỏi về thông tin cá nhân (tên, tuổi, MBTI, DISC, nghề nghiệp, lương, định hướng...).
+  • Gọi \`get_financial_report\` khi hỏi về tài chính cá nhân, số dư, chi tiêu danh mục, ngân sách, xu hướng chi tiêu 6 tháng.
+  • Gọi \`get_todos_and_schedule\` khi hỏi về việc cần làm (todos) và thời khóa biểu cố định.
+  • Gọi \`get_academic_gpa_record\` khi hỏi về điểm số học tập, các học kỳ, môn học, tín chỉ, tính GPA tích lũy.
+  • Gọi \`get_habits_tracker\` khi hỏi về thói quen cá nhân, streaks thói quen, tỷ lệ check-in hoàn thành.
+  • Gọi \`get_countdown_events\` khi hỏi về các sự kiện đếm ngược hoặc mốc đếm tiến.
+  • Gọi \`get_journal_entries\` khi hỏi về nội dung nhật ký gần đây hoặc phân tích cảm xúc dạo gần đây.
+  • Gọi \`query_database\` khi cần thực hiện các truy vấn lọc Supabase phức tạp hơn trên các bảng.
+- Bạn phải LUÔN gọi các công cụ này trước khi trả lời, KHÔNG tự bịa số liệu hay đoán bừa nếu chưa gọi tool tương ứng.
+
+ĐỊNH DẠNG BÁO CÁO CHI TIẾT (ARTIFACTS):
+- Chỉ sử dụng cặp thẻ <artifact title="Tiêu đề ngắn gọn của báo cáo">...</artifact> khi người dùng có yêu cầu rõ ràng như "tạo báo cáo", "lập tài liệu", "tạo tài liệu riêng", "lập báo cáo phân tích riêng", hoặc "tải báo cáo".
+- Đối với mọi câu hỏi bình thường khác (kể cả câu trả lời dài dòng, phân tích chi tiết, bảng biểu lớn, hay kế hoạch học tập/tài chính), bạn TUYỆT ĐỐI KHÔNG tự ý sử dụng thẻ <artifact>. Thay vào đó, bạn phải phản hồi trực tiếp bằng văn bản Markdown bình thường trong đoạn chat để hiển thị inline trực tiếp cho người dùng ở cả giao diện máy tính và điện thoại.
+
+NGUYÊN TẮC PHÂN TÍCH:
+1. Luôn phân tích dựa trên DỮ LIỆU THỰC của người dùng thu được từ các công cụ gọi hàm.
 2. Trả lời bằng tiếng Việt, ngắn gọn, dùng emoji phù hợp.
 3. Khi phân tích chi tiêu: so sánh với ngân sách, chỉ ra danh mục chi nhiều nhất, đề xuất cắt giảm cụ thể.
 4. Khi dự đoán: dựa trên xu hướng 6 tháng, đưa ra con số cụ thể.
 5. Khi tư vấn mục tiêu: tính toán cần tiết kiệm bao nhiêu/tháng để đạt mục tiêu đúng hạn.
 6. ƯU TIÊN dùng bảng (Table Markdown và biểu đồ cột ) để trình bày danh sách hoặc so sánh số liệu thực tế vs dự đoán.
-7. Khi vẽ biểu đồ, CHỈ DÙNG biểu đồ cột (bar) hoặc đường (line) qua tool call. TUYỆT ĐỐI KHÔNG vẽ biểu đồ tròn (pie).
+7. Khi vẽ biểu đồ, bạn PHẢI gọi công cụ (tool call) \`render_chart\`. Tuyệt đối KHÔNG viết mã JSON của biểu đồ hoặc văn bản thô của biểu đồ vào bên trong thẻ <artifact>. Thẻ <artifact> chỉ chứa văn bản báo cáo định dạng Markdown (như tiêu đề, bảng biểu Markdown, văn bản phân tích), còn biểu đồ sẽ được hệ thống vẽ tự động từ tool call.
 8. Khi người dùng yêu cầu dự đoán chi tiêu: phân tích mức chi tiêu trung bình các tháng trước, tính độ lệch và đưa ra dự đoán số tiền cho các tháng tới bằng một bảng (table) rõ ràng.
 9. Khi người dùng yêu cầu thêm lịch/việc/giao dịch, dùng tool tương ứng. Nếu người dùng liệt kê NHIỀU khoản thu chi trong 1 tin nhắn, LUÔN dùng tool \`batch_add_transactions\` thay vì gọi \`add_transaction\` nhiều lần.
 10. Giọng điệu chuyên nghiệp, ngắn gọn. Đầu ra phải dễ đọc trên giao diện mobile (tránh viết văn quá dài).
-11. Dùng tool \`query_database\` để tính toán tổng số tiền khi cần thiết, đừng tự bịa số. Các bảng khả dụng: transactions, goals, budgets, timetable, todos, profiles, calendar_events, gpa_semesters, gpa_courses, habits, habit_logs, countdown_items, countup_items.
+11. BẮT BUỘC định dạng danh sách việc cần làm (todo list) và lịch trình (schedule) một cách trực quan: In đậm các nội dung quan trọng/tên nhiệm vụ và luôn kèm theo các emoji sinh động ở đầu dòng (ví dụ: 📝, 📅, ⏰, ✅, 🔴, 🟡, 🟢) để người dùng dễ quan sát.
 
 🔥 THÓI QUEN (habits):
-- Dữ liệu thói quen (streak, tỷ lệ hoàn thành, check-in hôm nay) được cung cấp trong context.
-- Dùng tool \`query_database\` với bảng \`habits\` hoặc \`habit_logs\` khi cần phân tích chi tiết hơn.
 - Khi phân tích thói quen: đánh giá tỷ lệ hoàn thành, xu hướng streak, và đề xuất cải thiện.
 
 ⏳ ĐẾM NGƯỢC / ĐẾM TIẾN (countdown_items, countup_items):
-- Dữ liệu sự kiện đếm ngược và mốc đếm tiến được cung cấp trong context.
-- Dùng tool \`query_database\` với bảng \`countdown_items\` hoặc \`countup_items\` khi cần.
+- Phân tích và ước lượng số ngày còn lại hoặc đã qua của các sự kiện quan trọng.
 
 🎓 QUY CHẾ GPA ĐHQGHN 2022:
 - Thang điểm: 10 → Chữ (A+/A/B+/B/C+/C/D+/D/F) → Thang 4 (4.0/3.7/3.5/3.0/2.5/2.0/1.5/1.0/0.0)
@@ -481,7 +495,7 @@ Khi tư vấn GPA:
 - Dùng tool \`calculate_needed_gpa\` và \`simulate_gpa\` khi cần tính toán.
 
 🧠 CÁ NHÂN HÓA PHONG CÁCH GIAO TIẾP (MBTI & DISC):
-Hãy đọc thông tin "Tính cách MBTI" và "Tính cách DISC" của người dùng trong phần "👤 HỒ SƠ NGƯỜI DÙNG" và thay đổi phong cách phản hồi cho phù hợp:
+Hãy đọc thông tin MBTI và DISC của người dùng sau khi gọi công cụ get_user_profile và thay đổi phong cách phản hồi cho phù hợp:
 1. ĐỊNH HÌNH TÔNG GIỌNG GIAO TIẾP theo nhóm DISC:
    - Nhóm D (Thống trị): Trả lời cực kỳ ngắn gọn, trực diện, tập trung vào kết quả và số liệu. Tránh nói dông dài, hạn chế tối đa emoji.
    - Nhóm I (Ảnh hưởng): Tràn đầy năng lượng, tích cực, sử dụng nhiều emoji, thường xuyên đưa ra lời khen và khích lệ người dùng.
@@ -509,17 +523,23 @@ export async function callGeminiRaw(body: object, retryCount = 0): Promise<any> 
         const err = await res.json().catch(() => ({}));
         const status = res.status;
 
-        if (status === 429) {
-            // Key bị limit -> đổi sang key tiếp theo nếu còn key khác
-            if (API_KEYS.length > 1 && retryCount < API_KEYS.length) {
-                currentKeyIndex++;
-                console.warn(`[SmartLife] Key limit reached (429). Switching to key #${(currentKeyIndex % API_KEYS.length) + 1}...`);
+        if (status === 429 || status === 500 || status === 503 || status === 504) {
+            if (retryCount < Math.max(3, API_KEYS.length)) {
+                if (API_KEYS.length > 1) {
+                    currentKeyIndex++;
+                    console.warn(`[SmartLife] Status ${status}. Switching to key #${(currentKeyIndex % API_KEYS.length) + 1} and retrying...`);
+                } else {
+                    console.warn(`[SmartLife] Status ${status}. Retrying request...`);
+                }
+                const delay = 1500 * (retryCount + 1); // 1.5s, 3s, 4.5s...
+                await new Promise(r => setTimeout(r, delay));
                 return callGeminiRaw(body, retryCount + 1);
             }
-            throw new Error('Hệ thống AI đang bị quá tải (429). Đã hết sạch khóa dự phòng. Vui lòng đợi 1 phút. 🔄');
-        }
-        if (status === 503) {
-            throw new Error('Dịch vụ AI tạm thời không khả dụng (503). Vui lòng thử lại sau. 🔄');
+            if (status === 429) {
+                throw new Error('Hệ thống AI đang bị quá tải (429). Đã hết sạch khóa dự phòng. Vui lòng đợi một lát rồi thử lại. 🔄');
+            } else {
+                throw new Error(`Dịch vụ AI tạm thời gặp sự cố (${status}). Vui lòng thử lại sau. 🔄`);
+            }
         }
 
         console.error(`[SmartLife] ${MODEL} Error ${status}:`, err);

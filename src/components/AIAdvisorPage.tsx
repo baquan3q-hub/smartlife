@@ -6,9 +6,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     ArrowLeft, Send, Sparkles, Loader2, Bot, RefreshCw,
     TrendingDown, Target, ListChecks, BarChart3, Wallet,
-    PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight,
+    PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight, ChevronDown, ChevronUp,
     CheckCircle2, AlertCircle, History, X, Plus, Trash2, GraduationCap,
-    Heart, Pin
+    Heart, Pin, Copy, Check, Download, FileText, LayoutGrid
 } from 'lucide-react';
 
 import { AppState, TransactionType } from '../types';
@@ -192,6 +192,56 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [activeArtifact, setActiveArtifact] = useState<{ title: string; content: string } | null>(null);
+    const [copied, setCopied] = useState(false);
+
+    // Sidebar cards layout states (Collapse/Hide)
+    const [isStatsCollapsed, setIsStatsCollapsed] = useState(false);
+    const [isInsightCollapsed, setIsInsightCollapsed] = useState(false);
+    const [isGoalsCollapsed, setIsGoalsCollapsed] = useState(false);
+
+    const [isStatsHidden, setIsStatsHidden] = useState(false);
+    const [isInsightHidden, setIsInsightHidden] = useState(false);
+    const [isGoalsHidden, setIsGoalsHidden] = useState(false);
+
+    const [showWidgetMenu, setShowWidgetMenu] = useState(false);
+    const widgetMenuRef = useRef<HTMLDivElement>(null);
+    const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+    const parseArtifact = (content: string) => {
+        const artifactRegex = /<artifact\s+title=["']([^"']+)["']\s*>([\s\S]*?)<\/artifact>/i;
+        const match = content.match(artifactRegex);
+        if (match) {
+            const title = match[1];
+            const artifactContent = match[2].trim();
+            const cleanContent = content.replace(artifactRegex, '').trim();
+            return {
+                title,
+                artifactContent,
+                cleanContent
+            };
+        }
+        return null;
+    };
+
+    const getParsedChart = (text: string): ChartData | null => {
+        try {
+            const cleanText = text.trim();
+            if (cleanText.startsWith('{') && cleanText.endsWith('}')) {
+                const parsed = JSON.parse(cleanText);
+                if (parsed && (parsed.chartType || parsed.chart_type) && parsed.title && Array.isArray(parsed.data)) {
+                    return {
+                        chart_type: parsed.chartType || parsed.chart_type || 'bar',
+                        title: parsed.title,
+                        data: parsed.data
+                    };
+                }
+            }
+        } catch (e) {
+            // silent fail
+        }
+        return null;
+    };
     const [quickInsight, setQuickInsight] = useState<string | null>(null);
     const [isLoadingInsight, setIsLoadingInsight] = useState(false);
 
@@ -298,6 +348,14 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         return () => clearTimeout(timer);
     }, []);
 
+    useEffect(() => {
+        const handleResize = () => {
+            setIsDesktop(window.innerWidth >= 1024);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     // Load conversations when the component mounts or when conversationId changes
     useEffect(() => {
         chatHistoryService.getConversations().then(setConversations);
@@ -317,6 +375,25 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         }
     };
 
+    const handleCopyArtifact = () => {
+        if (!activeArtifact) return;
+        navigator.clipboard.writeText(activeArtifact.content);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleDownloadArtifact = () => {
+        if (!activeArtifact) return;
+        const blob = new Blob([activeArtifact.content], { type: 'text/markdown;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${activeArtifact.title.replace(/\s+/g, '_')}.md`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     // Load memory context on mount
     useEffect(() => {
         memoryService.getMemoryContextString()
@@ -324,20 +401,23 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             .catch(console.error);
     }, []);
 
-    // Click outside upload menu handler
+    // Click outside upload menu & widget menu handler
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (uploadMenuRef.current && !uploadMenuRef.current.contains(event.target as Node)) {
                 setShowUploadMenu(false);
             }
+            if (widgetMenuRef.current && !widgetMenuRef.current.contains(event.target as Node)) {
+                setShowWidgetMenu(false);
+            }
         };
-        if (showUploadMenu) {
+        if (showUploadMenu || showWidgetMenu) {
             document.addEventListener('mousedown', handleClickOutside);
         }
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showUploadMenu]);
+    }, [showUploadMenu, showWidgetMenu]);
 
 
     // Build chat history for Gemini (convert UIMessage → ChatMessage)
@@ -451,6 +531,15 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 memoryService.extractMemoriesFromConversation(chatText).catch(console.error);
             }
 
+            // Auto-open artifact if generated (Mobile only)
+            const parsedRes = parseArtifact(response.text);
+            if (parsedRes && !isDesktop) {
+                setActiveArtifact({
+                    title: parsedRes.title,
+                    content: parsedRes.artifactContent
+                });
+            }
+
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: response.text,
@@ -477,6 +566,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
     const handleReset = () => {
         setConversationId(null);
+        setActiveArtifact(null);
         setMessages([{
             role: 'assistant',
             content: '🔄 Cuộc trò chuyện đã được làm mới! Mình sẵn sàng phân tích dữ liệu cho bạn. 🌱'
@@ -486,6 +576,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
     const loadConversation = async (convId: string) => {
         setIsLoading(true);
+        setActiveArtifact(null);
         try {
             const msgs: AIMessage[] = await chatHistoryService.getMessages(convId);
             const uiMsgs: UIMessage[] = msgs.map((m: AIMessage) => ({
@@ -542,7 +633,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const savingsPercentOfIncome = monthIncome > 0 ? Math.round((totalSavings / monthIncome) * 100) : 0;
 
     return (
-        <div className="animate-fade-in fixed inset-0 md:relative md:inset-auto bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex flex-col h-[100dvh] md:h-auto z-40 md:z-auto">
+        <div className="animate-fade-in fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex flex-col h-[100dvh] z-40">
             {/* History Overlay/Drawer */}
             {showHistory && (
                 <div className="fixed inset-0 z-50 flex">
@@ -657,6 +748,49 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <Lightbulb size={16} />
                             <span className="hidden sm:inline">Gợi ý lệnh</span>
                         </button>
+                        
+                        {(isStatsHidden || isInsightHidden || isGoalsHidden) && (
+                            <div className="relative" ref={widgetMenuRef}>
+                                <button
+                                    onClick={() => setShowWidgetMenu(!showWidgetMenu)}
+                                    className={`p-2 rounded-xl transition-colors flex items-center gap-1.5 text-sm font-medium ${showWidgetMenu ? 'bg-indigo-100 text-indigo-750' : 'hover:bg-gray-100 text-gray-500 hover:text-indigo-600'}`}
+                                    title="Quản lý thẻ thông tin"
+                                >
+                                    <LayoutGrid size={16} />
+                                    <span className="hidden sm:inline">Quản lý thẻ</span>
+                                </button>
+                                {showWidgetMenu && (
+                                    <div className="absolute right-0 top-11 w-56 bg-white rounded-2xl shadow-xl border border-gray-150 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-200 flex flex-col gap-0.5">
+                                        <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Khôi phục thẻ</div>
+                                        {isStatsHidden && (
+                                            <button
+                                                onClick={() => { setIsStatsHidden(false); setShowWidgetMenu(false); }}
+                                                className="w-full text-left px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors flex items-center gap-2"
+                                            >
+                                                <Wallet size={14} className="text-indigo-500" /> Hiện Tóm tắt tài chính
+                                            </button>
+                                        )}
+                                        {isInsightHidden && (
+                                            <button
+                                                onClick={() => { setIsInsightHidden(false); setShowWidgetMenu(false); }}
+                                                className="w-full text-left px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors flex items-center gap-2"
+                                            >
+                                                <Lightbulb size={14} className="text-amber-500" /> Hiện Nhận xét nhanh
+                                            </button>
+                                        )}
+                                        {isGoalsHidden && (
+                                            <button
+                                                onClick={() => { setIsGoalsHidden(false); setShowWidgetMenu(false); }}
+                                                className="w-full text-left px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors flex items-center gap-2"
+                                            >
+                                                <Target size={14} className="text-purple-500" /> Hiện Mục tiêu
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <button
                             onClick={() => setShowHistory(true)}
                             className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-indigo-600 flex items-center gap-1.5"
@@ -707,209 +841,330 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             <div className="max-w-7xl mx-auto flex-1 flex flex-col lg:flex-row gap-0 lg:gap-6 px-0 lg:px-8 pt-0 lg:pt-2 overflow-hidden w-full min-h-0">
 
                 {/* ── Sidebar (Desktop only) ── */}
-                <div className="hidden lg:flex flex-col w-80 shrink-0 gap-4 overflow-y-auto pb-6 pr-2 custom-scrollbar">
+                {!(isStatsHidden && isInsightHidden && isGoalsHidden) && (
+                    <div className={`hidden lg:flex flex-col w-80 shrink-0 gap-4 overflow-y-auto pb-6 pr-2 custom-scrollbar ${activeArtifact && !isDesktop ? 'lg:hidden' : ''}`}>
                     {/* Quick Stats */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                        <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
-                            <Wallet size={16} className="text-indigo-500" /> Tóm tắt T{now.getMonth() + 1}
-                        </h3>
-                        <div className="space-y-3">
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-500">Số dư</span>
-                                <span className="font-bold text-gray-800 text-sm">{formatCurrency(totalBalance)}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-500">Thu nhập</span>
-                                <span className="font-semibold text-emerald-600 text-sm">+{formatCurrency(monthIncome)}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-500">Chi tiêu</span>
-                                <span className="font-semibold text-red-500 text-sm">-{formatCurrency(monthExpense)}</span>
-                            </div>
-                            <div className="pt-2 border-t border-gray-50">
-                                <div className="flex justify-between items-center mb-1.5">
-                                    <span className="text-xs text-gray-500">Tổng quỹ tiết kiệm</span>
-                                    <span className="font-bold text-sm text-indigo-600">{formatCurrency(totalSavings)}</span>
-                                </div>
-                                <div className="w-full bg-gray-100 rounded-full h-2">
-                                    <div
-                                        className="h-2 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all duration-700 max-w-full"
-                                        style={{ width: `${Math.max(Math.min(savingsPercentOfIncome, 100), 5)}%` }}
-                                    />
+                    {!isStatsHidden && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 transition-all duration-300">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                    <Wallet size={16} className="text-indigo-500" /> Tóm tắt T{now.getMonth() + 1}
+                                </h3>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={() => setIsStatsCollapsed(!isStatsCollapsed)}
+                                        className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+                                        title={isStatsCollapsed ? "Mở rộng" : "Thu gọn"}
+                                    >
+                                        {isStatsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                                    </button>
+                                    <button
+                                        onClick={() => setIsStatsHidden(true)}
+                                        className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                                        title="Tắt/Ẩn thẻ"
+                                    >
+                                        <X size={14} />
+                                    </button>
                                 </div>
                             </div>
+                            
+                            {!isStatsCollapsed && (
+                                <div className="space-y-3 animate-fade-in">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs text-gray-500">Số dư</span>
+                                        <span className="font-bold text-gray-800 text-sm">{formatCurrency(totalBalance)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs text-gray-500">Thu nhập</span>
+                                        <span className="font-semibold text-emerald-600 text-sm">+{formatCurrency(monthIncome)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs text-gray-500">Chi tiêu</span>
+                                        <span className="font-semibold text-red-500 text-sm">-{formatCurrency(monthExpense)}</span>
+                                    </div>
+                                    <div className="pt-2 border-t border-gray-50">
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <span className="text-xs text-gray-500">Tổng quỹ tiết kiệm</span>
+                                            <span className="font-bold text-sm text-indigo-600">{formatCurrency(totalSavings)}</span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 rounded-full h-2">
+                                            <div
+                                                className="h-2 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all duration-700 max-w-full"
+                                                style={{ width: `${Math.max(Math.min(savingsPercentOfIncome, 100), 5)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    </div>
+                    )}
 
                     {/* AI Quick Insight */}
-                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-5">
-                        <h3 className="text-sm font-bold text-indigo-700 mb-2.5 flex items-center justify-between">
-                            <span className="flex items-center gap-2">
-                                <Lightbulb size={16} className="text-amber-500" /> Nhận xét nhanh
-                            </span>
-                        </h3>
-                        {isLoadingInsight ? (
-                            <div className="flex items-center gap-2 text-indigo-500 text-xs font-semibold py-2">
-                                <Loader2 size={14} className="animate-spin" /> Đang phân tích sâu...
-                            </div>
-                        ) : quickInsight ? (
-                            <div className="space-y-3">
-                                <div className="text-xs text-indigo-900/80 leading-relaxed prose prose-sm prose-p:my-0.5">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{quickInsight}</ReactMarkdown>
+                    {!isInsightHidden && (
+                        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-5 transition-all duration-300">
+                            <div className="flex items-center justify-between mb-2.5">
+                                <h3 className="text-sm font-bold text-indigo-700 flex items-center gap-2">
+                                    <Lightbulb size={16} className="text-amber-500" /> Nhận xét nhanh
+                                </h3>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={() => setIsInsightCollapsed(!isInsightCollapsed)}
+                                        className="p-1 hover:bg-indigo-100/50 rounded-lg text-indigo-400 hover:text-indigo-700 transition-colors"
+                                        title={isInsightCollapsed ? "Mở rộng" : "Thu gọn"}
+                                    >
+                                        {isInsightCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                                    </button>
+                                    <button
+                                        onClick={() => setIsInsightHidden(true)}
+                                        className="p-1 hover:bg-indigo-100/50 rounded-lg text-indigo-400 hover:text-red-500 transition-colors"
+                                        title="Tắt/Ẩn thẻ"
+                                    >
+                                        <X size={14} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={() => setQuickInsight(null)}
-                                    className="text-[11px] text-indigo-500 hover:text-indigo-700 font-bold hover:underline flex items-center gap-1 mt-1"
-                                >
-                                    Thu nhỏ ↩
-                                </button>
                             </div>
-                        ) : (
-                            <div className="space-y-3">
-                                <p className="text-xs text-indigo-900/80 leading-relaxed font-medium">
-                                    Tháng {now.getMonth() + 1}: Thu nhập {formatCurrency(monthIncome)}, chi tiêu {formatCurrency(monthExpense)}. Còn lại: <strong className="text-indigo-700">{formatCurrency(monthIncome - monthExpense)}</strong> ({monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 100) : 0}%).
-                                </p>
-                                <button
-                                    onClick={handleFetchAIInsight}
-                                    className="w-full py-1.5 px-3 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-150 transition-colors flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
-                                >
-                                    <Sparkles size={12} /> Phân tích sâu bằng AI ✨
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
+                            
+                            {!isInsightCollapsed && (
+                                <div className="animate-fade-in">
+                                    {isLoadingInsight ? (
+                                        <div className="flex items-center gap-2 text-indigo-500 text-xs font-semibold py-2">
+                                            <Loader2 size={14} className="animate-spin" /> Đang phân tích sâu...
+                                        </div>
+                                    ) : quickInsight ? (
+                                        <div className="space-y-3">
+                                            <div className="text-xs text-indigo-900/80 leading-relaxed prose prose-sm prose-p:my-0.5">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{quickInsight}</ReactMarkdown>
+                                            </div>
+                                            <button
+                                                onClick={() => setQuickInsight(null)}
+                                                className="text-[11px] text-indigo-500 hover:text-indigo-700 font-bold hover:underline flex items-center gap-1 mt-1"
+                                            >
+                                                Thu nhỏ ↩
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-indigo-900/80 leading-relaxed font-medium">
+                                                Tháng {now.getMonth() + 1}: Thu nhập {formatCurrency(monthIncome)}, chi tiêu {formatCurrency(monthExpense)}. Còn lại: <strong className="text-indigo-700">{formatCurrency(monthIncome - monthExpense)}</strong> ({monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 100) : 0}%).
+                                            </p>
+                                            <button
+                                                onClick={handleFetchAIInsight}
+                                                className="w-full py-1.5 px-3 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-150 transition-colors flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+                                            >
+                                                <Sparkles size={12} /> Phân tích sâu bằng AI ✨
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Goals Summary */}
-                    {appState.goals.length > 0 && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                            <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                                <Target size={16} className="text-purple-500" /> Mục tiêu ({appState.goals.length})
-                            </h3>
-                            <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-                                {appState.goals.map(g => {
-                                    // Financial goals: current_amount / target_amount
-                                    // Schedule/learning goals: time-based progress
-                                    let pct = 0;
-                                    let subLabel = '';
+                    {appState.goals.length > 0 && !isGoalsHidden && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 transition-all duration-300">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                    <Target size={16} className="text-purple-500" /> Mục tiêu ({appState.goals.length})
+                                </h3>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={() => setIsGoalsCollapsed(!isGoalsCollapsed)}
+                                        className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+                                        title={isGoalsCollapsed ? "Mở rộng" : "Thu gọn"}
+                                    >
+                                        {isGoalsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                                    </button>
+                                    <button
+                                        onClick={() => setIsGoalsHidden(true)}
+                                        className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                                        title="Tắt/Ẩn thẻ"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            </div>
 
-                                    if (g.target_amount && g.target_amount > 0) {
-                                        // Financial goal
-                                        pct = Math.min(100, Math.round(((g.current_amount || 0) / g.target_amount) * 100));
-                                        subLabel = `${formatCurrency(g.current_amount || 0)} / ${formatCurrency(g.target_amount)}`;
-                                    } else if (g.progress != null) {
-                                        // Has explicit progress field
-                                        pct = g.progress;
-                                    } else if (g.created_at && g.deadline) {
-                                        // Time-based progress
-                                        const start = new Date(g.created_at).getTime();
-                                        const end = new Date(g.deadline).getTime();
-                                        const now = Date.now();
-                                        if (end > start) {
-                                            pct = Math.min(100, Math.max(0, Math.round(((now - start) / (end - start)) * 100)));
+                            {!isGoalsCollapsed && (
+                                <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1 animate-fade-in">
+                                    {appState.goals.map(g => {
+                                        let pct = 0;
+                                        let subLabel = '';
+
+                                        if (g.target_amount && g.target_amount > 0) {
+                                            pct = Math.min(100, Math.round(((g.current_amount || 0) / g.target_amount) * 100));
+                                            subLabel = `${formatCurrency(g.current_amount || 0)} / ${formatCurrency(g.target_amount)}`;
+                                        } else if (g.progress != null) {
+                                            pct = g.progress;
+                                        } else if (g.created_at && g.deadline) {
+                                            const start = new Date(g.created_at).getTime();
+                                            const end = new Date(g.deadline).getTime();
+                                            const now = Date.now();
+                                            if (end > start) {
+                                                pct = Math.min(100, Math.max(0, Math.round(((now - start) / (end - start)) * 100)));
+                                            }
                                         }
-                                    }
 
-                                    return (
-                                        <div key={g.id}>
-                                            <div className="flex justify-between text-xs mb-1">
-                                                <span className="font-medium text-gray-700 truncate">{g.title}</span>
-                                                <span className="text-gray-400 ml-2 shrink-0">{pct}%</span>
+                                        return (
+                                            <div key={g.id}>
+                                                <div className="flex justify-between text-xs mb-1">
+                                                    <span className="font-medium text-gray-700 truncate">{g.title}</span>
+                                                    <span className="text-gray-400 ml-2 shrink-0">{pct}%</span>
+                                                </div>
+                                                <div className="w-full bg-gray-100 rounded-full h-2 relative overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full bg-gradient-to-r from-purple-400 to-pink-500 transition-all duration-500"
+                                                        style={{ width: `${Math.max(pct, 2)}%` }}
+                                                    />
+                                                </div>
+                                                {subLabel && (
+                                                    <p className="text-[10px] text-gray-400 mt-0.5 text-right">{subLabel}</p>
+                                                )}
                                             </div>
-                                            <div className="w-full bg-gray-100 rounded-full h-2 relative overflow-hidden">
-                                                <div
-                                                    className="h-full rounded-full bg-gradient-to-r from-purple-400 to-pink-500 transition-all duration-500"
-                                                    style={{ width: `${Math.max(pct, 2)}%` }}
-                                                />
-                                            </div>
-                                            {subLabel && (
-                                                <p className="text-[10px] text-gray-400 mt-0.5 text-right">{subLabel}</p>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Hidden Widgets Restore Bar */}
+                    {(isStatsHidden || isInsightHidden || isGoalsHidden) && (
+                        <div className="bg-slate-50/50 rounded-2xl border border-dashed border-gray-200 p-4 mt-auto">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Thẻ đã ẩn</p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {isStatsHidden && (
+                                    <button
+                                        onClick={() => setIsStatsHidden(false)}
+                                        className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
+                                    >
+                                        + Tóm tắt
+                                    </button>
+                                )}
+                                {isInsightHidden && (
+                                    <button
+                                        onClick={() => setIsInsightHidden(false)}
+                                        className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
+                                    >
+                                        + Nhận xét
+                                    </button>
+                                )}
+                                {isGoalsHidden && (
+                                    <button
+                                        onClick={() => setIsGoalsHidden(false)}
+                                        className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
+                                    >
+                                        + Mục tiêu
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
                 </div>
+            )}
 
                 {/* ── Chat Area ── */}
                 <div className="flex-1 flex flex-col min-h-0 bg-white lg:rounded-t-2xl lg:border lg:border-gray-100 lg:shadow-sm overflow-hidden">
                     {/* Messages */}
                     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
-                        {messages.map((msg, idx) => (
-                            <div key={idx} className={`flex items-end gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in`}>
-                                {/* Avatar */}
-                                {msg.role === 'assistant' && (
-                                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
-                                        <Sparkles size={12} className="text-white bg-transparent" />
-                                    </div>
-                                )}
+                        {messages.map((msg, idx) => {
+                            const parsedArtifactData = msg.role === 'assistant' ? parseArtifact(msg.content) : null;
+                            const displayContent = parsedArtifactData 
+                                ? (parsedArtifactData.cleanContent || `📊 AI đã lập báo cáo **${parsedArtifactData.title}**`) 
+                                : msg.content;
+                            
+                            return (
+                                <div key={idx} className={`flex items-end gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in`}>
+                                    {/* Avatar */}
+                                    {msg.role === 'assistant' && (
+                                        <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
+                                            <Sparkles size={12} className="text-white bg-transparent" />
+                                        </div>
+                                    )}
 
-                                {/* Bubble */}
-                                <div className={`max-w-[88%] lg:max-w-[75%] ${msg.role === 'user' ? '' : ''}`}>
-                                    <div className={`px-3.5 py-2.5 md:px-4 md:py-3 text-sm leading-relaxed shadow-sm
-                                        ${msg.role === 'user'
-                                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl rounded-br-md prose-invert prose-p:text-white prose-headings:text-white'
-                                            : 'bg-gray-50 text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm prose-p:my-1 md:prose-p:my-1.5 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-indigo-700 prose-h3:text-base prose-h3:mt-3 prose-h3:mb-1'
-                                        }`}
-                                    >
-                                        {msg.role === 'assistant' ? (
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                components={{
-                                                    p: ({ node, ...props }) => <p className="mb-3.5 leading-relaxed text-gray-700 last:mb-0" {...props} />,
-                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
-                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-3.5 space-y-1.5" {...props} />,
-                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-3.5 space-y-1.5" {...props} />,
-                                                    li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
-                                                    strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />,
-                                                    table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
-                                                    thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
-                                                    th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
-                                                    td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
-                                                    tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
-                                                }}
-                                            >
-                                                {msg.content}
-                                            </ReactMarkdown>
-                                        ) : (
-                                            msg.content
+                                    {/* Bubble */}
+                                    <div className={`max-w-[88%] ${msg.role === 'user' ? 'lg:max-w-[75%]' : 'lg:max-w-[85%]'} ${msg.role === 'user' ? '' : ''}`}>
+                                        <div className={`px-3.5 py-2.5 md:px-4 md:py-3 text-sm md:text-[15px] leading-relaxed shadow-sm
+                                            ${msg.role === 'user'
+                                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl rounded-br-md prose-invert prose-p:text-white prose-headings:text-white'
+                                                : 'bg-gray-50 text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm md:prose-base prose-p:my-1 md:prose-p:my-1.5 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-indigo-700 prose-h3:text-base md:prose-h3:text-lg prose-h3:mt-3 prose-h3:mb-1'
+                                            }`}
+                                        >
+                                            {msg.role === 'assistant' ? (
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                    components={{
+                                                        p: ({ node, ...props }) => <p className="mb-3.5 leading-relaxed text-gray-700 last:mb-0" {...props} />,
+                                                        h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
+                                                        ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-3.5 space-y-1.5" {...props} />,
+                                                        ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-3.5 space-y-1.5" {...props} />,
+                                                        li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
+                                                        strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />,
+                                                        table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
+                                                        thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
+                                                        th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
+                                                        td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
+                                                        tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
+                                                    }}
+                                                >
+                                                    {displayContent}
+                                                </ReactMarkdown>
+                                            ) : (
+                                                displayContent
+                                            )}
+                                        </div>
+
+                                        {/* Artifact Card trigger in Chat Bubble */}
+                                        {parsedArtifactData && !isDesktop && (
+                                            <div className="mt-2 p-3 bg-indigo-50/75 rounded-xl border border-indigo-100 flex items-center justify-between gap-3 animate-fade-in shadow-sm">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-semibold text-indigo-950 flex items-center gap-1.5">
+                                                        <FileText size={14} className="text-indigo-600" /> Báo cáo: {parsedArtifactData.title}
+                                                    </p>
+                                                    <p className="text-[10px] text-indigo-700/80 mt-0.5 truncate">Báo cáo chi tiết đã được lập.</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setActiveArtifact({ title: parsedArtifactData.title, content: parsedArtifactData.artifactContent })}
+                                                    className="px-2.5 py-1.5 bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-150 text-xs font-bold rounded-lg transition-colors shadow-sm shrink-0"
+                                                >
+                                                    Xem báo cáo 📑
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Action Confirmations */}
+                                        {msg.actions && msg.actions.length > 0 && (
+                                            <div className="mt-2 space-y-1.5">
+                                                {msg.actions.map((action, ai) => (
+                                                    <div
+                                                        key={ai}
+                                                        className={`flex items-start gap-2 px-3 py-2 rounded-xl text-xs ${action.success
+                                                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                                                            : 'bg-red-50 border border-red-200 text-red-700'
+                                                            }`}
+                                                    >
+                                                        {action.success
+                                                            ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                                                            : <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                                                        }
+                                                        <span>{action.message}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Inline Charts */}
+                                        {msg.charts && msg.charts.length > 0 && (
+                                            <div className="mt-2 space-y-2">
+                                                {msg.charts.map((chart, ci) => (
+                                                    <InlineChatChart key={ci} chart={chart} />
+                                                ))}
+                                            </div>
                                         )}
                                     </div>
-
-                                    {/* Action Confirmations */}
-                                    {msg.actions && msg.actions.length > 0 && (
-                                        <div className="mt-2 space-y-1.5">
-                                            {msg.actions.map((action, ai) => (
-                                                <div
-                                                    key={ai}
-                                                    className={`flex items-start gap-2 px-3 py-2 rounded-xl text-xs ${action.success
-                                                        ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                                                        : 'bg-red-50 border border-red-200 text-red-700'
-                                                        }`}
-                                                >
-                                                    {action.success
-                                                        ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
-                                                        : <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
-                                                    }
-                                                    <span>{action.message}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* Inline Charts */}
-                                    {msg.charts && msg.charts.length > 0 && (
-                                        <div className="mt-2 space-y-2">
-                                            {msg.charts.map((chart, ci) => (
-                                                <InlineChatChart key={ci} chart={chart} />
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
 
                         {/* Loading */}
                         {isLoading && (
@@ -1051,6 +1306,148 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         </p>
                     </div>
                 </div>
+                
+                {/* ── Artifact Pane (Desktop side column, Mobile drawer) ── */}
+                {activeArtifact && (
+                        <>
+                            {/* Desktop Side Column */}
+                            {!isDesktop && (
+                                <div className="hidden lg:flex flex-col w-[45%] lg:max-w-2xl shrink-0 bg-white border border-gray-100 rounded-t-2xl shadow-sm overflow-hidden animate-fade-in-left">
+                                <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+                                            <FileText size={14} className="bg-transparent text-indigo-650" />
+                                        </div>
+                                        <h2 className="font-bold text-gray-800 text-sm truncate" title={activeArtifact.title}>
+                                            {activeArtifact.title}
+                                        </h2>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={handleCopyArtifact}
+                                            className="p-1.5 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1 bg-transparent"
+                                            title="Sao chép báo cáo"
+                                        >
+                                            {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                                        </button>
+                                        <button
+                                            onClick={handleDownloadArtifact}
+                                            className="p-1.5 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors bg-transparent"
+                                            title="Tải xuống Markdown"
+                                        >
+                                            <Download size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => setActiveArtifact(null)}
+                                            className="p-1.5 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors ml-1 bg-transparent"
+                                            title="Đóng báo cáo"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-6 prose prose-sm md:prose-base custom-scrollbar">
+                                    {(() => {
+                                        const chart = getParsedChart(activeArtifact.content);
+                                        if (chart) {
+                                            return (
+                                                <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-sm max-w-full overflow-hidden">
+                                                    <InlineChatChart chart={chart} />
+                                                </div>
+                                            );
+                                        }
+                                        return (
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    p: ({ node, ...props }) => <p className="mb-4 leading-relaxed text-gray-700 last:mb-0" {...props} />,
+                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
+                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
+                                                    li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
+                                                    strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />,
+                                                    table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
+                                                    thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
+                                                    th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
+                                                    td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
+                                                    tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
+                                                }}
+                                            >
+                                                {activeArtifact.content}
+                                            </ReactMarkdown>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                            )}
+
+                            {/* Mobile Slide-up Fullscreen Drawer */}
+                            <div className="lg:hidden fixed inset-0 z-[100] flex flex-col bg-white animate-fade-in-up">
+                                <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+                                            <FileText size={14} className="bg-transparent text-indigo-650" />
+                                        </div>
+                                        <h2 className="font-bold text-gray-800 text-sm truncate" title={activeArtifact.title}>
+                                            {activeArtifact.title}
+                                        </h2>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={handleCopyArtifact}
+                                            className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1 bg-transparent"
+                                        >
+                                            {copied ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                                        </button>
+                                        <button
+                                            onClick={handleDownloadArtifact}
+                                            className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors bg-transparent"
+                                        >
+                                            <Download size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => setActiveArtifact(null)}
+                                            className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors bg-transparent"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-5 prose prose-sm md:prose-base custom-scrollbar pb-10">
+                                    {(() => {
+                                        const chart = getParsedChart(activeArtifact.content);
+                                        if (chart) {
+                                            return (
+                                                <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-sm max-w-full overflow-hidden">
+                                                    <InlineChatChart chart={chart} />
+                                                </div>
+                                            );
+                                        }
+                                        return (
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    p: ({ node, ...props }) => <p className="mb-4 leading-relaxed text-gray-700 last:mb-0" {...props} />,
+                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
+                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
+                                                    li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
+                                                    strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />,
+                                                    table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
+                                                    thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
+                                                    th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
+                                                    td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
+                                                    tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
+                                                }}
+                                            >
+                                                {activeArtifact.content}
+                                            </ReactMarkdown>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </>
+                    )}
             </div>
             <ConfirmModal
                 isOpen={confirmDialog.isOpen}

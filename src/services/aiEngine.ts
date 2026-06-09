@@ -5,6 +5,9 @@
 import { supabase } from './supabase';
 import {
     callGeminiRaw, enqueue, buildFullContext, buildFullContextAsync,
+    buildProfileContext, buildFinanceContext, buildGoalsContext,
+    buildScheduleContext, buildGPAContext, buildHabitContext,
+    buildCountdownContext, buildJournalContext,
     SYSTEM_INSTRUCTION,
     type ChatMessage, type MessagePart, type ToolDeclaration
 } from './geminiService';
@@ -224,6 +227,41 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
             },
             required: ['transactions']
         }
+    },
+    {
+        name: 'get_user_profile',
+        description: 'Lấy thông tin cá nhân của người dùng (tên, tuổi, DISC, MBTI, sở thích, nghề nghiệp, định hướng...).',
+        parameters: { type: 'OBJECT', properties: {} }
+    },
+    {
+        name: 'get_financial_report',
+        description: 'Lấy báo cáo chi tiết tài chính của người dùng (số dư hiện tại, tổng thu chi tháng, chi tiêu chi tiết theo danh mục, trạng thái ngân sách, xu hướng 6 tháng và 10 giao dịch gần nhất).',
+        parameters: { type: 'OBJECT', properties: {} }
+    },
+    {
+        name: 'get_todos_and_schedule',
+        description: 'Lấy danh sách công việc cần làm (todos) và lịch trình cố định của người dùng.',
+        parameters: { type: 'OBJECT', properties: {} }
+    },
+    {
+        name: 'get_academic_gpa_record',
+        description: 'Lấy bảng điểm chi tiết, tín chỉ tích lũy, cảnh báo học vụ, dự báo xếp loại tốt nghiệp và GPA tích lũy.',
+        parameters: { type: 'OBJECT', properties: {} }
+    },
+    {
+        name: 'get_habits_tracker',
+        description: 'Lấy danh sách thói quen đang hoạt động, streak ngày, tần suất, tỷ lệ hoàn thành và check-in hôm nay.',
+        parameters: { type: 'OBJECT', properties: {} }
+    },
+    {
+        name: 'get_countdown_events',
+        description: 'Lấy danh sách sự kiện đếm ngược hoặc mốc đếm tiến.',
+        parameters: { type: 'OBJECT', properties: {} }
+    },
+    {
+        name: 'get_journal_entries',
+        description: 'Lấy nội dung các bài viết nhật ký, mood (cảm xúc), và lòng biết ơn của người dùng trong 5 ngày gần nhất.',
+        parameters: { type: 'OBJECT', properties: {} }
     }
 ];
 
@@ -426,9 +464,12 @@ export async function chatWithAI(
     memoryContext: string = '',
     attachments?: AIAttachment[]
 ): Promise<AIResponse> {
-    const contextText = await buildFullContextAsync(appState);
+    const userName = appState.profile?.full_name || 'Người dùng';
+    const now = new Date();
+    const minimalContext = `\n👤 NGƯỜI DÙNG HIỆN TẠI: ${userName}\n📅 THỜI GIAN HỆ THỐNG: ${now.toLocaleString('vi-VN')} (Thứ ${now.getDay() === 0 ? 'Chủ Nhật' : now.getDay() + 1}, ngày ${now.getDate()} tháng ${now.getMonth() + 1} năm ${now.getFullYear()})`;
+
     const fullSystemPrompt = SYSTEM_INSTRUCTION
-        + '\n\n--- DỮ LIỆU NGƯỜI DÙNG (TÓM TẮT) ---\n' + contextText
+        + minimalContext
         + (memoryContext ? '\n\n--- BỘ NHỚ DÀI HẠN ---\n' + memoryContext : '');
 
     const charts: ChartData[] = [];
@@ -473,6 +514,10 @@ export async function chatWithAI(
         let toolCallCount = 0;
 
         while (toolCallCount < MAX_TOOL_CALLS) {
+            if (toolCallCount > 0) {
+                // Tránh gọi API liên tục quá nhanh gây nghẽn burst limit (lỗi 503)
+                await new Promise(r => setTimeout(r, 1200));
+            }
             const body = buildRequest(contents);
             const data = await callGeminiRaw(body);
 
@@ -565,6 +610,27 @@ export async function chatWithAI(
                         result = { success: actionResult.success, message: actionResult.message };
                         break;
                     }
+                    case 'get_user_profile':
+                        result = { result: buildProfileContext(appState) };
+                        break;
+                    case 'get_financial_report':
+                        result = { result: buildFinanceContext(appState) };
+                        break;
+                    case 'get_todos_and_schedule':
+                        result = { result: buildScheduleContext(appState) };
+                        break;
+                    case 'get_academic_gpa_record':
+                        result = { result: buildGPAContext(appState) };
+                        break;
+                    case 'get_habits_tracker':
+                        result = { result: await buildHabitContext() };
+                        break;
+                    case 'get_countdown_events':
+                        result = { result: await buildCountdownContext() };
+                        break;
+                    case 'get_journal_entries':
+                        result = { result: await buildJournalContext() };
+                        break;
                     default:
                         result = { error: `Unknown tool: ${name}` };
                 }

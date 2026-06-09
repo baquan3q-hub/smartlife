@@ -230,6 +230,9 @@ export interface Profile {
   personality_disc?: string; // D, I, S, C
   hobbies?: string[];
   life_motto?: string;
+  qr_code_url?: string;
+  student_card_url?: string;
+  citizen_card_url?: string;
 }
 
 // Interface cho Smart Backend

@@ -1,6 +1,6 @@
 // File: src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target, Grid2X2 } from 'lucide-react';
 import { NotificationPopupModal } from './components/NotificationPopupModal';
 import { getUnreadCount, getUserNotifications } from './services/adminNotificationService';
 
@@ -15,7 +15,6 @@ import Login from './components/Login';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import WelcomeTourModal from './components/WelcomeTourModal';
 // Import FocusSpace
-import FocusSpace from './components/FocusSpace';
 import MusicSpace from './components/MusicSpace';
 import GPADashboard from './components/GPADashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -28,6 +27,7 @@ import HabitDashboard from './components/HabitDashboard';
 import JournalDashboard from './components/JournalDashboard';
 import ClickRippleEffect from './components/ClickRippleEffect';
 import GoalsDashboard from './components/GoalsDashboard';
+import ExpandSection from './components/ExpandSection';
 import { careerGoalService } from './services/careerGoalService';
 
 
@@ -163,7 +163,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         gpaTargetSemesters: 4,
     });
 
-    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals'>('visual');
+    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals' | 'expand'>('visual');
     const [gpaInitialView, setGpaInitialView] = useState<string | null>(null);
     const [goalsInitialView, setGoalsInitialView] = useState<'career' | 'life' | 'cv' | null>(null);
     const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
@@ -171,26 +171,27 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isSpotifyOpen, setIsSpotifyOpen] = useState(false);
 
-    // Visible Mobile Navigation Tabs State
-    const [visibleMobileTabs, setVisibleMobileTabs] = useState<string[]>(() => {
-        const saved = localStorage.getItem(`smartlife_visible_tabs_${user?.id}`);
-        return saved ? JSON.parse(saved) : ['visual', 'finance', 'schedule', 'journal', 'habit'];
+
+
+    // Header Shortcuts State (Spotify & Habit buttons on mobile header)
+    const [headerShortcuts, setHeaderShortcuts] = useState<{ spotify: boolean; habit: boolean }>(() => {
+        const saved = localStorage.getItem(`smartlife_header_shortcuts_${user?.id}`);
+        return saved ? JSON.parse(saved) : { spotify: true, habit: true };
     });
 
     useEffect(() => {
         if (user?.id) {
-            const saved = localStorage.getItem(`smartlife_visible_tabs_${user.id}`);
-            setVisibleMobileTabs(saved ? JSON.parse(saved) : ['visual', 'finance', 'schedule', 'journal', 'habit']);
+            const saved = localStorage.getItem(`smartlife_header_shortcuts_${user.id}`);
+            setHeaderShortcuts(saved ? JSON.parse(saved) : { spotify: true, habit: true });
         }
     }, [user?.id]);
 
-    const AVAILABLE_MOBILE_TABS = [
+    // Fixed mobile navbar tabs (4 items only)
+    const MOBILE_NAV_TABS = [
         { id: 'visual', labelVi: 'Tổng quan', labelEn: 'Overview', labelKo: '개요', icon: LayoutDashboard, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', icon: Wallet, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { id: 'journal', labelVi: 'Nhật ký', labelEn: 'Journal', labelKo: '일기', icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { id: 'schedule', labelVi: 'Lịch trình', labelEn: 'Schedule', labelKo: '일정', icon: CalendarDays, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { id: 'habit', labelVi: 'Thói quen', labelEn: 'Habits', labelKo: '습관', icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50' },
-        { id: 'gpa', labelVi: 'GPA', labelEn: 'GPA', labelKo: 'GPA', icon: GraduationCap, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', icon: Wallet, color: 'text-sky-600', bg: 'bg-sky-50' },
+        { id: 'schedule', labelVi: 'Lịch trình', labelEn: 'Schedule', labelKo: '일정', icon: CalendarDays, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { id: 'expand', labelVi: 'Mở rộng', labelEn: 'More', labelKo: '더보기', icon: Grid2X2, color: 'text-violet-600', bg: 'bg-violet-50' },
     ];
 
     // Pro Subscription State
@@ -1041,7 +1042,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     };
 
     return (
-        <div className="min-h-screen bg-[#F8F9FC] font-sans text-gray-900 flex">
+        <div className="h-screen w-screen overflow-hidden bg-[#F8F9FC] font-sans text-gray-900 flex flex-col md:flex-row">
             {/* Sidebar Desktop */}
             <aside className={`hidden md:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 fixed h-full z-20 shadow-sm transition-all duration-300 ease-in-out`}>
                 <div className={`p-6 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} gap-3 relative`}>
@@ -1151,7 +1152,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             </aside>
 
             {/* Main Content */}
-            <main className={`flex-1 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} min-h-screen relative bg-[#F8F9FC] transition-all duration-300 ease-in-out overflow-x-hidden ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-24 md:pb-8'}`}> {/* Added safe bottom padding for mobile */}
+            <main className={`flex-1 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} h-full overflow-y-auto scrollbar-hide relative bg-[#F8F9FC] transition-all duration-300 ease-in-out ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-28 md:pb-8'}`}>
                 {activeTab !== 'ai-advisor' && <header className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 z-30 transition-all h-16">
                     <div className="flex items-center justify-between px-4 h-full">
                         <div className="flex items-center gap-2">
@@ -1160,32 +1161,41 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             </div>
                             <span className="font-bold text-gray-800 text-lg tracking-tight hidden sm:block">SmartLife</span>
                         </div>
-                        <div className="flex gap-3 items-center">
-                            <button onClick={() => setActiveTab('gpa')} className={`p-2 rounded-full transition-colors ${activeTab === 'gpa' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:bg-gray-100'}`} title="GPA">
-                                <GraduationCap size={20} />
-                            </button>
-                            <button onClick={() => setActiveTab('goals')} className={`p-2 rounded-full transition-colors ${activeTab === 'goals' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:bg-gray-100'}`} title="Mục tiêu">
-                                <Target size={20} />
-                            </button>
-                            {/* Admin Panel — mobile header */}
+                        <div className="flex gap-2 items-center">
+                            {/* Habit Shortcut — toggleable in Settings */}
+                            {headerShortcuts.habit && (
+                                <button onClick={() => setActiveTab('habit')} className={`p-2 rounded-full transition-all ${activeTab === 'habit' ? 'text-orange-600 bg-orange-100' : 'text-orange-500 bg-orange-50 hover:bg-orange-100'}`} title="Thói quen">
+                                    <Flame size={20} />
+                                </button>
+                            )}
+                            {/* Spotify Shortcut — toggleable in Settings */}
+                            {headerShortcuts.spotify && (
+                                <button onClick={() => setIsSpotifyOpen(true)} className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-full transition-colors" title="My Spotify">
+                                    <Music size={20} />
+                                </button>
+                            )}
+                            {/* Admin Panel — always visible for admin */}
                             {user?.email === 'baquan3q@gmail.com' && (
-                                <button onClick={() => setActiveTab('admin')} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors" title="Admin Panel">
+                                <button onClick={() => setActiveTab('admin')} className={`p-2 rounded-full transition-colors ${activeTab === 'admin' ? 'text-red-600 bg-red-50' : 'text-red-500 hover:bg-red-50'}`} title="Admin Panel">
                                     <ShieldAlert size={20} />
                                 </button>
                             )}
+                            {/* Pro Upgrade */}
                             {!proAccess.isProActive && !proAccess.isLifetime && (
                                 <button onClick={handleOpenPricing} className="relative p-2 rounded-full hover:bg-yellow-50 transition-colors" title="Nâng cấp Pro">
                                     <Crown size={20} className="text-yellow-500" fill="currentColor" />
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white" />
                                 </button>
                             )}
-                            <button onClick={() => setIsSpotifyOpen(true)} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-full transition-colors"><Music size={20} /></button>
-                            <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"><Settings size={20} /></button>
+                            {/* Settings — always visible */}
+                            <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Cài đặt">
+                                <Settings size={20} />
+                            </button>
                         </div>
                     </div>
                 </header>}
 
-                <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative h-full'}`}> {/* AI Advisor gets full screen, others get padded layout */}
+                <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative'}`}> {/* AI Advisor gets full screen, others get dynamic fluid layout */}
                     {activeTab === 'visual' && (
                         proAccess.hasAccess ? (
                             <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
@@ -1279,7 +1289,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 onRefresh={async () => { await fetchData(true); }}
                             />
                         ) : (
-                            <ProGateOverlay featureName="Lịch trình & Mục tiêu" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
+                            <ProGateOverlay featureName="Lịch trình" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
                         )
                     )}
                     {activeTab === 'gpa' && (
@@ -1331,16 +1341,32 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     {activeTab === 'journal' && (
                         <JournalDashboard userId={user?.id || ''} />
                     )}
+                    {activeTab === 'expand' && (
+                        <ExpandSection
+                            userId={user?.id || ''}
+                            profile={appState.profile}
+                            onNavigate={(tab) => {
+                                if (tab === 'music') {
+                                    setStartInFocusMode(true);
+                                    setActiveTab('schedule');
+                                } else {
+                                    setActiveTab(tab as any);
+                                }
+                            }}
+                            onOpenSettings={() => setIsSettingsOpen(true)}
+                            onOpenSpotify={() => setIsSpotifyOpen(true)}
+                            onRefreshProfile={async () => { await fetchData(true); }}
+                        />
+                    )}
                 </div>
             </main>
 
 
-            {/* Mobile Bottom Nav */}
+            {/* Mobile Bottom Nav — Fixed 4 items */}
             {activeTab !== 'ai-advisor' && (
-                <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center z-40 pb-safe pt-1 h-[70px] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                    {AVAILABLE_MOBILE_TABS
-                        .filter(tab => visibleMobileTabs.includes(tab.id))
-                        .map(tab => {
+                <div className="md:hidden fixed bottom-safe-dock left-4 right-4 z-40 max-w-lg mx-auto">
+                    <nav className="bg-white/90 backdrop-blur-xl border border-gray-100/80 flex justify-between items-center rounded-full h-[62px] shadow-[0_12px_36px_-4px_rgba(16,24,40,0.08)] px-2 py-1">
+                        {MOBILE_NAV_TABS.map(tab => {
                             const IconComponent = tab.icon;
                             const isActive = activeTab === tab.id;
                             const activeColorClass = tab.color;
@@ -1350,24 +1376,27 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setActiveTab(tab.id as any)}
-                                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all active:scale-95 ${
-                                        isActive ? activeColorClass : 'text-gray-400 hover:text-gray-600'
+                                    onClick={() => { setActiveTab(tab.id as any); }}
+                                    className={`flex items-center justify-center rounded-full h-11 transition-all duration-300 ease-out active:scale-95 ${
+                                        isActive
+                                            ? `px-4 py-2.5 ${activeBgClass} ${activeColorClass} shadow-sm shadow-indigo-100/10`
+                                            : 'px-3 py-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50/50'
                                     }`}
                                 >
-                                    <div className={`p-1.5 rounded-xl transition-all ${
-                                        isActive ? activeBgClass : 'bg-transparent'
-                                    }`}>
-                                        <IconComponent size={24} strokeWidth={isActive ? 2.5 : 2} />
-                                    </div>
-                                    <span className="text-[10px] font-bold">{label}</span>
+                                    <IconComponent size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 transition-transform duration-300 ${isActive && tab.id === 'expand' ? 'rotate-90' : ''}`} />
+                                    <span
+                                        className={`text-[11px] font-bold tracking-tight transition-all duration-300 ease-out overflow-hidden whitespace-nowrap ${
+                                            isActive ? 'max-w-[100px] opacity-100 ml-1.5' : 'max-w-0 opacity-0 ml-0'
+                                        }`}
+                                    >
+                                        {label}
+                                    </span>
                                 </button>
                             );
                         })}
-                </nav>
+                    </nav>
+                </div>
             )}
-
-
             <SettingsModal 
                 isOpen={isSettingsOpen} 
                 onClose={() => setIsSettingsOpen(false)} 
@@ -1377,8 +1406,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 toggleNotifications={toggleNotifications}
                 lang={lang}
                 setLang={setLang}
-                visibleMobileTabs={visibleMobileTabs}
-                onUpdateVisibleMobileTabs={setVisibleMobileTabs}
+                headerShortcuts={headerShortcuts}
+                onUpdateHeaderShortcuts={setHeaderShortcuts}
             />
             <PricingModal
                 isOpen={isPricingOpen}

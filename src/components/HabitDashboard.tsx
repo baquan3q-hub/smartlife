@@ -95,21 +95,28 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
     fetchAll();
   }, [userId]);
 
-  // ── On-open: fill missed days ──
+  // ── On-open: fill missed days (Optimized to O(1) checks and max 30 days history) ──
   useEffect(() => {
     if (!habits.length || loading) return;
     const fillMissed = async () => {
       const todayStr = today();
       const logsToInsert: { habit_id: string; log_date: string; completed: boolean }[] = [];
+      const existingLogsSet = new Set(habitLogs.map(l => `${l.habit_id}_${l.log_date}`));
+      
+      // Quét tối đa 30 ngày trước để tránh quá tải
+      const thirtyDaysAgoTime = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
       for (const h of habits) {
         const start = new Date(h.start_date);
+        const limitStart = new Date(Math.max(start.getTime(), thirtyDaysAgoTime));
         const now = new Date(todayStr);
-        const cursor = new Date(start);
+        const cursor = new Date(limitStart);
+        
         while (cursor < now) {
           const dateStr = cursor.toISOString().split('T')[0];
           const dayKey = getDayKey(cursor);
           if ((h.frequency === 'daily' || h.frequency === 'custom') && h.active_days.includes(dayKey)) {
-            const exists = habitLogs.some(l => l.habit_id === h.id && l.log_date === dateStr);
+            const exists = existingLogsSet.has(`${h.id}_${dateStr}`);
             if (!exists) logsToInsert.push({ habit_id: h.id, log_date: dateStr, completed: false });
           }
           cursor.setDate(cursor.getDate() + 1);
@@ -222,8 +229,35 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
   const getWeekKey = (d: Date) => { const t = new Date(d); t.setDate(t.getDate() - (t.getDay() === 0 ? 6 : t.getDay() - 1)); return toLocalDateStr(t); };
   const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`;
 
+  // Group habit logs by habit ID for O(1) retrieval
+  const logsByHabitId = useMemo(() => {
+    const map = new Map<string, HabitLog[]>();
+    for (let i = 0; i < habitLogs.length; i++) {
+      const log = habitLogs[i];
+      let arr = map.get(log.habit_id);
+      if (!arr) {
+        arr = [];
+        map.set(log.habit_id, arr);
+      }
+      arr.push(log);
+    }
+    return map;
+  }, [habitLogs]);
+
+  // A Set of completed log keys (format: "habitId_date") for O(1) checks
+  const completedLogsSet = useMemo(() => {
+    const set = new Set<string>();
+    for (let i = 0; i < habitLogs.length; i++) {
+      const log = habitLogs[i];
+      if (log.completed) {
+        set.add(`${log.habit_id}_${log.log_date}`);
+      }
+    }
+    return set;
+  }, [habitLogs]);
+
   const getHabitStats = useCallback((habit: Habit) => {
-    const logs = habitLogs.filter(l => l.habit_id === habit.id);
+    const logs = logsByHabitId.get(habit.id) || [];
     const completedLogs = logs.filter(l => l.completed);
 
     if (habit.frequency === 'weekly' || habit.frequency === 'monthly') {
@@ -313,14 +347,20 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
     }
     bestStreak = Math.max(bestStreak, currentStreak);
     return { currentStreak, bestStreak, completionRate, totalCompleted: completedLogs.length, totalScheduled: scheduledLogs };
-  }, [habitLogs]);
+  }, [logsByHabitId]);
 
-  // ── Today's habits ──
-  const todayDayKey = getDayKey(new Date());
-  const todaysHabits = habits.filter(h => h.frequency === 'weekly' || h.frequency === 'monthly' || h.active_days.includes(todayDayKey));
-  const todayDone = todaysHabits.filter(h => habitLogs.some(l => l.habit_id === h.id && l.log_date === today() && l.completed)).length;
+  // ── Today's habits (Memoized for Performance) ──
+  const todaysHabits = useMemo(() => {
+    const todayDayKey = getDayKey(new Date());
+    return habits.filter(h => h.frequency === 'weekly' || h.frequency === 'monthly' || h.active_days.includes(todayDayKey));
+  }, [habits]);
 
-  // ── 30-day streak bar data ──
+  const todayDone = useMemo(() => {
+    const todayStr = today();
+    return todaysHabits.filter(h => completedLogsSet.has(`${h.id}_${todayStr}`)).length;
+  }, [todaysHabits, completedLogsSet]);
+
+  // ── 30-day streak bar data (Optimized with completedLogsSet) ──
   const getStreakBar = useCallback((habit: Habit) => {
     const bars: { date: string; done: boolean; scheduled: boolean }[] = [];
     const d = new Date();
@@ -328,11 +368,11 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
       const cursor = new Date(d); cursor.setDate(cursor.getDate() - i);
       const ds = cursor.toISOString().split('T')[0];
       const scheduled = habit.frequency === 'weekly' || habit.frequency === 'monthly' ? true : habit.active_days.includes(getDayKey(cursor));
-      const done = habitLogs.some(l => l.habit_id === habit.id && l.log_date === ds && l.completed);
+      const done = completedLogsSet.has(`${habit.id}_${ds}`);
       bars.push({ date: ds, done, scheduled });
     }
     return bars;
-  }, [habitLogs]);
+  }, [completedLogsSet]);
 
   // ── CRUD Countdown ──
   const addCountdown = async (item: Omit<CountdownItem, 'id' | 'user_id' | 'created_at'>) => {

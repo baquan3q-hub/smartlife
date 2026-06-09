@@ -193,8 +193,9 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const isDragging = React.useRef(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    const container = e.currentTarget;
-    if (container.scrollTop === 0 && window.scrollY === 0) {
+    const mainScroll = document.querySelector('main');
+    const isAtTop = !mainScroll || mainScroll.scrollTop === 0;
+    if (isAtTop && window.scrollY === 0) {
       startY.current = e.touches[0].clientY;
       isDragging.current = true;
     }
