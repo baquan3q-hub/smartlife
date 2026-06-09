@@ -1,86 +1,86 @@
-# 🚀 SmartLife - Hệ Sinh Thái Quản Trị Bản Thân Toàn Diện
+# 🚀 SmartLife - Siêu Ứng Dụng Quản Trị Học Tập & Đời Sống Sinh Viên Toàn Diện
 
-> **SmartLife** là một Super App (Siêu ứng dụng) tích hợp sâu sắc được thiết kế đặc thù dành cho sinh viên và người học tự chủ. Hệ sinh thái kết hợp giữa quản lý học vụ (GPA VNU), tài chính cá nhân, tối ưu hóa thời gian học tập, rèn luyện thói quen lành mạnh, viết nhật ký chữa lành và trợ lý AI thông minh định hướng nghề nghiệp, tạo lập CV tự động.
+> **SmartLife** là một Super App (Siêu ứng dụng) đa phân hệ được thiết kế đặc thù nhằm giải quyết các bài toán thiết thực của sinh viên và người tự học trong kỷ nguyên số. Ứng dụng tích hợp sâu sắc giữa quản lý học vụ (GPA VNU), định hướng nghề nghiệp dựa trên tính cách (MBTI/DISC) bằng trí tuệ nhân tạo (Gemini AI), thiết lập và kết xuất CV tự động chuẩn ATS, quản lý chi tiêu toán học thông minh, rèn luyện thói quen, không gian tập trung Pomodoro, nhật ký cảm xúc có khóa bảo mật mã PIN và **Ví tài liệu số cá nhân** tích hợp.
 
 ---
 
 ## 🌟 Giá Trị Đột Phá & Triết Lý Sản Phẩm
 
-SmartLife giải quyết vấn đề lớn nhất của thế hệ trẻ trong thời đại số: **Sự quá tải thông tin và rời rạc của các công cụ quản lý.** Thay vì sử dụng 5-6 phần mềm riêng lẻ, SmartLife kết nối mọi khía cạnh cuộc sống vào một bảng điều khiển trực quan (Visual Board):
-1. **Tính Đồng Nhất (Unified):** Dữ liệu tài chính, học tập, công việc, thói quen liên thông chặt chẽ giúp phác họa bức tranh phong cách sống toàn diện.
-2. **Trí Tuệ Nhân Tạo (Actionable AI):** Không chỉ lưu trữ thụ động, AI Advisor đọc dữ liệu thời gian thực để đưa ra các lời khuyên học tập, tài chính và định hướng hành động.
-3. **Trải Nghiệm Premium:** Giao diện ứng dụng được tối ưu mượt mà với hiệu ứng kính mờ (Glassmorphism), chuyển động vi mô (Micro-animations), chế độ tối (Dark Mode) và thao tác vuốt làm mới (Pull-to-Refresh) tự nhiên.
+Thách thức lớn nhất đối với sinh viên hiện đại không phải là thiếu công cụ quản lý, mà là **sự rời rạc, phân mảnh của thông tin**. Khi phải quản lý học tập trên một app, ghi chép chi tiêu trên một app khác, và viết nhật ký hay rèn luyện thói quen ở các công cụ rời rạc, họ sẽ mất đi bức tranh toàn cảnh về bản thân.
+
+SmartLife ra đời với 3 giá trị cốt lõi:
+1. **Liên thông Dữ liệu (Unified Ecosystem):** Dữ liệu học tập (GPA) kết hợp với bài test tính cách (MBTI, DISC) để làm đầu vào cho Cố vấn AI; dữ liệu tài chính cảnh báo hạn mức dựa trên mức lương/chi tiêu thực tế.
+2. **Bảo mật tối đa (High Security by RLS):** Các thông tin nhạy cảm như Nhật ký cá nhân, ảnh Căn cước công dân (CCCD), Thẻ sinh viên được bảo vệ nghiêm ngặt bằng cơ chế Row Level Security (RLS) của Supabase và mã hóa mật khẩu PIN cục bộ.
+3. **Trải nghiệm Premium (Premium UX/UI):** Ngôn ngữ thiết kế Glassmorphism hiện đại, tối ưu hóa kích thước thanh cuộn, hiệu ứng phóng to thẻ khi chọn và chuyển động vi mô (Micro-animations) mang lại giao diện sống động, cao cấp.
 
 ---
 
-## 🛠️ Bản Đồ Tính Năng Cốt Lõi (9 Core Modules)
+## 🛠️ Bản Đồ Tính Năng Cốt Lõi (10 Core Modules)
 
-### 1. 📊 Hệ Thống Quản Lý Học Vụ & GPA Tracker (Độc quyền VNU)
-* Tích hợp quy chế đào tạo mới nhất của Đại học Quốc gia Hà Nội (ĐHQGHN - VNU).
-* Tự động quy đổi điểm hệ 10 sang điểm chữ (A+, A, B...) và hệ 4.
-* Tính điểm GPA học kỳ, GPA tích lũy, tự động phân loại học tập và đưa ra cảnh báo học vụ kịp thời.
-* Cho phép người dùng lên kịch bản giả lập điểm số mục tiêu để hoạch định kế hoạch học kỳ tới.
+### 1. 📊 Hệ Thống GPA VNU & Quản Lý Học Vụ
+* Tích hợp quy chế đào tạo tín chỉ mới nhất của Đại học Quốc gia Hà Nội (ĐHQGHN - VNU).
+* Quy đổi điểm số hệ 10 sang điểm chữ (A+, A, B...) và hệ số 4 chính xác.
+* Mô phỏng và lập kịch bản điểm số mục tiêu (GPA Projection) để tính toán điểm số tối thiểu cần đạt ở các học kỳ còn lại nhằm đạt bằng Khá/Giỏi/Xuất sắc khi tốt nghiệp.
 
 ### 2. 🤖 Cố Vấn Sự Nghiệp AI (AI Career Coach)
-* Phân tích kết hợp giữa kết quả học tập thực tế (GPA) và các bài kiểm tra khảo sát tính cách (MBTI / DISC) cùng sở thích cá nhân.
-* AI tự động gợi ý các ngành nghề triển vọng, các vị trí công việc phù hợp nhất.
-* Đề xuất lộ trình nâng cao kỹ năng (Hard skills & Soft skills) chi tiết từng bước.
+* Đọc dữ liệu điểm số thực tế từ GPA Tracker phối hợp cùng thông tin MBTI/DISC để đưa ra phân tích thế mạnh, điểm yếu.
+* AI đề xuất chi tiết 3 vị trí công việc phù hợp nhất kèm theo roadmap học tập các kỹ năng bổ trợ cụ thể.
 
-### 3. 📄 Xây Dựng CV Tự Động & Chuyên Nghiệp (Auto CV Builder)
-* Tự động trích xuất thông tin cá nhân, trình độ học vấn, điểm số nổi bật và dự án thực hành từ GPA Dashboard.
-* Hỗ trợ thiết kế CV chuẩn ATS với nhiều mẫu template hiện đại, tối giản.
-* Xuất file PDF chất lượng cao sẵn sàng ứng tuyển chỉ trong một click.
+### 3. 📄 Xây Dựng CV Tự Động Chuẩn ATS (Auto CV Builder)
+* Đồng bộ trực tiếp kết quả học tập từ GPA Dashboard sang CV.
+* Hỗ trợ biên soạn thông tin cá nhân, kinh nghiệm, dự án, chứng chỉ và xuất bản tệp PDF chuẩn ATS chuyên nghiệp chỉ trong một click.
 
-### 4. 💸 Quản Lý Tài Chính Cá Nhân (Finance Dashboard)
-* Ghi chép thu chi nhanh chóng phân loại theo các danh mục thực tế (Ăn uống, Thuê nhà, Giáo dục, Giải trí...).
-* Tự động vẽ biểu đồ trực quan hóa dòng tiền (Cash Flow), thiết lập hạn mức chi tiêu tháng và đưa ra cảnh báo khi chi tiêu vượt ngưỡng.
-* Hỗ trợ cử chỉ vuốt để làm mới ngầm dữ liệu (Pull-to-Refresh) cực kỳ mượt mà.
+### 4. 💳 Quản Lý Tài Chính & Máy Tính Số Học (Finance Dashboard)
+* Ghi chép chi tiêu/thu nhập với danh mục đa dạng, tự động gán icon và màu sắc phù hợp dựa trên phân tích từ khóa tiếng Việt.
+* Tích hợp bộ giải biểu thức toán học trực tiếp trong ô nhập số tiền (hỗ trợ các toán tử `+`, `-`, `*`, `/`, viết tắt `k`, `tr`, `m`, `t` như `50k + 1.5tr`).
+* Tích hợp bàn phím toán học ảo trượt lên mượt mà (Custom Keypad) độc quyền.
 
-### 5. 📅 Quản Lý Lịch Trình & To-Do List Thông Minh
-* Thiết lập thời khóa biểu cố định trong tuần theo từng thứ.
-* Hỗ trợ tính năng xuất thời khóa biểu thành hình ảnh PNG chất lượng cao để làm hình nền điện thoại.
-* Quản lý mục tiêu ngắn, trung, dài hạn kết hợp bộ đếm ngược/đếm xuôi ngày quan trọng.
-* Danh sách việc cần làm (To-Do List) hỗ trợ kéo thả sắp xếp (Drag & Drop) và ghi nhận thời gian thực hiện (Time tracking).
+### 5. 📂 Ví Tài Liệu Số Cá Nhân & Thay Ảnh Đại Diện (New ✨)
+* **Tải ảnh đại diện trực tiếp**: Người dùng có thể chạm vào ảnh đại diện trong phần Cài đặt để chụp hoặc chọn ảnh từ thiết bị, hệ thống tự động nén chất lượng cao.
+* **Ví tài liệu số ngay trên đầu Cài đặt**: Lưu trữ hình ảnh mã QR (Thanh toán/Cá nhân), Thẻ sinh viên và Căn cước công dân (CCCD) để xem nhanh lúc cần thiết.
+* **Xem chi tiết tài liệu (Lightbox modal)**: Bấm vào tài liệu sẽ mở Pop-up zoom lớn rõ nét, hỗ trợ thay đổi hoặc xóa bảo mật.
 
-### 6. ⏱️ Không Gian Tập Trung & Âm Nhạc (Focus & Sound Space)
-* Đồng hồ Pomodoro khoa học giúp quản lý chu kỳ tập trung học tập.
-* Bộ phát âm thanh nền thư giãn (tiếng mưa, tiếng sóng biển, quán cà phê...).
-* Tích hợp sâu tiện ích Spotify trực tiếp trong ứng dụng giúp thưởng thức âm nhạc và podcast không giới hạn mà không cần rời màn hình.
+### 6. 📅 Thời Khóa Biểu & Xuất Ảnh Tiện Ích
+* Lên lịch học cố định theo thứ trong tuần, theo dõi phòng học và giảng viên.
+* Cho phép xuất thời khóa biểu thành file ảnh PNG độ phân giải cao để sinh viên cài làm hình nền điện thoại tiện tra cứu.
 
-### 7. 🔒 Nhật Ký Chữa Lành Bảo Mật (Healing Journal)
-* Không gian ghi lại cảm xúc hàng ngày kèm bộ theo dõi tâm trạng (Mood Tracker).
-* Gợi ý câu hỏi viết nhật ký (Journal Prompts) khi bí ý tưởng.
-* Bảo vệ tuyệt đối thông tin cá nhân với khóa bảo mật mã PIN riêng biệt (Journal PIN Guard).
+### 7. ⏱️ Không Gian Tập Trung Pomodoro & Âm Nhạc
+* Đồng hồ Pomodoro đếm ngược hỗ trợ quản lý thời gian học tập tập trung hiệu quả.
+* Tích hợp kho âm thanh nền thư giãn (tiếng mưa rơi, sóng biển, tiếng ồn trắng) và Widget Spotify kết nối thư viện nhạc không giới hạn.
 
-### 8. 🎯 Theo Dõi Thói Quen (Habit Tracker)
-* Thiết lập các thói quen hàng ngày cần rèn luyện (Đọc sách, tập thể thao, học từ vựng...).
-* Tính toán chuỗi ngày thực hiện liên tục (Streak) trực quan tạo động lực tích cực.
+### 8. 🔒 Nhật Ký Chữa Lành Bảo Mật (Healing Journal)
+* Ghi chép cảm xúc, chấm điểm tâm trạng hàng ngày (Mood Tracker) và viết lời biết ơn.
+* Hệ thống bảo mật mã PIN riêng biệt (Journal PIN Guard), ngăn chặn truy cập nhật ký ngay cả khi thiết bị đã được mở khóa.
 
-### 9. 📁 Kho Lưu Trữ Trực Quan (My Storage & Visual Board)
-* Hỗ trợ người dùng lưu trữ hình ảnh, liên kết tài liệu, tệp tin phục vụ học tập, tiểu luận, nghiên cứu khoa học ngay trong một giao diện trung tâm.
+### 9. 🎯 Rèn Luyện Thói Quen (Habit Tracker) & Vòng Đời Thử Thách
+* Theo dõi thói quen hàng ngày với cơ chế tính chuỗi ngày liên tục (Streak).
+* Tích lũy điểm thưởng StarBrain khi hoàn thành thói quen để đổi các phần thưởng động lực tự thiết lập.
+
+### 10. 💾 Kho Lưu Trữ Trực Quan (My Storage)
+* Lưu trữ các liên kết tài liệu tham khảo, bài báo khoa học, ghi chú nhanh hoặc hình ảnh học tập vào một bảng điều khiển trung tâm.
 
 ---
 
 ## 💻 Công Nghệ Sử Dụng (Tech Stack)
 
-* **Frontend:** React (TypeScript), Vite, TailwindCSS (Vanilla CSS custom).
-* **Backend & Database:** Supabase (PostgreSQL) phục vụ lưu trữ dữ liệu thời gian thực và xác thực người dùng.
-* **AI Engine:** Google Gemini AI API phục vụ phân tích dữ liệu, chat trực tiếp và đề xuất lộ trình.
-* **Cử chỉ & Kéo thả:** `@dnd-kit/core` & `@dnd-kit/sortable` cho To-Do List.
-* **Xuất bản & Xuất ảnh:** `html2canvas` và `jspdf` phục vụ xuất PDF CV/PNG thời khóa biểu.
+* **Core Framework:** React (TypeScript) + Vite mang lại tốc độ phản hồi cực nhanh dưới local.
+* **Styling System:** TailwindCSS phối hợp Vanilla CSS tùy biến các hiệu ứng Glassmorphic, thanh cuộn mỏng `.custom-scrollbar` rộng 5px và hoạt ảnh trượt/zoom.
+* **Database & Auth:** Supabase (PostgreSQL) hỗ trợ quản lý dữ liệu thời gian thực và quản lý tài khoản người dùng.
+* **AI Integration:** Google Gemini AI API cung cấp khả năng phân tích dữ liệu học thuật và tư vấn định hướng.
+* **Cử chỉ & Drag-Drop:** `@dnd-kit/core` cho các thao tác kéo thả việc cần làm trực quan.
+* **Export Utilities:** `html2canvas` và `jspdf` để kết xuất tệp tin hình ảnh/PDF trực tiếp từ client.
 
 ---
 
 ## 📁 Cấu Trúc Thư Mục Dự Án (Project Structure)
 
-Dưới đây là sơ đồ cấu trúc mã nguồn chính trong thư mục `src/`:
-
+Sơ đồ cấu trúc mã nguồn chính trong thư mục `src/`:
 ```bash
 src/
 ├── App.tsx             # Luồng điều hướng chính, xử lý Deep Link và State đồng bộ hóa
 ├── index.tsx           # Điểm khởi chạy ứng dụng (Entry point)
-├── index.css           # Cấu hình hệ thống thiết kế CSS, các biến màu sắc, hoạt ảnh
-├── types.ts            # Định nghĩa toàn bộ kiểu dữ liệu TypeScript (Goal, Todo, TimetableEvent,...)
+├── index.css           # Cấu hình hệ thống thiết kế CSS, các biến màu sắc, hoạt ảnh, thanh cuộn
+├── types.ts            # Định nghĩa toàn bộ kiểu dữ liệu TypeScript (Profile, Goal, Todo,...)
 ├── constants.ts        # Các preset cấu hình ban đầu, danh mục thu chi, và hằng số hệ thống
 │
 ├── components/         # Chứa toàn bộ các thành phần giao diện của ứng dụng
@@ -90,7 +90,7 @@ src/
 │   ├── AIAdvisorPage.tsx     # Trang phân tích chi tiết của Trợ lý AI Tài chính & Học tập
 │   ├── GPACareerTab.tsx      # Giao diện Cố vấn sự nghiệp AI (GPA + MBTI/DISC)
 │   ├── CVBuilder.tsx         # Trình tạo CV và xuất PDF chuyên nghiệp
-│   ├── FinanceDashboard.tsx  # Trang quản lý thu chi và tài chính
+│   ├── FinanceDashboard.tsx  # Trang quản lý thu chi và tài chính (Bàn phím tính toán và nén ảnh)
 │   ├── ScheduleDashboard.tsx # Trang quản lý thời khóa biểu tuần và To-Do List (Dnd)
 │   ├── JournalDashboard.tsx  # Nhật ký chữa lành và theo dõi tâm trạng
 │   ├── JournalPinGuard.tsx   # Hệ thống khóa mã PIN bảo mật cho nhật ký
@@ -98,7 +98,7 @@ src/
 │   ├── MySpotify.tsx         # Widget tích hợp ứng dụng nghe nhạc Spotify
 │   ├── MyStorage.tsx         # Bảng lưu trữ file tài liệu và ghi chú cá nhân
 │   ├── FocusTimer.tsx        # Bộ bấm giờ Pomodoro và âm thanh thư giãn
-│   └── ...                   # Các modal cài đặt, thông báo PWA, loader,...
+│   └── SettingsModal.tsx     # Modal cài đặt cá nhân hóa, đổi ngôn ngữ, tải lên avatar và ví tài liệu
 │
 ├── services/           # Lớp kết nối API, dịch vụ tính toán và Supabase
 │   ├── supabase.ts           # Cấu hình Supabase client kết nối cơ sở dữ liệu
@@ -115,7 +115,7 @@ src/
 │   ├── useProAccess.ts       # Kiểm tra quyền tài khoản Premium
 │   └── useTaskTracker.ts     # Bộ đếm giờ thực hiện công việc (Todo time spent)
 │
-└── i18n/               # Cấu hình đa ngôn ngữ (nếu có)
+└── i18n/               # Cấu hình đa ngôn ngữ (Tiếng Việt, Tiếng Anh, Tiếng Hàn)
 ```
 
 ---
@@ -123,7 +123,7 @@ src/
 ## 🚀 Hướng Dẫn Cài Đặt & Chạy Dưới Local
 
 ### Yêu cầu hệ thống:
-* **Node.js** (Phiên bản 16 trở lên)
+* **Node.js** (Phiên bản 18 trở lên)
 * **npm** hoặc **yarn**
 
 ### Các bước thực hiện:
@@ -154,8 +154,21 @@ src/
 
 ---
 
-## 🛡️ Thiết Kế Cơ Sở Dữ Liệu
-Các file schema SQL dùng để khởi tạo Supabase Database nằm trong thư mục gốc:
-* `supabase_schema.sql`: Khởi tạo các bảng tài chính, người dùng và thiết lập bảo mật.
-* `gpa_tables.sql`: Khởi tạo cấu trúc lưu trữ điểm số môn học và mục tiêu học tập.
-* `ai_advisor_tables.sql`: Quản lý lưu trữ cuộc hội thoại với trợ lý ảo AI.
+## 🛡️ Thiết Kế Cơ Sở Dữ Liệu & Bảo Mật Row Level Security (RLS)
+
+Dữ liệu của người dùng được lưu trữ an toàn trong PostgreSQL trên Supabase.
+Các file schema SQL dùng để khởi tạo cơ sở dữ liệu nằm trong thư mục gốc và thư mục `sql/`:
+* `supabase_schema.sql`: Khởi tạo bảng hồ sơ người dùng `profiles` và các chức năng tài chính cơ bản.
+* `sql/add_documents_columns.sql`: Thêm các cột lưu trữ ảnh đại diện, QR và ảnh tài liệu (CCCD/Thẻ SV) mã hóa Base64 dưới dạng text tối ưu.
+* `sql/add_ai_personalization_columns.sql`: Cập nhật các trường thông tin MBTI/DISC cá nhân hóa AI.
+* `sql/journal_schema.sql`: Định nghĩa bảng nhật ký số và kích hoạt khóa mã PIN.
+
+### Cơ chế bảo mật RLS:
+Bảng `profiles` được bảo vệ nghiêm ngặt:
+```sql
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Cho phép người dùng quản lý hồ sơ cá nhân" ON profiles
+  FOR ALL USING (auth.uid() = id);
+```
+Điều này đảm bảo rằng **chỉ chính bạn** (người dùng đã đăng nhập thành công) mới có thể đọc hoặc ghi đè ảnh CCCD, Thẻ SV và thông tin cá nhân của mình, ngăn chặn hoàn toàn rò rỉ dữ liệu chéo giữa các người dùng.

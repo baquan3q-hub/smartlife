@@ -33,8 +33,9 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const isDragging = useRef(false);
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        const container = e.currentTarget;
-        if (container.scrollTop === 0 && window.scrollY === 0) {
+        const mainScroll = document.querySelector('main');
+        const isAtTop = !mainScroll || mainScroll.scrollTop === 0;
+        if (isAtTop && window.scrollY === 0) {
             startY.current = e.touches[0].clientY;
             isDragging.current = true;
         }
@@ -425,7 +426,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            className="w-full h-full overflow-y-auto overflow-x-hidden pb-32 px-3 md:px-8 pt-4 md:pt-8 relative"
+            className="w-full overflow-x-hidden px-3 md:px-8 pt-4 md:pt-8 relative"
         >
             {/* Pull to Refresh Spinner */}
             <div 

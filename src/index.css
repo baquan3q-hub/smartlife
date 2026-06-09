@@ -2,11 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Prevent horizontal scroll on mobile browsers */
+/* Prevent full page scroll & bounce on mobile browsers */
 html,
 body {
-  overflow-x: hidden;
+  overflow: hidden;
+  height: 100%;
   width: 100%;
+  position: fixed;
 }
 
 @layer utilities {
@@ -21,6 +23,10 @@ body {
 
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottom-safe-dock {
+    bottom: calc(1rem + env(safe-area-inset-bottom));
   }
 }
 
@@ -140,4 +146,40 @@ body {
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+/* Expand Drawer — Item Pop Animation */
+@keyframes expand-item-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }

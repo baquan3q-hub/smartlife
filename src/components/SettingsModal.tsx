@@ -1,8 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Save, Loader2, Bell, Calendar, Clock, Target, Moon, Zap, Sparkles, LogOut, Smartphone, Lock } from 'lucide-react';
+import { X, User, Save, Loader2, Bell, Calendar, Clock, Target, Moon, Zap, Sparkles, LogOut, Smartphone, Lock, Camera, QrCode, CreditCard, Contact, Trash2, Music, Flame } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { Profile } from '../types';
 import { Lang, t } from '../i18n/i18n';
+
+const DocumentCard: React.FC<{
+    title: string;
+    imageUrl?: string;
+    icon: React.ReactNode;
+    onClick: () => void;
+}> = ({ title, imageUrl, icon, onClick }) => {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all duration-200 relative overflow-hidden aspect-video select-none group/card
+                ${imageUrl
+                    ? 'border-indigo-100 bg-white hover:border-indigo-300 shadow-sm'
+                    : 'border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-100 hover:border-gray-300 text-gray-400 hover:text-gray-500'}`}
+        >
+            {imageUrl ? (
+                <>
+                    <img src={imageUrl} alt={title} className="absolute inset-0 w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-200" />
+                    <div className="absolute inset-0 bg-black/45 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity">
+                        <span className="text-white text-[10px] font-black uppercase tracking-widest">Xem thẻ</span>
+                    </div>
+                </>
+            ) : (
+                <div className="flex flex-col items-center gap-1 text-center">
+                    <span className="text-gray-400 group-hover/card:text-indigo-500 transition-colors">{icon}</span>
+                    <span className="text-[10px] font-extrabold tracking-wide mt-0.5">{title}</span>
+                </div>
+            )}
+        </button>
+    );
+};
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -13,8 +45,8 @@ interface SettingsModalProps {
     toggleNotifications?: () => void;
     lang: Lang;
     setLang: (lang: Lang) => void;
-    visibleMobileTabs: string[];
-    onUpdateVisibleMobileTabs: (tabs: string[]) => void;
+    headerShortcuts: { spotify: boolean; habit: boolean };
+    onUpdateHeaderShortcuts: (shortcuts: { spotify: boolean; habit: boolean }) => void;
 }
 
 const DEFAULT_NOTI_SETTINGS = {
@@ -26,25 +58,95 @@ const DEFAULT_NOTI_SETTINGS = {
     goals_remind: true
 };
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ 
-    isOpen, 
-    onClose, 
-    userId, 
-    onSignOut, 
-    notificationsEnabled, 
-    toggleNotifications, 
-    lang, 
+const SettingsModal: React.FC<SettingsModalProps> = ({
+    isOpen,
+    onClose,
+    userId,
+    onSignOut,
+    notificationsEnabled,
+    toggleNotifications,
+    lang,
     setLang,
-    visibleMobileTabs,
-    onUpdateVisibleMobileTabs
+    headerShortcuts,
+    onUpdateHeaderShortcuts
 }) => {
     const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'navigation'>('profile');
     const [profile, setProfile] = useState<Profile | null>(null);
     const [notiSettings, setNotiSettings] = useState(DEFAULT_NOTI_SETTINGS);
-    const [tempVisibleTabs, setTempVisibleTabs] = useState<string[]>([]);
+    const [tempHeaderShortcuts, setTempHeaderShortcuts] = useState<{ spotify: boolean; habit: boolean }>({ spotify: true, habit: true });
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [hobbiesInput, setHobbiesInput] = useState('');
+    const [activeLightbox, setActiveLightbox] = useState<{ field: 'qr_code_url' | 'student_card_url' | 'citizen_card_url', url: string } | null>(null);
+
+    const compressImageToBase64 = (file: File, maxWidth = 800, quality = 0.7): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        resolve(event.target?.result as string);
+                        return;
+                    }
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const compressed = canvas.toDataURL('image/jpeg', quality);
+                    resolve(compressed);
+                };
+                img.onerror = (err) => reject(err);
+            };
+            reader.onerror = (err) => reject(err);
+        });
+    };
+
+    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const compressed = await compressImageToBase64(file, 200, 0.75);
+            setProfile(prev => prev ? { ...prev, avatar_url: compressed } : null);
+        } catch (err) {
+            console.error("Error uploading avatar:", err);
+            alert("Không thể tải lên ảnh đại diện.");
+        }
+    };
+
+    const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'qr_code_url' | 'student_card_url' | 'citizen_card_url') => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const compressed = await compressImageToBase64(file, 800, 0.75);
+            setProfile(prev => prev ? { ...prev, [field]: compressed } : null);
+            if (activeLightbox && activeLightbox.field === field) {
+                setActiveLightbox({ field, url: compressed });
+            }
+        } catch (err) {
+            console.error(`Error uploading ${field}:`, err);
+            alert("Không thể tải lên ảnh tài liệu.");
+        }
+    };
+
+    const getFieldNameVi = (field: string) => {
+        if (field === 'qr_code_url') return 'Mã QR Cá Nhân';
+        if (field === 'student_card_url') return 'Thẻ Sinh Viên';
+        if (field === 'citizen_card_url') return 'Căn Cước Công Dân';
+        return 'Tài liệu';
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -58,10 +160,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     console.error("Error parsing settings", e);
                 }
             }
-            // Sync mobile visible tabs temp state
-            setTempVisibleTabs([...visibleMobileTabs]);
+            // Sync header shortcuts temp state
+            setTempHeaderShortcuts({ ...headerShortcuts });
         }
-    }, [isOpen, userId, visibleMobileTabs]);
+    }, [isOpen, userId, headerShortcuts]);
 
     useEffect(() => {
         if (profile) {
@@ -97,18 +199,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         }
     };
 
-    const handleToggleTab = (tabId: string) => {
-        // Enforce constraint: visual, finance, and schedule CANNOT be toggled off.
-        if (['visual', 'finance', 'schedule'].includes(tabId)) return;
 
-        setTempVisibleTabs(prev => {
-            if (prev.includes(tabId)) {
-                return prev.filter(t => t !== tabId);
-            } else {
-                return [...prev, tabId];
-            }
-        });
-    };
 
     const toggleDisc = (char: string) => {
         setProfile(prev => {
@@ -155,6 +246,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     personality_disc: profile.personality_disc || null,
                     hobbies: hobbiesInput.split(',').map(s => s.trim()).filter(Boolean),
                     life_motto: profile.life_motto || null,
+                    qr_code_url: profile.qr_code_url || null,
+                    student_card_url: profile.student_card_url || null,
+                    citizen_card_url: profile.citizen_card_url || null,
                     updated_at: new Date().toISOString(),
                 };
                 const { error } = await supabase.from('profiles').upsert(updates);
@@ -164,9 +258,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             // 2. Save Notification Settings
             localStorage.setItem('smartlife_noti_settings', JSON.stringify(notiSettings));
 
-            // 3. Save Navigation Settings
-            localStorage.setItem(`smartlife_visible_tabs_${userId}`, JSON.stringify(tempVisibleTabs));
-            onUpdateVisibleMobileTabs(tempVisibleTabs);
+            // 3. Save Header Shortcuts
+            localStorage.setItem(`smartlife_header_shortcuts_${userId}`, JSON.stringify(tempHeaderShortcuts));
+            onUpdateHeaderShortcuts(tempHeaderShortcuts);
 
             // Dispatch event so other components can pick up changes immediately
             window.dispatchEvent(new Event('storage'));
@@ -198,30 +292,46 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Tabs */}
-                <div className="flex px-5 pt-3 gap-4 border-b border-gray-50 bg-gray-50/30 overflow-x-auto scrollbar-hide">
+                <div className="flex p-1.5 mx-5 mt-4 bg-gray-150/50 rounded-2xl gap-1 border border-gray-200/20 select-none">
                     <button
+                        type="button"
                         onClick={() => setActiveTab('profile')}
-                        className={`py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-all shrink-0 ${activeTab === 'profile' ? 'text-indigo-600 border-indigo-600' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
+                        className={`py-2.5 rounded-xl text-xs md:text-sm font-extrabold flex items-center justify-center gap-2 transition-all duration-300 shrink-0
+                            ${activeTab === 'profile'
+                                ? 'flex-[1.5] bg-white text-indigo-600 shadow-sm px-4'
+                                : 'flex-1 text-gray-400 hover:text-gray-600 hover:bg-white/40 px-2'}`}
                     >
-                        <User size={18} /> {t('settings.profile', lang)}
+                        <User size={16} />
+                        {activeTab === 'profile' && <span className="animate-in fade-in zoom-in-95 duration-200 truncate">{t('settings.profile', lang)}</span>}
                     </button>
                     <button
+                        type="button"
                         onClick={() => setActiveTab('notifications')}
-                        className={`py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-all shrink-0 ${activeTab === 'notifications' ? 'text-emerald-600 border-emerald-600' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
+                        className={`py-2.5 rounded-xl text-xs md:text-sm font-extrabold flex items-center justify-center gap-2 transition-all duration-300 shrink-0
+                            ${activeTab === 'notifications'
+                                ? 'flex-[1.5] bg-white text-emerald-600 shadow-sm px-4'
+                                : 'flex-1 text-gray-400 hover:text-gray-600 hover:bg-white/40 px-2'}`}
                     >
-                        <Bell size={18} /> {t('settings.notifications', lang)}
+                        <Bell size={16} />
+                        {activeTab === 'notifications' && <span className="animate-in fade-in zoom-in-95 duration-200 truncate">{t('settings.notifications', lang)}</span>}
                     </button>
                     <button
+                        type="button"
                         onClick={() => setActiveTab('navigation')}
-                        className={`py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-all shrink-0 ${activeTab === 'navigation' ? 'text-indigo-600 border-indigo-600' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
+                        className={`py-2.5 rounded-xl text-xs md:text-sm font-extrabold flex items-center justify-center gap-2 transition-all duration-300 shrink-0
+                            ${activeTab === 'navigation'
+                                ? 'flex-[1.5] bg-white text-indigo-600 shadow-sm px-4'
+                                : 'flex-1 text-gray-400 hover:text-gray-600 hover:bg-white/40 px-2'}`}
                     >
-                        <Smartphone size={18} /> {t('settings.navbar', lang)}
+                        <Smartphone size={16} />
+                        {activeTab === 'navigation' && <span className="animate-in fade-in zoom-in-95 duration-200 truncate">{t('settings.navbar', lang)}</span>}
                     </button>
                 </div>
 
                 {/* Body */}
                 <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
 
+                    {/* PROFILE TAB */}
                     {/* PROFILE TAB */}
                     {activeTab === 'profile' && (
                         loading ? (
@@ -230,15 +340,112 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             </div>
                         ) : (
                             <div className="space-y-5">
-                                <div className="flex justify-center mb-6">
-                                    <div className="relative group cursor-pointer">
-                                        <img
-                                            src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name || 'User'}`}
-                                            alt="Avatar"
-                                            className="w-24 h-24 rounded-full object-cover border-4 border-indigo-50 shadow-sm"
-                                        />
-                                        <div className="absolute inset-0 bg-black/20 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <span className="text-white text-xs font-bold">{t('settings.change_avatar', lang)}</span>
+                                {/* Hidden Inputs for Documents */}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    id="qr-upload-input"
+                                    onChange={(e) => handleDocumentUpload(e, 'qr_code_url')}
+                                />
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    id="student-upload-input"
+                                    onChange={(e) => handleDocumentUpload(e, 'student_card_url')}
+                                />
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    id="citizen-upload-input"
+                                    onChange={(e) => handleDocumentUpload(e, 'citizen_card_url')}
+                                />
+
+                                {/* Document & Profile Header Hub */}
+                                <div className="bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50 p-4 rounded-3xl border border-indigo-100/40 space-y-4 mb-2">
+                                    <div className="flex items-center gap-4">
+                                        {/* Avatar section */}
+                                        <div className="relative group cursor-pointer shrink-0" onClick={() => document.getElementById('avatar-upload-input')?.click()}>
+                                            <img
+                                                src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name || 'User'}`}
+                                                alt="Avatar"
+                                                className="w-16 h-16 rounded-full object-cover border-4 border-indigo-100 shadow-sm group-hover:border-indigo-300 transition-colors"
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Camera size={14} className="text-white" />
+                                            </div>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                id="avatar-upload-input"
+                                                onChange={handleAvatarChange}
+                                            />
+                                        </div>
+
+                                        {/* User basic greetings */}
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-extrabold text-gray-800 truncate text-sm leading-snug">
+                                                {profile?.full_name || 'Học viên SmartLife'}
+                                            </h3>
+                                            <p className="text-xs text-gray-400 font-medium truncate">
+                                                {profile?.email || 'Chưa thiết lập email'}
+                                            </p>
+                                            <p className="text-[10px] text-indigo-500 font-black tracking-wider uppercase mt-1 flex items-center gap-1">
+                                                <Sparkles size={10} /> {profile?.job || 'Thành viên'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Documents row */}
+                                    <div className="pt-3 border-t border-indigo-100/30">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2 ml-0.5">
+                                            Ảnh QR bank + Thẻ SV + CCCD (Take Anywhere)
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {/* QR Card */}
+                                            <DocumentCard
+                                                title="Mã QR"
+                                                imageUrl={profile?.qr_code_url}
+                                                icon={<QrCode size={18} />}
+                                                onClick={() => {
+                                                    if (profile?.qr_code_url) {
+                                                        setActiveLightbox({ field: 'qr_code_url', url: profile.qr_code_url });
+                                                    } else {
+                                                        document.getElementById('qr-upload-input')?.click();
+                                                    }
+                                                }}
+                                            />
+
+                                            {/* Student Card */}
+                                            <DocumentCard
+                                                title="Thẻ SV"
+                                                imageUrl={profile?.student_card_url}
+                                                icon={<CreditCard size={18} />}
+                                                onClick={() => {
+                                                    if (profile?.student_card_url) {
+                                                        setActiveLightbox({ field: 'student_card_url', url: profile.student_card_url });
+                                                    } else {
+                                                        document.getElementById('student-upload-input')?.click();
+                                                    }
+                                                }}
+                                            />
+
+                                            {/* Citizen Card */}
+                                            <DocumentCard
+                                                title="CCCD"
+                                                imageUrl={profile?.citizen_card_url}
+                                                icon={<Contact size={18} />}
+                                                onClick={() => {
+                                                    if (profile?.citizen_card_url) {
+                                                        setActiveLightbox({ field: 'citizen_card_url', url: profile.citizen_card_url });
+                                                    } else {
+                                                        document.getElementById('citizen-upload-input')?.click();
+                                                    }
+                                                }}
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -251,20 +458,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                 <div className="text-xs text-gray-400 font-medium mt-0.5">{t('settings.language_desc', lang)}</div>
                                             </div>
                                             <div className="flex bg-gray-200 rounded-lg p-1">
-                                                <button 
-                                                    onClick={() => setLang('vi')} 
+                                                <button
+                                                    onClick={() => setLang('vi')}
                                                     className={`px-2 py-1 text-xs font-bold rounded-md transition-all ${lang === 'vi' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                                                 >
                                                     Tiếng Việt
                                                 </button>
-                                                <button 
-                                                    onClick={() => setLang('en')} 
+                                                <button
+                                                    onClick={() => setLang('en')}
                                                     className={`px-2 py-1 text-xs font-bold rounded-md transition-all ${lang === 'en' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                                                 >
                                                     English
                                                 </button>
-                                                <button 
-                                                    onClick={() => setLang('ko')} 
+                                                <button
+                                                    onClick={() => setLang('ko')}
                                                     className={`px-2 py-1 text-xs font-bold rounded-md transition-all ${lang === 'ko' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                                                 >
                                                     한국어
@@ -399,11 +606,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                             key={type.id}
                                                             type="button"
                                                             onClick={() => toggleDisc(type.id)}
-                                                            className={`text-left p-3.5 rounded-2xl border transition-all select-none flex flex-col justify-between min-h-[90px] ${
-                                                                isSelected 
-                                                                    ? type.activeClass 
-                                                                    : 'border-gray-200 bg-gray-50/50 hover:bg-gray-100/50 text-gray-600'
-                                                            }`}
+                                                            className={`text-left p-3.5 rounded-2xl border transition-all select-none flex flex-col justify-between min-h-[90px] ${isSelected
+                                                                ? type.activeClass
+                                                                : 'border-gray-200 bg-gray-50/50 hover:bg-gray-100/50 text-gray-600'
+                                                                }`}
                                                         >
                                                             <div className="flex justify-between items-center w-full">
                                                                 <span className="font-bold text-sm">{type.label}</span>
@@ -567,7 +773,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
                     )}
 
-                    {/* NAVIGATION TAB */}
+                    {/* NAVIGATION TAB — Header Shortcuts */}
                     {activeTab === 'navigation' && (
                         <div className="space-y-6">
                             <div className="bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 p-4 rounded-2xl text-white shadow-lg mb-6 relative overflow-hidden">
@@ -583,72 +789,74 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 </p>
                             </div>
 
+                            {/* Header Shortcuts Section */}
                             <div className="space-y-3">
                                 <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                                     <Smartphone size={14} />
-                                    {t('settings.tabs_title', lang)}
+                                    Phím tắt thanh Header
                                 </h4>
-                                
+                                <p className="text-xs text-gray-400 font-medium -mt-1">
+                                    Bật/tắt các nút truy cập nhanh trên thanh header mobile. Các tính năng này cũng có thể truy cập qua menu "Mở rộng" trên navbar.
+                                </p>
+
                                 <div className="bg-gray-50 rounded-2xl p-2 border border-gray-100 divide-y divide-gray-100">
-                                    {/* 1. Tổng quan */}
-                                    <SwitchItemWithLock
-                                        label={t('tab.overview', lang)}
-                                        desc={t('tab.overview_desc', lang)}
-                                        checked={true}
-                                        locked={true}
-                                        onChange={() => {}}
-                                        lang={lang}
-                                    />
+                                    {/* My Spotify shortcut */}
+                                    <div
+                                        className="flex items-center justify-between p-3.5 rounded-xl hover:bg-white cursor-pointer group transition-all"
+                                        onClick={() => setTempHeaderShortcuts(prev => ({ ...prev, spotify: !prev.spotify }))}
+                                    >
+                                        <div className="flex items-center gap-3 flex-1 pr-4">
+                                            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                                                <Music size={18} className="text-emerald-600" />
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-sm text-gray-800 group-hover:text-emerald-600 transition-colors">My Spotify</div>
+                                                <div className="text-xs text-gray-400 font-medium mt-0.5">Hiện nút Spotify trên header để mở nhanh</div>
+                                            </div>
+                                        </div>
+                                        <div className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ease-in-out shrink-0 ${tempHeaderShortcuts.spotify ? 'bg-emerald-500' : 'bg-gray-200'}`}>
+                                            <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform duration-300 ease-in-out ${tempHeaderShortcuts.spotify ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        </div>
+                                    </div>
 
-                                    {/* 2. Tài chính */}
-                                    <SwitchItemWithLock
-                                        label={t('tab.finance', lang)}
-                                        desc={t('tab.finance_desc', lang)}
-                                        checked={true}
-                                        locked={true}
-                                        onChange={() => {}}
-                                        lang={lang}
-                                    />
+                                    {/* Habit streak shortcut */}
+                                    <div
+                                        className="flex items-center justify-between p-3.5 rounded-xl hover:bg-white cursor-pointer group transition-all"
+                                        onClick={() => setTempHeaderShortcuts(prev => ({ ...prev, habit: !prev.habit }))}
+                                    >
+                                        <div className="flex items-center gap-3 flex-1 pr-4">
+                                            <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
+                                                <Flame size={18} className="text-orange-600" />
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-sm text-gray-800 group-hover:text-orange-600 transition-colors">Thói quen</div>
+                                                <div className="text-xs text-gray-400 font-medium mt-0.5">Hiện nút Thói quen trên header để truy cập nhanh</div>
+                                            </div>
+                                        </div>
+                                        <div className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ease-in-out shrink-0 ${tempHeaderShortcuts.habit ? 'bg-orange-500' : 'bg-gray-200'}`}>
+                                            <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform duration-300 ease-in-out ${tempHeaderShortcuts.habit ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                                    {/* 3. Lịch trình */}
-                                    <SwitchItemWithLock
-                                        label={t('tab.schedule', lang)}
-                                        desc={t('tab.schedule_desc', lang)}
-                                        checked={true}
-                                        locked={true}
-                                        onChange={() => {}}
-                                        lang={lang}
-                                    />
-
-                                    {/* 4. Nhật ký */}
-                                    <SwitchItemWithLock
-                                        label={t('tab.journal', lang)}
-                                        desc={t('tab.journal_desc', lang)}
-                                        checked={tempVisibleTabs.includes('journal')}
-                                        locked={false}
-                                        onChange={() => handleToggleTab('journal')}
-                                        lang={lang}
-                                    />
-
-                                    {/* 5. Thói quen */}
-                                    <SwitchItemWithLock
-                                        label={t('tab.habit', lang)}
-                                        desc={t('tab.habit_desc', lang)}
-                                        checked={tempVisibleTabs.includes('habit')}
-                                        locked={false}
-                                        onChange={() => handleToggleTab('habit')}
-                                        lang={lang}
-                                    />
-
-                                    {/* 6. GPA Tracker */}
-                                    <SwitchItemWithLock
-                                        label={t('tab.gpa', lang)}
-                                        desc={t('tab.gpa_desc', lang)}
-                                        checked={tempVisibleTabs.includes('gpa')}
-                                        locked={false}
-                                        onChange={() => handleToggleTab('gpa')}
-                                        lang={lang}
-                                    />
+                            {/* Info about Expand Drawer */}
+                            <div className="bg-violet-50/50 rounded-2xl p-4 border border-violet-100/50">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0 mt-0.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-violet-600">
+                                            <rect width="7" height="7" x="3" y="3" rx="1" />
+                                            <rect width="7" height="7" x="14" y="3" rx="1" />
+                                            <rect width="7" height="7" x="14" y="14" rx="1" />
+                                            <rect width="7" height="7" x="3" y="14" rx="1" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-sm text-violet-800">Menu Mở rộng</div>
+                                        <p className="text-xs text-violet-600/80 font-medium mt-1 leading-relaxed">
+                                            Tất cả tính năng phụ (GPA, Mục tiêu, Spotify, Nhật ký, Thói quen, Cài đặt) đều có trong menu "Mở rộng" ở thanh navbar bên dưới.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -686,6 +894,78 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Document Lightbox Modal */}
+            {activeLightbox && (
+                <div className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[28px] overflow-hidden max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] relative animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                            <span className="font-extrabold text-gray-800 text-sm">{getFieldNameVi(activeLightbox.field)}</span>
+                            <button
+                                onClick={() => setActiveLightbox(null)}
+                                className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Image View */}
+                        <div className="p-5 flex-1 overflow-y-auto flex items-center justify-center bg-gray-50/50 min-h-[300px]">
+                            <img
+                                src={activeLightbox.url}
+                                alt="Document full resolution"
+                                className="max-w-full max-h-[50vh] object-contain rounded-xl shadow-md border border-gray-150"
+                            />
+                        </div>
+
+                        {/* Actions Footer */}
+                        <div className="p-4 border-t border-gray-100 flex gap-2 justify-between bg-gray-50/20">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const confirmDelete = window.confirm(`Bạn có chắc chắn muốn xóa ${getFieldNameVi(activeLightbox.field)}?`);
+                                    if (confirmDelete) {
+                                        setProfile(prev => {
+                                            if (!prev) return null;
+                                            const updated = { ...prev };
+                                            delete updated[activeLightbox.field];
+                                            return updated;
+                                        });
+                                        setActiveLightbox(null);
+                                    }
+                                }}
+                                className="px-4 py-2 rounded-xl text-red-500 hover:bg-red-55 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95"
+                            >
+                                <Trash2 size={14} /> Xóa ảnh
+                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const inputId = activeLightbox.field === 'qr_code_url'
+                                            ? 'qr-upload-input'
+                                            : activeLightbox.field === 'student_card_url'
+                                                ? 'student-upload-input'
+                                                : 'citizen-upload-input';
+                                        document.getElementById(inputId)?.click();
+                                    }}
+                                    className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95"
+                                >
+                                    Thay đổi
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveLightbox(null)}
+                                    className="px-5 py-2 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-xs transition-all active:scale-95"
+                                >
+                                    Đóng
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -704,32 +984,30 @@ const SwitchItem = ({ label, desc, checked, onChange }: { label: string, desc: s
 );
 
 // Custom Switch Component with Core/Lock Constraint Support
-const SwitchItemWithLock = ({ 
-    label, 
-    desc, 
-    checked, 
-    locked, 
+const SwitchItemWithLock = ({
+    label,
+    desc,
+    checked,
+    locked,
     onChange,
-    lang 
-}: { 
-    label: string, 
-    desc: string, 
-    checked: boolean, 
-    locked: boolean, 
+    lang
+}: {
+    label: string,
+    desc: string,
+    checked: boolean,
+    locked: boolean,
     onChange: () => void,
-    lang: Lang 
+    lang: Lang
 }) => (
-    <div 
-        className={`flex items-center justify-between p-3.5 rounded-xl transition-all select-none ${
-            locked ? 'opacity-85 hover:bg-transparent cursor-not-allowed' : 'hover:bg-white cursor-pointer group'
-        }`}
+    <div
+        className={`flex items-center justify-between p-3.5 rounded-xl transition-all select-none ${locked ? 'opacity-85 hover:bg-transparent cursor-not-allowed' : 'hover:bg-white cursor-pointer group'
+            }`}
         onClick={locked ? undefined : onChange}
     >
         <div className="flex-1 pr-4">
             <div className="flex items-center gap-2">
-                <span className={`font-bold text-sm transition-colors ${
-                    locked ? 'text-gray-700' : 'group-hover:text-indigo-600'
-                }`}>
+                <span className={`font-bold text-sm transition-colors ${locked ? 'text-gray-700' : 'group-hover:text-indigo-600'
+                    }`}>
                     {label}
                 </span>
                 {locked && (
@@ -741,12 +1019,10 @@ const SwitchItemWithLock = ({
             </div>
             <div className="text-xs text-gray-400 font-medium mt-0.5 leading-relaxed">{desc}</div>
         </div>
-        <div className={`w-12 h-7 rounded-full p-1 transition-all duration-300 ease-in-out shrink-0 ${
-            checked ? (locked ? 'bg-gray-300' : 'bg-indigo-500') : 'bg-gray-200'
-        }`}>
-            <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-all duration-300 ease-in-out ${
-                checked ? 'translate-x-5' : 'translate-x-0'
-            }`} />
+        <div className={`w-12 h-7 rounded-full p-1 transition-all duration-300 ease-in-out shrink-0 ${checked ? (locked ? 'bg-gray-300' : 'bg-indigo-500') : 'bg-gray-200'
+            }`}>
+            <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-all duration-300 ease-in-out ${checked ? 'translate-x-5' : 'translate-x-0'
+                }`} />
         </div>
     </div>
 );

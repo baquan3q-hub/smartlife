@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, TransactionType, Transaction, Goal, BudgetConfig } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, LineChart, Line } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart, Loader2, Utensils, Car, ShoppingBag, FileText, Tv, Heart, BookOpen, Coffee, Gift, Briefcase, Coins, PiggyBank, GraduationCap, Home, Droplets, Landmark, Plane, Eye, EyeOff } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
 import { Lang } from '../i18n/i18n';
@@ -152,9 +152,300 @@ const formatCurrency = (amount: number, lang: Lang) => {
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay(); // 0 = Sunday
 
+// --- Helper for Category Icons & Emojis ---
+const getCategoryEmoji = (category: string): string | null => {
+    const match = category.match(/\p{Extended_Pictographic}/u);
+    return match ? match[0] : null;
+};
+
+const cleanCategoryName = (category: string): string => {
+    const cleaned = category.replace(/\p{Extended_Pictographic}/ug, '').trim();
+    return cleaned || category;
+};
+
+const hashString = (str: string): number => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash);
+};
+
+const getCategoryStyles = (category: string) => {
+    const cat = category.toLowerCase().trim();
+    const emoji = getCategoryEmoji(category);
+
+    // Dynamic keyword matching
+    if (cat.includes('cà phê') || cat.includes('cafe') || cat.includes('coffee') || cat.includes('caffe') || cat.includes('trà sữa')) {
+        return {
+            emoji,
+            icon: Coffee,
+            bgClass: 'bg-[#efebe9] text-[#5d4037] group-hover:bg-[#5d4037] group-hover:text-white',
+            borderColor: 'border-[#efebe9]',
+            accentColor: 'amber'
+        };
+    }
+    if (cat.includes('ăn uống') || cat.includes('food') || cat.includes('ẩm thực') || cat.includes('nhà hàng') || cat.includes('quán ăn') || cat.includes('đồ ăn') || cat.includes('ăn trưa') || cat.includes('ăn tối')) {
+        return {
+            emoji,
+            icon: Utensils,
+            bgClass: 'bg-rose-50 text-rose-500 group-hover:bg-rose-500 group-hover:text-white',
+            borderColor: 'border-rose-100',
+            accentColor: 'rose'
+        };
+    }
+    if (cat.includes('dating') || cat.includes('hẹn hò') || cat.includes('tình yêu') || cat.includes('người yêu') || cat.includes('crush') || cat.includes('yêu')) {
+        return {
+            emoji,
+            icon: Heart,
+            bgClass: 'bg-pink-50 text-pink-500 group-hover:bg-pink-500 group-hover:text-white',
+            borderColor: 'border-pink-100',
+            accentColor: 'pink'
+        };
+    }
+    if (cat.includes('di chuyển') || cat.includes('transport') || cat.includes('xe cộ') || cat.includes('đi lại') || cat.includes('xăng') || cat.includes('grab') || cat.includes('taxi')) {
+        return {
+            emoji,
+            icon: Car,
+            bgClass: 'bg-blue-50 text-blue-500 group-hover:bg-blue-500 group-hover:text-white',
+            borderColor: 'border-blue-100',
+            accentColor: 'blue'
+        };
+    }
+    if (cat.includes('vé máy bay') || cat.includes('du lịch') || cat.includes('travel') || cat.includes('bay') || cat.includes('khách sạn')) {
+        return {
+            emoji,
+            icon: Plane,
+            bgClass: 'bg-sky-50 text-sky-500 group-hover:bg-sky-500 group-hover:text-white',
+            borderColor: 'border-sky-100',
+            accentColor: 'sky'
+        };
+    }
+    if (cat.includes('mua sắm') || cat.includes('shopping') || cat.includes('quần áo') || cat.includes('mỹ phẩm') || cat.includes('giày') || cat.includes('shopee') || cat.includes('lazada') || cat.includes('siêu thị')) {
+        return {
+            emoji,
+            icon: ShoppingBag,
+            bgClass: 'bg-amber-50 text-amber-500 group-hover:bg-amber-500 group-hover:text-white',
+            borderColor: 'border-amber-100',
+            accentColor: 'amber'
+        };
+    }
+    if (cat.includes('hóa đơn') || cat.includes('bills') || cat.includes('điện nước') || cat.includes('internet') || cat.includes('dịch vụ') || cat.includes('wifi') || cat.includes('điện') || cat.includes('nước') || cat.includes('gas')) {
+        return {
+            emoji,
+            icon: Droplets,
+            bgClass: 'bg-purple-50 text-purple-500 group-hover:bg-purple-500 group-hover:text-white',
+            borderColor: 'border-purple-100',
+            accentColor: 'purple'
+        };
+    }
+    if (cat.includes('giải trí') || cat.includes('entertainment') || cat.includes('phim') || cat.includes('chơi') || cat.includes('game') || cat.includes('netflix') || cat.includes('spotify') || cat.includes('karaoke')) {
+        return {
+            emoji,
+            icon: Tv,
+            bgClass: 'bg-indigo-50 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white',
+            borderColor: 'border-indigo-100',
+            accentColor: 'indigo'
+        };
+    }
+    if (cat.includes('sức khỏe') || cat.includes('health') || cat.includes('thuốc') || cat.includes('bệnh viện') || cat.includes('khám') || cat.includes('gym') || cat.includes('nha khoa')) {
+        return {
+            emoji,
+            icon: Heart,
+            bgClass: 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white',
+            borderColor: 'border-emerald-100',
+            accentColor: 'emerald'
+        };
+    }
+    if (cat.includes('giáo dục') || cat.includes('education') || cat.includes('học tập') || cat.includes('sách') || cat.includes('khóa học') || cat.includes('học phí') || cat.includes('tài liệu')) {
+        return {
+            emoji,
+            icon: GraduationCap,
+            bgClass: 'bg-teal-50 text-teal-500 group-hover:bg-teal-500 group-hover:text-white',
+            borderColor: 'border-teal-100',
+            accentColor: 'teal'
+        };
+    }
+    if (cat.includes('nhà cửa') || cat.includes('nhà') || cat.includes('phòng') || cat.includes('rent') || cat.includes('thuê nhà') || cat.includes('tiền nhà')) {
+        return {
+            emoji,
+            icon: Home,
+            bgClass: 'bg-orange-50 text-orange-500 group-hover:bg-orange-500 group-hover:text-white',
+            borderColor: 'border-orange-100',
+            accentColor: 'orange'
+        };
+    }
+    if (cat.includes('đầu tư') || cat.includes('invest') || cat.includes('cổ phiếu') || cat.includes('coin') || cat.includes('vàng')) {
+        return {
+            emoji,
+            icon: TrendingUp,
+            bgClass: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white',
+            borderColor: 'border-emerald-150',
+            accentColor: 'emerald'
+        };
+    }
+    if (cat.includes('trả nợ') || cat.includes('nợ') || cat.includes('debt') || cat.includes('ngân hàng') || cat.includes('bank') || cat.includes('vay') || cat.includes('mượn')) {
+        return {
+            emoji,
+            icon: Landmark,
+            bgClass: 'bg-red-50 text-red-500 group-hover:bg-red-500 group-hover:text-white',
+            borderColor: 'border-red-100',
+            accentColor: 'red'
+        };
+    }
+    if (cat.includes('tiết kiệm') || cat.includes('heo đất') || cat.includes('tích lũy') || cat.includes('gửi tiết kiệm')) {
+        return {
+            emoji,
+            icon: PiggyBank,
+            bgClass: 'bg-pink-50 text-pink-500 group-hover:bg-pink-500 group-hover:text-white',
+            borderColor: 'border-pink-100',
+            accentColor: 'pink'
+        };
+    }
+    if (cat.includes('hiếu hỉ') || cat.includes('cưới') || cat.includes('tân gia') || cat.includes('sinh nhật') || cat.includes('quà') || cat.includes('tặng') || cat.includes('lì xì')) {
+        return {
+            emoji,
+            icon: Gift,
+            bgClass: 'bg-violet-50 text-violet-500 group-hover:bg-violet-500 group-hover:text-white',
+            borderColor: 'border-violet-100',
+            accentColor: 'violet'
+        };
+    }
+    if (cat.includes('lương') || cat.includes('salary') || cat.includes('công ty') || cat.includes('working') || cat.includes('thu nhập')) {
+        return {
+            emoji,
+            icon: Briefcase,
+            bgClass: 'bg-indigo-50 text-indigo-650 group-hover:bg-indigo-650 group-hover:text-white',
+            borderColor: 'border-indigo-100',
+            accentColor: 'indigo'
+        };
+    }
+    if (cat.includes('thưởng') || cat.includes('bonus')) {
+        return {
+            emoji,
+            icon: Sparkles,
+            bgClass: 'bg-yellow-50 text-yellow-600 group-hover:bg-yellow-600 group-hover:text-white',
+            borderColor: 'border-yellow-100',
+            accentColor: 'amber'
+        };
+    }
+    if (cat.includes('bán hàng') || cat.includes('kinh doanh') || cat.includes('doanh thu') || cat.includes('sales') || cat.includes('tiệm')) {
+        return {
+            emoji,
+            icon: Coins,
+            bgClass: 'bg-cyan-50 text-cyan-600 group-hover:bg-cyan-600 group-hover:text-white',
+            borderColor: 'border-cyan-100',
+            accentColor: 'cyan'
+        };
+    }
+
+    // Deterministic fallback for custom categories
+    const hash = hashString(category);
+    const fallbackPalettes = [
+        { bgClass: 'bg-indigo-50 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white', borderColor: 'border-indigo-100', accentColor: 'indigo' },
+        { bgClass: 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white', borderColor: 'border-emerald-100', accentColor: 'emerald' },
+        { bgClass: 'bg-rose-50 text-rose-500 group-hover:bg-rose-500 group-hover:text-white', borderColor: 'border-rose-100', accentColor: 'rose' },
+        { bgClass: 'bg-amber-50 text-amber-500 group-hover:bg-amber-500 group-hover:text-white', borderColor: 'border-amber-100', accentColor: 'amber' },
+        { bgClass: 'bg-blue-50 text-blue-500 group-hover:bg-blue-500 group-hover:text-white', borderColor: 'border-blue-100', accentColor: 'blue' },
+        { bgClass: 'bg-purple-50 text-purple-500 group-hover:bg-purple-500 group-hover:text-white', borderColor: 'border-purple-100', accentColor: 'purple' },
+        { bgClass: 'bg-pink-50 text-pink-500 group-hover:bg-pink-500 group-hover:text-white', borderColor: 'border-pink-100', accentColor: 'pink' },
+        { bgClass: 'bg-cyan-50 text-cyan-500 group-hover:bg-cyan-500 group-hover:text-white', borderColor: 'border-cyan-100', accentColor: 'cyan' },
+        { bgClass: 'bg-teal-50 text-teal-500 group-hover:bg-teal-500 group-hover:text-white', borderColor: 'border-teal-100', accentColor: 'teal' },
+        { bgClass: 'bg-orange-50 text-orange-500 group-hover:bg-orange-500 group-hover:text-white', borderColor: 'border-orange-100', accentColor: 'orange' },
+    ];
+    const palette = fallbackPalettes[hash % fallbackPalettes.length];
+
+    const fallbackIcons = [Wallet, Coins, PiggyBank, Sparkles, Heart, FileText];
+    const IconComponent = fallbackIcons[hash % fallbackIcons.length];
+
+    return {
+        emoji,
+        icon: IconComponent,
+        ...palette
+    };
+};
+
+// --- Helper to parse mathematical expressions and shorthands safely ---
+const parseMathExpression = (expr: string): number | null => {
+    if (!expr || !expr.trim()) return null;
+    try {
+        let cleaned = expr.toLowerCase();
+        
+        // Replace Vietnamese shorthands & general shorthands
+        cleaned = cleaned.replace(/tr(iệu)?/g, '*1000000');
+        cleaned = cleaned.replace(/m/g, '*1000000');
+        cleaned = cleaned.replace(/t(ỷ)?/g, '*1000000000');
+        cleaned = cleaned.replace(/k/g, '*1000');
+        
+        // Replace visual operators with JS operators
+        cleaned = cleaned.replace(/x|×/g, '*');
+        cleaned = cleaned.replace(/:|÷/g, '/');
+        
+        // Remove spaces
+        cleaned = cleaned.replace(/\s+/g, '');
+
+        // Remove thousands separators: commas or dots followed by exactly three digits
+        cleaned = cleaned.replace(/(\d)[.,](\d{3})(?!\d)/g, '$1$2');
+        
+        // Now any remaining comma is a decimal point
+        cleaned = cleaned.replace(/,/g, '.');
+
+        // Only allow safe math characters
+        const safeRegex = /^[\d\+\-\*\/\(\)\.]+$/;
+        if (!safeRegex.test(cleaned)) {
+            return null;
+        }
+
+        // Evaluate safely
+        // eslint-disable-next-line no-new-func
+        const result = new Function(`return (${cleaned})`)();
+        if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+            return Math.max(0, result);
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+};
+
+const keypadKeys = [
+    { label: 'C', value: 'C', bg: 'bg-rose-50 text-rose-600 hover:bg-rose-100' },
+    { label: '(', value: '(', bg: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+    { label: ')', value: ')', bg: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+    { label: '⌫', value: 'backspace', bg: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+    
+    { label: '7', value: '7', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: '8', value: '8', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: '9', value: '9', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: '÷', value: '/', bg: 'bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100' },
+    
+    { label: '4', value: '4', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: '5', value: '5', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: '6', value: '6', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: '×', value: '*', bg: 'bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100' },
+    
+    { label: '1', value: '1', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: '2', value: '2', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: '3', value: '3', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: '-', value: '-', bg: 'bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100' },
+    
+    { label: '0', value: '0', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: '.', value: '.', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
+    { label: 'k', value: 'k', bg: 'bg-emerald-50 text-emerald-600 font-bold hover:bg-emerald-100' },
+    { label: '+', value: '+', bg: 'bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100' },
+    
+    { label: '=', value: '=', bg: 'col-span-4 bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 text-white font-extrabold hover:from-indigo-600 hover:to-purple-700 shadow-md shadow-indigo-100 py-3.5' }
+];
+
 const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, onNavigateToCashFlow, onNavigateToAI, isLoading, lang, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onAddBudget, onUpdateBudget, onDeleteBudget, onRefresh }) => {
     const t = translations[lang];
     const { transactions } = state;
+
+    const [hideBalance, setHideBalance] = useState(() => localStorage.getItem('smartlife_hide_balance') === 'true');
+
+    useEffect(() => {
+        localStorage.setItem('smartlife_hide_balance', hideBalance.toString());
+    }, [hideBalance]);
 
     // Pull to Refresh state
     const [pullDistance, setPullDistance] = useState(0);
@@ -163,8 +454,9 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     const isDragging = React.useRef(false);
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        const container = e.currentTarget;
-        if (container.scrollTop === 0 && window.scrollY === 0) {
+        const mainScroll = document.querySelector('main');
+        const isAtTop = !mainScroll || mainScroll.scrollTop === 0;
+        if (isAtTop && window.scrollY === 0) {
             startY.current = e.touches[0].clientY;
             isDragging.current = true;
         }
@@ -238,6 +530,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     const today = new Date();
     const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
     const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+    const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
 
     // Form State
     const [amount, setAmount] = useState('');
@@ -269,6 +562,36 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     // Balance Form State
     const [newBalance, setNewBalance] = useState('');
     const [showCalculator, setShowCalculator] = useState(false);
+
+    const handleKeypadPress = (key: string) => {
+        if (key === 'C') {
+            setAmount('');
+        } else if (key === 'backspace') {
+            setAmount(prev => {
+                if (prev.endsWith(' ')) {
+                    return prev.trimEnd().slice(0, -1).trimEnd();
+                }
+                return prev.slice(0, -1);
+            });
+        } else if (key === '=') {
+            const parsed = parseMathExpression(amount);
+            if (parsed !== null) {
+                setAmount(parsed.toString());
+            }
+        } else {
+            setAmount(prev => {
+                if (prev === '0' && /\d/.test(key)) return key;
+                if (['+', '-', '*', '/'].includes(key)) {
+                    let op = key;
+                    if (key === '*') op = ' × ';
+                    else if (key === '/') op = ' ÷ ';
+                    else op = ` ${key} `;
+                    return prev + op;
+                }
+                return prev + key;
+            });
+        }
+    };
 
     // AI State
     const [aiInsight, setAiInsight] = useState<{ insight: string; actions: string[] } | null>(null);
@@ -370,6 +693,12 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         e.preventDefault();
         if (!amount) return;
 
+        const parsedAmount = parseMathExpression(amount);
+        if (parsedAmount === null || isNaN(parsedAmount) || parsedAmount <= 0) {
+            alert("Số tiền không hợp lệ. Vui lòng kiểm tra lại phép tính!");
+            return;
+        }
+
         let finalCategory = category;
 
         // Handle Custom Category Creation
@@ -386,7 +715,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             // Mode: Update
             onUpdateTransaction({
                 ...editingTransaction,
-                amount: Number(amount),
+                amount: parsedAmount,
                 category: finalCategory,
                 date: date,
                 type: type,
@@ -395,7 +724,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         } else {
             // Mode: Create
             onAddTransaction({
-                amount: Number(amount),
+                amount: parsedAmount,
                 category: finalCategory,
                 date: date,
                 type: type,
@@ -550,96 +879,105 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
     const renderBudgets = () => {
         return (
-            <div className="relative mb-6 rounded-2xl p-[2px] overflow-hidden group shadow-lg animate-fade-in">
-                {/* Gold Running Border Effect */}
-                <div className="absolute inset-[-200%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#E2E8F0_0%,#FFD700_25%,#FDB931_50%,#FFD700_75%,#E2E8F0_100%)]"></div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 md:p-6 mb-6 animate-fade-in">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-gray-800">Ngân sách Tháng {selectedMonth + 1}</h3>
+                    <button
+                        onClick={() => {
+                            setEditingBudget(null);
+                            setBudgetLimit('');
+                            // Default to first category if possible, or reset
+                            setSelectedBudgetCategory(expenseCategories[0]);
+                            setIsBudgetModalOpen(true);
+                        }}
+                        className="text-sm text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition-colors"
+                    >
+                        + Thiết lập
+                    </button>
+                </div>
 
-                <div className="relative bg-white rounded-2xl p-6 h-full">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-gray-800">Ngân sách Tháng {selectedMonth + 1}</h3>
-                        <button
-                            onClick={() => {
-                                setEditingBudget(null);
-                                setBudgetLimit('');
-                                // Default to first category if possible, or reset
-                                setSelectedBudgetCategory(expenseCategories[0]);
-                                setIsBudgetModalOpen(true);
-                            }}
-                            className="text-sm text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition-colors"
-                        >
-                            + Thiết lập
-                        </button>
-                    </div>
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    {state.budgets
+                        ?.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`)
+                        .map(budget => {
+                            const progress = getBudgetProgress(budget.category);
+                            if (!progress) return null;
+                            const { spent, percent, isOver } = progress;
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {state.budgets
-                            ?.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`)
-                            .map(budget => {
-                                const progress = getBudgetProgress(budget.category);
-                                if (!progress) return null;
-                                const { spent, percent, isOver } = progress;
+                            return (
+                                <div
+                                    key={budget.id}
+                                    onClick={() => {
+                                        setSelectedBudgetForDetails(budget);
+                                        setDetailViewMonth(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`);
+                                    }}
+                                    className="bg-white rounded-2xl p-3 md:p-5 border border-gray-100 hover:shadow-lg hover:border-indigo-100 transition-all cursor-pointer group relative overflow-hidden"
+                                >
+                                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-50 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
 
-                                return (
-                                    <div
-                                        key={budget.id}
-                                        onClick={() => {
-                                            setSelectedBudgetForDetails(budget);
-                                            setDetailViewMonth(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`);
-                                        }}
-                                        className="bg-white rounded-2xl p-5 border border-gray-100 hover:shadow-lg hover:border-indigo-100 transition-all cursor-pointer group relative overflow-hidden"
-                                    >
-                                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-50 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
+                                    {(() => {
+                                        const styles = getCategoryStyles(budget.category);
+                                        const cleanName = cleanCategoryName(budget.category);
+                                        const IconComponent = styles.icon;
 
-                                        <div className="flex justify-between items-center mb-3 relative z-10">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                                    <Wallet size={20} />
+                                        return (
+                                            <>
+                                                <div className="flex justify-between items-start mb-2.5 relative z-10">
+                                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 md:gap-3 min-w-0">
+                                                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center transition-all shrink-0 ${styles.bgClass}`}>
+                                                            {styles.emoji ? (
+                                                                <span className="text-sm md:text-base">{styles.emoji}</span>
+                                                            ) : (
+                                                                <IconComponent size={16} className="md:w-5 md:h-5" />
+                                                            )}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <span className="font-bold text-gray-800 text-xs md:text-sm block truncate" title={cleanName}>{cleanName}</span>
+                                                            {isOver && <span className="text-[9px] md:text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full font-bold inline-block whitespace-nowrap mt-0.5">Vượt</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                        <button onClick={() => { setEditingBudget(budget); setBudgetLimit(budget.amount.toString()); setSelectedBudgetCategory(budget.category); setIsBudgetModalOpen(true); }} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 size={14} /></button>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (window.confirm("Bạn có chắc chắn muốn xóa ngân sách này?")) {
+                                                                    onDeleteBudget(budget.id);
+                                                                }
+                                                            }}
+                                                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <span className="font-bold text-gray-800 text-sm md:text-base block">{budget.category}</span>
-                                                    {isOver && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold inline-block">Vượt ngân sách</span>}
+
+                                                <div className="flex flex-col sm:flex-row justify-between text-[10px] md:text-xs font-medium text-gray-500 mb-1.5 mt-2 gap-0.5">
+                                                    <span className="truncate">Đã chi: <span className={isOver ? 'text-red-600 font-bold' : 'text-gray-900 font-bold'}>{formatCurrency(spent, lang)}</span></span>
+                                                    <span className="text-gray-400 sm:text-right shrink-0">/ {formatCurrency(budget.amount, lang)}</span>
                                                 </div>
-                                            </div>
-                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                                <button onClick={() => { setEditingBudget(budget); setBudgetLimit(budget.amount.toString()); setSelectedBudgetCategory(budget.category); setIsBudgetModalOpen(true); }} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 size={16} /></button>
-                                                <button
-                                                    onClick={() => {
-                                                        if (window.confirm("Bạn có chắc chắn muốn xóa ngân sách này?")) {
-                                                            onDeleteBudget(budget.id);
-                                                        }
-                                                    }}
-                                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </div>
 
-                                        <div className="flex justify-between text-xs font-medium text-gray-500 mb-2">
-                                            <span>Đã chi: <span className={isOver ? 'text-red-600 font-bold' : 'text-gray-900 font-bold'}>{formatCurrency(spent, lang)}</span></span>
-                                            <span className="text-gray-400">/ {formatCurrency(budget.amount, lang)}</span>
-                                        </div>
-
-                                        <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden shadow-inner">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-700 ease-out shadow-sm ${isOver ? 'bg-gradient-to-r from-red-500 to-rose-600' : percent > 80 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}
-                                                style={{ width: `${Math.min(percent, 100)}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                );
-                            })}
-
-                        {(!state.budgets || state.budgets.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`).length === 0) && (
-                            <div className="col-span-1 md:col-span-2 text-center py-6 border-2 border-dashed border-gray-100 rounded-xl">
-                                <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-2 text-indigo-400">
-                                    <DollarSign size={20} />
+                                                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all duration-700 ease-out shadow-sm ${isOver ? 'bg-gradient-to-r from-red-500 to-rose-600' : percent > 80 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}
+                                                        style={{ width: `${Math.min(percent, 100)}%` }}
+                                                    />
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
                                 </div>
-                                <p className="text-gray-400 text-sm">Chưa thiết lập ngân sách</p>
-                                <button onClick={() => setIsBudgetModalOpen(true)} className="mt-2 text-indigo-600 text-xs font-bold hover:underline">Thêm ngay</button>
+                            );
+                        })}
+
+                    {(!state.budgets || state.budgets.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`).length === 0) && (
+                        <div className="col-span-2 text-center py-6 border-2 border-dashed border-gray-100 rounded-xl">
+                            <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-2 text-indigo-400">
+                                <DollarSign size={20} />
                             </div>
-                        )}
-                    </div>
+                            <p className="text-gray-400 text-sm">Chưa thiết lập ngân sách</p>
+                            <button onClick={() => setIsBudgetModalOpen(true)} className="mt-2 text-indigo-600 text-xs font-bold hover:underline">Thêm ngay</button>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -1072,28 +1410,12 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     const renderHistory = () => {
         // Filter transactions for history view
         const filteredTransactions = transactions.filter(t => {
-            // Filter by Month/Year (reuse selectedMonth/Year from global state or allow independent?)
-            // User requested "Lịch sử chi tiêu" inside "Chi tiết", likely wants to see everything or filter specifically.
-            // Let's use the global selectedMonth/Year for consistency with the rest of the dashboard,
-            // BUT allow "All Time" or specific filtering if needed. 
-            // For now, let's stick to the Global Month Filter for date, and add Category Filter.
-
             const d = new Date(t.date);
             const matchMonth = d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
-
-            // However, user might want to see ALL history. 
-            // Let's add a toggle or just use the separate filter state if we want robust filtering.
-            // Simplified: Use the global month filter for now, as that's the dashboard's context. 
-            // If user wants "All", they might expect a separate page, but here we are in a dashboard view.
-
-            // UPDATE: Making it strictly based on the requested "Phễu để lọc".
-            // Let's filter by the Global Month FIRST, then apply Category.
-
             const matchCategory = selectedCategoryFilter === 'all' || t.category === selectedCategoryFilter;
+            const matchType = !activeStatsCard || t.type === (activeStatsCard === 'income' ? TransactionType.INCOME : TransactionType.EXPENSE);
 
-
-
-            return matchMonth && matchCategory;
+            return matchMonth && matchCategory && matchType;
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         const totalFilteredIncome = filteredTransactions.filter(t => t.type === TransactionType.INCOME && t.category !== 'Điều chỉnh số dư').reduce((a, b) => a + b.amount, 0);
@@ -1112,13 +1434,36 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     </div>
 
                     {/* Filters */}
-                    <div className="flex items-center gap-2 relative">
+                    <div className="flex items-center gap-3 relative flex-wrap">
+                        {/* Type Segment Control */}
+                        <div className="flex bg-gray-100/80 p-0.5 rounded-lg text-xs font-bold border border-gray-200/50 shadow-inner">
+                            <button
+                                onClick={() => setActiveStatsCard(null)}
+                                className={`px-2.5 py-1.5 rounded-md transition-all ${!activeStatsCard ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/20' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                Tất cả
+                            </button>
+                            <button
+                                onClick={() => setActiveStatsCard('income')}
+                                className={`px-2.5 py-1.5 rounded-md transition-all ${activeStatsCard === 'income' ? 'bg-white text-emerald-600 shadow-sm border border-gray-200/20' : 'text-gray-500 hover:text-emerald-600'}`}
+                            >
+                                Thu
+                            </button>
+                            <button
+                                onClick={() => setActiveStatsCard('expense')}
+                                className={`px-2.5 py-1.5 rounded-md transition-all ${activeStatsCard === 'expense' ? 'bg-white text-rose-600 shadow-sm border border-gray-200/20' : 'text-gray-500 hover:text-rose-600'}`}
+                            >
+                                Chi
+                            </button>
+                        </div>
+
+                        {/* Category Filter */}
                         <div className="relative">
                             <button
                                 onClick={() => setShowFilterMenu(!showFilterMenu)}
-                                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${selectedCategoryFilter !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${selectedCategoryFilter !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
                             >
-                                <Filter size={16} />
+                                <Filter size={14} />
                                 <span>
                                     {selectedCategoryFilter === 'all' ? 'Tất cả danh mục' : selectedCategoryFilter}
                                 </span>
@@ -1235,25 +1580,25 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     )
 
     return (
-        <div 
+        <div
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             className="space-y-4 md:space-y-6 animate-fade-in pb-20 relative min-h-[500px]"
         >
             {/* Pull to Refresh Spinner */}
-            <div 
+            <div
                 className="absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-200 z-[100]"
-                style={{ 
-                    top: `${pullDistance - 40}px`, 
-                    opacity: pullDistance > 10 ? Math.min(pullDistance / 50, 1) : 0 
+                style={{
+                    top: `${pullDistance - 40}px`,
+                    opacity: pullDistance > 10 ? Math.min(pullDistance / 50, 1) : 0
                 }}
             >
                 <div className="bg-white rounded-full p-2.5 shadow-lg border border-gray-100 flex items-center justify-center">
-                    <Loader2 
-                        className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`} 
-                        size={20} 
-                        style={{ transform: `rotate(${pullDistance * 4}deg)` }} 
+                    <Loader2
+                        className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`}
+                        size={20}
+                        style={{ transform: `rotate(${pullDistance * 4}deg)` }}
                     />
                 </div>
             </div>
@@ -1263,20 +1608,57 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <h2 className="text-2xl font-bold text-gray-800"> Tổng quan tài chính </h2>
                     <p className="text-gray-400 text-sm">Manage Your Assets Wisely </p>
                 </div>
+                <div className="flex flex-wrap gap-2 md:gap-3 items-center w-full md:w-auto justify-between md:justify-end">
+                    {/* Unified Selector Toolbar: Month Picker + View Switcher */}
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm w-full md:w-auto justify-between md:justify-start">
+                        {/* Compact Month Picker Button */}
+                        <button
+                            onClick={() => setIsMonthPickerOpen(true)}
+                            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 hover:bg-indigo-50 hover:text-indigo-600 text-gray-600 font-bold transition-all border border-gray-100 shrink-0"
+                            title="Chọn tháng/năm"
+                        >
+                            <CalendarDays size={14} className="text-indigo-500" />
+                            <span className="text-[11px] md:text-xs">T{selectedMonth + 1}/{selectedYear}</span>
+                        </button>
 
-                <div className="flex flex-wrap gap-2 md:gap-3 items-center">
-                    {/* Global Month Filter */}
-                    <div className="flex items-center bg-white border border-gray-200 rounded-xl px-2 py-1.5 md:px-3 md:py-2 shadow-sm">
-                        <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-indigo-600 transition-colors">❮</button>
-                        <span className="mx-2 md:mx-3 font-semibold text-gray-700 min-w-[90px] md:min-w-[100px] text-center text-sm md:text-base">Tháng {selectedMonth + 1}/{selectedYear}</span>
-                        <button onClick={() => changeMonth(1)} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-indigo-600 transition-colors">❯</button>
-                    </div>
+                        {/* Divider Line */}
+                        <div className="w-[1px] h-5 bg-gray-200 mx-1 shrink-0"></div>
 
-                    <div className="flex gap-1 md:gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
-                        <button onClick={() => setViewMode('overview')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'overview' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Tổng quan"><LayoutDashboard size={18} /></button>
-                        <button onClick={() => setViewMode('calendar')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Lịch"><CalendarDays size={18} /></button>
-                        <button onClick={() => setViewMode('history')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'history' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Danh sách"><List size={18} /></button>
-                        <button onClick={() => setViewMode('report')} className={`p-1.5 md:p-2 rounded-lg transition-all ${viewMode === 'report' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-50'}`} title="Báo cáo"><FileBarChart size={18} /></button>
+                        {/* 4 Switcher Sub-Tabs */}
+                        <div className="flex flex-1 md:flex-initial gap-0.5 justify-around md:justify-start">
+                            <button
+                                onClick={() => setViewMode('overview')}
+                                className={`flex items-center justify-center gap-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg transition-all duration-300 ${viewMode === 'overview' ? 'bg-indigo-50 text-indigo-600 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                title="Tổng quan"
+                            >
+                                <LayoutDashboard size={16} />
+                                {viewMode === 'overview' && <span className="text-[11px] md:text-xs font-semibold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Tổng quan</span>}
+                            </button>
+                            <button
+                                onClick={() => setViewMode('calendar')}
+                                className={`flex items-center justify-center gap-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg transition-all duration-300 ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-600 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                title="Xem lịch theo ngày"
+                            >
+                                <CalendarDays size={16} />
+                                {viewMode === 'calendar' && <span className="text-[11px] md:text-xs font-semibold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Lịch ngày</span>}
+                            </button>
+                            <button
+                                onClick={() => setViewMode('history')}
+                                className={`flex items-center justify-center gap-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg transition-all duration-300 ${viewMode === 'history' ? 'bg-indigo-50 text-indigo-600 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                title="Lịch sử"
+                            >
+                                <List size={16} />
+                                {viewMode === 'history' && <span className="text-[11px] md:text-xs font-semibold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Lịch sử</span>}
+                            </button>
+                            <button
+                                onClick={() => setViewMode('report')}
+                                className={`flex items-center justify-center gap-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg transition-all duration-300 ${viewMode === 'report' ? 'bg-indigo-50 text-indigo-600 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                title="Báo cáo"
+                            >
+                                <FileBarChart size={16} />
+                                {viewMode === 'report' && <span className="text-[11px] md:text-xs font-semibold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Báo cáo</span>}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Buttons Group */}
@@ -1287,7 +1669,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all whitespace-nowrap"
                         >
                             <Sparkles size={16} className="text-yellow-300" />
-                            <span className="text-xs md:text-sm">Phân tích</span>
+                            <span className="text-xs md:text-sm">AI Own</span>
                         </button>
 
                         {/* Add Transaction Button */}
@@ -1298,12 +1680,12 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                 setType(TransactionType.EXPENSE);
                                 setAmount('');
                                 setDesc('');
-                                setCategory(EXPENSE_CATEGORIES[0]);
+                                setCategory(expenseCategories[0] || EXPENSE_CATEGORIES[0]);
                             }}
-                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all whitespace-nowrap"
+                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-800 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl font-extrabold shadow-[0_4px_14px_rgba(67,56,202,0.35)] hover:from-blue-800 hover:via-indigo-700 hover:to-indigo-900 hover:shadow-[0_6px_20px_rgba(67,56,202,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 whitespace-nowrap border border-indigo-500/20"
                         >
-                            <Plus size={18} />
-                            <span className="text-xs md:text-sm">Thêm Mới</span>
+                            <Plus size={18} className="animate-pulse text-indigo-100" />
+                            <span className="text-xs md:text-sm">Thêm giao dịch</span>
                         </button>
                     </div>
                 </div>
@@ -1311,72 +1693,87 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
             {/* Main Stats Cards */}
             {/* Main Stats Cards - Compact & Minimal */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-                {/* Balance Card - Luxurious Circle */}
-                <div className="col-span-2 md:col-span-1 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center relative overflow-hidden group">
-                    {/* Decorative Circle */}
-                    <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 blur-xl"></div>
-                    <div className="absolute right-2 top-2 w-12 h-12 rounded-full border border-indigo-50/50"></div>
+            {viewMode === 'overview' && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                    {/* Balance Card - Luxurious Circle */}
+                    <div className="col-span-2 md:col-span-1 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center relative overflow-hidden group">
+                        {/* Decorative Circle */}
+                        <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 blur-xl"></div>
+                        <div className="absolute right-2 top-2 w-12 h-12 rounded-full border border-indigo-50/50"></div>
 
+                        <button
+                            onClick={() => setIsBalanceModalOpen(true)}
+                            className="absolute top-2 right-4 text-gray-300 hover:text-indigo-600 transition-colors p-1"
+                        >
+                            <Edit2 size={16} />
+                        </button>
+
+                        <div className="flex items-center gap-1.5 relative z-10 mb-1">
+                            <p className="text-gray-400 font-bold text-[10px] uppercase tracking-wider">Số dư khả dụng</p>
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setHideBalance(!hideBalance); }}
+                                className="text-gray-400 hover:text-indigo-650 transition-colors p-0.5 rounded-md hover:bg-indigo-50/50"
+                                title={hideBalance ? "Hiện số tiền" : "Ẩn số tiền"}
+                            >
+                                {hideBalance ? <EyeOff size={13} /> : <Eye size={13} />}
+                            </button>
+                        </div>
+                        <h3 className="text-2xl font-bold tracking-tight text-gray-900 relative z-10">
+                            {hideBalance ? '••••••' : formatCurrency(stats.totalBalance, lang)}
+                        </h3>
+                    </div>
+
+                    {/* Income Card - 2-Step Interaction */}
                     <button
-                        onClick={() => setIsBalanceModalOpen(true)}
-                        className="absolute top-2 right-4 text-gray-300 hover:text-indigo-600 transition-colors p-1"
+                        onClick={() => setActiveStatsCard(activeStatsCard === 'income' ? null : 'income')}
+                        className={`col-span-1 bg-white p-4 rounded-2xl shadow-sm border flex flex-col justify-center text-left transition-all group relative
+                            ${activeStatsCard === 'income' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-gray-100 hover:border-emerald-100 hover:shadow-md'}
+                        `}
                     >
-                        <Edit2 size={16} />
+                        <div className="flex justify-between w-full">
+                            <p className={`font-bold text-[10px] uppercase tracking-wider mb-1 transition-colors ${activeStatsCard === 'income' ? 'text-emerald-600' : 'text-gray-400 group-hover:text-emerald-500'}`}>Thu nhập T{selectedMonth + 1}</p>
+                            {activeStatsCard === 'income' && (
+                                <div
+                                    onClick={(e) => { e.stopPropagation(); setViewMode('history'); }}
+                                    className="absolute top-2 right-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full cursor-pointer hover:bg-emerald-100 flex items-center gap-1 animate-in fade-in zoom-in"
+                                >
+                                    Chi tiết <ExternalLink size={10} />
+                                </div>
+                            )}
+                        </div>
+                        <h3 className="text-xl md:text-2xl font-bold tracking-tight text-emerald-600">
+                            {hideBalance ? '••••••' : `+${formatCurrency(stats.currentMonthIncome, lang)}`}
+                        </h3>
                     </button>
 
-                    <p className="text-gray-400 font-bold text-[10px] uppercase tracking-wider mb-1 relative z-10">Số dư khả dụng</p>
-                    <h3 className="text-2xl font-bold tracking-tight text-gray-900 relative z-10">{formatCurrency(stats.totalBalance, lang)}</h3>
+                    {/* Expense Card - 2-Step Interaction */}
+                    <button
+                        onClick={() => setActiveStatsCard(activeStatsCard === 'expense' ? null : 'expense')}
+                        className={`col-span-1 bg-white p-4 rounded-2xl shadow-sm border flex flex-col justify-center text-left transition-all group relative
+                            ${activeStatsCard === 'expense' ? 'border-rose-200 ring-2 ring-rose-50' : 'border-gray-100 hover:border-rose-100 hover:shadow-md'}
+                        `}
+                    >
+                        <div className="flex justify-between w-full">
+                            <p className={`font-bold text-[10px] uppercase tracking-wider mb-1 transition-colors ${activeStatsCard === 'expense' ? 'text-rose-600' : 'text-gray-400 group-hover:text-rose-500'}`}>Chi tiêu T{selectedMonth + 1}</p>
+                            {activeStatsCard === 'expense' && (
+                                <div
+                                    onClick={(e) => { e.stopPropagation(); setViewMode('history'); }}
+                                    className="absolute top-2 right-2 text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-full cursor-pointer hover:bg-rose-100 flex items-center gap-1 animate-in fade-in zoom-in"
+                                >
+                                    Chi tiết <ExternalLink size={10} />
+                                </div>
+                            )}
+                        </div>
+                        <h3 className="text-xl md:text-2xl font-bold tracking-tight text-rose-600">
+                            {hideBalance ? '••••••' : `-${formatCurrency(stats.currentMonthExpense, lang)}`}
+                        </h3>
+                    </button>
                 </div>
-
-                {/* Income Card - 2-Step Interaction */}
-                <button
-                    onClick={() => setActiveStatsCard(activeStatsCard === 'income' ? null : 'income')}
-                    className={`col-span-1 bg-white p-4 rounded-2xl shadow-sm border flex flex-col justify-center text-left transition-all group relative
-                        ${activeStatsCard === 'income' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-gray-100 hover:border-emerald-100 hover:shadow-md'}
-                    `}
-                >
-                    <div className="flex justify-between w-full">
-                        <p className={`font-bold text-[10px] uppercase tracking-wider mb-1 transition-colors ${activeStatsCard === 'income' ? 'text-emerald-600' : 'text-gray-400 group-hover:text-emerald-500'}`}>Thu nhập T{selectedMonth + 1}</p>
-                        {activeStatsCard === 'income' && (
-                            <div
-                                onClick={(e) => { e.stopPropagation(); setViewMode('history'); }}
-                                className="absolute top-2 right-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full cursor-pointer hover:bg-emerald-100 flex items-center gap-1 animate-in fade-in zoom-in"
-                            >
-                                Chi tiết <ExternalLink size={10} />
-                            </div>
-                        )}
-                    </div>
-                    <h3 className="text-xl md:text-2xl font-bold tracking-tight text-emerald-600">+{formatCurrency(stats.currentMonthIncome, lang)}</h3>
-                </button>
-
-                {/* Expense Card - 2-Step Interaction */}
-                <button
-                    onClick={() => setActiveStatsCard(activeStatsCard === 'expense' ? null : 'expense')}
-                    className={`col-span-1 bg-white p-4 rounded-2xl shadow-sm border flex flex-col justify-center text-left transition-all group relative
-                        ${activeStatsCard === 'expense' ? 'border-rose-200 ring-2 ring-rose-50' : 'border-gray-100 hover:border-rose-100 hover:shadow-md'}
-                    `}
-                >
-                    <div className="flex justify-between w-full">
-                        <p className={`font-bold text-[10px] uppercase tracking-wider mb-1 transition-colors ${activeStatsCard === 'expense' ? 'text-rose-600' : 'text-gray-400 group-hover:text-rose-500'}`}>Chi tiêu T{selectedMonth + 1}</p>
-                        {activeStatsCard === 'expense' && (
-                            <div
-                                onClick={(e) => { e.stopPropagation(); setViewMode('history'); }}
-                                className="absolute top-2 right-2 text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-full cursor-pointer hover:bg-rose-100 flex items-center gap-1 animate-in fade-in zoom-in"
-                            >
-                                Chi tiết <ExternalLink size={10} />
-                            </div>
-                        )}
-                    </div>
-                    <h3 className="text-xl md:text-2xl font-bold tracking-tight text-rose-600">-{formatCurrency(stats.currentMonthExpense, lang)}</h3>
-                </button>
-            </div>
-
-
-
+            )}
 
             {/* Budget Section */}
-            {renderBudgets()}
+            {viewMode === 'overview' && renderBudgets()}
 
             {/* AI Analysis Modal */}
             {
@@ -1745,37 +2142,43 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             {
                 isModalOpen && (
                     <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col transform transition-all scale-100">
+                        <div className="bg-white rounded-[32px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] w-full max-w-md max-h-[92vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100 border border-white/20 relative animate-scale-up">
 
-                            {/* Header - Minimal, No Title */}
-                            <div className="absolute top-4 right-4 z-10">
+                            {/* Header Close button */}
+                            <div className="absolute top-4 right-4 z-20">
                                 <button
                                     onClick={() => { setIsModalOpen(false); setEditingTransaction(null); }}
-                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors shadow-sm"
                                 >
                                     <X size={20} />
                                 </button>
                             </div>
 
                             {/* Body */}
-                            <div className="overflow-y-auto px-6 pt-12 pb-6 scrollbar-thin">
+                            <div className="overflow-y-auto px-6 pt-12 pb-8 custom-scrollbar flex-1">
                                 <form onSubmit={handleAddSubmit} className="space-y-6">
 
                                     {/* Type Switcher */}
-                                    <div className="bg-gray-100/80 p-1.5 rounded-2xl flex relative">
+                                    <div className="bg-teal-50/40 p-1.5 rounded-2xl flex relative border border-teal-100/50">
                                         <button
                                             type="button"
-                                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 relative z-10 flex items-center justify-center gap-2
-                                                ${type === TransactionType.EXPENSE ? 'text-rose-600 shadow-sm bg-white' : 'text-gray-500 hover:text-gray-700'}`}
-                                            onClick={() => setType(TransactionType.EXPENSE)}
+                                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-extrabold transition-all duration-300 relative z-10 flex items-center justify-center gap-2
+                                                ${type === TransactionType.EXPENSE ? 'text-rose-600 shadow-sm bg-white' : 'text-gray-400 hover:text-gray-600'}`}
+                                            onClick={() => {
+                                                setType(TransactionType.EXPENSE);
+                                                if (!editingTransaction) setCategory(expenseCategories[0] || EXPENSE_CATEGORIES[0]);
+                                            }}
                                         >
                                             <TrendingDown size={16} /> Chi tiêu
                                         </button>
                                         <button
                                             type="button"
-                                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 relative z-10 flex items-center justify-center gap-2
-                                                ${type === TransactionType.INCOME ? 'text-emerald-600 shadow-sm bg-white' : 'text-gray-500 hover:text-gray-700'}`}
-                                            onClick={() => setType(TransactionType.INCOME)}
+                                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-extrabold transition-all duration-300 relative z-10 flex items-center justify-center gap-2
+                                                ${type === TransactionType.INCOME ? 'text-emerald-600 shadow-sm bg-white' : 'text-gray-400 hover:text-gray-600'}`}
+                                            onClick={() => {
+                                                setType(TransactionType.INCOME);
+                                                if (!editingTransaction) setCategory(incomeCategories[0] || INCOME_CATEGORIES[0]);
+                                            }}
                                         >
                                             <TrendingUp size={16} /> Thu nhập
                                         </button>
@@ -1783,15 +2186,17 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
                                     {/* Amount Input */}
                                     <div>
-                                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Số tiền</label>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Số tiền giao dịch</label>
                                         <div className="relative group">
                                             <input
-                                                type="number"
+                                                type="text"
                                                 required
                                                 value={amount}
                                                 onChange={(e) => setAmount(e.target.value)}
-                                                className={`w-full p-4 bg-gray-50/50 border-2 rounded-2xl outline-none text-2xl font-bold pr-12 transition-all
-                                                    ${type === TransactionType.EXPENSE ? 'text-rose-600 border-transparent focus:border-rose-100 focus:bg-white focus:ring-4 focus:ring-rose-50' : 'text-emerald-600 border-transparent focus:border-emerald-100 focus:bg-white focus:ring-4 focus:ring-emerald-50'}
+                                                className={`w-full p-4 pb-4 bg-gray-50/50 border-2 rounded-2xl outline-none text-3xl font-extrabold text-center pr-12 pl-6 transition-all
+                                                    ${type === TransactionType.EXPENSE 
+                                                        ? 'text-rose-600 border-transparent focus:border-rose-100 focus:bg-white focus:ring-4 focus:ring-rose-50/50' 
+                                                        : 'text-emerald-600 border-transparent focus:border-emerald-100 focus:bg-white focus:ring-4 focus:ring-emerald-50/50'}
                                                     placeholder-gray-300
                                                 `}
                                                 placeholder="0"
@@ -1801,123 +2206,187 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                 type="button"
                                                 onClick={() => setShowCalculator(!showCalculator)}
                                                 className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all
-                                                    ${showCalculator ? 'bg-indigo-100 text-indigo-600 shadow-inner' : 'text-gray-300 hover:text-indigo-500 hover:bg-indigo-50'}
-                                                `}
+                                                    ${showCalculator ? 'bg-indigo-100 text-indigo-600 shadow-inner' : 'text-gray-300 hover:text-indigo-500 hover:bg-indigo-50'}`}
                                                 title="Máy tính"
                                             >
                                                 <CalculatorIcon size={20} />
                                             </button>
                                         </div>
 
-                                        {/* Calculator Preview */}
-                                        {showCalculator && (
-                                            <div className="mt-3 overflow-hidden rounded-2xl shadow-lg border border-gray-100 animate-in slide-in-from-top-2">
-                                                <Calculator
-                                                    initialValue={amount}
-                                                    onComplete={(val) => {
-                                                        setAmount(val);
-                                                        setShowCalculator(false);
-                                                    }}
-                                                    onClose={() => setShowCalculator(false)}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {/* Currency Helper */}
-                                        <div className={`flex justify-end mt-2 text-xs font-bold transition-opacity ${amount ? 'opacity-100' : 'opacity-0'}`}>
-                                            <span className="bg-gray-100 px-2 py-1 rounded-lg text-gray-500">
-                                                {amount && !isNaN(Number(amount)) && formatCurrency(Number(amount), lang)}
-                                            </span>
-                                        </div>
+                                        {/* Dynamic Math Evaluated Live Preview */}
+                                        {(() => {
+                                            const parsed = parseMathExpression(amount);
+                                            if (parsed === null) return null;
+                                            return (
+                                                <div className="flex justify-center mt-3 animate-fade-in">
+                                                    <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-sm flex items-center gap-1.5 border
+                                                        ${type === TransactionType.EXPENSE 
+                                                            ? 'bg-rose-50/80 border-rose-100 text-rose-600 shadow-rose-50/30' 
+                                                            : 'bg-emerald-50/80 border-emerald-100 text-emerald-600 shadow-emerald-50/30'}`}>
+                                                        <span className="opacity-60">=</span>
+                                                        <span>{formatCurrency(parsed, lang)}</span>
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
 
-                                    {/* Category Select */}
                                     {/* Category Select Grid */}
                                     <div className="space-y-3">
-                                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Danh mục</label>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
-                                            {(type === TransactionType.INCOME ? incomeCategories : expenseCategories).map(c => (
-                                                <button
-                                                    key={c}
-                                                    type="button"
-                                                    onClick={() => { setCategory(c); setIsAddingNewCategory(false); }}
-                                                    className={`p-3 rounded-2xl text-sm font-bold transition-all border-2 text-left truncate flex items-center gap-2
-                                                        ${category === c
-                                                            ? (type === TransactionType.EXPENSE ? 'bg-rose-50 border-rose-100 text-rose-600 shadow-sm ring-2 ring-rose-50' : 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-sm ring-2 ring-emerald-50')
-                                                            : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50 hover:border-gray-200'
-                                                        }
-                                                    `}
-                                                >
-                                                    <div className={`w-2 h-2 rounded-full ${category === c ? (type === TransactionType.EXPENSE ? 'bg-rose-500' : 'bg-emerald-500') : 'bg-gray-300'}`}></div>
-                                                    {c}
-                                                </button>
-                                            ))}
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Chọn danh mục</label>
+                                        <div className="grid grid-cols-2 gap-2 max-h-[220px] overflow-y-auto px-2 py-2 -mx-2 custom-scrollbar">
+                                            {(type === TransactionType.INCOME ? incomeCategories : expenseCategories).map(c => {
+                                                const catStyles = getCategoryStyles(c);
+                                                const IconComponent = catStyles.icon;
+                                                const isSelected = category === c && !isAddingNewCategory;
+                                                
+                                                let cardClass = "";
+                                                if (isSelected) {
+                                                    if (type === TransactionType.EXPENSE) {
+                                                        cardClass = "bg-rose-500 border-rose-600 text-white shadow-md shadow-rose-200/50 scale-[1.02]";
+                                                    } else {
+                                                        cardClass = "bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-200/50 scale-[1.02]";
+                                                    }
+                                                } else {
+                                                    cardClass = "bg-white border-gray-100 hover:border-gray-200 text-gray-655 hover:bg-gray-50/60";
+                                                }
+
+                                                return (
+                                                    <button
+                                                        key={c}
+                                                        type="button"
+                                                        onClick={() => { setCategory(c); setIsAddingNewCategory(false); }}
+                                                        className={`p-3 rounded-2xl text-xs md:text-sm font-extrabold transition-all border-2 text-left truncate flex items-center gap-2 duration-200 active:scale-95 ${cardClass}`}
+                                                    >
+                                                        <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200
+                                                            ${isSelected ? 'bg-white/20 text-white' : catStyles.bgClass}`}>
+                                                            {catStyles.emoji ? (
+                                                                <span className="text-sm">{catStyles.emoji}</span>
+                                                            ) : (
+                                                                <IconComponent size={14} />
+                                                            )}
+                                                        </div>
+                                                        <span className="truncate">{cleanCategoryName(c)}</span>
+                                                    </button>
+                                                );
+                                            })}
                                             <button
                                                 type="button"
                                                 onClick={() => { setCategory(''); setIsAddingNewCategory(true); }}
-                                                className={`p-3 rounded-2xl text-sm font-bold transition-all border-2 border-dashed flex items-center justify-center gap-1
+                                                className={`p-3 rounded-2xl text-xs md:text-sm font-extrabold transition-all border-2 border-dashed flex items-center justify-center gap-1.5 duration-200 active:scale-95
                                                     ${isAddingNewCategory
-                                                        ? 'border-indigo-300 bg-indigo-50 text-indigo-600'
-                                                        : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-500'
+                                                        ? 'border-indigo-400 bg-indigo-500 text-white shadow-md shadow-indigo-200/50 scale-[1.02]'
+                                                        : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-500 bg-white'
                                                     }
                                                 `}
                                             >
-                                                <Plus size={16} /> Khác
+                                                <Plus size={16} />
+                                                <span>Khác</span>
                                             </button>
                                         </div>
 
                                         {isAddingNewCategory && (
-                                            <div className="animate-in fade-in slide-in-from-top-2 pt-2">
+                                            <div className="animate-in fade-in slide-in-from-top-2 pt-1">
                                                 <input
                                                     placeholder="Nhập tên danh mục mới..."
                                                     value={newCategoryName}
                                                     onChange={(e) => setNewCategoryName(e.target.value)}
-                                                    className="w-full p-4 bg-indigo-50/50 border-2 border-indigo-100 text-indigo-700 rounded-2xl outline-none font-bold placeholder-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50 transition-all"
+                                                    className="w-full p-3.5 bg-indigo-50/30 border border-indigo-200 text-indigo-750 rounded-2xl outline-none font-bold placeholder-indigo-300 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all"
                                                     autoFocus
                                                 />
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* Date & Desc Grid */}
+                                    {/* Date & Note Grid */}
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="col-span-2 md:col-span-1">
-                                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Ngày</label>
-                                            <div className="relative">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block ml-1">Ngày</label>
+                                            <div className="relative flex items-center">
+                                                <CalendarDays size={16} className="absolute left-4 text-gray-400 pointer-events-none" />
                                                 <input
                                                     type="date"
                                                     required
                                                     value={date}
                                                     onChange={(e) => setDate(e.target.value)}
-                                                    className="w-full p-3.5 bg-gray-50/50 border-2 border-transparent rounded-2xl outline-none text-gray-700 font-semibold focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-50 transition-all"
+                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50/60 border border-gray-150 rounded-2xl outline-none text-gray-700 font-extrabold text-xs focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all"
                                                 />
                                             </div>
                                         </div>
-                                        <div className="col-span-2 md:col-span-1">
-                                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Note</label>
-                                            <input
-                                                placeholder="Chi tiết..."
-                                                value={desc}
-                                                onChange={(e) => setDesc(e.target.value)}
-                                                className="w-full p-3.5 bg-gray-50/50 border-2 border-transparent rounded-2xl outline-none text-gray-700 font-medium focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-50 transition-all placeholder-gray-400"
-                                            />
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block ml-1">Ghi chú</label>
+                                            <div className="relative flex items-center">
+                                                <StickyNote size={16} className="absolute left-4 text-gray-400 pointer-events-none" />
+                                                <input
+                                                    placeholder="Mua sắm, ăn trưa..."
+                                                    value={desc}
+                                                    onChange={(e) => setDesc(e.target.value)}
+                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50/60 border border-gray-150 rounded-2xl outline-none text-gray-750 font-bold text-xs focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all placeholder-gray-300"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Submit Button */}
-                                    <button
-                                        type="submit"
-                                        className={`w-full py-4 rounded-2xl font-bold text-white shadow-xl transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4
-                                            ${type === TransactionType.EXPENSE
-                                                ? 'bg-gradient-to-r from-rose-500 to-red-600 shadow-rose-200 hover:bg-rose-600'
-                                                : 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-200 hover:bg-emerald-600'}
-                                        `}
-                                    >
-                                        {editingTransaction ? <Edit2 size={20} /> : <Plus size={20} />}
-                                        {editingTransaction ? 'Cập nhật' : 'Lưu Giao dịch'}
-                                    </button>
+                                    {/* Submit Button & Confirmation Text */}
+                                    <div className="space-y-3 pt-2">
+                                        <button
+                                            type="submit"
+                                            className={`w-full py-4 rounded-2xl font-extrabold text-white shadow-xl transform active:scale-[0.98] transition-all flex items-center justify-center gap-2
+                                                ${type === TransactionType.EXPENSE
+                                                    ? 'bg-gradient-to-r from-rose-500 to-red-600 shadow-rose-200/50 hover:from-rose-600 hover:to-red-700'
+                                                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-200/50 hover:from-emerald-600 hover:to-teal-700'}
+                                            `}
+                                        >
+                                            {editingTransaction ? <Edit2 size={18} /> : <Plus size={18} />}
+                                            {editingTransaction ? 'Cập nhật giao dịch' : 'Lưu giao dịch'}
+                                        </button>
+                                        
+                                        {(() => {
+                                            const parsed = parseMathExpression(amount);
+                                            if (!parsed || parsed <= 0) return null;
+                                            const displayCat = isAddingNewCategory ? (newCategoryName || 'Danh mục mới') : category;
+                                            return (
+                                                <p className="text-center text-[10px] md:text-xs font-bold text-gray-405 animate-fade-in tracking-wide">
+                                                    {type === TransactionType.EXPENSE ? 'Chi tiêu' : 'Thu nhập'}:{' '}
+                                                    <span className={type === TransactionType.EXPENSE ? 'text-rose-500 font-extrabold' : 'text-emerald-500 font-extrabold'}>
+                                                        {formatCurrency(parsed, lang)}
+                                                    </span>{' '}
+                                                    • {displayCat || 'Chưa chọn danh mục'}
+                                                </p>
+                                            );
+                                        })()}
+                                    </div>
                                 </form>
                             </div>
+
+                            {/* Custom Sliding Keypad Drawer Overlay */}
+                            {showCalculator && (
+                                <div className="absolute inset-x-0 bottom-0 bg-white/98 backdrop-blur-md border-t border-gray-100 rounded-t-[32px] shadow-[0_-12px_40px_rgba(0,0,0,0.14)] p-5 animate-in slide-in-from-bottom duration-300 z-30 flex flex-col">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Bàn phím máy tính</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCalculator(false)}
+                                            className="text-xs font-extrabold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-1.5 rounded-full transition-all"
+                                        >
+                                            Xong
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {keypadKeys.map((k) => (
+                                            <button
+                                                key={k.label}
+                                                type="button"
+                                                onClick={() => handleKeypadPress(k.value)}
+                                                className={`py-3.5 rounded-2xl text-base font-bold transition-all duration-100 active:scale-90 flex items-center justify-center ${k.bg}`}
+                                            >
+                                                {k.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )
@@ -2029,12 +2498,29 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <div className="fixed inset-0 bg-black/50 z-[65] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
                         <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl flex flex-col max-h-[90vh]">
                             <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                                <div>
-                                    <h3 className="font-bold text-lg text-gray-800">Chi tiết: {selectedBudgetForDetails.category}</h3>
-                                    <p className="text-xs text-gray-500">
-                                        {detailViewMonth ? `Tháng ${detailViewMonth.split('-')[1]}/${detailViewMonth.split('-')[0]}` : 'Lịch sử chi tiêu'}
-                                    </p>
-                                </div>
+                                {(() => {
+                                    const styles = getCategoryStyles(selectedBudgetForDetails.category);
+                                    const cleanName = cleanCategoryName(selectedBudgetForDetails.category);
+                                    const IconComponent = styles.icon;
+
+                                    return (
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${styles.bgClass}`}>
+                                                {styles.emoji ? (
+                                                    <span className="text-lg">{styles.emoji}</span>
+                                                ) : (
+                                                    <IconComponent size={20} />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-base md:text-lg text-gray-800">Chi tiết: {cleanName}</h3>
+                                                <p className="text-xs text-gray-500">
+                                                    {detailViewMonth ? `Tháng ${detailViewMonth.split('-')[1]}/${detailViewMonth.split('-')[0]}` : 'Lịch sử chi tiêu'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                                 <button onClick={() => { setSelectedBudgetForDetails(null); setDetailViewMonth(null); }}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
                             </div>
 
@@ -2142,6 +2628,69 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     </div>
                 )}
             {/* --- End Budget Modals --- */}
+
+            {/* Month/Year Selection Popup Modal */}
+            {isMonthPickerOpen && (
+                <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 transform transition-all scale-100 animate-slide-up">
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                                <CalendarDays className="text-indigo-600" size={20} />
+                                Chọn Thời Gian
+                            </h3>
+                            <button
+                                onClick={() => setIsMonthPickerOpen(false)}
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Year Selector */}
+                        <div className="flex items-center justify-between bg-indigo-50/50 p-2 rounded-2xl mb-6 border border-indigo-100/50">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedYear(y => y - 1)}
+                                className="p-2 bg-white hover:bg-indigo-50 text-indigo-600 rounded-xl transition-all shadow-sm border border-indigo-100/20 font-bold"
+                            >
+                                ❮
+                            </button>
+                            <span className="font-extrabold text-indigo-900 text-lg">Năm {selectedYear}</span>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedYear(y => y + 1)}
+                                className="p-2 bg-white hover:bg-indigo-50 text-indigo-600 rounded-xl transition-all shadow-sm border border-indigo-100/20 font-bold"
+                            >
+                                ❯
+                            </button>
+                        </div>
+
+                        {/* Months Grid */}
+                        <div className="grid grid-cols-3 gap-2.5">
+                            {Array.from({ length: 12 }, (_, i) => {
+                                const isCurrentMonth = selectedMonth === i;
+                                return (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedMonth(i);
+                                            setIsMonthPickerOpen(false);
+                                        }}
+                                        className={`py-3 px-2 rounded-2xl text-xs font-bold transition-all border ${isCurrentMonth
+                                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-transparent shadow-lg shadow-indigo-100 scale-[1.03]'
+                                                : 'bg-white border-gray-100 text-gray-600 hover:bg-indigo-50/40 hover:border-indigo-100'
+                                            }`}
+                                    >
+                                        Tháng {i + 1}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
