@@ -88,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const signOut = async () => {
         try {
+            localStorage.setItem('smartlife_logged_out_flag', 'true');
             const { error } = await supabase.auth.signOut();
             if (error) console.error('Supabase signout error:', error);
         } catch (error) {
