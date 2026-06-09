@@ -1608,67 +1608,67 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <h2 className="text-2xl font-bold text-gray-800"> Tổng quan tài chính </h2>
                     <p className="text-gray-400 text-sm">Manage Your Assets Wisely </p>
                 </div>
-                <div className="flex flex-wrap gap-2 md:gap-3 items-center w-full md:w-auto justify-between md:justify-end">
+                <div className="flex flex-wrap gap-3.5 md:gap-3 items-center w-full md:w-auto justify-between md:justify-end">
                     {/* Unified Selector Toolbar: Month Picker + View Switcher */}
-                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm w-full md:w-auto justify-between md:justify-start">
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-gray-200/80 shadow-sm w-full md:w-auto justify-between md:justify-start">
                         {/* Compact Month Picker Button */}
                         <button
                             onClick={() => setIsMonthPickerOpen(true)}
-                            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 hover:bg-indigo-50 hover:text-indigo-600 text-gray-600 font-bold transition-all border border-gray-100 shrink-0"
+                            className="flex items-center justify-center gap-1.5 px-3 h-10 rounded-xl bg-gray-50 hover:bg-indigo-50 hover:text-indigo-600 text-gray-700 font-bold transition-all border border-gray-150 shrink-0 text-xs"
                             title="Chọn tháng/năm"
                         >
                             <CalendarDays size={14} className="text-indigo-500" />
-                            <span className="text-[11px] md:text-xs">T{selectedMonth + 1}/{selectedYear}</span>
+                            <span>T{selectedMonth + 1}/{selectedYear}</span>
                         </button>
 
                         {/* Divider Line */}
-                        <div className="w-[1px] h-5 bg-gray-200 mx-1 shrink-0"></div>
+                        <div className="w-[1px] h-6 bg-gray-200 mx-1 shrink-0"></div>
 
                         {/* 4 Switcher Sub-Tabs */}
                         <div className="flex flex-1 md:flex-initial gap-0.5 justify-around md:justify-start">
                             <button
                                 onClick={() => setViewMode('overview')}
-                                className={`flex items-center justify-center gap-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg transition-all duration-300 ${viewMode === 'overview' ? 'bg-indigo-50 text-indigo-600 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'overview' ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
                                 title="Tổng quan"
                             >
                                 <LayoutDashboard size={16} />
-                                {viewMode === 'overview' && <span className="text-[11px] md:text-xs font-semibold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Tổng quan</span>}
+                                {viewMode === 'overview' && <span className="text-[11px] md:text-xs font-bold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Tổng quan</span>}
                             </button>
                             <button
                                 onClick={() => setViewMode('calendar')}
-                                className={`flex items-center justify-center gap-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg transition-all duration-300 ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-600 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
                                 title="Xem lịch theo ngày"
                             >
                                 <CalendarDays size={16} />
-                                {viewMode === 'calendar' && <span className="text-[11px] md:text-xs font-semibold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Lịch ngày</span>}
+                                {viewMode === 'calendar' && <span className="text-[11px] md:text-xs font-bold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Lịch ngày</span>}
                             </button>
                             <button
                                 onClick={() => setViewMode('history')}
-                                className={`flex items-center justify-center gap-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg transition-all duration-300 ${viewMode === 'history' ? 'bg-indigo-50 text-indigo-600 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'history' ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
                                 title="Lịch sử"
                             >
                                 <List size={16} />
-                                {viewMode === 'history' && <span className="text-[11px] md:text-xs font-semibold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Lịch sử</span>}
+                                {viewMode === 'history' && <span className="text-[11px] md:text-xs font-bold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Lịch sử</span>}
                             </button>
                             <button
                                 onClick={() => setViewMode('report')}
-                                className={`flex items-center justify-center gap-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg transition-all duration-300 ${viewMode === 'report' ? 'bg-indigo-50 text-indigo-600 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'report' ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
                                 title="Báo cáo"
                             >
                                 <FileBarChart size={16} />
-                                {viewMode === 'report' && <span className="text-[11px] md:text-xs font-semibold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Báo cáo</span>}
+                                {viewMode === 'report' && <span className="text-[11px] md:text-xs font-bold whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-200">Báo cáo</span>}
                             </button>
                         </div>
                     </div>
 
                     {/* Buttons Group */}
-                    <div className="flex flex-1 w-full md:w-auto gap-2">
+                    <div className="flex flex-1 w-full md:w-auto gap-3">
                         {/* AI Analysis Button */}
                         <button
                             onClick={handleAnalyzeFinance}
-                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all whitespace-nowrap"
+                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-fuchsia-600 via-pink-600 to-rose-500 text-white px-3 h-11 rounded-2xl font-extrabold shadow-[0_4px_14px_rgba(219,39,119,0.3)] hover:from-fuchsia-700 hover:via-pink-700 hover:to-rose-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 whitespace-nowrap border border-pink-500/20"
                         >
-                            <Sparkles size={16} className="text-yellow-300" />
+                            <Sparkles size={16} className="text-yellow-300 animate-pulse" />
                             <span className="text-xs md:text-sm">AI Own</span>
                         </button>
 
@@ -1682,7 +1682,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                 setDesc('');
                                 setCategory(expenseCategories[0] || EXPENSE_CATEGORIES[0]);
                             }}
-                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-800 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl font-extrabold shadow-[0_4px_14px_rgba(67,56,202,0.35)] hover:from-blue-800 hover:via-indigo-700 hover:to-indigo-900 hover:shadow-[0_6px_20px_rgba(67,56,202,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 whitespace-nowrap border border-indigo-500/20"
+                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-800 text-white px-3 h-11 rounded-2xl font-extrabold shadow-[0_4px_14px_rgba(67,56,202,0.35)] hover:from-blue-800 hover:via-indigo-700 hover:to-indigo-900 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 whitespace-nowrap border border-indigo-500/20"
                         >
                             <Plus size={18} className="animate-pulse text-indigo-100" />
                             <span className="text-xs md:text-sm">Thêm giao dịch</span>
