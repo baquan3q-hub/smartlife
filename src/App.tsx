@@ -1299,6 +1299,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 onAddTimetable={handleAddTimetable}
                                 onAddTodo={handleAddTodo}
                                 onAddTransaction={handleAddTransaction}
+                                onImportGPAData={handleImportGPAData}
                             />
                         ) : (
                             <div className="max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8">
@@ -1513,6 +1514,19 @@ const AppWrapper: React.FC = () => {
         window.addEventListener('hashchange', handleHashChange);
         return () => window.removeEventListener('hashchange', handleHashChange);
     }, []);
+
+    const isLocked = !!user || hash === '#/focus' || hash === '#/study';
+
+    useEffect(() => {
+        if (isLocked) {
+            document.documentElement.classList.add('authenticated-app');
+        } else {
+            document.documentElement.classList.remove('authenticated-app');
+        }
+        return () => {
+            document.documentElement.classList.remove('authenticated-app');
+        };
+    }, [isLocked]);
 
     useEffect(() => {
         localStorage.setItem('smartlife_lang', lang);

@@ -46,6 +46,7 @@ export interface ActionHandlers {
     onAddTimetable?: (item: any) => Promise<void>;
     onAddTodo?: (content: string, priority: string, deadline?: string) => Promise<void>;
     onAddTransaction?: (tx: any) => Promise<void>;
+    onImportGPAData?: (semesters: any[]) => Promise<void>;
 }
 
 // ────────────────────────────────────────
@@ -263,6 +264,48 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
         name: 'get_journal_entries',
         description: 'Lấy nội dung các bài viết nhật ký, mood (cảm xúc), và lòng biết ơn của người dùng trong 5 ngày gần nhất.',
         parameters: { type: 'object', properties: {} }
+    },
+    {
+        name: 'import_gpa_data',
+        description: 'Tự động thêm dữ liệu bảng điểm học kỳ và các môn học vào GPA Tracker dựa trên kết quả phân tích hình ảnh bảng điểm hoặc văn bản do người dùng cung cấp.',
+        parameters: {
+            type: 'object',
+            properties: {
+                semesters: {
+                    type: 'array',
+                    description: 'Danh sách các học kỳ kèm môn học.',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            name: { type: 'string', description: 'Tên học kỳ. VD: "Học kỳ 1", "Học kỳ 2", "Học kỳ phụ (Hè)"' },
+                            academic_year: { type: 'string', description: 'Năm học theo định dạng YYYY-YYYY. VD: "2023-2024", "2024-2025"' },
+                            semester_type: { type: 'string', enum: ['HK1', 'HK2', 'HocHe'], description: 'Loại học kỳ: HK1, HK2, HocHe' },
+                            year_of_study: { type: 'integer', description: 'Năm học thứ mấy của sinh viên. VD: 1, 2, 3, 4' },
+                            courses: {
+                                type: 'array',
+                                description: 'Danh sách các môn học trong học kỳ này.',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        name: { type: 'string', description: 'Tên môn học/học phần' },
+                                        credits: { type: 'integer', description: 'Số tín chỉ của môn học. VD: 2, 3, 4' },
+                                        template: { type: 'string', enum: ['A', 'B', 'C'], description: 'Mẫu tính điểm (A: CC1 10%, CC2 30%, CK 60%; B: CC1 10%, CC2 10%, CC3 20%, CK 60%; C: CC1 20%, CC2 20%, CK 60%). Mặc định "A" nếu không chắc chắn.' },
+                                        score_cc1: { type: 'number', description: 'Điểm thành phần 1 (thang 10), nếu có.' },
+                                        score_cc2: { type: 'number', description: 'Điểm thành phần 2 (thang 10), nếu có.' },
+                                        score_cc3: { type: 'number', description: 'Điểm thành phần 3 (thang 10), nếu có.' },
+                                        score_final: { type: 'number', description: 'Điểm cuối kỳ hoặc điểm tổng kết thang 10. Nếu là điểm tổng kết môn học thang 10, hãy gán vào score_final và đặt template phù hợp.' },
+                                        exclude_from_gpa: { type: 'boolean', description: 'Đặt true nếu môn học này không tính vào GPA (ví dụ: Thể dục, Giáo dục quốc phòng).' }
+                                    },
+                                    required: ['name', 'credits']
+                                }
+                            }
+                        },
+                        required: ['name', 'academic_year', 'semester_type', 'year_of_study', 'courses']
+                    }
+                }
+            },
+            required: ['semesters']
+        }
     }
 ];
 
@@ -409,6 +452,7 @@ export interface ActionHandlers {
     onAddTimetable?: (item: any) => Promise<void>;
     onAddTodo?: (content: string, priority: string, deadline?: string) => Promise<void>;
     onAddTransaction?: (tx: any) => Promise<void>;
+    onImportGPAData?: (semesters: any[]) => Promise<void>;
 }
 
 async function executeBatchAddTransactions(
@@ -635,6 +679,19 @@ export async function chatWithAI(
                         const actionResult = await executeBatchAddTransactions(args, handlers);
                         actions.push(actionResult);
                         result = { success: actionResult.success, message: actionResult.message };
+                        break;
+                    }
+                    case 'import_gpa_data': {
+                        if (handlers.onImportGPAData) {
+                            try {
+                                await handlers.onImportGPAData(args.semesters);
+                                result = { success: true, message: `✅ Đã import thành công ${args.semesters.length} học kỳ vào GPA Tracker.` };
+                            } catch (e: any) {
+                                result = { success: false, error: e.message };
+                            }
+                        } else {
+                            result = { success: false, error: 'GPA Import handler is not registered.' };
+                        }
                         break;
                     }
                     case 'get_user_profile':
