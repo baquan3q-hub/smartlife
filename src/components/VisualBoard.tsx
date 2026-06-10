@@ -25,7 +25,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const [showAllHolidays, setShowAllHolidays] = useState(false);
     const [showStorage, setShowStorage] = useState(false);
     const [showStorageGate, setShowStorageGate] = useState(false);
-    
+
     // Pull to Refresh state
     const [pullDistance, setPullDistance] = useState(0);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -74,7 +74,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             setPullDistance(0);
         }
     };
-    
+
     // Habit & Event States
     const [habits, setHabits] = useState<Habit[]>([]);
     const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
@@ -119,7 +119,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             const todayStr = new Date().toISOString().split('T')[0];
             const entry = await journalService.fetchEntryByDate(userId, todayStr);
             setTodayJournal(entry);
-            
+
             const stats = await journalService.fetchStats(userId);
             setJournalStreak(stats.currentStreak);
         };
@@ -130,7 +130,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
         if (!userId || isSavingMood) return;
         setIsSavingMood(true);
         const todayStr = new Date().toISOString().split('T')[0];
-        
+
         const entryData = {
             entry_date: todayStr,
             content: todayJournal?.content || '',
@@ -141,11 +141,11 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             writing_prompt: todayJournal?.writing_prompt || '',
             tags: todayJournal?.tags || []
         };
-        
+
         const saved = await journalService.saveEntry(userId, entryData);
         if (saved) {
             setTodayJournal(saved);
-            
+
             const reward = await processJournalReward({
                 userId,
                 wordCount: saved.word_count,
@@ -156,7 +156,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                 setDashboardReward(reward.totalStars);
                 setTimeout(() => setDashboardReward(null), 4000);
             }
-            
+
             const stats = await journalService.fetchStats(userId);
             setJournalStreak(stats.currentStreak);
         }
@@ -184,15 +184,15 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
         d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
         return d.toISOString().split('T')[0];
     };
-    const getDayKey = (d: Date): any => ['mon','tue','wed','thu','fri','sat','sun'][d.getDay() === 0 ? 6 : d.getDay() - 1];
+    const getDayKey = (d: Date): any => ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][d.getDay() === 0 ? 6 : d.getDay() - 1];
     const diffDays = (d: string, isPast: boolean = false) => {
-        const target = new Date(d); target.setHours(0,0,0,0);
-        const now = new Date(today()); now.setHours(0,0,0,0);
-        return isPast ? Math.floor((now.getTime() - target.getTime())/(1000*3600*24)) : Math.ceil((target.getTime() - now.getTime())/(1000*3600*24));
+        const target = new Date(d); target.setHours(0, 0, 0, 0);
+        const now = new Date(today()); now.setHours(0, 0, 0, 0);
+        return isPast ? Math.floor((now.getTime() - target.getTime()) / (1000 * 3600 * 24)) : Math.ceil((target.getTime() - now.getTime()) / (1000 * 3600 * 24));
     };
 
     const getWeekKey = (d: Date) => { const t = new Date(d); t.setDate(t.getDate() - (t.getDay() === 0 ? 6 : t.getDay() - 1)); return t.toISOString().split('T')[0]; };
-    const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`;
+    const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
     const getHabitStats = (habit: Habit) => {
         const logs = habitLogs.filter(l => l.habit_id === habit.id);
@@ -225,7 +225,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
         const todayLog = logs.find(l => l.log_date === today());
         const todayScheduled = habit.active_days.includes(getDayKey(d));
         if (todayScheduled && todayLog?.completed) currentStreak = 1;
-        
+
         const cursor = new Date(d); cursor.setDate(cursor.getDate() - 1);
         while (true) {
             const ds = cursor.toISOString().split('T')[0];
@@ -422,25 +422,25 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const visibleHolidays = showAllHolidays ? holidays : holidays.slice(0, 4);
 
     return (
-        <div 
+        <div
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             className="w-full overflow-x-hidden px-3 md:px-8 pt-4 md:pt-8 relative"
         >
             {/* Pull to Refresh Spinner */}
-            <div 
+            <div
                 className="absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-200 z-[100]"
-                style={{ 
-                    top: `${pullDistance - 40}px`, 
-                    opacity: pullDistance > 10 ? Math.min(pullDistance / 50, 1) : 0 
+                style={{
+                    top: `${pullDistance - 40}px`,
+                    opacity: pullDistance > 10 ? Math.min(pullDistance / 50, 1) : 0
                 }}
             >
                 <div className="bg-white rounded-full p-2.5 shadow-lg border border-gray-100 flex items-center justify-center">
-                    <Loader2 
-                        className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`} 
-                        size={20} 
-                        style={{ transform: `rotate(${pullDistance * 4}deg)` }} 
+                    <Loader2
+                        className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`}
+                        size={20}
+                        style={{ transform: `rotate(${pullDistance * 4}deg)` }}
                     />
                 </div>
             </div>
@@ -732,18 +732,18 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             <div className="space-y-3">
                                 <div className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3 border border-gray-100">
                                     <span className="text-3xl">
-                                        {todayJournal.mood === 1 ? '😢' : 
-                                         todayJournal.mood === 2 ? '😟' : 
-                                         todayJournal.mood === 3 ? '😐' : 
-                                         todayJournal.mood === 4 ? '😊' : '🤩'}
+                                        {todayJournal.mood === 1 ? '😢' :
+                                            todayJournal.mood === 2 ? '😟' :
+                                                todayJournal.mood === 3 ? '😐' :
+                                                    todayJournal.mood === 4 ? '😊' : '🤩'}
                                     </span>
                                     <div>
                                         <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Cảm xúc của bạn</div>
                                         <div className="font-bold text-sm text-gray-700">
-                                            {todayJournal.mood === 1 ? 'Rất tệ' : 
-                                             todayJournal.mood === 2 ? 'Không tốt' : 
-                                             todayJournal.mood === 3 ? 'Bình thường' : 
-                                             todayJournal.mood === 4 ? 'Tốt' : 'Tuyệt vời'}
+                                            {todayJournal.mood === 1 ? 'Rất tệ' :
+                                                todayJournal.mood === 2 ? 'Không tốt' :
+                                                    todayJournal.mood === 3 ? 'Bình thường' :
+                                                        todayJournal.mood === 4 ? 'Tốt' : 'Tuyệt vời'}
                                         </div>
                                     </div>
                                 </div>
@@ -817,7 +817,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     {/* NEW: GPA Snapshot Card */}
                     <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all overflow-hidden group relative">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 pointer-events-none"></div>
-                        
+
                         <div className="relative">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -827,7 +827,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                     Chi tiết
                                 </button>
                             </div>
-                            
+
                             <div className="flex items-center gap-5">
                                 <div className="flex-1">
                                     <div className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-800 mb-1">
@@ -835,7 +835,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                     </div>
                                     <div className="text-xs text-gray-400 font-medium">Trung bình Tích lũy (Hệ số 4)</div>
                                 </div>
-                                <div 
+                                <div
                                     onClick={() => onNavigate?.('gpa')}
                                     className="shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30 group-hover:-translate-y-1 cursor-pointer transition-all hover:scale-105"
                                 >
@@ -844,7 +844,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             </div>
 
                             <div className="mt-5 pt-5 border-t border-gray-50">
-                                <button 
+                                <button
                                     onClick={() => onNavigate?.('gpa')}
                                     className="w-full py-2.5 bg-blue-50/50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                                 >
@@ -919,7 +919,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                                     else if (currentStatus === 'COMPLETED') { nextStatus = 'NOT_STARTED'; nextProgress = 0; }
                                                     onUpdateGoal({ ...goal, status: nextStatus, progress: nextProgress });
                                                 };
-                                                
+
                                                 if (currentStatus === 'COMPLETED') return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium border border-emerald-200 whitespace-nowrap hover:bg-emerald-200 transition-colors cursor-pointer">Đã hoàn thành</button>;
                                                 if (currentStatus === 'IN_PROGRESS') return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium border border-blue-200 whitespace-nowrap hover:bg-blue-200 transition-colors cursor-pointer">Đang hoàn thành</button>;
                                                 return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium border border-gray-200 whitespace-nowrap hover:bg-gray-200 transition-colors cursor-pointer">Chưa hoàn thành</button>;
@@ -1084,7 +1084,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                     const completed = posGoals.filter(g => g.status === 'completed' || g.progress === 100).length;
                                     const total = posGoals.length;
                                     const progress = total > 0 ? Math.round((posGoals.reduce((acc, curr) => acc + curr.progress, 0)) / total) : 0;
-                                    
+
                                     return (
                                         <div key={pos.id} className="bg-indigo-50/30 border border-indigo-100/40 rounded-2xl p-3">
                                             <div className="flex justify-between items-center mb-1">
@@ -1131,7 +1131,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     </div>
 
                     {/* NEW: MY SPOTIFY WIDGET */}
-                    <div 
+                    <div
                         onClick={() => onOpenSpotify?.()}
                         className="bg-[#121212] rounded-3xl p-6 shadow-md hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group border border-[#282828]"
                     >
@@ -1153,7 +1153,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     </div>
 
                     {/* NEW: CAREER ORIENTATION AI WIDGET */}
-                    <div 
+                    <div
                         onClick={() => onNavigate?.('gpa-career')}
                         className="bg-gradient-to-br from-indigo-50/45 via-cyan-50/35 to-purple-50/45 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer border border-indigo-100/50 hover:border-indigo-200 group relative overflow-hidden"
                     >
@@ -1175,7 +1175,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     </div>
 
                     {/* NEW: AUTO CV BUILDER WIDGET */}
-                    <div 
+                    <div
                         onClick={() => onNavigate?.('goals-cv')}
                         className="bg-gradient-to-br from-purple-50/45 via-pink-50/35 to-rose-50/45 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer border border-purple-100/50 hover:border-purple-200 group relative overflow-hidden"
                     >
@@ -1249,17 +1249,18 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
 
                         {/* CTA */}
                         <div className="shrink-0">
-                            <div className={`px-6 py-3 rounded-2xl font-bold text-sm shadow-lg group-hover:scale-105 transition-all duration-300 flex items-center gap-2 ${
-                                canUseStorage
+                            <div className={`px-6 py-3 rounded-2xl font-bold text-sm shadow-lg group-hover:scale-105 transition-all duration-300 flex items-center gap-2 ${canUseStorage
                                     ? 'bg-white text-gray-900 group-hover:bg-indigo-100'
                                     : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white group-hover:from-indigo-600 group-hover:to-purple-700'
-                            }`}>
+                                }`}>
                                 {canUseStorage ? <><LockKeyhole size={16} /> Mở kho</> : <><Crown size={16} className="text-yellow-300" /> Nâng cấp Pro</>}
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+            {/* Safe space at the bottom for mobile to prevent navbar cover */}
+            <div className="h-30 md:hidden" />
         </div>
     );
 };
