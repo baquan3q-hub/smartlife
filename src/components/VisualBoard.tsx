@@ -1260,7 +1260,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                 </div>
             </div>
             {/* Safe space at the bottom for mobile to prevent navbar cover */}
-            <div className="h-30 md:hidden" />
+            <div className="md:hidden" style={{ height: 'calc(100px + env(safe-area-inset-bottom))' }} />
         </div>
     );
 };
