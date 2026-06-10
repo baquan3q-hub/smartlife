@@ -1076,7 +1076,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     };
 
     return (
-        <div className="h-screen w-screen overflow-hidden bg-[#F8F9FC] font-sans text-gray-900 flex flex-col md:flex-row">
+        <div className="h-[100dvh] w-screen overflow-hidden bg-[#F8F9FC] font-sans text-gray-900 flex flex-col md:flex-row">
             {/* Sidebar Desktop */}
             <aside className={`hidden md:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 fixed h-full z-20 shadow-sm transition-all duration-300 ease-in-out`}>
                 <div className={`p-6 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} gap-3 relative`}>

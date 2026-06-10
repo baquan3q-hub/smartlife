@@ -274,7 +274,7 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
     };
 
     return (
-        <div className="relative w-full overflow-hidden min-h-full">
+        <div className="relative w-full overflow-x-hidden min-h-full">
             {/* Fixed background pull-to-refresh indicator */}
             <div
                 className="absolute left-0 right-0 top-0 flex justify-center items-center pointer-events-none z-0"
@@ -433,104 +433,105 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
                     </div>
                 </div>
 
-                {/* Document Lightbox Zoom Modal */}
-                {activeLightboxField && (
-                    <div className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
-                        <div className="bg-white rounded-[28px] overflow-hidden max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] relative animate-in zoom-in-95 duration-200">
-                            {/* Header */}
-                            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                                <span className="font-extrabold text-gray-800 text-sm">
-                                    {getFieldNameVi(activeLightboxField)} ({getDocImages(activeLightboxField).length}/2)
-                                </span>
-                                <button
-                                    onClick={() => setActiveLightboxField(null)}
-                                    className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
+                {/* Safe space at the bottom for mobile to prevent navbar cover */}
+                <div className="md:hidden" style={{ height: 'calc(100px + env(safe-area-inset-bottom))' }} />
+            </div>
 
-                            {/* Image list / upload slot */}
-                            <div className="p-5 flex-1 overflow-y-auto flex flex-col gap-4 bg-gray-50/50 min-h-[300px] max-h-[60vh] scrollbar-thin">
-                                {getDocImages(activeLightboxField).map((url, index) => (
-                                    <div key={index} className="relative group/img bg-white p-3 rounded-2xl border border-gray-150 shadow-sm flex flex-col items-center gap-2.5">
-                                        <div
-                                            onClick={() => setZoomedImage(url)}
-                                            className="relative cursor-zoom-in overflow-hidden rounded-xl w-full h-[200px] flex items-center justify-center bg-gray-100/40"
-                                        >
-                                            <img
-                                                src={url}
-                                                alt={`Ảnh ${index + 1}`}
-                                                className="max-w-full max-h-full object-contain hover:scale-[1.02] transition-transform duration-200"
-                                            />
-                                            <div className="absolute inset-0 bg-black/25 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
-                                                <Eye size={20} className="text-white" />
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDocDelete(activeLightboxField, index)}
-                                            className="w-full py-2 rounded-xl text-red-500 bg-red-50/60 hover:bg-red-50 hover:text-red-600 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-95"
-                                        >
-                                            <Trash2 size={13} /> Xóa ảnh {getDocImages(activeLightboxField).length > 1 ? index + 1 : ''}
-                                        </button>
-                                    </div>
-                                ))}
+            {/* Document Lightbox Zoom Modal */}
+            {activeLightboxField && (
+                <div className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[28px] overflow-hidden max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] relative animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                            <span className="font-extrabold text-gray-800 text-sm">
+                                {getFieldNameVi(activeLightboxField)} ({getDocImages(activeLightboxField).length}/2)
+                            </span>
+                            <button
+                                onClick={() => setActiveLightboxField(null)}
+                                className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
 
-                                {getDocImages(activeLightboxField).length < 2 && (
-                                    <button
-                                        onClick={() => {
-                                            const inputId = activeLightboxField === 'qr_code_url'
-                                                ? 'expand-qr-upload'
-                                                : activeLightboxField === 'student_card_url'
-                                                    ? 'expand-student-upload'
-                                                    : 'expand-citizen-upload';
-                                            document.getElementById(inputId)?.click();
-                                        }}
-                                        className="w-full aspect-video min-h-[140px] rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/20 flex flex-col items-center justify-center text-indigo-500 hover:bg-indigo-50/50 hover:text-indigo-600 transition-all font-black text-xs gap-2 py-4 cursor-pointer active:scale-95"
+                        {/* Image list / upload slot */}
+                        <div className="p-5 flex-1 overflow-y-auto flex flex-col gap-4 bg-gray-50/50 min-h-[300px] max-h-[60vh] scrollbar-thin">
+                            {getDocImages(activeLightboxField).map((url, index) => (
+                                <div key={index} className="relative group/img bg-white p-3 rounded-2xl border border-gray-150 shadow-sm flex flex-col items-center gap-2.5">
+                                    <div
+                                        onClick={() => setZoomedImage(url)}
+                                        className="relative cursor-zoom-in overflow-hidden rounded-xl w-full h-[200px] flex items-center justify-center bg-gray-100/40"
                                     >
-                                        <Plus size={22} className="stroke-[2.5]" />
-                                        Tải lên ảnh thứ 2
+                                        <img
+                                            src={url}
+                                            alt={`Ảnh ${index + 1}`}
+                                            className="max-w-full max-h-full object-contain hover:scale-[1.02] transition-transform duration-200"
+                                        />
+                                        <div className="absolute inset-0 bg-black/25 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                            <Eye size={20} className="text-white" />
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDocDelete(activeLightboxField, index)}
+                                        className="w-full py-2 rounded-xl text-red-500 bg-red-50/60 hover:bg-red-50 hover:text-red-600 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                                    >
+                                        <Trash2 size={13} /> Xóa ảnh {getDocImages(activeLightboxField).length > 1 ? index + 1 : ''}
                                     </button>
-                                )}
-                            </div>
+                                </div>
+                            ))}
 
-                            {/* Actions Footer */}
-                            <div className="p-4 border-t border-gray-100 flex gap-2 justify-end bg-gray-50/20">
+                            {getDocImages(activeLightboxField).length < 2 && (
                                 <button
-                                    type="button"
-                                    onClick={() => setActiveLightboxField(null)}
-                                    className="px-5 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-xs transition-all active:scale-95"
+                                    onClick={() => {
+                                        const inputId = activeLightboxField === 'qr_code_url'
+                                            ? 'expand-qr-upload'
+                                            : activeLightboxField === 'student_card_url'
+                                                ? 'expand-student-upload'
+                                                : 'expand-citizen-upload';
+                                        document.getElementById(inputId)?.click();
+                                    }}
+                                    className="w-full aspect-video min-h-[140px] rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/20 flex flex-col items-center justify-center text-indigo-500 hover:bg-indigo-50/50 hover:text-indigo-600 transition-all font-black text-xs gap-2 py-4 cursor-pointer active:scale-95"
                                 >
-                                    Đóng
+                                    <Plus size={22} className="stroke-[2.5]" />
+                                    Tải lên ảnh thứ 2
                                 </button>
-                            </div>
+                            )}
+                        </div>
+
+                        {/* Actions Footer */}
+                        <div className="p-4 border-t border-gray-100 flex gap-2 justify-end bg-gray-50/20">
+                            <button
+                                type="button"
+                                onClick={() => setActiveLightboxField(null)}
+                                className="px-5 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-xs transition-all active:scale-95"
+                            >
+                                Đóng
+                            </button>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {/* Fullscreen Zoom Overlay */}
-                {zoomedImage && (
-                    <div
+            {/* Fullscreen Zoom Overlay */}
+            {zoomedImage && (
+                <div
+                    onClick={() => setZoomedImage(null)}
+                    className="fixed inset-0 bg-black/95 z-[110] flex items-center justify-center p-4 backdrop-blur-lg animate-in fade-in duration-200 cursor-zoom-out"
+                >
+                    <button
                         onClick={() => setZoomedImage(null)}
-                        className="fixed inset-0 bg-black/95 z-[110] flex items-center justify-center p-4 backdrop-blur-lg animate-in fade-in duration-200 cursor-zoom-out"
+                        className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
                     >
-                        <button
-                            onClick={() => setZoomedImage(null)}
-                            className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-                        >
-                            <X size={20} />
-                        </button>
-                        <img
-                            src={zoomedImage}
-                            alt="Zoomed document"
-                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
-                        />
-                    </div>
-                )}
-                {/* Safe space at the bottom for mobile to prevent navbar cover */}
-                <div className="h-30 md:hidden" />
-            </div>
+                        <X size={20} />
+                    </button>
+                    <img
+                        src={zoomedImage}
+                        alt="Zoomed document"
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+                    />
+                </div>
+            )}
         </div>
     );
 };
