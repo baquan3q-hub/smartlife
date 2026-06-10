@@ -28,7 +28,7 @@ interface FinanceDashboardProps {
     onRefresh?: () => Promise<void>;
 }
 
-const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#14B8A6', '#F97316', '#64748B'];
+const COLORS = ['#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#14B8A6', '#F97316', '#64748B'];
 
 const translations = {
     vi: {
@@ -243,9 +243,9 @@ const getCategoryStyles = (category: string) => {
         return {
             emoji,
             icon: Tv,
-            bgClass: 'bg-indigo-50 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white',
-            borderColor: 'border-indigo-100',
-            accentColor: 'indigo'
+            bgClass: 'bg-sky-50 text-sky-500 group-hover:bg-sky-500 group-hover:text-white',
+            borderColor: 'border-sky-100',
+            accentColor: 'sky'
         };
     }
     if (cat.includes('sức khỏe') || cat.includes('health') || cat.includes('thuốc') || cat.includes('bệnh viện') || cat.includes('khám') || cat.includes('gym') || cat.includes('nha khoa')) {
@@ -315,9 +315,9 @@ const getCategoryStyles = (category: string) => {
         return {
             emoji,
             icon: Briefcase,
-            bgClass: 'bg-indigo-50 text-indigo-650 group-hover:bg-indigo-650 group-hover:text-white',
-            borderColor: 'border-indigo-100',
-            accentColor: 'indigo'
+            bgClass: 'bg-sky-50 text-sky-600 group-hover:bg-sky-600 group-hover:text-white',
+            borderColor: 'border-sky-100',
+            accentColor: 'sky'
         };
     }
     if (cat.includes('thưởng') || cat.includes('bonus')) {
@@ -342,7 +342,7 @@ const getCategoryStyles = (category: string) => {
     // Deterministic fallback for custom categories
     const hash = hashString(category);
     const fallbackPalettes = [
-        { bgClass: 'bg-indigo-50 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white', borderColor: 'border-indigo-100', accentColor: 'indigo' },
+        { bgClass: 'bg-sky-50 text-sky-500 group-hover:bg-sky-500 group-hover:text-white', borderColor: 'border-sky-100', accentColor: 'sky' },
         { bgClass: 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white', borderColor: 'border-emerald-100', accentColor: 'emerald' },
         { bgClass: 'bg-rose-50 text-rose-500 group-hover:bg-rose-500 group-hover:text-white', borderColor: 'border-rose-100', accentColor: 'rose' },
         { bgClass: 'bg-amber-50 text-amber-500 group-hover:bg-amber-500 group-hover:text-white', borderColor: 'border-amber-100', accentColor: 'amber' },
@@ -417,24 +417,24 @@ const keypadKeys = [
     { label: '7', value: '7', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
     { label: '8', value: '8', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
     { label: '9', value: '9', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
-    { label: '÷', value: '/', bg: 'bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100' },
+    { label: '÷', value: '/', bg: 'bg-sky-50 text-sky-600 font-bold hover:bg-sky-100' },
     
     { label: '4', value: '4', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
     { label: '5', value: '5', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
     { label: '6', value: '6', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
-    { label: '×', value: '*', bg: 'bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100' },
+    { label: '×', value: '*', bg: 'bg-sky-50 text-sky-600 font-bold hover:bg-sky-100' },
     
     { label: '1', value: '1', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
     { label: '2', value: '2', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
     { label: '3', value: '3', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
-    { label: '-', value: '-', bg: 'bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100' },
+    { label: '-', value: '-', bg: 'bg-sky-50 text-sky-600 font-bold hover:bg-sky-100' },
     
     { label: '0', value: '0', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
     { label: '.', value: '.', bg: 'bg-gray-50 text-gray-800 hover:bg-gray-105' },
     { label: 'k', value: 'k', bg: 'bg-emerald-50 text-emerald-600 font-bold hover:bg-emerald-100' },
-    { label: '+', value: '+', bg: 'bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100' },
+    { label: '+', value: '+', bg: 'bg-sky-50 text-sky-600 font-bold hover:bg-sky-100' },
     
-    { label: '=', value: '=', bg: 'col-span-4 bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 text-white font-extrabold hover:from-indigo-600 hover:to-purple-700 shadow-md shadow-indigo-100 py-3.5' }
+    { label: '=', value: '=', bg: 'col-span-4 bg-gradient-to-r from-sky-500 via-sky-600 to-blue-600 text-white font-extrabold hover:from-sky-600 hover:to-blue-700 shadow-md shadow-sky-100 py-3.5' }
 ];
 
 const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, onNavigateToCashFlow, onNavigateToAI, isLoading, lang, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onAddBudget, onUpdateBudget, onDeleteBudget, onRefresh }) => {
@@ -890,7 +890,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             setSelectedBudgetCategory(expenseCategories[0]);
                             setIsBudgetModalOpen(true);
                         }}
-                        className="text-sm text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition-colors"
+                        className="text-sm text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg font-semibold hover:bg-sky-100 transition-colors"
                     >
                         + Thiết lập
                     </button>
@@ -911,9 +911,9 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         setSelectedBudgetForDetails(budget);
                                         setDetailViewMonth(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`);
                                     }}
-                                    className="bg-white rounded-2xl p-3 md:p-5 border border-gray-100 hover:shadow-lg hover:border-indigo-100 transition-all cursor-pointer group relative overflow-hidden"
+                                    className="bg-white rounded-2xl p-3 md:p-5 border border-gray-100 hover:shadow-lg hover:border-sky-100 transition-all cursor-pointer group relative overflow-hidden"
                                 >
-                                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-50 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
+                                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-sky-50 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
 
                                     {(() => {
                                         const styles = getCategoryStyles(budget.category);
@@ -937,7 +937,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                         </div>
                                                     </div>
                                                     <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                        <button onClick={() => { setEditingBudget(budget); setBudgetLimit(budget.amount.toString()); setSelectedBudgetCategory(budget.category); setIsBudgetModalOpen(true); }} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 size={14} /></button>
+                                                        <button onClick={() => { setEditingBudget(budget); setBudgetLimit(budget.amount.toString()); setSelectedBudgetCategory(budget.category); setIsBudgetModalOpen(true); }} className="p-1 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"><Edit2 size={14} /></button>
                                                         <button
                                                             onClick={() => {
                                                                 if (window.confirm("Bạn có chắc chắn muốn xóa ngân sách này?")) {
@@ -971,11 +971,11 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
                     {(!state.budgets || state.budgets.filter(b => b.month === `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`).length === 0) && (
                         <div className="col-span-2 text-center py-6 border-2 border-dashed border-gray-100 rounded-xl">
-                            <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-2 text-indigo-400">
+                            <div className="w-10 h-10 bg-sky-50 rounded-full flex items-center justify-center mx-auto mb-2 text-sky-400">
                                 <DollarSign size={20} />
                             </div>
                             <p className="text-gray-400 text-sm">Chưa thiết lập ngân sách</p>
-                            <button onClick={() => setIsBudgetModalOpen(true)} className="mt-2 text-indigo-600 text-xs font-bold hover:underline">Thêm ngay</button>
+                            <button onClick={() => setIsBudgetModalOpen(true)} className="mt-2 text-sky-600 text-xs font-bold hover:underline">Thêm ngay</button>
                         </div>
                     )}
                 </div>
@@ -1065,7 +1065,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                         <div>
                             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                                <FileBarChart size={22} className="text-indigo-600" /> Báo cáo Tài chính
+                                <FileBarChart size={22} className="text-sky-600" /> Báo cáo Tài chính
                             </h3>
                             <p className="text-sm text-gray-500">{getPeriodLabel()}</p>
                         </div>
@@ -1074,7 +1074,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             <div className="flex bg-gray-100 rounded-xl p-1">
                                 {(['month', 'quarter', 'year'] as const).map(p => (
                                     <button key={p} onClick={() => setReportPeriod(p)}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${reportPeriod === p ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${reportPeriod === p ? 'bg-white text-sky-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                                         {p === 'month' ? 'Tháng' : p === 'quarter' ? 'Quý' : 'Năm'}
                                     </button>
                                 ))}
@@ -1302,10 +1302,10 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     key={day}
                     onClick={() => setSelectedCalendarDate(dayString)}
                     className={`h-20 md:h-32 border p-1 md:p-2 cursor-pointer transition-all relative group overflow-hidden
-                    ${isSelected ? 'border-2 border-indigo-500 bg-indigo-50' : 'border-gray-100 bg-white hover:bg-gray-50'}
+                    ${isSelected ? 'border-2 border-sky-500 bg-sky-50' : 'border-gray-100 bg-white hover:bg-gray-50'}
                 `}
                 >
-                    <div className={`text-xs md:text-sm font-semibold mb-1 ${isToday ? 'bg-indigo-600 text-white w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center' : 'text-gray-700'} ml-1 mt-1`}>
+                    <div className={`text-xs md:text-sm font-semibold mb-1 ${isToday ? 'bg-sky-600 text-white w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center' : 'text-gray-700'} ml-1 mt-1`}>
                         {day}
                     </div>
                     <div className="space-y-0.5 px-0.5">
@@ -1388,7 +1388,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                     {t.type === TransactionType.INCOME ? '+' : '-'}{formatCurrency(t.amount, lang)}
                                                 </td>
                                                 <td className="px-4 py-3 text-center flex justify-center gap-2">
-                                                    <button onClick={() => openEditModal(t)} className="p-1.5 text-gray-400 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 rounded-lg transition-colors" title="Sửa">
+                                                    <button onClick={() => openEditModal(t)} className="p-1.5 text-gray-400 hover:text-sky-600 bg-gray-50 hover:bg-sky-50 rounded-lg transition-colors" title="Sửa">
                                                         <Edit2 size={16} />
                                                     </button>
                                                     <button onClick={() => onDeleteTransaction(t.id)} className="p-1.5 text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-lg transition-colors" title="Xóa">
@@ -1439,7 +1439,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         <div className="flex bg-gray-100/80 p-0.5 rounded-lg text-xs font-bold border border-gray-200/50 shadow-inner">
                             <button
                                 onClick={() => setActiveStatsCard(null)}
-                                className={`px-2.5 py-1.5 rounded-md transition-all ${!activeStatsCard ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/20' : 'text-gray-500 hover:text-gray-700'}`}
+                                className={`px-2.5 py-1.5 rounded-md transition-all ${!activeStatsCard ? 'bg-white text-sky-700 shadow-sm border border-gray-200/20' : 'text-gray-500 hover:text-gray-700'}`}
                             >
                                 Tất cả
                             </button>
@@ -1461,7 +1461,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         <div className="relative">
                             <button
                                 onClick={() => setShowFilterMenu(!showFilterMenu)}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${selectedCategoryFilter !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${selectedCategoryFilter !== 'all' ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
                             >
                                 <Filter size={14} />
                                 <span>
@@ -1476,7 +1476,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     <div className="absolute left-0 md:left-auto md:right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-20 max-h-80 overflow-y-auto py-1">
                                         <button
                                             onClick={() => { setSelectedCategoryFilter('all'); setShowFilterMenu(false); }}
-                                            className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedCategoryFilter === 'all' ? 'font-bold text-indigo-600 bg-indigo-50' : 'text-gray-700'}`}
+                                            className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedCategoryFilter === 'all' ? 'font-bold text-sky-600 bg-sky-50' : 'text-gray-700'}`}
                                         >
                                             Tất cả danh mục
                                         </button>
@@ -1486,7 +1486,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             <button
                                                 key={cat}
                                                 onClick={() => { setSelectedCategoryFilter(cat); setShowFilterMenu(false); }}
-                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedCategoryFilter === cat ? 'font-bold text-indigo-600 bg-indigo-50' : 'text-gray-700'}`}
+                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedCategoryFilter === cat ? 'font-bold text-sky-600 bg-sky-50' : 'text-gray-700'}`}
                                             >
                                                 {cat}
                                             </button>
@@ -1497,7 +1497,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             <button
                                                 key={cat}
                                                 onClick={() => { setSelectedCategoryFilter(cat); setShowFilterMenu(false); }}
-                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedCategoryFilter === cat ? 'font-bold text-indigo-600 bg-indigo-50' : 'text-gray-700'}`}
+                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedCategoryFilter === cat ? 'font-bold text-sky-600 bg-sky-50' : 'text-gray-700'}`}
                                             >
                                                 {cat}
                                             </button>
@@ -1521,7 +1521,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {filteredTransactions.map(t => (
-                                <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors group border-b border-gray-100">
+                                <tr key={t.id} className="hover:bg-sky-50/30 transition-colors group border-b border-gray-100">
                                     <td className="px-4 py-3 md:px-6 md:py-5">
                                         <div className="flex flex-col">
                                             <span className="text-gray-700 font-bold text-xs md:text-sm">{t.date.split('-').reverse().join('/')}</span>
@@ -1547,7 +1547,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     </td>
                                     <td className="px-4 py-3 md:px-6 md:py-5 text-center">
                                         <div className="flex justify-center gap-2">
-                                            <button onClick={() => openEditModal(t)} className="p-1.5 md:p-2 text-gray-400 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-indigo-100 rounded-lg transition-all shadow-sm" title="Sửa">
+                                            <button onClick={() => openEditModal(t)} className="p-1.5 md:p-2 text-gray-400 hover:text-sky-600 hover:bg-white border border-transparent hover:border-sky-100 rounded-lg transition-all shadow-sm" title="Sửa">
                                                 <Edit2 size={16} />
                                             </button>
                                             <button onClick={() => onDeleteTransaction(t.id)} className="p-1.5 md:p-2 text-gray-400 hover:text-red-600 hover:bg-white border border-transparent hover:border-red-100 rounded-lg transition-all shadow-sm" title="Xóa">
@@ -1584,7 +1584,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            className="space-y-4 md:space-y-6 animate-fade-in pb-20 relative min-h-[500px]"
+            className="space-y-4 md:space-y-6 animate-fade-in pb-36 md:pb-20 relative min-h-[500px]"
         >
             {/* Pull to Refresh Spinner */}
             <div
@@ -1596,7 +1596,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             >
                 <div className="bg-white rounded-full p-2.5 shadow-lg border border-gray-100 flex items-center justify-center">
                     <Loader2
-                        className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`}
+                        className={`text-sky-600 ${isRefreshing ? 'animate-spin' : ''}`}
                         size={20}
                         style={{ transform: `rotate(${pullDistance * 4}deg)` }}
                     />
@@ -1614,10 +1614,10 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         {/* Compact Month Picker Button */}
                         <button
                             onClick={() => setIsMonthPickerOpen(true)}
-                            className="flex items-center justify-center gap-1.5 px-3 h-10 rounded-xl bg-gray-50 hover:bg-indigo-50 hover:text-indigo-600 text-gray-700 font-bold transition-all border border-gray-150 shrink-0 text-xs"
+                            className="flex items-center justify-center gap-1.5 px-3 h-10 rounded-xl bg-gray-50 hover:bg-sky-50 hover:text-sky-600 text-gray-700 font-bold transition-all border border-gray-150 shrink-0 text-xs"
                             title="Chọn tháng/năm"
                         >
-                            <CalendarDays size={14} className="text-indigo-500" />
+                            <CalendarDays size={14} className="text-sky-500" />
                             <span>T{selectedMonth + 1}/{selectedYear}</span>
                         </button>
 
@@ -1628,7 +1628,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         <div className="flex flex-1 md:flex-initial gap-0.5 justify-around md:justify-start">
                             <button
                                 onClick={() => setViewMode('overview')}
-                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'overview' ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'overview' ? 'bg-sky-50 text-sky-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
                                 title="Tổng quan"
                             >
                                 <LayoutDashboard size={16} />
@@ -1636,7 +1636,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             </button>
                             <button
                                 onClick={() => setViewMode('calendar')}
-                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'calendar' ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'calendar' ? 'bg-sky-50 text-sky-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
                                 title="Xem lịch theo ngày"
                             >
                                 <CalendarDays size={16} />
@@ -1644,7 +1644,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             </button>
                             <button
                                 onClick={() => setViewMode('history')}
-                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'history' ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'history' ? 'bg-sky-50 text-sky-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
                                 title="Lịch sử"
                             >
                                 <List size={16} />
@@ -1652,7 +1652,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             </button>
                             <button
                                 onClick={() => setViewMode('report')}
-                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'report' ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                                className={`flex items-center justify-center gap-1 h-10 px-2.5 md:px-3 rounded-xl transition-all duration-300 ${viewMode === 'report' ? 'bg-sky-50 text-sky-700 font-bold shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
                                 title="Báo cáo"
                             >
                                 <FileBarChart size={16} />
@@ -1682,9 +1682,9 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                 setDesc('');
                                 setCategory(expenseCategories[0] || EXPENSE_CATEGORIES[0]);
                             }}
-                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-800 text-white px-3 h-11 rounded-2xl font-extrabold shadow-[0_4px_14px_rgba(67,56,202,0.35)] hover:from-blue-800 hover:via-indigo-700 hover:to-indigo-900 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 whitespace-nowrap border border-indigo-500/20"
+                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-sky-700 via-blue-600 to-blue-800 text-white px-3 h-11 rounded-2xl font-extrabold shadow-[0_4px_14px_rgba(2,132,199,0.35)] hover:from-sky-800 hover:via-blue-700 hover:to-blue-900 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 whitespace-nowrap border border-sky-500/20"
                         >
-                            <Plus size={18} className="animate-pulse text-indigo-100" />
+                            <Plus size={18} className="animate-pulse text-sky-100" />
                             <span className="text-xs md:text-sm">Thêm giao dịch</span>
                         </button>
                     </div>
@@ -1698,12 +1698,12 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     {/* Balance Card - Luxurious Circle */}
                     <div className="col-span-2 md:col-span-1 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center relative overflow-hidden group">
                         {/* Decorative Circle */}
-                        <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 blur-xl"></div>
-                        <div className="absolute right-2 top-2 w-12 h-12 rounded-full border border-indigo-50/50"></div>
+                        <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-gradient-to-br from-sky-500/20 to-blue-500/20 blur-xl"></div>
+                        <div className="absolute right-2 top-2 w-12 h-12 rounded-full border border-sky-50/50"></div>
 
                         <button
                             onClick={() => setIsBalanceModalOpen(true)}
-                            className="absolute top-2 right-4 text-gray-300 hover:text-indigo-600 transition-colors p-1"
+                            className="absolute top-2 right-4 text-gray-300 hover:text-sky-600 transition-colors p-1"
                         >
                             <Edit2 size={16} />
                         </button>
@@ -1713,7 +1713,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); setHideBalance(!hideBalance); }}
-                                className="text-gray-400 hover:text-indigo-650 transition-colors p-0.5 rounded-md hover:bg-indigo-50/50"
+                                className="text-gray-400 hover:text-sky-600 transition-colors p-0.5 rounded-md hover:bg-sky-50/50"
                                 title={hideBalance ? "Hiện số tiền" : "Ẩn số tiền"}
                             >
                                 {hideBalance ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -1781,11 +1781,11 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <div className="fixed inset-0 bg-black/50 z-[80] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
                         <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl relative overflow-hidden">
                             {/* Decoration */}
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 via-blue-500 to-teal-500"></div>
 
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                                    <Bot size={24} className="text-indigo-600" />
+                                    <Bot size={24} className="text-sky-600" />
                                     Trợ lý Tài chính AI
                                 </h3>
                                 <button onClick={() => { setAiInsight(null); setIsAnalyzing(false); }} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={24} /></button>
@@ -1793,23 +1793,24 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
                             {isAnalyzing ? (
                                 <div className="py-10 flex flex-col items-center justify-center text-center gap-4">
-                                    <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                                    <div className="w-12 h-12 border-4 border-sky-200 border-t-sky-600 rounded-full animate-spin"></div>
                                     <p className="text-gray-500 font-medium animate-pulse">Đang phân tích dữ liệu chi tiêu của bạn...</p>
                                 </div>
                             ) : aiInsight ? (
                                 <div className="space-y-6">
-                                    <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                                    <div className="p-4 bg-sky-50 rounded-xl border border-sky-100">
                                         <p className="text-gray-700 leading-relaxed font-medium">"{aiInsight.insight}"</p>
                                     </div>
 
                                     <div>
                                         <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
                                             <Sparkles size={14} className="text-amber-500" /> Đề xuất hành động
+                                            <Sparkles size={14} className="text-sky-500" /> Đề xuất hành động
                                         </h4>
                                         <div className="space-y-2">
                                             {aiInsight.actions.map((action, idx) => (
-                                                <div key={idx} className="flex items-start gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-indigo-200 transition-colors">
-                                                    <div className="mt-1 w-5 h-5 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</div>
+                                                <div key={idx} className="flex items-start gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-sky-200 transition-colors">
+                                                    <div className="mt-1 w-5 h-5 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</div>
                                                     <p className="text-sm text-gray-700">{action}</p>
                                                 </div>
                                             ))}
@@ -1818,7 +1819,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
                                     <button
                                         onClick={() => { setAiInsight(null); }}
-                                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-200"
+                                        className="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-sky-200"
                                     >
                                         Đã hiểu, cảm ơn AI!
                                     </button>
@@ -1924,7 +1925,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                 {/* Area Chart Section (Moved) */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-full">
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <TrendingUp className="text-indigo-600" /> Xu hướng Thu nhập & Chi tiêu
+                        <TrendingUp className="text-sky-600" /> Xu hướng Thu nhập & Chi tiêu
                     </h3>
                     <div className="h-80 w-full min-h-[320px]" >
                         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
@@ -1956,7 +1957,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <div className="flex justify-between items-center mb-4 md:mb-6">
                         <div>
                             <h3 className="text-lg md:text-xl font-bold text-gray-800 flex items-center gap-2">
-                                <Wallet className="text-indigo-600 w-5 h-5 md:w-6 md:h-6" /> <span className="hidden md:inline">Danh sách Mục tiêu Tiết kiệm</span><span className="md:hidden">Mục tiêu Tiết kiệm</span>
+                                <Wallet className="text-sky-600 w-5 h-5 md:w-6 md:h-6" /> <span className="hidden md:inline">Danh sách Mục tiêu Tiết kiệm</span><span className="md:hidden">Mục tiêu Tiết kiệm</span>
                             </h3>
                             <p className="text-xs md:text-sm text-gray-500">Đặt mục tiêu và theo dõi tiến độ</p>
                         </div>
@@ -1967,7 +1968,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                 setGoalCurrent('');
                                 setIsGoalModalOpen(true);
                             }}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-bold hover:bg-indigo-100 transition"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-sky-50 text-sky-600 rounded-lg text-sm font-bold hover:bg-sky-100 transition"
                         >
                             <Plus size={16} /> Thêm
                         </button>
@@ -1989,7 +1990,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         setGoalCurrent(goal.current_amount?.toString() || '');
                                         setIsGoalModalOpen(true);
                                     }}
-                                    className="absolute top-2 right-9 p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                    className="absolute top-2 right-9 p-1.5 text-gray-400 hover:text-sky-600 hover:bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                                 >
                                     <Edit2 size={16} />
                                 </button>
@@ -2000,13 +2001,13 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                 </p>
 
                                 <div className="flex justify-between items-end text-sm mb-1">
-                                    <span className="text-indigo-600 font-bold">{formatCurrency(goal.current_amount || 0, lang)}</span>
+                                    <span className="text-sky-600 font-bold">{formatCurrency(goal.current_amount || 0, lang)}</span>
                                     <span className="text-gray-400 font-medium">/ {formatCurrency(goal.target_amount || 0, lang)}</span>
                                 </div>
 
                                 <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                                     <div
-                                        className="bg-gradient-to-r from-indigo-500 to-purple-600 h-full rounded-full transition-all duration-1000"
+                                        className="bg-gradient-to-r from-sky-500 to-blue-600 h-full rounded-full transition-all duration-1000"
                                         style={{ width: `${Math.min(((goal.current_amount || 0) / (goal.target_amount || 1)) * 100, 100)}%` }}
                                     ></div>
                                 </div>
@@ -2017,7 +2018,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             setDepositAmount('');
                                             setIsDepositModalOpen(true);
                                         }}
-                                        className="text-xs font-bold text-indigo-600 hover:underline"
+                                        className="text-xs font-bold text-sky-600 hover:underline"
                                     >
                                         + Nạp thêm
                                     </button>
@@ -2060,7 +2061,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         placeholder="0"
                                         className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium mt-1"
                                     />
-                                    <div className="flex justify-end mt-1 text-xs text-indigo-600 font-bold">
+                                    <div className="flex justify-end mt-1 text-xs text-sky-600 font-bold">
                                         {goalTarget && !isNaN(Number(goalTarget)) && formatCurrency(Number(goalTarget), lang)}
                                     </div>
                                 </div>
@@ -2074,7 +2075,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         placeholder="0"
                                         className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium mt-1"
                                     />
-                                    <div className="flex justify-end mt-1 text-xs text-indigo-600 font-bold">
+                                    <div className="flex justify-end mt-1 text-xs text-sky-600 font-bold">
                                         {goalCurrent && !isNaN(Number(goalCurrent)) && formatCurrency(Number(goalCurrent), lang)}
                                     </div>
                                 </div>
@@ -2111,7 +2112,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         value={depositAmount}
                                         onChange={(e) => setDepositAmount(e.target.value)}
                                         placeholder="Nhập số tiền..."
-                                        className="w-full p-4 bg-indigo-50 rounded-xl border-2 border-indigo-100 text-indigo-700 text-lg font-bold outline-none focus:border-indigo-500 transition-colors mt-2"
+                                        className="w-full p-4 bg-sky-50 rounded-xl border-2 border-sky-100 text-sky-700 text-lg font-bold outline-none focus:border-sky-500 transition-colors mt-2"
                                     />
                                     <div className="flex justify-end mt-1 text-xs text-gray-400">
                                         {depositAmount && !isNaN(Number(depositAmount)) && formatCurrency(Number(depositAmount), lang)}
@@ -2128,7 +2129,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition"
+                                        className="flex-1 py-3 bg-sky-600 text-white rounded-xl font-bold shadow-lg shadow-sky-200 hover:bg-sky-700 transition"
                                     >
                                         Xác nhận
                                     </button>
@@ -2206,7 +2207,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                 type="button"
                                                 onClick={() => setShowCalculator(!showCalculator)}
                                                 className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all
-                                                    ${showCalculator ? 'bg-indigo-100 text-indigo-600 shadow-inner' : 'text-gray-300 hover:text-indigo-500 hover:bg-indigo-50'}`}
+                                                    ${showCalculator ? 'bg-sky-100 text-sky-600 shadow-inner' : 'text-gray-300 hover:text-sky-500 hover:bg-sky-50'}`}
                                                 title="Máy tính"
                                             >
                                                 <CalculatorIcon size={20} />
@@ -2275,7 +2276,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                 onClick={() => { setCategory(''); setIsAddingNewCategory(true); }}
                                                 className={`p-3 rounded-2xl text-xs md:text-sm font-extrabold transition-all border-2 border-dashed flex items-center justify-center gap-1.5 duration-200 active:scale-95
                                                     ${isAddingNewCategory
-                                                        ? 'border-indigo-400 bg-indigo-500 text-white shadow-md shadow-indigo-200/50 scale-[1.02]'
+                                                        ? 'border-sky-400 bg-sky-500 text-white shadow-md shadow-sky-200/50 scale-[1.02]'
                                                         : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-500 bg-white'
                                                     }
                                                 `}
@@ -2291,7 +2292,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                     placeholder="Nhập tên danh mục mới..."
                                                     value={newCategoryName}
                                                     onChange={(e) => setNewCategoryName(e.target.value)}
-                                                    className="w-full p-3.5 bg-indigo-50/30 border border-indigo-200 text-indigo-750 rounded-2xl outline-none font-bold placeholder-indigo-300 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all"
+                                                    className="w-full p-3.5 bg-sky-50/30 border border-sky-200 text-sky-750 rounded-2xl outline-none font-bold placeholder-sky-300 focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-50 transition-all"
                                                     autoFocus
                                                 />
                                             </div>
@@ -2309,7 +2310,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                     required
                                                     value={date}
                                                     onChange={(e) => setDate(e.target.value)}
-                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50/60 border border-gray-150 rounded-2xl outline-none text-gray-700 font-extrabold text-xs focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all"
+                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50/60 border border-gray-150 rounded-2xl outline-none text-gray-700 font-extrabold text-xs focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-50 transition-all"
                                                 />
                                             </div>
                                         </div>
@@ -2321,7 +2322,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                     placeholder="Mua sắm, ăn trưa..."
                                                     value={desc}
                                                     onChange={(e) => setDesc(e.target.value)}
-                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50/60 border border-gray-150 rounded-2xl outline-none text-gray-750 font-bold text-xs focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all placeholder-gray-300"
+                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50/60 border border-gray-150 rounded-2xl outline-none text-gray-755 font-bold text-xs focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-50 transition-all placeholder-gray-300"
                                                 />
                                             </div>
                                         </div>
@@ -2367,7 +2368,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         <button
                                             type="button"
                                             onClick={() => setShowCalculator(false)}
-                                            className="text-xs font-extrabold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-1.5 rounded-full transition-all"
+                                            className="text-xs font-extrabold text-sky-600 bg-sky-50 hover:bg-sky-100 px-3.5 py-1.5 rounded-full transition-all"
                                         >
                                             Xong
                                         </button>
@@ -2398,7 +2399,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
                             <div className="p-6 text-center">
-                                <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-600">
+                                <div className="bg-sky-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-sky-600">
                                     <Wallet size={32} />
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-800 mb-2">Điều chỉnh số dư</h3>
@@ -2413,16 +2414,16 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             autoFocus
                                             value={newBalance}
                                             onChange={(e) => setNewBalance(e.target.value)}
-                                            className="w-full pl-8 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-bold text-center"
+                                            className="w-full pl-8 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-lg font-bold text-center"
                                             placeholder={stats.totalBalance.toString()}
                                         />
-                                        <div className="flex justify-center mt-2 text-sm text-indigo-600 font-bold">
+                                        <div className="flex justify-center mt-2 text-sm text-sky-600 font-bold">
                                             {newBalance && !isNaN(Number(newBalance)) && formatCurrency(Number(newBalance), lang)}
                                         </div>
                                     </div>
                                     <div className="flex gap-3">
                                         <button type="button" onClick={() => setIsBalanceModalOpen(false)} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl">Hủy</button>
-                                        <button type="submit" className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg">Cập nhật</button>
+                                        <button type="submit" className="flex-1 py-3 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl shadow-lg">Cập nhật</button>
                                     </div>
                                 </form>
                             </div>
@@ -2466,7 +2467,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         placeholder="0"
                                         className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-lg font-bold mt-1"
                                     />
-                                    <div className="flex justify-end mt-1 text-xs text-indigo-600 font-bold">
+                                    <div className="flex justify-end mt-1 text-xs text-sky-600 font-bold">
                                         {budgetLimit && !isNaN(Number(budgetLimit)) && formatCurrency(Number(budgetLimit), lang)}
                                     </div>
                                 </div>
@@ -2481,7 +2482,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition"
+                                        className="flex-1 py-3 bg-sky-600 text-white rounded-xl font-bold shadow-lg shadow-sky-200 hover:bg-sky-700 transition"
                                     >
                                         Lưu
                                     </button>
@@ -2573,7 +2574,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                 })().map((entry, index) => (
                                                     <Cell
                                                         key={`cell-${index}`}
-                                                        fill={entry === detailViewMonth ? '#4F46E5' : '#E5E7EB'}
+                                                        fill={entry === detailViewMonth ? '#0284C7' : '#E5E7EB'}
                                                     />
                                                 ))
                                             }
@@ -2636,7 +2637,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         {/* Modal Header */}
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                                <CalendarDays className="text-indigo-600" size={20} />
+                                <CalendarDays className="text-sky-600" size={20} />
                                 Chọn Thời Gian
                             </h3>
                             <button
@@ -2648,19 +2649,19 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         </div>
 
                         {/* Year Selector */}
-                        <div className="flex items-center justify-between bg-indigo-50/50 p-2 rounded-2xl mb-6 border border-indigo-100/50">
+                        <div className="flex items-center justify-between bg-sky-50/50 p-2 rounded-2xl mb-6 border border-sky-100/50">
                             <button
                                 type="button"
                                 onClick={() => setSelectedYear(y => y - 1)}
-                                className="p-2 bg-white hover:bg-indigo-50 text-indigo-600 rounded-xl transition-all shadow-sm border border-indigo-100/20 font-bold"
+                                className="p-2 bg-white hover:bg-sky-50 text-sky-600 rounded-xl transition-all shadow-sm border border-sky-100/20 font-bold"
                             >
                                 ❮
                             </button>
-                            <span className="font-extrabold text-indigo-900 text-lg">Năm {selectedYear}</span>
+                            <span className="font-extrabold text-sky-900 text-lg">Năm {selectedYear}</span>
                             <button
                                 type="button"
                                 onClick={() => setSelectedYear(y => y + 1)}
-                                className="p-2 bg-white hover:bg-indigo-50 text-indigo-600 rounded-xl transition-all shadow-sm border border-indigo-100/20 font-bold"
+                                className="p-2 bg-white hover:bg-sky-50 text-sky-600 rounded-xl transition-all shadow-sm border border-sky-100/20 font-bold"
                             >
                                 ❯
                             </button>
@@ -2679,8 +2680,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             setIsMonthPickerOpen(false);
                                         }}
                                         className={`py-3 px-2 rounded-2xl text-xs font-bold transition-all border ${isCurrentMonth
-                                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-transparent shadow-lg shadow-indigo-100 scale-[1.03]'
-                                                : 'bg-white border-gray-100 text-gray-600 hover:bg-indigo-50/40 hover:border-indigo-100'
+                                                ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white border-transparent shadow-lg shadow-sky-100 scale-[1.03]'
+                                                : 'bg-white border-gray-100 text-gray-600 hover:bg-sky-50/40 hover:border-sky-100'
                                             }`}
                                     >
                                         Tháng {i + 1}

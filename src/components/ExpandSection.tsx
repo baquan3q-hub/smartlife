@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { 
-    GraduationCap, Target, Music, BookOpen, Flame, Settings, 
+import {
+    GraduationCap, Target, Music, BookOpen, Flame, Settings,
     QrCode, CreditCard, Contact, Camera, Trash2, X, Sparkles, Plus, Eye, Loader2
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
@@ -104,7 +104,7 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
     const handleTouchStart = (e: React.TouchEvent) => {
         // Only trigger if no modal/lightbox is active
         if (activeLightboxField || zoomedImage) return;
-        
+
         const mainScroll = document.querySelector('main');
         const isAtTop = !mainScroll || mainScroll.scrollTop === 0;
         if (isAtTop && window.scrollY === 0) {
@@ -122,7 +122,7 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
             // Apply spring resistance damping for longer/smoother pull-down
             const offset = Math.min(diff * 0.45, 130);
             setPullDistance(offset);
-            
+
             // Critical: prevent page rubber-banding on body scroll
             if (diff > 10 && e.cancelable) {
                 e.preventDefault();
@@ -276,19 +276,19 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
     return (
         <div className="relative w-full overflow-hidden min-h-full">
             {/* Fixed background pull-to-refresh indicator */}
-            <div 
+            <div
                 className="absolute left-0 right-0 top-0 flex justify-center items-center pointer-events-none z-0"
-                style={{ 
-                    height: '80px', 
+                style={{
+                    height: '80px',
                     opacity: Math.min(pullDistance / 85, 1),
                     transform: `scale(${Math.min(pullDistance / 85, 1)})`,
                     transition: isDragging.current ? 'none' : 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
             >
                 <div className="bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-full border border-indigo-100 shadow-[0_8px_30px_rgba(99,102,241,0.15)] flex items-center justify-center gap-2">
-                    <Loader2 
-                        className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`} 
-                        size={18} 
+                    <Loader2
+                        className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`}
+                        size={18}
                         style={{ transform: !isRefreshing ? `rotate(${pullDistance * 3}deg)` : 'none' }}
                     />
                     <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest pr-1">
@@ -298,7 +298,7 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
             </div>
 
             {/* Main content with touch handlers & GPU acceleration */}
-            <div 
+            <div
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
@@ -309,225 +309,227 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
                     willChange: 'transform'
                 }}
             >
-            {/* Hidden Document Inputs */}
-            <input type="file" id="expand-qr-upload" accept="image/*" className="hidden" onChange={(e) => handleDocUpload(e, 'qr_code_url')} />
-            <input type="file" id="expand-student-upload" accept="image/*" className="hidden" onChange={(e) => handleDocUpload(e, 'student_card_url')} />
-            <input type="file" id="expand-citizen-upload" accept="image/*" className="hidden" onChange={(e) => handleDocUpload(e, 'citizen_card_url')} />
+                {/* Hidden Document Inputs */}
+                <input type="file" id="expand-qr-upload" accept="image/*" className="hidden" onChange={(e) => handleDocUpload(e, 'qr_code_url')} />
+                <input type="file" id="expand-student-upload" accept="image/*" className="hidden" onChange={(e) => handleDocUpload(e, 'student_card_url')} />
+                <input type="file" id="expand-citizen-upload" accept="image/*" className="hidden" onChange={(e) => handleDocUpload(e, 'citizen_card_url')} />
 
-            {/* Centered Profile Header */}
-            <div className="flex flex-col items-center text-center mt-2 mb-4 bg-gradient-to-b from-indigo-50/40 via-white/50 to-transparent p-6 rounded-3xl border border-indigo-50/20">
-                <div className="relative group cursor-pointer" onClick={() => document.getElementById('section-avatar-upload')?.click()}>
-                    <img
-                        src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name || 'User'}&background=6366F1&color=fff`}
-                        alt="Avatar"
-                        className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-xl ring-4 ring-indigo-50/80 transition-transform duration-300 hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Camera size={18} className="text-white" />
+                {/* Centered Profile Header */}
+                <div className="flex flex-col items-center text-center mt-2 mb-4 bg-gradient-to-b from-indigo-50/40 via-white/50 to-transparent p-6 rounded-3xl border border-indigo-50/20">
+                    <div className="relative group cursor-pointer" onClick={() => document.getElementById('section-avatar-upload')?.click()}>
+                        <img
+                            src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name || 'User'}&background=6366F1&color=fff`}
+                            alt="Avatar"
+                            className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-xl ring-4 ring-indigo-50/80 transition-transform duration-300 hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Camera size={18} className="text-white" />
+                        </div>
+                        <input
+                            type="file"
+                            id="section-avatar-upload"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleAvatarChange}
+                        />
                     </div>
-                    <input
-                        type="file"
-                        id="section-avatar-upload"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleAvatarChange}
-                    />
+                    <h2 className="text-xl font-black text-gray-800 mt-4 leading-tight">{profile?.full_name || 'Học viên SmartLife'}</h2>
+                    <p className="text-xs text-gray-400 font-medium mt-1">{profile?.email || 'Chưa liên kết email'}</p>
+                    {profile?.job && (
+                        <span className="mt-2.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black tracking-wider uppercase flex items-center gap-1.5 shadow-sm border border-indigo-100/30">
+                            <Sparkles size={10} /> {profile.job}
+                        </span>
+                    )}
                 </div>
-                <h2 className="text-xl font-black text-gray-800 mt-4 leading-tight">{profile?.full_name || 'Học viên SmartLife'}</h2>
-                <p className="text-xs text-gray-400 font-medium mt-1">{profile?.email || 'Chưa liên kết email'}</p>
-                {profile?.job && (
-                    <span className="mt-2.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black tracking-wider uppercase flex items-center gap-1.5 shadow-sm border border-indigo-100/30">
-                        <Sparkles size={10} /> {profile.job}
-                    </span>
-                )}
-            </div>
 
-            {/* Document Wallet Card Row */}
-            <div className="bg-white rounded-[28px] p-5 border border-gray-100 shadow-sm space-y-4">
-                <div className="flex items-center justify-between px-1">
-                    <div>
-                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Ví tài liệu cá nhân</h3>
-                        <p className="text-[10px] text-gray-400 mt-0.5">Click để xem nhanh ảnh tài liệu của bạn</p>
+                {/* Document Wallet Card Row */}
+                <div className="bg-white rounded-[28px] p-5 border border-gray-100 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between px-1">
+                        <div>
+                            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Ví tài liệu cá nhân</h3>
+                            <p className="text-[10px] text-gray-400 mt-0.5">Click để xem nhanh ảnh tài liệu của bạn</p>
+                        </div>
+                        <span className="text-[9px] text-indigo-600 bg-indigo-50 font-bold px-2 py-0.5 rounded-full border border-indigo-100/30">
+                            Take Anywhere
+                        </span>
                     </div>
-                    <span className="text-[9px] text-indigo-600 bg-indigo-50 font-bold px-2 py-0.5 rounded-full border border-indigo-100/30">
-                        Take Anywhere
-                    </span>
-                </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                    {/* QR Card */}
-                    <button
-                        onClick={() => handleCardClick('qr_code_url', 'expand-qr-upload')}
-                        className={`aspect-video rounded-2xl flex flex-col items-center justify-center border-2 p-2 relative overflow-hidden select-none transition-all duration-200 active:scale-95 group/doc
-                            ${getDocImages('qr_code_url').length > 0 
-                                ? 'border-blue-500 bg-blue-50/20 text-blue-600 shadow-sm shadow-blue-100/30' 
-                                : 'border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-100 text-gray-400'}`}
-                    >
-                        <div className="flex flex-col items-center text-center gap-1.5">
-                            <QrCode size={20} className={getDocImages('qr_code_url').length > 0 ? 'text-blue-500' : 'text-gray-400 group-hover/doc:text-indigo-500 transition-colors'} />
-                            <span className={`text-[9px] font-black tracking-wide ${getDocImages('qr_code_url').length > 0 ? 'text-blue-700' : ''}`}>
-                                Mã QR {getDocImages('qr_code_url').length > 0 && `(${getDocImages('qr_code_url').length}/2)`}
-                            </span>
-                        </div>
-                    </button>
-
-                    {/* Student Card */}
-                    <button
-                        onClick={() => handleCardClick('student_card_url', 'expand-student-upload')}
-                        className={`aspect-video rounded-2xl flex flex-col items-center justify-center border-2 p-2 relative overflow-hidden select-none transition-all duration-200 active:scale-95 group/doc
-                            ${getDocImages('student_card_url').length > 0 
-                                ? 'border-blue-500 bg-blue-50/20 text-blue-600 shadow-sm shadow-blue-100/30' 
-                                : 'border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-100 text-gray-400'}`}
-                    >
-                        <div className="flex flex-col items-center text-center gap-1.5">
-                            <CreditCard size={20} className={getDocImages('student_card_url').length > 0 ? 'text-blue-500' : 'text-gray-400 group-hover/doc:text-indigo-500 transition-colors'} />
-                            <span className={`text-[9px] font-black tracking-wide ${getDocImages('student_card_url').length > 0 ? 'text-blue-700' : ''}`}>
-                                Thẻ SV {getDocImages('student_card_url').length > 0 && `(${getDocImages('student_card_url').length}/2)`}
-                            </span>
-                        </div>
-                    </button>
-
-                    {/* CCCD Card */}
-                    <button
-                        onClick={() => handleCardClick('citizen_card_url', 'expand-citizen-upload')}
-                        className={`aspect-video rounded-2xl flex flex-col items-center justify-center border-2 p-2 relative overflow-hidden select-none transition-all duration-200 active:scale-95 group/doc
-                            ${getDocImages('citizen_card_url').length > 0 
-                                ? 'border-blue-500 bg-blue-50/20 text-blue-600 shadow-sm shadow-blue-100/30' 
-                                : 'border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-100 text-gray-400'}`}
-                    >
-                        <div className="flex flex-col items-center text-center gap-1.5">
-                            <Contact size={20} className={getDocImages('citizen_card_url').length > 0 ? 'text-blue-500' : 'text-gray-400 group-hover/doc:text-indigo-500 transition-colors'} />
-                            <span className={`text-[9px] font-black tracking-wide ${getDocImages('citizen_card_url').length > 0 ? 'text-blue-700' : ''}`}>
-                                CCCD {getDocImages('citizen_card_url').length > 0 && `(${getDocImages('citizen_card_url').length}/2)`}
-                            </span>
-                        </div>
-                    </button>
-                </div>
-            </div>
-
-            {/* Extended Features Grid */}
-            <div className="bg-white rounded-[28px] p-5 border border-gray-100 shadow-sm space-y-4">
-                <div className="px-1">
-                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Tính năng mở rộng</h3>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Lối tắt thao tác nhanh các tiện ích</p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                    {EXPAND_ITEMS.map((item) => {
-                        const IconComponent = item.icon;
-                        return (
-                            <button
-                                key={item.id}
-                                onClick={() => handleItemClick(item)}
-                                className={`flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-white hover:shadow-md ${item.shadowColor} transition-all duration-200 active:scale-95 group relative overflow-hidden`}
-                            >
-                                <div className={`w-11 h-11 rounded-2xl ${item.bg} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
-                                    <IconComponent size={20} className={`${item.iconColor}`} strokeWidth={2.2} />
-                                </div>
-                                <span className="text-[10px] font-bold text-gray-800 text-center leading-tight tracking-tight">
-                                    {item.label}
+                    <div className="grid grid-cols-3 gap-3">
+                        {/* QR Card */}
+                        <button
+                            onClick={() => handleCardClick('qr_code_url', 'expand-qr-upload')}
+                            className={`aspect-video rounded-2xl flex flex-col items-center justify-center border-2 p-2 relative overflow-hidden select-none transition-all duration-200 active:scale-95 group/doc
+                            ${getDocImages('qr_code_url').length > 0
+                                    ? 'border-blue-500 bg-blue-50/20 text-blue-600 shadow-sm shadow-blue-100/30'
+                                    : 'border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-100 text-gray-400'}`}
+                        >
+                            <div className="flex flex-col items-center text-center gap-1.5">
+                                <QrCode size={20} className={getDocImages('qr_code_url').length > 0 ? 'text-blue-500' : 'text-gray-400 group-hover/doc:text-indigo-500 transition-colors'} />
+                                <span className={`text-[9px] font-black tracking-wide ${getDocImages('qr_code_url').length > 0 ? 'text-blue-700' : ''}`}>
+                                    Mã QR {getDocImages('qr_code_url').length > 0 && `(${getDocImages('qr_code_url').length}/2)`}
                                 </span>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
+                            </div>
+                        </button>
 
-            {/* Document Lightbox Zoom Modal */}
-            {activeLightboxField && (
-                <div className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
-                    <div className="bg-white rounded-[28px] overflow-hidden max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] relative animate-in zoom-in-95 duration-200">
-                        {/* Header */}
-                        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                            <span className="font-extrabold text-gray-800 text-sm">
-                                {getFieldNameVi(activeLightboxField)} ({getDocImages(activeLightboxField).length}/2)
-                            </span>
-                            <button
-                                onClick={() => setActiveLightboxField(null)}
-                                className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
+                        {/* Student Card */}
+                        <button
+                            onClick={() => handleCardClick('student_card_url', 'expand-student-upload')}
+                            className={`aspect-video rounded-2xl flex flex-col items-center justify-center border-2 p-2 relative overflow-hidden select-none transition-all duration-200 active:scale-95 group/doc
+                            ${getDocImages('student_card_url').length > 0
+                                    ? 'border-blue-500 bg-blue-50/20 text-blue-600 shadow-sm shadow-blue-100/30'
+                                    : 'border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-100 text-gray-400'}`}
+                        >
+                            <div className="flex flex-col items-center text-center gap-1.5">
+                                <CreditCard size={20} className={getDocImages('student_card_url').length > 0 ? 'text-blue-500' : 'text-gray-400 group-hover/doc:text-indigo-500 transition-colors'} />
+                                <span className={`text-[9px] font-black tracking-wide ${getDocImages('student_card_url').length > 0 ? 'text-blue-700' : ''}`}>
+                                    Thẻ SV {getDocImages('student_card_url').length > 0 && `(${getDocImages('student_card_url').length}/2)`}
+                                </span>
+                            </div>
+                        </button>
 
-                        {/* Image list / upload slot */}
-                        <div className="p-5 flex-1 overflow-y-auto flex flex-col gap-4 bg-gray-50/50 min-h-[300px] max-h-[60vh] scrollbar-thin">
-                            {getDocImages(activeLightboxField).map((url, index) => (
-                                <div key={index} className="relative group/img bg-white p-3 rounded-2xl border border-gray-150 shadow-sm flex flex-col items-center gap-2.5">
-                                    <div 
-                                        onClick={() => setZoomedImage(url)}
-                                        className="relative cursor-zoom-in overflow-hidden rounded-xl w-full h-[200px] flex items-center justify-center bg-gray-100/40"
-                                    >
-                                        <img
-                                            src={url}
-                                            alt={`Ảnh ${index + 1}`}
-                                            className="max-w-full max-h-full object-contain hover:scale-[1.02] transition-transform duration-200"
-                                        />
-                                        <div className="absolute inset-0 bg-black/25 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
-                                            <Eye size={20} className="text-white" />
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleDocDelete(activeLightboxField, index)}
-                                        className="w-full py-2 rounded-xl text-red-500 bg-red-50/60 hover:bg-red-50 hover:text-red-600 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-95"
-                                    >
-                                        <Trash2 size={13} /> Xóa ảnh {getDocImages(activeLightboxField).length > 1 ? index + 1 : ''}
-                                    </button>
-                                </div>
-                            ))}
-                            
-                            {getDocImages(activeLightboxField).length < 2 && (
-                                <button
-                                    onClick={() => {
-                                        const inputId = activeLightboxField === 'qr_code_url'
-                                            ? 'expand-qr-upload'
-                                            : activeLightboxField === 'student_card_url'
-                                                ? 'expand-student-upload'
-                                                : 'expand-citizen-upload';
-                                        document.getElementById(inputId)?.click();
-                                    }}
-                                    className="w-full aspect-video min-h-[140px] rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/20 flex flex-col items-center justify-center text-indigo-500 hover:bg-indigo-50/50 hover:text-indigo-600 transition-all font-black text-xs gap-2 py-4 cursor-pointer active:scale-95"
-                                >
-                                    <Plus size={22} className="stroke-[2.5]" />
-                                    Tải lên ảnh thứ 2
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Actions Footer */}
-                        <div className="p-4 border-t border-gray-100 flex gap-2 justify-end bg-gray-50/20">
-                            <button
-                                type="button"
-                                onClick={() => setActiveLightboxField(null)}
-                                className="px-5 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-xs transition-all active:scale-95"
-                            >
-                                Đóng
-                            </button>
-                        </div>
+                        {/* CCCD Card */}
+                        <button
+                            onClick={() => handleCardClick('citizen_card_url', 'expand-citizen-upload')}
+                            className={`aspect-video rounded-2xl flex flex-col items-center justify-center border-2 p-2 relative overflow-hidden select-none transition-all duration-200 active:scale-95 group/doc
+                            ${getDocImages('citizen_card_url').length > 0
+                                    ? 'border-blue-500 bg-blue-50/20 text-blue-600 shadow-sm shadow-blue-100/30'
+                                    : 'border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-100 text-gray-400'}`}
+                        >
+                            <div className="flex flex-col items-center text-center gap-1.5">
+                                <Contact size={20} className={getDocImages('citizen_card_url').length > 0 ? 'text-blue-500' : 'text-gray-400 group-hover/doc:text-indigo-500 transition-colors'} />
+                                <span className={`text-[9px] font-black tracking-wide ${getDocImages('citizen_card_url').length > 0 ? 'text-blue-700' : ''}`}>
+                                    CCCD {getDocImages('citizen_card_url').length > 0 && `(${getDocImages('citizen_card_url').length}/2)`}
+                                </span>
+                            </div>
+                        </button>
                     </div>
                 </div>
-            )}
 
-            {/* Fullscreen Zoom Overlay */}
-            {zoomedImage && (
-                <div 
-                    onClick={() => setZoomedImage(null)}
-                    className="fixed inset-0 bg-black/95 z-[110] flex items-center justify-center p-4 backdrop-blur-lg animate-in fade-in duration-200 cursor-zoom-out"
-                >
-                    <button 
-                        onClick={() => setZoomedImage(null)}
-                        className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-                    >
-                        <X size={20} />
-                    </button>
-                    <img 
-                        src={zoomedImage} 
-                        alt="Zoomed document" 
-                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
-                    />
+                {/* Extended Features Grid */}
+                <div className="bg-white rounded-[28px] p-5 border border-gray-100 shadow-sm space-y-4">
+                    <div className="px-1">
+                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Tính năng mở rộng</h3>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Lối tắt thao tác nhanh các tiện ích</p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                        {EXPAND_ITEMS.map((item) => {
+                            const IconComponent = item.icon;
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={() => handleItemClick(item)}
+                                    className={`flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-white hover:shadow-md ${item.shadowColor} transition-all duration-200 active:scale-95 group relative overflow-hidden`}
+                                >
+                                    <div className={`w-11 h-11 rounded-2xl ${item.bg} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
+                                        <IconComponent size={20} className={`${item.iconColor}`} strokeWidth={2.2} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-gray-800 text-center leading-tight tracking-tight">
+                                        {item.label}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
-            )}
+
+                {/* Document Lightbox Zoom Modal */}
+                {activeLightboxField && (
+                    <div className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
+                        <div className="bg-white rounded-[28px] overflow-hidden max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] relative animate-in zoom-in-95 duration-200">
+                            {/* Header */}
+                            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                                <span className="font-extrabold text-gray-800 text-sm">
+                                    {getFieldNameVi(activeLightboxField)} ({getDocImages(activeLightboxField).length}/2)
+                                </span>
+                                <button
+                                    onClick={() => setActiveLightboxField(null)}
+                                    className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            {/* Image list / upload slot */}
+                            <div className="p-5 flex-1 overflow-y-auto flex flex-col gap-4 bg-gray-50/50 min-h-[300px] max-h-[60vh] scrollbar-thin">
+                                {getDocImages(activeLightboxField).map((url, index) => (
+                                    <div key={index} className="relative group/img bg-white p-3 rounded-2xl border border-gray-150 shadow-sm flex flex-col items-center gap-2.5">
+                                        <div
+                                            onClick={() => setZoomedImage(url)}
+                                            className="relative cursor-zoom-in overflow-hidden rounded-xl w-full h-[200px] flex items-center justify-center bg-gray-100/40"
+                                        >
+                                            <img
+                                                src={url}
+                                                alt={`Ảnh ${index + 1}`}
+                                                className="max-w-full max-h-full object-contain hover:scale-[1.02] transition-transform duration-200"
+                                            />
+                                            <div className="absolute inset-0 bg-black/25 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                                <Eye size={20} className="text-white" />
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDocDelete(activeLightboxField, index)}
+                                            className="w-full py-2 rounded-xl text-red-500 bg-red-50/60 hover:bg-red-50 hover:text-red-600 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                                        >
+                                            <Trash2 size={13} /> Xóa ảnh {getDocImages(activeLightboxField).length > 1 ? index + 1 : ''}
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {getDocImages(activeLightboxField).length < 2 && (
+                                    <button
+                                        onClick={() => {
+                                            const inputId = activeLightboxField === 'qr_code_url'
+                                                ? 'expand-qr-upload'
+                                                : activeLightboxField === 'student_card_url'
+                                                    ? 'expand-student-upload'
+                                                    : 'expand-citizen-upload';
+                                            document.getElementById(inputId)?.click();
+                                        }}
+                                        className="w-full aspect-video min-h-[140px] rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/20 flex flex-col items-center justify-center text-indigo-500 hover:bg-indigo-50/50 hover:text-indigo-600 transition-all font-black text-xs gap-2 py-4 cursor-pointer active:scale-95"
+                                    >
+                                        <Plus size={22} className="stroke-[2.5]" />
+                                        Tải lên ảnh thứ 2
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Actions Footer */}
+                            <div className="p-4 border-t border-gray-100 flex gap-2 justify-end bg-gray-50/20">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveLightboxField(null)}
+                                    className="px-5 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-xs transition-all active:scale-95"
+                                >
+                                    Đóng
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Fullscreen Zoom Overlay */}
+                {zoomedImage && (
+                    <div
+                        onClick={() => setZoomedImage(null)}
+                        className="fixed inset-0 bg-black/95 z-[110] flex items-center justify-center p-4 backdrop-blur-lg animate-in fade-in duration-200 cursor-zoom-out"
+                    >
+                        <button
+                            onClick={() => setZoomedImage(null)}
+                            className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                        >
+                            <X size={20} />
+                        </button>
+                        <img
+                            src={zoomedImage}
+                            alt="Zoomed document"
+                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+                        />
+                    </div>
+                )}
+                {/* Safe space at the bottom for mobile to prevent navbar cover */}
+                <div className="h-30 md:hidden" />
             </div>
         </div>
     );
