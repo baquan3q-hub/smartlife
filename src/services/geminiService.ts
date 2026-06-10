@@ -14,7 +14,7 @@ import { supabase } from './supabase';
 // ────────────────────────────────────────
 // API Configuration
 // ────────────────────────────────────────
-const envKeys = (import.meta as any).env?.VITE_GEMINI_API_KEYS || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+const envKeys = import.meta.env.VITE_GEMINI_API_KEYS || import.meta.env.VITE_GEMINI_API_KEY || '';
 const API_KEYS = envKeys.split(',').map((k: string) => k.trim()).filter(Boolean);
 let currentKeyIndex = 0;
 
