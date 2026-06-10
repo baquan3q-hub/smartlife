@@ -191,7 +191,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     // Fixed mobile navbar tabs (4 items only)
     const MOBILE_NAV_TABS = [
         { id: 'visual', labelVi: 'Tổng quan', labelEn: 'Overview', labelKo: '개요', icon: LayoutDashboard, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', icon: Wallet, color: 'text-sky-600', bg: 'bg-sky-50' },
+        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', icon: Wallet, color: 'text-orange-600', bg: 'bg-orange-50' },
         { id: 'schedule', labelVi: 'Lịch trình', labelEn: 'Schedule', labelKo: '일정', icon: CalendarDays, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         { id: 'expand', labelVi: 'Mở rộng', labelEn: 'More', labelKo: '더보기', icon: Grid2X2, color: 'text-violet-600', bg: 'bg-violet-50' },
     ];
@@ -1120,7 +1120,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'finance' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.finance', lang) : ''}>
                         <Wallet size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.finance', lang)}</span>}
                     </button>
-                    <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.schedule_goals', lang) : ''}>
+                    <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.schedule_goals', lang) : ''}>
                         <CalendarDays size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.schedule_goals', lang)}</span>}
                         {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>

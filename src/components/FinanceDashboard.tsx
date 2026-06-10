@@ -2142,8 +2142,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
             {
                 isModalOpen && (
-                    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-                        <div className="bg-white rounded-[32px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] w-full max-w-md max-h-[92vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100 border border-white/20 relative animate-scale-up">
+                    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 pb-24 md:p-6 backdrop-blur-md animate-fade-in">
+                        <div className="bg-white rounded-[32px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] w-full max-w-md max-h-[80vh] md:max-h-[92vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100 border border-white/20 relative animate-scale-up">
 
                             {/* Header Close button */}
                             <div className="absolute top-4 right-4 z-20">
@@ -2496,8 +2496,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             {/* Budget Details Modal */}
             {
                 selectedBudgetForDetails && (
-                    <div className="fixed inset-0 bg-black/50 z-[65] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                        <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl flex flex-col max-h-[90vh]">
+                    <div className="fixed inset-0 bg-black/50 z-[65] flex items-center justify-center p-4 pb-24 md:p-6 backdrop-blur-sm animate-fade-in">
+                        <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl flex flex-col max-h-[80vh] md:max-h-[90vh]">
                             <div className="flex justify-between items-center mb-4 flex-shrink-0">
                                 {(() => {
                                     const styles = getCategoryStyles(selectedBudgetForDetails.category);

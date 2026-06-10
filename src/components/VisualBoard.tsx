@@ -32,6 +32,27 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const startY = useRef(0);
     const isDragging = useRef(false);
 
+    // Schedule Carousel Mobile (PWA) State & Refs
+    const scheduleScrollRef = useRef<HTMLDivElement>(null);
+    const lastActiveSlideInteraction = useRef<number>(Date.now());
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (Date.now() - lastActiveSlideInteraction.current >= 5000) {
+                const el = scheduleScrollRef.current;
+                if (el) {
+                    const isAtEnd = el.scrollLeft > el.clientWidth / 2;
+                    el.scrollTo({
+                        left: isAtEnd ? 0 : el.clientWidth,
+                        behavior: 'smooth'
+                    });
+                    lastActiveSlideInteraction.current = Date.now();
+                }
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
     const handleTouchStart = (e: React.TouchEvent) => {
         const mainScroll = document.querySelector('main');
         const isAtTop = !mainScroll || mainScroll.scrollTop === 0;
@@ -564,7 +585,8 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                {/* DESKTOP LAYOUT (md and up): 2 Columns */}
+                <div className="hidden md:grid md:grid-cols-2 gap-4">
                     {/* TODAY CARD */}
                     <div className="bg-white rounded-3xl p-3 md:p-5 shadow-sm border border-indigo-100 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110 pointer-events-none"></div>
@@ -634,29 +656,115 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                         </div>
                     </div>
                 </div>
+
+                {/* MOBILE LAYOUT (md:hidden): Swipeable / Autoplay Carousel Slider */}
+                <div className="md:hidden relative w-full">
+                    <div
+                        ref={scheduleScrollRef}
+                        onTouchStart={() => { lastActiveSlideInteraction.current = Date.now(); }}
+                        className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-3 pb-2 scroll-smooth"
+                    >
+                        {/* Slide 1: TODAY */}
+                        <div className="w-[90%] shrink-0 snap-center px-1">
+                            <div className="bg-white rounded-3xl p-4 shadow-sm border border-indigo-100 relative overflow-hidden min-h-[180px]">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 pointer-events-none"></div>
+                                <div className="relative z-10">
+                                    <h3 className="text-indigo-900 font-bold mb-4 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                                        Hôm nay ({scheduleData.todayLabel})
+                                    </h3>
+
+                                    <div className="space-y-3">
+                                        {scheduleData.today.length > 0 ? scheduleData.today.map((ev, idx) => (
+                                            <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100/50">
+                                                <div className="flex flex-col items-center justify-center min-w-[55px] border-r border-indigo-100 pr-3">
+                                                    <span className="text-base font-black text-indigo-600 leading-none">{ev.start_time}</span>
+                                                    <span className="text-[9px] text-gray-400 font-medium uppercase">{ev.end_time || '...'}</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-bold text-gray-800 text-sm truncate">{ev.title}</div>
+                                                    {ev.location && (
+                                                        <div className="flex items-center gap-1 text-[10px] text-gray-500 mt-1">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-300"></div>
+                                                            {ev.location}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )) : (
+                                            <div className="text-center py-8 text-indigo-300 italic text-sm">
+                                                Không có lịch trình hôm nay. Enjoy! 🎉
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Slide 2: TOMORROW */}
+                        <div className="w-[90%] shrink-0 snap-center px-1">
+                            <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100 relative overflow-hidden min-h-[180px]">
+                                <div className="relative z-10">
+                                    <h3 className="text-gray-600 font-bold mb-4 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-gray-300"></span>
+                                        Ngày mai ({scheduleData.tomorrowLabel})
+                                    </h3>
+
+                                    <div className="space-y-3">
+                                        {scheduleData.tomorrow.length > 0 ? scheduleData.tomorrow.map((ev, idx) => (
+                                            <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-gray-50 border border-transparent">
+                                                <div className="flex flex-col items-center justify-center min-w-[55px] border-r border-gray-200/50 pr-3">
+                                                    <span className="text-base font-black text-gray-500 leading-none">{ev.start_time}</span>
+                                                    <span className="text-[9px] text-gray-400 font-medium uppercase">{ev.end_time || '...'}</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-bold text-gray-700 text-sm truncate">{ev.title}</div>
+                                                    {ev.location && (
+                                                        <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-1">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
+                                                            {ev.location}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )) : (
+                                            <div className="text-center py-8 text-gray-300 italic text-sm">
+                                                Ngày mai rảnh rỗi.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* NEW: AI Advisor Banner */}
             <div
                 onClick={() => onNavigate?.('ai-advisor')}
-                className="mb-8 relative bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl md:rounded-3xl p-4 md:p-8 shadow-xl text-white cursor-pointer group overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
+                className="mb-8 relative bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 md:p-8 shadow-xl text-white cursor-pointer group overflow-hidden hover:shadow-2xl hover:-translate-y-1 border border-indigo-500/20 hover:border-indigo-400/40 transition-all duration-300"
             >
-                {/* Decorative elements */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-white/20 transition-colors" />
-                <div className="absolute bottom-0 right-10 w-32 h-32 bg-indigo-900/40 rounded-full blur-2xl pointer-events-none" />
+                {/* Glowing decorative elements */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-cyan-500/20 transition-all duration-500" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -ml-16 -mb-16 group-hover:bg-purple-500/20 transition-all duration-500" />
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-25 group-hover:opacity-45 transition-opacity duration-500" />
 
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="flex-1 text-center md:text-left">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-white/20 shadow-sm backdrop-blur-md">
-                            <Sparkles size={14} className="animate-pulse text-yellow-300" /> Tính năng AI Mới
+                <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div className="flex-1 text-center sm:text-left">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-cyan-300 rounded-full text-xs font-black uppercase tracking-widest mb-4 shadow-sm backdrop-blur-md">
+                            <Sparkles size={14} className="animate-pulse text-yellow-300" /> AI Advisor
                         </div>
-                        <h3 className="text-lg sm:text-2xl md:text-3xl font-black mb-2 tracking-tight">Trợ lý AI Tài chính</h3>
-                        <p className="text-indigo-100 max-w-xl text-xs sm:text-sm md:text-base leading-relaxed mx-auto md:mx-0">
-                            Chat trực tiếp với AI để phân tích dữ liệu thu chi, đánh giá ngân sách, và nhận các lời khuyên thông minh thiết kế riêng dựa trên dữ liệu thực tế của bạn.
+                        <h3 className="text-xl sm:text-3xl font-black mb-2 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-indigo-200 to-purple-300">
+                            TRỢ LÝ SỰ NGHIỆP AI
+                        </h3>
+                        <p className="text-slate-300 max-w-xl text-xs sm:text-sm leading-relaxed mx-auto sm:mx-0">
+                            Hỏi đáp thông minh về lộ trình học tập, tài chính và lập kế hoạch sự nghiệp.
                         </p>
                     </div>
-                    <div className="shrink-0 hidden sm:flex items-center justify-center p-5 bg-white/10 rounded-3xl backdrop-blur-md border border-white/20 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-2xl">
-                        <Bot size={48} className="text-white drop-shadow-lg" />
+                    <div className="relative shrink-0 hidden sm:flex items-center justify-center w-20 h-20 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border border-cyan-400/30 rounded-2xl shadow-[0_0_20px_rgba(34,211,238,0.15)] group-hover:shadow-[0_0_30px_rgba(34,211,238,0.3)] group-hover:scale-105 group-hover:rotate-2 transition-all duration-300 backdrop-blur-md">
+                        <Bot size={36} className="text-cyan-400" />
+                        <Sparkles className="absolute -top-1.5 -right-1.5 text-yellow-300 animate-pulse" size={14} />
                     </div>
                 </div>
             </div>
@@ -1177,20 +1285,20 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     {/* NEW: AUTO CV BUILDER WIDGET */}
                     <div
                         onClick={() => onNavigate?.('goals-cv')}
-                        className="bg-gradient-to-br from-purple-50/45 via-pink-50/35 to-rose-50/45 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer border border-purple-100/50 hover:border-purple-200 group relative overflow-hidden"
+                        className="bg-gradient-to-br from-teal-50/45 via-emerald-50/35 to-cyan-50/45 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer border border-teal-100/50 hover:border-teal-200 group relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-200/20 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-teal-200/20 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
                         <div className="relative flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20 group-hover:scale-110 transition-transform">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20 group-hover:scale-110 transition-transform">
                                     <FileText size={22} className="text-white" />
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-gray-800 text-lg">Xây dựng CV tự động</h3>
-                                    <p className="text-purple-600 text-xs font-bold uppercase tracking-wider mt-0.5">Ứng tuyển chuyên nghiệp</p>
+                                    <p className="text-teal-600 text-xs font-bold uppercase tracking-wider mt-0.5">Ứng tuyển chuyên nghiệp</p>
                                 </div>
                             </div>
-                            <div className="text-gray-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all">
+                            <div className="text-gray-400 group-hover:text-teal-600 group-hover:translate-x-0.5 transition-all">
                                 <ArrowUpRight size={20} />
                             </div>
                         </div>
@@ -1250,8 +1358,8 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                         {/* CTA */}
                         <div className="shrink-0">
                             <div className={`px-6 py-3 rounded-2xl font-bold text-sm shadow-lg group-hover:scale-105 transition-all duration-300 flex items-center gap-2 ${canUseStorage
-                                    ? 'bg-white text-gray-900 group-hover:bg-indigo-100'
-                                    : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white group-hover:from-indigo-600 group-hover:to-purple-700'
+                                ? 'bg-white text-gray-900 group-hover:bg-indigo-100'
+                                : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white group-hover:from-indigo-600 group-hover:to-purple-700'
                                 }`}>
                                 {canUseStorage ? <><LockKeyhole size={16} /> Mở kho</> : <><Crown size={16} className="text-yellow-300" /> Nâng cấp Pro</>}
                             </div>
