@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 /* Prevent full page scroll & bounce on mobile browsers */
-html,
-body {
+html.authenticated-app,
+html.authenticated-app body {
   overflow: hidden;
   height: 100%;
   width: 100%;

@@ -8,7 +8,7 @@ import {
     TrendingDown, Target, ListChecks, BarChart3, Wallet,
     PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight, ChevronDown, ChevronUp,
     CheckCircle2, AlertCircle, History, X, Plus, Trash2, GraduationCap,
-    Heart, Pin, Copy, Check, Download, FileText, LayoutGrid
+    Heart, Pin, Copy, Check, Download, FileText, LayoutGrid, Mic, MicOff
 } from 'lucide-react';
 
 import { AppState, TransactionType } from '../types';
@@ -34,6 +34,7 @@ interface AIAdvisorPageProps {
     onAddTimetable?: (item: any) => Promise<void>;
     onAddTodo?: (content: string, priority: string, deadline?: string) => Promise<void>;
     onAddTransaction?: (tx: any) => Promise<void>;
+    onImportGPAData?: (semesters: any[]) => Promise<void>;
 }
 
 interface UIMessage {
@@ -65,7 +66,7 @@ const SUGGESTIONS: Suggestion[] = [
         icon: <BarChart3 size={16} />,
         label: 'Phân tích & Dự đoán',
         prompt: 'Hãy phân tích chi tiết chi tiêu tháng này của tôi bằng bảng (table) theo danh mục và đưa ra dự đoán chi tiêu cho tháng tới.',
-        gradient: 'from-blue-500 to-cyan-500',
+        gradient: 'from-violet-500 to-violet-500',
     },
     {
         icon: <TrendingDown size={16} />,
@@ -77,7 +78,7 @@ const SUGGESTIONS: Suggestion[] = [
         icon: <Target size={16} />,
         label: 'Tiến độ mục tiêu',
         prompt: 'Hãy đánh giá tiến độ các task và todolist deadline và các mục tiêu tài chính của tôi. Tôi cần tiết kiệm bao nhiêu mỗi tháng để đạt được chúng?',
-        gradient: 'from-purple-500 to-pink-500',
+        gradient: 'from-green-500 to-emerald-500',
     },
     {
         icon: <PiggyBank size={16} />,
@@ -182,7 +183,7 @@ const getMimeTypeFromExtension = (ext: string): string => {
 // ────────────────────────────────────────
 const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     appState, lang, onBack,
-    onAddTimetable, onAddTodo, onAddTransaction
+    onAddTimetable, onAddTodo, onAddTransaction, onImportGPAData
 }) => {
     const [messages, setMessages] = useState<UIMessage[]>([
         {
@@ -330,6 +331,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         onAddTimetable,
         onAddTodo,
         onAddTransaction,
+        onImportGPAData,
     };
 
     // Auto scroll
@@ -401,6 +403,68 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             .then(setMemoryContext)
             .catch(console.error);
     }, []);
+
+    // Speech Recognition states & setup
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingError, setRecordingError] = useState<string | null>(null);
+    const recognitionRef = useRef<any>(null);
+
+    useEffect(() => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            const rec = new SpeechRecognition();
+            rec.continuous = true;
+            rec.interimResults = true;
+            rec.lang = lang === 'vi' ? 'vi-VN' : lang === 'ko' ? 'ko-KR' : 'en-US';
+
+            rec.onresult = (event: any) => {
+                let currentText = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        currentText += event.results[i][0].transcript;
+                    }
+                }
+                if (currentText) {
+                    setInput(prev => prev + (prev ? ' ' : '') + currentText);
+                }
+            };
+
+            rec.onerror = (event: any) => {
+                console.error('Speech recognition error:', event.error);
+                if (event.error !== 'no-speech') {
+                    setRecordingError(event.error);
+                    setIsRecording(false);
+                }
+            };
+
+            rec.onend = () => {
+                setIsRecording(false);
+            };
+
+            recognitionRef.current = rec;
+        }
+    }, [lang]);
+
+    const toggleRecording = () => {
+        if (!recognitionRef.current) {
+            alert(lang === 'vi' ? 'Trình duyệt của bạn không hỗ trợ nhận diện giọng nói.' : 'Your browser does not support Speech Recognition.');
+            return;
+        }
+
+        if (isRecording) {
+            recognitionRef.current.stop();
+            setIsRecording(false);
+        } else {
+            setRecordingError(null);
+            try {
+                recognitionRef.current.start();
+                setIsRecording(true);
+            } catch (err: any) {
+                console.error('Error starting recognition:', err);
+                setIsRecording(false);
+            }
+        }
+    };
 
     // Click outside upload menu & widget menu handler
     useEffect(() => {
@@ -646,7 +710,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const savingsPercentOfIncome = monthIncome > 0 ? Math.round((totalSavings / monthIncome) * 100) : 0;
 
     return (
-        <div className="animate-fade-in fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex flex-col h-[100dvh] z-40">
+        <div className="animate-fade-in fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex flex-col h-[100dvh] z-40">
             {/* History Overlay/Drawer */}
             {showHistory && (
                 <div className="fixed inset-0 z-50 flex">
@@ -654,7 +718,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     <div className="relative w-80 max-w-[85%] h-full bg-white shadow-2xl flex flex-col animate-fade-in-right">
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                             <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                                <History size={18} className="text-indigo-500" />
+                                <History size={18} className="text-blue-500" />
                                 Lịch sử trò chuyện
                             </h2>
                             <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-gray-200 rounded-lg">
@@ -665,7 +729,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         <div className="p-3">
                             <button
                                 onClick={handleReset}
-                                className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-50 text-indigo-700 rounded-xl hover:bg-indigo-100 font-medium transition-colors text-sm"
+                                className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 font-medium transition-colors text-sm"
                             >
                                 <Plus size={16} /> Cuộc trò chuyện mới
                             </button>
@@ -686,12 +750,12 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                         <div
                                             key={conv.id}
                                             onClick={() => loadConversation(conv.id)}
-                                            className={`group px-3 py-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all border ${conversationId === conv.id ? 'bg-indigo-50/80 border-indigo-100' : 'hover:bg-gray-50/50 border-transparent'} ${conv.is_pinned ? 'border-l-4 border-l-indigo-500 bg-slate-50/40 shadow-sm' : ''}`}
+                                            className={`group px-3 py-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all border ${conversationId === conv.id ? 'bg-blue-50/80 border-blue-100' : 'hover:bg-gray-50/50 border-transparent'} ${conv.is_pinned ? 'border-l-4 border-l-blue-500 bg-slate-50/40 shadow-sm' : ''}`}
                                         >
                                             <div className="flex-1 min-w-0 pr-2">
                                                 <div className="flex items-center gap-1.5">
-                                                    <p className={`text-sm truncate font-medium ${conversationId === conv.id ? 'text-indigo-700 font-semibold' : 'text-gray-700'}`}>{conv.title}</p>
-                                                    {conv.is_pinned && <Pin size={10} className="text-indigo-500 fill-indigo-500 shrink-0" />}
+                                                    <p className={`text-sm truncate font-medium ${conversationId === conv.id ? 'text-blue-700 font-semibold' : 'text-gray-700'}`}>{conv.title}</p>
+                                                    {conv.is_pinned && <Pin size={10} className="text-blue-500 fill-blue-500 shrink-0" />}
                                                 </div>
                                                 <p className="text-[10px] text-gray-400 mt-0.5">{new Date(conv.updated_at).toLocaleDateString('vi-VN')}</p>
                                             </div>
@@ -700,12 +764,12 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                 <button
                                                     onClick={(e) => handleTogglePinConversation(e, conv.id, !conv.is_pinned)}
                                                     className={`p-1 rounded-lg transition-colors ${conv.is_pinned
-                                                            ? 'text-indigo-600 bg-indigo-50 opacity-100'
-                                                            : 'opacity-0 group-hover:opacity-100 text-gray-400 hover:bg-gray-150 hover:text-gray-600'
+                                                        ? 'text-blue-600 bg-blue-50 opacity-100'
+                                                        : 'opacity-0 group-hover:opacity-100 text-gray-400 hover:bg-gray-150 hover:text-gray-600'
                                                         }`}
                                                     title={conv.is_pinned ? "Bỏ ghim" : "Ghim lên đầu"}
                                                 >
-                                                    <Pin size={13} className={conv.is_pinned ? "fill-indigo-500" : ""} />
+                                                    <Pin size={13} className={conv.is_pinned ? "fill-blue-500" : ""} />
                                                 </button>
                                                 {/* Delete */}
                                                 <button
@@ -736,15 +800,15 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <ArrowLeft size={18} />
                         </button>
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center shadow-md shadow-indigo-100">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-100">
                                 <Brain size={16} className="text-white" />
                             </div>
                             <div>
                                 <h1 className="font-bold text-gray-800 text-sm leading-tight">SmartLife AI Advisor</h1>
                                 <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
                                     <span className="relative flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                                     </span>
                                     Gemini AI Advisor ({getCurrentModel().replace('gemini-', '')})
                                 </div>
@@ -754,7 +818,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     <div className="flex items-center gap-1">
                         <button
                             onClick={() => setShowPopupHint(!showPopupHint)}
-                            className={`p-2 rounded-xl transition-colors flex items-center gap-1.5 text-sm font-medium ${showPopupHint ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-100 text-amber-500 hover:text-amber-600'}`}
+                            className={`p-2 rounded-xl transition-colors flex items-center gap-1.5 text-sm font-medium ${showPopupHint ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-amber-500 hover:text-amber-600'}`}
                             title="Gợi ý lệnh AI Agent"
                         >
                             <Lightbulb size={16} />
@@ -765,7 +829,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <div className="relative" ref={widgetMenuRef}>
                                 <button
                                     onClick={() => setShowWidgetMenu(!showWidgetMenu)}
-                                    className={`p-2 rounded-xl transition-colors flex items-center gap-1.5 text-sm font-medium ${showWidgetMenu ? 'bg-indigo-100 text-indigo-750' : 'hover:bg-gray-100 text-gray-500 hover:text-indigo-600'}`}
+                                    className={`p-2 rounded-xl transition-colors flex items-center gap-1.5 text-sm font-medium ${showWidgetMenu ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-500 hover:text-blue-600'}`}
                                     title="Quản lý thẻ thông tin"
                                 >
                                     <LayoutGrid size={16} />
@@ -777,25 +841,25 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                         {isStatsHidden && (
                                             <button
                                                 onClick={() => { setIsStatsHidden(false); setShowWidgetMenu(false); }}
-                                                className="w-full text-left px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors flex items-center gap-2"
+                                                className="w-full text-left px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors flex items-center gap-2"
                                             >
-                                                <Wallet size={14} className="text-indigo-500" /> Hiện Tóm tắt tài chính
+                                                <Wallet size={14} className="text-blue-500" /> Hiện Tóm tắt tài chính
                                             </button>
                                         )}
                                         {isInsightHidden && (
                                             <button
                                                 onClick={() => { setIsInsightHidden(false); setShowWidgetMenu(false); }}
-                                                className="w-full text-left px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors flex items-center gap-2"
+                                                className="w-full text-left px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors flex items-center gap-2"
                                             >
-                                                <Lightbulb size={14} className="text-amber-500" /> Hiện Nhận xét nhanh
+                                                <Lightbulb size={14} className="text-blue-500" /> Hiện Nhận xét nhanh
                                             </button>
                                         )}
                                         {isGoalsHidden && (
                                             <button
                                                 onClick={() => { setIsGoalsHidden(false); setShowWidgetMenu(false); }}
-                                                className="w-full text-left px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors flex items-center gap-2"
+                                                className="w-full text-left px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors flex items-center gap-2"
                                             >
-                                                <Target size={14} className="text-purple-500" /> Hiện Mục tiêu
+                                                <Target size={14} className="text-blue-500" /> Hiện Mục tiêu
                                             </button>
                                         )}
                                     </div>
@@ -805,7 +869,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
                         <button
                             onClick={() => setShowHistory(true)}
-                            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-indigo-600 flex items-center gap-1.5"
+                            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-blue-600 flex items-center gap-1.5"
                             title="Lịch sử chat"
                         >
                             <History size={16} />
@@ -824,26 +888,26 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
             {/* Floating Suggestion Popup */}
             {showPopupHint && (
-                <div className="absolute top-[60px] right-4 md:right-8 w-80 bg-white rounded-2xl shadow-2xl border border-indigo-100 p-4 z-[60] animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="absolute top-[60px] right-4 md:right-8 w-80 bg-white rounded-2xl shadow-2xl border border-blue-100 p-4 z-[60] animate-in fade-in slide-in-from-top-4 duration-300">
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                            <Sparkles size={16} className="text-amber-500" /> Gợi ý lệnh AI nhanh
+                            <Sparkles size={16} className="text-blue-500" /> Gợi ý lệnh AI Agent
                         </h3>
                         <button onClick={() => setShowPopupHint(false)} className="text-gray-400 hover:text-gray-600 p-1">
                             <X size={14} />
                         </button>
                     </div>
                     <div className="space-y-3">
-                        <button onClick={() => { setInput('Hôm nay ăn sáng 30k, uống cafe 25k, đổ xăng 50k.'); setShowPopupHint(false); inputRef.current?.focus(); }} className="w-full text-left p-2.5 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-transparent hover:border-indigo-100 transition-colors group">
-                            <p className="text-xs font-semibold text-gray-700 group-hover:text-indigo-700 flex items-center gap-1.5"><Wallet size={12} /> Thêm thu chi tự động bằng prompt tự nhiên </p>
+                        <button onClick={() => { setInput('Hôm nay ăn sáng 30k, uống cafe 25k, đổ xăng 50k.'); setShowPopupHint(false); inputRef.current?.focus(); }} className="w-full text-left p-2.5 rounded-xl bg-gray-50 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-colors group">
+                            <p className="text-xs font-semibold text-gray-700 group-hover:text-blue-700 flex items-center gap-1.5"><Wallet size={12} /> Thêm thu chi tự động bằng prompt tự nhiên </p>
                             <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">"Hôm nay ăn sáng 30k, uống cafe 25k, đổ xăng 50k."</p>
                         </button>
-                        <button onClick={() => { setInput('Thêm lịch học Toán vào 19h tối thứ 3 và thứ 5.'); setShowPopupHint(false); inputRef.current?.focus(); }} className="w-full text-left p-2.5 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-transparent hover:border-indigo-100 transition-colors group">
-                            <p className="text-xs font-semibold text-gray-700 group-hover:text-indigo-700 flex items-center gap-1.5"><CalendarCheck size={12} /> Tạo lịch trình nhanh</p>
+                        <button onClick={() => { setInput('Thêm lịch học Toán vào 19h tối thứ 3 và thứ 5.'); setShowPopupHint(false); inputRef.current?.focus(); }} className="w-full text-left p-2.5 rounded-xl bg-gray-50 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-colors group">
+                            <p className="text-xs font-semibold text-gray-700 group-hover:text-blue-700 flex items-center gap-1.5"><CalendarCheck size={12} /> Tạo lịch trình nhanh</p>
                             <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">"Thêm lịch học Toán vào 19h tối thứ 3 và thứ 5."</p>
                         </button>
-                        <button onClick={() => { setInput('Nhắc tôi làm bài tập môn Hóa trước 22h tối nay.'); setShowPopupHint(false); inputRef.current?.focus(); }} className="w-full text-left p-2.5 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-transparent hover:border-indigo-100 transition-colors group">
-                            <p className="text-xs font-semibold text-gray-700 group-hover:text-indigo-700 flex items-center gap-1.5"><ListChecks size={12} /> Quản lý công việc (Todo)</p>
+                        <button onClick={() => { setInput('Nhắc tôi làm bài tập môn Hóa trước 22h tối nay.'); setShowPopupHint(false); inputRef.current?.focus(); }} className="w-full text-left p-2.5 rounded-xl bg-gray-50 hover:bg-emerald-50 border border-transparent hover:border-emerald-100 transition-colors group">
+                            <p className="text-xs font-semibold text-gray-700 group-hover:text-emerald-700 flex items-center gap-1.5"><ListChecks size={12} /> Quản lý công việc (Todo)</p>
                             <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">"Nhắc tôi làm bài tập môn Hóa trước 22h tối nay."</p>
                         </button>
                     </div>
@@ -860,7 +924,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 transition-all duration-300">
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                        <Wallet size={16} className="text-indigo-500" /> Tóm tắt T{now.getMonth() + 1}
+                                        <Wallet size={16} className="text-blue-500" /> Tóm tắt T{now.getMonth() + 1}
                                     </h3>
                                     <div className="flex items-center gap-1 shrink-0">
                                         <button
@@ -888,7 +952,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-xs text-gray-500">Thu nhập</span>
-                                            <span className="font-semibold text-emerald-600 text-sm">+{formatCurrency(monthIncome)}</span>
+                                            <span className="font-semibold text-blue-600 text-sm">+{formatCurrency(monthIncome)}</span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-xs text-gray-500">Chi tiêu</span>
@@ -897,11 +961,11 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                         <div className="pt-2 border-t border-gray-50">
                                             <div className="flex justify-between items-center mb-1.5">
                                                 <span className="text-xs text-gray-500">Tổng quỹ tiết kiệm</span>
-                                                <span className="font-bold text-sm text-indigo-600">{formatCurrency(totalSavings)}</span>
+                                                <span className="font-bold text-sm text-blue-600">{formatCurrency(totalSavings)}</span>
                                             </div>
                                             <div className="w-full bg-gray-100 rounded-full h-2">
                                                 <div
-                                                    className="h-2 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all duration-700 max-w-full"
+                                                    className="h-2 rounded-full bg-gradient-to-r from-blue-400 to-blue-500 transition-all duration-700 max-w-full"
                                                     style={{ width: `${Math.max(Math.min(savingsPercentOfIncome, 100), 5)}%` }}
                                                 />
                                             </div>
@@ -913,22 +977,22 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
                         {/* AI Quick Insight */}
                         {!isInsightHidden && (
-                            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-5 transition-all duration-300">
+                            <div className="bg-gradient-to-br from-blue-55 to-indigo-50/50 rounded-2xl border border-blue-100 p-5 transition-all duration-300">
                                 <div className="flex items-center justify-between mb-2.5">
-                                    <h3 className="text-sm font-bold text-indigo-700 flex items-center gap-2">
+                                    <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
                                         <Lightbulb size={16} className="text-amber-500" /> Nhận xét nhanh
                                     </h3>
                                     <div className="flex items-center gap-1 shrink-0">
                                         <button
                                             onClick={() => setIsInsightCollapsed(!isInsightCollapsed)}
-                                            className="p-1 hover:bg-indigo-100/50 rounded-lg text-indigo-400 hover:text-indigo-700 transition-colors"
+                                            className="p-1 hover:bg-blue-100/50 rounded-lg text-blue-400 hover:text-blue-700 transition-colors"
                                             title={isInsightCollapsed ? "Mở rộng" : "Thu gọn"}
                                         >
                                             {isInsightCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                                         </button>
                                         <button
                                             onClick={() => setIsInsightHidden(true)}
-                                            className="p-1 hover:bg-indigo-100/50 rounded-lg text-indigo-400 hover:text-red-500 transition-colors"
+                                            className="p-1 hover:bg-blue-100/50 rounded-lg text-blue-400 hover:text-red-500 transition-colors"
                                             title="Tắt/Ẩn thẻ"
                                         >
                                             <X size={14} />
@@ -939,29 +1003,29 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                 {!isInsightCollapsed && (
                                     <div className="animate-fade-in">
                                         {isLoadingInsight ? (
-                                            <div className="flex items-center gap-2 text-indigo-500 text-xs font-semibold py-2">
+                                            <div className="flex items-center gap-2 text-blue-500 text-xs font-semibold py-2">
                                                 <Loader2 size={14} className="animate-spin" /> Đang phân tích sâu...
                                             </div>
                                         ) : quickInsight ? (
                                             <div className="space-y-3">
-                                                <div className="text-xs text-indigo-900/80 leading-relaxed prose prose-sm prose-p:my-0.5">
+                                                <div className="text-xs text-blue-900/80 leading-relaxed prose prose-sm prose-p:my-0.5">
                                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{quickInsight}</ReactMarkdown>
                                                 </div>
                                                 <button
                                                     onClick={() => setQuickInsight(null)}
-                                                    className="text-[11px] text-indigo-500 hover:text-indigo-700 font-bold hover:underline flex items-center gap-1 mt-1"
+                                                    className="text-[11px] text-blue-500 hover:text-blue-700 font-bold hover:underline flex items-center gap-1 mt-1"
                                                 >
                                                     Thu nhỏ ↩
                                                 </button>
                                             </div>
                                         ) : (
                                             <div className="space-y-3">
-                                                <p className="text-xs text-indigo-900/80 leading-relaxed font-medium">
-                                                    Tháng {now.getMonth() + 1}: Thu nhập {formatCurrency(monthIncome)}, chi tiêu {formatCurrency(monthExpense)}. Còn lại: <strong className="text-indigo-700">{formatCurrency(monthIncome - monthExpense)}</strong> ({monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 100) : 0}%).
+                                                <p className="text-xs text-blue-900/80 leading-relaxed font-medium">
+                                                    Tháng {now.getMonth() + 1}: Thu nhập {formatCurrency(monthIncome)}, chi tiêu {formatCurrency(monthExpense)}. Còn lại: <strong className="text-blue-700">{formatCurrency(monthIncome - monthExpense)}</strong> ({monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 100) : 0}%).
                                                 </p>
                                                 <button
                                                     onClick={handleFetchAIInsight}
-                                                    className="w-full py-1.5 px-3 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-150 transition-colors flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+                                                    className="w-full py-1.5 px-3 bg-white hover:bg-blue-50 text-blue-700 text-xs font-bold rounded-xl border border-blue-150 transition-colors flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
                                                 >
                                                     <Sparkles size={12} /> Phân tích sâu bằng AI ✨
                                                 </button>
@@ -977,7 +1041,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 transition-all duration-300">
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                        <Target size={16} className="text-purple-500" /> Mục tiêu ({appState.goals.length})
+                                        <Target size={16} className="text-blue-500" /> Mục tiêu ({appState.goals.length})
                                     </h3>
                                     <div className="flex items-center gap-1 shrink-0">
                                         <button
@@ -1025,7 +1089,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                     </div>
                                                     <div className="w-full bg-gray-100 rounded-full h-2 relative overflow-hidden">
                                                         <div
-                                                            className="h-full rounded-full bg-gradient-to-r from-purple-400 to-pink-500 transition-all duration-500"
+                                                            className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-500"
                                                             style={{ width: `${Math.max(pct, 2)}%` }}
                                                         />
                                                     </div>
@@ -1048,7 +1112,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                     {isStatsHidden && (
                                         <button
                                             onClick={() => setIsStatsHidden(false)}
-                                            className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
+                                            className="px-2 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
                                         >
                                             + Tóm tắt
                                         </button>
@@ -1056,7 +1120,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                     {isInsightHidden && (
                                         <button
                                             onClick={() => setIsInsightHidden(false)}
-                                            className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
+                                            className="px-2 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
                                         >
                                             + Nhận xét
                                         </button>
@@ -1064,7 +1128,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                     {isGoalsHidden && (
                                         <button
                                             onClick={() => setIsGoalsHidden(false)}
-                                            className="px-2 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
+                                            className="px-2 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-gray-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm transition-all"
                                         >
                                             + Mục tiêu
                                         </button>
@@ -1089,7 +1153,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                 <div key={idx} className={`flex items-end gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in`}>
                                     {/* Avatar */}
                                     {msg.role === 'assistant' && (
-                                        <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
+                                        <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
                                             <Sparkles size={12} className="text-white bg-transparent" />
                                         </div>
                                     )}
@@ -1098,8 +1162,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                     <div className={`max-w-[88%] ${msg.role === 'user' ? 'lg:max-w-[75%]' : 'lg:max-w-[85%]'} ${msg.role === 'user' ? '' : ''}`}>
                                         <div className={`px-3.5 py-2.5 md:px-4 md:py-3 text-sm md:text-[15px] leading-relaxed shadow-sm
                                             ${msg.role === 'user'
-                                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl rounded-br-md prose-invert prose-p:text-white prose-headings:text-white'
-                                                : 'bg-gray-50 text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm md:prose-base prose-p:my-1 md:prose-p:my-1.5 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-indigo-700 prose-h3:text-base md:prose-h3:text-lg prose-h3:mt-3 prose-h3:mb-1'
+                                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl rounded-br-md prose-invert prose-p:text-white prose-headings:text-white'
+                                                : 'bg-gray-50 text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm md:prose-base prose-p:my-1 md:prose-p:my-1.5 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-blue-700 prose-h3:text-base md:prose-h3:text-lg prose-h3:mt-3 prose-h3:mb-1'
                                             }`}
                                         >
                                             {msg.role === 'assistant' ? (
@@ -1107,15 +1171,15 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                     remarkPlugins={[remarkGfm]}
                                                     components={{
                                                         p: ({ node, ...props }) => <p className="mb-3.5 leading-relaxed text-gray-700 last:mb-0" {...props} />,
-                                                        h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
+                                                        h3: ({ node, ...props }) => <h3 className="text-base font-bold text-blue-800 mt-4 mb-2" {...props} />,
                                                         ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-3.5 space-y-1.5" {...props} />,
                                                         ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-3.5 space-y-1.5" {...props} />,
                                                         li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
-                                                        strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />,
-                                                        table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
-                                                        thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
-                                                        th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
-                                                        td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
+                                                        strong: ({ node, ...props }) => <strong className="font-bold text-blue-950" {...props} />,
+                                                        table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-blue-200 text-sm" {...props} /></div>,
+                                                        thead: ({ node, ...props }) => <thead className="bg-blue-50" {...props} />,
+                                                        th: ({ node, ...props }) => <th className="border border-blue-200 px-4 py-2 text-left font-semibold text-blue-900" {...props} />,
+                                                        td: ({ node, ...props }) => <td className="border border-blue-100 px-4 py-2 text-gray-700" {...props} />,
                                                         tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
                                                     }}
                                                 >
@@ -1128,16 +1192,16 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
                                         {/* Artifact Card trigger in Chat Bubble */}
                                         {parsedArtifactData && !isDesktop && (
-                                            <div className="mt-2 p-3 bg-indigo-50/75 rounded-xl border border-indigo-100 flex items-center justify-between gap-3 animate-fade-in shadow-sm">
+                                            <div className="mt-2 p-3 bg-blue-50/75 rounded-xl border border-blue-100 flex items-center justify-between gap-3 animate-fade-in shadow-sm">
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-semibold text-indigo-950 flex items-center gap-1.5">
-                                                        <FileText size={14} className="text-indigo-600" /> Báo cáo: {parsedArtifactData.title}
+                                                    <p className="text-xs font-semibold text-blue-950 flex items-center gap-1.5">
+                                                        <FileText size={14} className="text-blue-600" /> Báo cáo: {parsedArtifactData.title}
                                                     </p>
-                                                    <p className="text-[10px] text-indigo-700/80 mt-0.5 truncate">Báo cáo chi tiết đã được lập.</p>
+                                                    <p className="text-[10px] text-blue-700/80 mt-0.5 truncate">Báo cáo chi tiết đã được lập.</p>
                                                 </div>
                                                 <button
                                                     onClick={() => setActiveArtifact({ title: parsedArtifactData.title, content: parsedArtifactData.artifactContent })}
-                                                    className="px-2.5 py-1.5 bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-150 text-xs font-bold rounded-lg transition-colors shadow-sm shrink-0"
+                                                    className="px-2.5 py-1.5 bg-white text-blue-700 hover:bg-blue-50 border border-blue-150 text-xs font-bold rounded-lg transition-colors shadow-sm shrink-0"
                                                 >
                                                     Xem báo cáo 📑
                                                 </button>
@@ -1151,12 +1215,12 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                     <div
                                                         key={ai}
                                                         className={`flex items-start gap-2 px-3 py-2 rounded-xl text-xs ${action.success
-                                                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                                                            ? 'bg-blue-50 border border-blue-200 text-blue-700'
                                                             : 'bg-red-50 border border-red-200 text-red-700'
                                                             }`}
                                                     >
                                                         {action.success
-                                                            ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                                                            ? <CheckCircle2 size={14} className="text-blue-500 shrink-0 mt-0.5" />
                                                             : <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
                                                         }
                                                         <span>{action.message}</span>
@@ -1181,14 +1245,14 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         {/* Loading */}
                         {isLoading && (
                             <div className="flex items-end gap-2.5 animate-fade-in">
-                                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0">
+                                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0">
                                     <Sparkles size={12} className="text-white" />
                                 </div>
                                 <div className="bg-gray-50 px-4 py-3 md:px-5 md:py-4 rounded-2xl rounded-bl-md border border-gray-100 shadow-sm">
                                     <div className="flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                        <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                        <span className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce"></span>
+                                        <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></span>
                                         <span className="text-[10px] text-gray-400 ml-1">Đang phân tích dữ liệu...</span>
                                     </div>
                                 </div>
@@ -1245,7 +1309,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                 })}
                             </div>
                         )}
-                        <div className="relative flex items-end gap-2 bg-gray-50 rounded-xl border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                        <div className="relative flex items-end gap-2 bg-gray-50 rounded-xl border border-gray-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                             {/* Upload Popover Menu */}
                             {showUploadMenu && (
                                 <div
@@ -1256,21 +1320,21 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => triggerFileSelect('image')}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors text-left"
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors text-left"
                                     >
                                         <span className="text-base">🖼️</span> Hình ảnh (Ảnh chụp, TKB...)
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => triggerFileSelect('document')}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors text-left"
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors text-left"
                                     >
                                         <span className="text-base">📄</span> Tài liệu (PDF, Excel, TXT...)
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => triggerFileSelect('audio')}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors text-left"
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors text-left"
                                     >
                                         <span className="text-base">🎙️</span> Âm thanh (Audio, Ghi âm...)
                                     </button>
@@ -1291,11 +1355,45 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                 type="button"
                                 onClick={() => setShowUploadMenu(!showUploadMenu)}
                                 disabled={isLoading}
-                                className={`m-1 p-2 rounded-xl transition-all shrink-0 ${showUploadMenu ? 'bg-indigo-100 text-indigo-700' : 'text-gray-400 hover:text-indigo-600 hover:bg-gray-150'}`}
+                                className={`m-1 p-2 rounded-xl transition-all shrink-0 ${showUploadMenu ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:text-blue-600 hover:bg-gray-150'}`}
                                 title="Đính kèm tài liệu, ảnh hoặc âm thanh"
                             >
                                 <Plus size={20} className={`transition-transform duration-200 ${showUploadMenu ? 'rotate-45' : ''}`} />
                             </button>
+
+                            {/* Voice recognition mic button */}
+                            <button
+                                type="button"
+                                onClick={toggleRecording}
+                                disabled={isLoading}
+                                className={`m-1 p-2 rounded-xl transition-all shrink-0 ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-gray-400 hover:text-blue-600 hover:bg-gray-150'}`}
+                                title={lang === 'vi' ? 'Nhận diện giọng nói' : 'Voice Typing'}
+                            >
+                                <Mic size={20} />
+                            </button>
+
+                            {/* Live Speech Recognition Overlay */}
+                            {isRecording && (
+                                <div className="absolute inset-y-0.5 left-0.5 right-0.5 bg-white/95 backdrop-blur-sm flex items-center justify-between px-4 z-10 animate-fade-in rounded-[10px] border border-red-100">
+                                    <div className="flex items-center gap-3">
+                                        <span className="relative flex h-3 w-3">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                        </span>
+                                        <span className="text-xs font-bold text-gray-650 animate-pulse">
+                                            {lang === 'vi' ? 'Đang lắng nghe giọng nói...' : lang === 'ko' ? '음성을 듣고 있습니다...' : 'Listening to your voice...'}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={toggleRecording}
+                                        className="text-xs font-bold text-red-500 hover:text-red-600 px-3 py-1 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100"
+                                    >
+                                        {lang === 'vi' ? 'Hoàn thành' : lang === 'ko' ? '완료' : 'Done'}
+                                    </button>
+                                </div>
+                            )}
+
                             <textarea
                                 ref={inputRef}
                                 value={input}
@@ -1308,7 +1406,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <button
                                 onClick={() => handleSend()}
                                 disabled={(!input.trim() && attachedFiles.length === 0) || isLoading}
-                                className="m-1 p-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:shadow-indigo-200 disabled:opacity-40 disabled:hover:shadow-none transition-all shrink-0"
+                                className="m-1 p-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:shadow-lg hover:shadow-blue-200 disabled:opacity-40 disabled:hover:shadow-none transition-all shrink-0"
                             >
                                 {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                             </button>
@@ -1327,8 +1425,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <div className="hidden lg:flex flex-col w-[45%] lg:max-w-2xl shrink-0 bg-white border border-gray-100 rounded-t-2xl shadow-sm overflow-hidden animate-fade-in-left">
                                 <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
                                     <div className="flex items-center gap-2 min-w-0">
-                                        <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-                                            <FileText size={14} className="bg-transparent text-indigo-650" />
+                                        <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                                            <FileText size={14} className="bg-transparent text-blue-700" />
                                         </div>
                                         <h2 className="font-bold text-gray-800 text-sm truncate" title={activeArtifact.title}>
                                             {activeArtifact.title}
@@ -1373,15 +1471,15 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                 remarkPlugins={[remarkGfm]}
                                                 components={{
                                                     p: ({ node, ...props }) => <p className="mb-4 leading-relaxed text-gray-700 last:mb-0" {...props} />,
-                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
+                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-blue-800 mt-4 mb-2" {...props} />,
                                                     ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
                                                     ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
                                                     li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
-                                                    strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />,
-                                                    table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
-                                                    thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
-                                                    th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
-                                                    td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
+                                                    strong: ({ node, ...props }) => <strong className="font-bold text-blue-950" {...props} />,
+                                                    table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-blue-200 text-sm" {...props} /></div>,
+                                                    thead: ({ node, ...props }) => <thead className="bg-blue-50" {...props} />,
+                                                    th: ({ node, ...props }) => <th className="border border-blue-200 px-4 py-2 text-left font-semibold text-blue-900" {...props} />,
+                                                    td: ({ node, ...props }) => <td className="border border-blue-100 px-4 py-2 text-gray-700" {...props} />,
                                                     tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
                                                 }}
                                             >
@@ -1397,8 +1495,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         <div className="lg:hidden fixed inset-0 z-[100] flex flex-col bg-white animate-fade-in-up">
                             <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
                                 <div className="flex items-center gap-2 min-w-0">
-                                    <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-                                        <FileText size={14} className="bg-transparent text-indigo-650" />
+                                    <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                                        <FileText size={14} className="bg-transparent text-blue-700" />
                                     </div>
                                     <h2 className="font-bold text-gray-800 text-sm truncate" title={activeArtifact.title}>
                                         {activeArtifact.title}
@@ -1440,15 +1538,15 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                             remarkPlugins={[remarkGfm]}
                                             components={{
                                                 p: ({ node, ...props }) => <p className="mb-4 leading-relaxed text-gray-700 last:mb-0" {...props} />,
-                                                h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-800 mt-4 mb-2" {...props} />,
+                                                h3: ({ node, ...props }) => <h3 className="text-base font-bold text-blue-800 mt-4 mb-2" {...props} />,
                                                 ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
                                                 ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
                                                 li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
-                                                strong: ({ node, ...props }) => <strong className="font-bold text-indigo-950" {...props} />,
-                                                table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-indigo-200 text-sm" {...props} /></div>,
-                                                thead: ({ node, ...props }) => <thead className="bg-indigo-50" {...props} />,
-                                                th: ({ node, ...props }) => <th className="border border-indigo-200 px-4 py-2 text-left font-semibold text-indigo-900" {...props} />,
-                                                td: ({ node, ...props }) => <td className="border border-indigo-100 px-4 py-2 text-gray-700" {...props} />,
+                                                strong: ({ node, ...props }) => <strong className="font-bold text-blue-950" {...props} />,
+                                                table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-blue-200 text-sm" {...props} /></div>,
+                                                thead: ({ node, ...props }) => <thead className="bg-blue-50" {...props} />,
+                                                th: ({ node, ...props }) => <th className="border border-blue-200 px-4 py-2 text-left font-semibold text-blue-900" {...props} />,
+                                                td: ({ node, ...props }) => <td className="border border-blue-100 px-4 py-2 text-gray-700" {...props} />,
                                                 tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
                                             }}
                                         >
