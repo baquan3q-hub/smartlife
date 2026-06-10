@@ -4,17 +4,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0ea5e9" id="theme-meta" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>SmartLife Assistant</title>
   <script>
     (function () {
       const theme = localStorage.getItem('smartlife_theme') || 'system';
       const root = document.documentElement;
-      if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
         root.classList.add('dark');
         root.style.colorScheme = 'dark';
       } else {
         root.classList.remove('dark');
         root.style.colorScheme = 'light';
+      }
+      
+      // Dynamic update of mobile theme color
+      const meta = document.getElementById('theme-meta');
+      if (meta) {
+        meta.setAttribute('content', isDark ? '#0B0F19' : '#0ea5e9');
       }
     })();
   </script>
@@ -28,12 +37,38 @@
             'xs': '475px',
           },
           colors: {
-            primary: '#4F46E5', // Indigo 600
+            primary: '#0ea5e9', // Sky 500
             secondary: '#10B981', // Emerald 500
             accent: '#F59E0B', // Amber 500
             danger: '#EF4444', // Red 500
             background: '#F3F4F6', // Gray 100
             surface: '#FFFFFF',
+            indigo: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              300: '#7dd3fc',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+              950: '#082f49',
+            },
+            purple: {
+              50: '#ecfeff',
+              100: '#cffafe',
+              200: '#a5f3fc',
+              300: '#67e8f9',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+              700: '#0e7490',
+              800: '#155e75',
+              900: '#164e63',
+              950: '#083344',
+            }
           },
           fontFamily: {
             sans: ['Inter', 'sans-serif'],

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AppState, TimetableEvent, Goal, Todo, TaskPriority } from '../types';
-import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Star, Download, Image as ImageIcon, GripVertical, ArrowUpToLine, ArrowDownToLine, Save, Loader2 } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Star, Download, Image as ImageIcon, GripVertical, ArrowUpToLine, ArrowDownToLine, Save, Loader2, ChevronRight } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import CalendarWidget from './CalendarWidget';
 import FocusTimer from './FocusTimer';
@@ -797,24 +797,27 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         </div>
 
         {todoFilter === 'active' && (
-          <form onSubmit={handleTodoSubmit} className="space-y-3 mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+          <form onSubmit={handleTodoSubmit} className="space-y-4 mb-6 bg-gradient-to-br from-indigo-500/5 via-transparent to-emerald-500/5 p-5 rounded-3xl border border-gray-100/80 shadow-sm relative overflow-hidden">
+            <div className="absolute -right-6 -top-6 w-20 h-20 bg-indigo-500/10 rounded-full blur-xl pointer-events-none"></div>
+            <div className="absolute -left-6 -bottom-6 w-20 h-20 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
+            
             <input
               type="text"
               value={newTodoContent}
               onChange={e => setNewTodoContent(e.target.value)}
               placeholder="Nhập công việc mới..."
-              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
+              className="w-full bg-white/70 backdrop-blur-sm border border-gray-200/80 rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none font-semibold transition-all shadow-sm"
             />
 
-            <div className="relative w-full">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Clock size={16} className="text-gray-400" />
+            <div className="custom-picker-input relative w-full group">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-emerald-500 transition-colors z-20">
+                <Clock size={14} />
               </div>
               <input
                 type="datetime-local"
                 value={newTodoDeadline}
                 onChange={(e) => setNewTodoDeadline(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-8 pr-2 py-2 text-xs focus:ring-2 focus:ring-emerald-500 outline-none text-gray-600 font-medium min-w-0"
+                className="w-full bg-white/70 backdrop-blur-sm border border-gray-200/80 rounded-2xl pl-10 pr-3 py-2.5 text-xs focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none text-gray-700 font-semibold min-w-0 transition-all shadow-sm"
               />
             </div>
 
@@ -828,7 +831,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                     key={p}
                     type="button"
                     onClick={() => setNewTodoPriority(p)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border
                                       ${isSelected ? config.color + ' ring-2 ring-offset-1 ring-gray-200' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}
                                   `}
                   >
@@ -837,7 +840,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 )
               })}
             </div>
-            <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md flex justify-center items-center gap-2">
+            <button type="submit" className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-95 text-white font-bold py-3 rounded-2xl transition-all shadow-md shadow-emerald-100/30 flex justify-center items-center gap-2">
               <Plus size={18} /> Thêm việc
             </button>
           </form>
@@ -922,28 +925,31 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
         {/* Edit Todo Modal */}
         {editingTodo && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setEditingTodo(null)}>
-            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Edit2 size={18} className="text-indigo-500" /> Sửa công việc</h3>
-                <button onClick={() => setEditingTodo(null)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setEditingTodo(null)}>
+            <div className="premium-glass-modal rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-fade-in relative z-50 overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="modal-glow-bubble-1 -top-16 -right-16 animate-pulse-slow"></div>
+              <div className="modal-glow-bubble-2 -bottom-16 -left-16 animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
+              
+              <div className="relative z-10 flex justify-between items-center mb-5">
+                <h3 className="font-extrabold text-lg text-gray-800 flex items-center gap-2"><Edit2 size={18} className="text-indigo-500" /> Sửa công việc</h3>
+                <button onClick={() => setEditingTodo(null)} className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors"><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
               </div>
 
-              <div className="space-y-4">
+              <div className="relative z-10 space-y-4">
                 {/* Content */}
                 <div>
-                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Nội dung</label>
+                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Nội dung</label>
                   <input
                     type="text"
                     value={editContent}
                     onChange={e => setEditContent(e.target.value)}
-                    className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
                   />
                 </div>
 
                 {/* Priority */}
                 <div>
-                  <label className="text-xs text-gray-500 uppercase font-bold ml-1 mb-2 block">Mức ưu tiên</label>
+                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1.5">Mức ưu tiên</label>
                   <div className="flex gap-2 flex-wrap">
                     {EDIT_PRIORITY_OPTIONS.map(opt => {
                       const Icon = opt.icon;
@@ -966,26 +972,31 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
                 {/* Deadline */}
                 <div>
-                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Thời hạn</label>
-                  <input
-                    type="datetime-local"
-                    value={editDeadline}
-                    onChange={e => setEditDeadline(e.target.value)}
-                    className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm focus:ring-2 focus:ring-indigo-500 min-w-0"
-                  />
+                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Thời hạn</label>
+                  <div className="custom-picker-input relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors z-20">
+                      <Clock size={16} />
+                    </div>
+                    <input
+                      type="datetime-local"
+                      value={editDeadline}
+                      onChange={e => setEditDeadline(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-700 min-w-0"
+                    />
+                  </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-3 pt-3">
                   <button
                     onClick={() => setEditingTodo(null)}
-                    className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200/85 text-gray-600 rounded-2xl font-bold transition-all active:scale-95"
                   >
                     Hủy
                   </button>
                   <button
                     onClick={handleSaveEdit}
-                    className="flex-[2] py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                    className="flex-[2] py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-95 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100/30 transition-all flex items-center justify-center gap-2 active:scale-95"
                   >
                     <Save size={16} /> Lưu thay đổi
                   </button>
@@ -1190,32 +1201,61 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
         {/* Goal Modal */}
         {isGoalModalOpen && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg text-gray-800">{editingGoal ? 'Sửa mục tiêu' : 'Mục tiêu mới'}</h3>
-                <button onClick={() => setIsGoalModalOpen(false)}><X size={20} className="text-gray-400" /></button>
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="premium-glass-modal rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-fade-in relative z-50 overflow-hidden">
+              <div className="modal-glow-bubble-1 -top-16 -right-16 animate-pulse-slow"></div>
+              <div className="modal-glow-bubble-2 -bottom-16 -left-16 animate-pulse-slow" style={{ animationDelay: '1.5s' }}></div>
+              
+              <div className="relative z-10 flex justify-between items-center mb-5">
+                <h3 className="font-extrabold text-lg text-gray-800">{editingGoal ? 'Sửa mục tiêu' : 'Mục tiêu mới'}</h3>
+                <button onClick={() => setIsGoalModalOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors"><X size={20} className="text-gray-400" /></button>
               </div>
-              <form onSubmit={handleGoalSubmit} className="space-y-4">
-                <input name="title" required defaultValue={editingGoal?.title} placeholder="Tên mục tiêu" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium" />
+              <form onSubmit={handleGoalSubmit} className="relative z-10 space-y-4">
+                <input
+                  name="title"
+                  required
+                  defaultValue={editingGoal?.title}
+                  placeholder="Tên mục tiêu"
+                  className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
+                />
                 <div>
-                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Hạn chót</label>
-                  <input type="date" name="deadline" required defaultValue={editingGoal?.deadline} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm" />
+                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Hạn chót</label>
+                  <div className="custom-picker-input relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors z-20">
+                      <Calendar size={16} />
+                    </div>
+                    <input
+                      type="date"
+                      name="deadline"
+                      required
+                      defaultValue={editingGoal?.deadline}
+                      className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Loại thời hạn</label>
-                  <select name="type" defaultValue={editingGoal?.type || 'SHORT_TERM'} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm">
-                    <option value="SHORT_TERM">Ngắn hạn</option>
-                    <option value="MEDIUM_TERM">Trung hạn</option>
-                    <option value="LONG_TERM">Dài hạn</option>
-                  </select>
+                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Loại thời hạn</label>
+                  <div className="relative group">
+                    <select
+                      name="type"
+                      defaultValue={editingGoal?.type || 'SHORT_TERM'}
+                      className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750 appearance-none"
+                    >
+                      <option value="SHORT_TERM">Ngắn hạn</option>
+                      <option value="MEDIUM_TERM">Trung hạn</option>
+                      <option value="LONG_TERM">Dài hạn</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 z-20">
+                      <ChevronRight size={14} className="rotate-90" />
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 p-1">
-                  <input type="checkbox" name="is_priority" id="is_priority" defaultChecked={editingGoal?.is_priority} className="w-5 h-5 accent-indigo-600 rounded cursor-pointer" />
+                  <input type="checkbox" name="is_priority" id="is_priority" defaultChecked={editingGoal?.is_priority} className="w-5 h-5 accent-indigo-600 rounded-lg cursor-pointer" />
                   <label htmlFor="is_priority" className="text-sm font-bold text-gray-700 cursor-pointer">Đánh dấu quan trọng/ưu tiên</label>
                 </div>
 
-                <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 mt-2">Lưu Mục Tiêu</button>
+                <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-95 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100/30 mt-2 transition-all active:scale-95">Lưu Mục Tiêu</button>
               </form>
             </div>
           </div>
@@ -1223,33 +1263,86 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
         {/* Time Modal */}
         {isTimeModalOpen && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg text-gray-800">{editingEvent ? 'Sửa lịch' : 'Thêm lịch mới'}</h3>
-                <button onClick={() => setIsTimeModalOpen(false)}><X size={20} className="text-gray-400" /></button>
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="premium-glass-modal rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-fade-in relative z-50 overflow-hidden">
+              <div className="modal-glow-bubble-1 -top-16 -right-16 animate-pulse-slow"></div>
+              <div className="modal-glow-bubble-2 -bottom-16 -left-16 animate-pulse-slow" style={{ animationDelay: '1s' }}></div>
+              
+              <div className="relative z-10 flex justify-between items-center mb-5">
+                <h3 className="font-extrabold text-lg text-gray-800">{editingEvent ? 'Sửa lịch' : 'Thêm lịch mới'}</h3>
+                <button onClick={() => setIsTimeModalOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors"><X size={20} className="text-gray-400" /></button>
               </div>
-              <form onSubmit={handleTimeSubmit} className="space-y-4">
-                <input name="title" required defaultValue={editingEvent?.title} placeholder="Tên sự kiện" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium" />
+              <form onSubmit={handleTimeSubmit} className="relative z-10 space-y-4">
+                <input
+                  name="title"
+                  required
+                  defaultValue={editingEvent?.title}
+                  placeholder="Tên sự kiện"
+                  className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
+                />
                 <div>
-                  <label className="text-xs text-gray-500 uppercase font-bold ml-1">Thứ trong tuần</label>
-                  <select name="day_of_week" defaultValue={editingEvent?.day_of_week ?? 1} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm">
-                    {DISPLAY_DAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-                  </select>
+                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Thứ trong tuần</label>
+                  <div className="relative group">
+                    <select
+                      name="day_of_week"
+                      defaultValue={editingEvent?.day_of_week ?? 1}
+                      className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750 appearance-none"
+                    >
+                      {DISPLAY_DAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 z-20">
+                      <ChevronRight size={14} className="rotate-90" />
+                    </div>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Bắt đầu</label>
-                    <input type="time" name="start_time" required defaultValue={editingEvent?.start_time} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" />
+                    <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Bắt đầu</label>
+                    <div className="custom-picker-input relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors z-20">
+                        <Clock size={14} />
+                      </div>
+                      <input
+                        type="time"
+                        name="start_time"
+                        required
+                        defaultValue={editingEvent?.start_time}
+                        className="w-full pl-9 pr-3 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Kết thúc</label>
-                    <input type="time" name="end_time" defaultValue={editingEvent?.end_time} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" />
+                    <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Kết thúc</label>
+                    <div className="custom-picker-input relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors z-20">
+                        <Clock size={14} />
+                      </div>
+                      <input
+                        type="time"
+                        name="end_time"
+                        defaultValue={editingEvent?.end_time}
+                        className="w-full pl-9 pr-3 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
+                      />
+                    </div>
                   </div>
                 </div>
-                <input name="location" defaultValue={editingEvent?.location} placeholder="Địa điểm (Tùy chọn)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" />
+                
+                <div>
+                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Địa điểm</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors">
+                      <MapPin size={16} />
+                    </div>
+                    <input
+                      name="location"
+                      defaultValue={editingEvent?.location}
+                      placeholder="Địa điểm (Tùy chọn)"
+                      className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
+                    />
+                  </div>
+                </div>
 
-                <div className="flex gap-3 mt-2">
+                <div className="flex gap-3 mt-3">
                   {editingEvent && (
                     <button
                       type="button"
@@ -1259,12 +1352,12 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                           setIsTimeModalOpen(false);
                         }
                       }}
-                      className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors"
+                      className="flex-1 py-3.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl font-bold transition-all active:scale-95 border border-red-100"
                     >
                       Xóa
                     </button>
                   )}
-                  <button type="submit" className="flex-[2] py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700">
+                  <button type="submit" className="flex-[2] py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-95 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100/30 transition-all active:scale-95">
                     {editingEvent ? 'Cập nhật' : 'Lưu mới'}
                   </button>
                 </div>

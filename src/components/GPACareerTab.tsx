@@ -57,7 +57,10 @@ const translations = {
     saveProfileBtn: "Lưu hồ sơ",
     profileSaved: "Hồ sơ đã được lưu! ✨",
     majorPlaceholder: "Ví dụ: Công nghệ thông tin",
-    uniPlaceholder: "Ví dụ: Đại học Quốc gia HN"
+    uniPlaceholder: "Ví dụ: Đại học Quốc gia HN",
+    deleteAnalysisBtn: "Xóa kết quả phân tích",
+    confirmDeleteAnalysis: "Bạn có chắc chắn muốn xóa kết quả phân tích nghề nghiệp này? Dữ liệu sẽ bị xóa trên tất cả thiết bị.",
+    deletingAnalysis: "Đang xóa phân tích..."
   },
   en: {
     careerTitle: "🎓 AI Career Counselor",
@@ -95,7 +98,10 @@ const translations = {
     saveProfileBtn: "Save Profile",
     profileSaved: "Profile saved! ✨",
     majorPlaceholder: "e.g., Computer Science",
-    uniPlaceholder: "e.g., National University"
+    uniPlaceholder: "e.g., National University",
+    deleteAnalysisBtn: "Delete Analysis",
+    confirmDeleteAnalysis: "Are you sure you want to delete this career analysis? Data will be deleted across all devices.",
+    deletingAnalysis: "Deleting analysis..."
   },
   ko: {
     careerTitle: "🎓 AI 진로 및 경력 상담사",
@@ -133,7 +139,10 @@ const translations = {
     saveProfileBtn: "프로필 저장",
     profileSaved: "프로필이 저장되었습니다! ✨",
     majorPlaceholder: "예: 컴퓨터공학",
-    uniPlaceholder: "예: 서울대학교"
+    uniPlaceholder: "예: 서울대학교",
+    deleteAnalysisBtn: "분석 삭제",
+    confirmDeleteAnalysis: "이 진로 분석 결과를 삭제하시겠습니까? 데이터는 모든 기기에서 삭제됩니다.",
+    deletingAnalysis: "분석 삭제 중..."
   }
 };
 
@@ -166,6 +175,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [cooldownTimeStr, setCooldownTimeStr] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Check if cache is still valid (24h cooldown)
   const isCacheValid = React.useMemo(() => {
@@ -352,6 +362,27 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
       setIsAnalyzing(false);
     }
   };
+ 
+  // Delete AI career analysis
+  const handleDeleteAnalysis = async () => {
+    if (!window.confirm(t.confirmDeleteAnalysis)) return;
+ 
+    setIsDeleting(true);
+    try {
+      const success = await careerGoalService.deleteCachedAnalysis(userId);
+      if (success) {
+        setAnalysisResults([]);
+        setCachedAt(null);
+      } else {
+        alert(lang === 'vi' ? 'Không thể xóa kết quả phân tích.' : lang === 'ko' ? '분석 결과를 삭제할 수 없습니다.' : 'Failed to delete analysis result.');
+      }
+    } catch (err) {
+      console.error('Error deleting career analysis:', err);
+      alert('An error occurred during deletion.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Select domain and create Position in Goals Dashboard
   const handleChooseDomain = async (domainResult: CareerAnalysisResult) => {
@@ -516,7 +547,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
               <div className="pt-3 flex items-center justify-between gap-2 border-t border-gray-100">
                 <button
                   onClick={handleSaveProfile}
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all rounded-xl shadow-sm shadow-indigo-100 flex items-center gap-1.5"
+                  className="px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all rounded-xl shadow-md shadow-indigo-100/30 flex items-center gap-1.5"
                 >
                   <Check size={14} />
                   {t.saveProfileBtn}
@@ -532,7 +563,7 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
             <button
               onClick={handleRunAnalysis}
               disabled={isAnalyzing || !editingMajor.trim() || isCacheValid}
-              className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-cyan-500 hover:opacity-95 text-white font-extrabold text-sm rounded-xl hover:shadow-lg hover:shadow-indigo-100 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:scale-100"
+              className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm rounded-xl shadow-md shadow-indigo-100/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:scale-100"
             >
               {isAnalyzing ? (
                 <>
@@ -599,16 +630,35 @@ export const GPACareerTab: React.FC<GPACareerTabProps> = ({
             {/* Results output */}
             {!isAnalyzing && analysisResults.length > 0 && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-3 gap-2">
                   <h3 className="font-extrabold text-gray-800 text-lg flex items-center gap-2">
                     <Award className="text-cyan-500" size={20} />
                     {t.resultsTitle}
                   </h3>
-                  {cachedAt && (
-                    <span className="text-[11px] text-gray-400 font-semibold">
-                      {t.cachedAtLabel} {new Date(cachedAt).toLocaleDateString()} {new Date(cachedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} {getDaysLeftText()}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {cachedAt && (
+                      <span className="text-[11px] text-gray-400 font-semibold">
+                        {t.cachedAtLabel} {new Date(cachedAt).toLocaleDateString()} {new Date(cachedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                    <button
+                      onClick={handleDeleteAnalysis}
+                      disabled={isDeleting}
+                      className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 transition-colors border border-red-100/50 disabled:opacity-50"
+                    >
+                      {isDeleting ? (
+                        <>
+                          <RefreshCw size={13} className="animate-spin" />
+                          {t.deletingAnalysis}
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 size={13} />
+                          {t.deleteAnalysisBtn}
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

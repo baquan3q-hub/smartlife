@@ -14,7 +14,7 @@ import {
   Target, Plus, Trash2, Edit3, ExternalLink, Calendar,
   ArrowUpDown, Settings, X, CheckCircle2, ChevronRight,
   AlertCircle, Star, Move, ArrowUp, ArrowDown, Sparkles, CheckSquare, Square,
-  Loader2, FileText, Compass
+  Loader2, FileText, Compass, Tag
 } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { CVBuilder } from './CVBuilder.tsx'; // Named import from CVBuilder.tsx
@@ -590,44 +590,59 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
 
       {/* Tab Switcher */}
       <div className="flex justify-between items-center flex-wrap gap-4 border-b border-gray-200 pb-3">
-        <div className="flex gap-4">
+        <div className="flex gap-4 justify-center w-full md:w-auto md:justify-start">
           <button
             onClick={() => setActiveSubTab('career')}
-            className={`flex items-center gap-2 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1 ${activeSubTab === 'career'
+            className={`flex items-center gap-1.5 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1.5 ${activeSubTab === 'career'
               ? 'border-indigo-600 text-indigo-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
-            <Target size={20} /> Mục tiêu Nghề nghiệp
+            <Target size={20} className="shrink-0" />
+            <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap text-sm md:text-base ${
+              activeSubTab === 'career' ? 'max-w-[200px] opacity-100 ml-1' : 'max-w-0 opacity-0 w-0 pointer-events-none'
+            }`}>
+              Mục tiêu Nghề nghiệp
+            </span>
           </button>
 
           <button
             onClick={() => setActiveSubTab('life')}
-            className={`flex items-center gap-2 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1 ${activeSubTab === 'life'
+            className={`flex items-center gap-1.5 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1.5 ${activeSubTab === 'life'
               ? 'border-indigo-600 text-indigo-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
-            <Star size={20} /> Mục tiêu 5 năm
+            <Star size={20} className="shrink-0" />
+            <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap text-sm md:text-base ${
+              activeSubTab === 'life' ? 'max-w-[200px] opacity-100 ml-1' : 'max-w-0 opacity-0 w-0 pointer-events-none'
+            }`}>
+              Mục tiêu 5 năm
+            </span>
           </button>
 
           <button
             onClick={() => setActiveSubTab('cv')}
-            className={`flex items-center gap-2 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1 ${activeSubTab === 'cv'
+            className={`flex items-center gap-1.5 pb-3 font-bold text-base md:text-lg border-b-2 transition-all px-1.5 ${activeSubTab === 'cv'
               ? 'border-indigo-600 text-indigo-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
-            <FileText size={20} /> CV Builder
+            <FileText size={20} className="shrink-0" />
+            <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap text-sm md:text-base ${
+              activeSubTab === 'cv' ? 'max-w-[200px] opacity-100 ml-1' : 'max-w-0 opacity-0 w-0 pointer-events-none'
+            }`}>
+              CV Builder
+            </span>
           </button>
         </div>
 
         {/* Global Action Button */}
         {activeSubTab === 'career' && positions.length > 0 && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 justify-center w-full md:w-auto md:justify-end">
             <button
               onClick={triggerAIRecommendations}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-indigo-100 hover:scale-105 active:scale-95 animate-in slide-in-from-right duration-300"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-indigo-100 hover:scale-105 active:scale-95 animate-in slide-in-from-right duration-300"
             >
               <Sparkles size={16} className="animate-pulse" /> Make a Roadmap by AI
             </button>
@@ -643,9 +658,11 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
         {activeSubTab === 'life' && (
           <button
             onClick={() => openLifeModal()}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-indigo-100"
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-indigo-100 mx-auto md:mx-0 md:ml-auto"
+            title="Thêm Mục tiêu 5 năm"
           >
-            <Plus size={16} /> Thêm Mục tiêu 5 năm
+            <Plus size={16} />
+            <span className="hidden sm:inline">Thêm Mục tiêu 5 năm</span>
           </button>
         )}
       </div>
@@ -660,13 +677,16 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
 
               {/* Vị trí mục tiêu dropdown */}
               <div className="flex items-center gap-2 flex-1 max-w-md">
-                <span className="text-gray-600 font-bold shrink-0 text-sm md:text-base">🎯 Vị trí mục tiêu:</span>
+                <span title="Vị trí mục tiêu" className="flex shrink-0">
+                  <Target size={20} className="text-indigo-600" />
+                </span>
                 {positions.length > 0 ? (
                   <div className="flex items-center gap-1.5 w-full">
                     <select
                       value={selectedPositionId}
                       onChange={(e) => setSelectedPositionId(e.target.value)}
-                      className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-full"
+                      className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-full cursor-pointer"
+                      title="Chọn vị trí mục tiêu"
                     >
                       {positions.map(p => (
                         <option key={p.id} value={p.id}>{p.title}</option>
@@ -734,90 +754,97 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
           </div>
 
           {positions.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-dashed border-gray-200 py-16 px-4 text-center">
-              <Target size={48} className="mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-600 font-bold">Chưa có vị trí nghề nghiệp nào</p>
-              <p className="text-gray-400 text-sm mt-1 mb-6 max-w-md mx-auto">
-                Hãy xác định vị trí bạn đang theo đuổi để lập lộ trình học tập, hoặc sử dụng AI để phân tích GPA và tính cách để gợi ý cho bạn.
-              </p>
-              <div className="flex gap-3 justify-center flex-wrap">
-                <button
-                  onClick={() => setShowPositionModal(true)}
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all hover:scale-105 active:scale-95 shadow-sm"
-                >
-                  + Bắt đầu thủ công
-                </button>
-                {onNavigateToGPACareer && (
-                  <button
-                    onClick={onNavigateToGPACareer}
-                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-95 text-white font-bold rounded-xl text-sm transition-all hover:scale-105 active:scale-95 shadow-md shadow-emerald-100"
-                  >
-                    🧭 Gợi ý ngành nghề bằng AI
-                  </button>
-                )}
-              </div>
-            </div>
+             <div className="bg-white rounded-2xl border border-dashed border-gray-200 py-16 px-4 text-center">
+               <Target size={48} className="mx-auto text-gray-300 mb-4" />
+               <p className="text-gray-600 font-bold">Chưa có vị trí nghề nghiệp nào</p>
+               <p className="text-gray-400 text-sm mt-1 mb-6 max-w-md mx-auto">
+                 Hãy xác định vị trí bạn đang theo đuổi để lập lộ trình học tập, hoặc sử dụng AI để phân tích GPA và tính cách để gợi ý cho bạn.
+               </p>
+               <div className="flex gap-3 justify-center flex-wrap">
+                 <button
+                   onClick={() => setShowPositionModal(true)}
+                   className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all hover:scale-105 active:scale-95 shadow-sm"
+                 >
+                   + Bắt đầu thủ công
+                 </button>
+                 {onNavigateToGPACareer && (
+                   <button
+                     onClick={onNavigateToGPACareer}
+                     className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-95 text-white font-bold rounded-xl text-sm transition-all hover:scale-105 active:scale-95 shadow-md shadow-emerald-100"
+                   >
+                     🧭 Gợi ý ngành nghề bằng AI
+                   </button>
+                 )}
+               </div>
+             </div>
           ) : (
             <>
-              {/* Filter and Sorting Row */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50/70 border border-gray-100 p-3 rounded-2xl">
+               {/* Filter and Sorting Row */}
+               <div className="flex items-center justify-between gap-3 bg-white border border-gray-100 p-2 rounded-2xl shadow-sm overflow-x-auto scrollbar-hide flex-nowrap w-full">
 
-                {/* Filters */}
-                <div className="flex flex-wrap gap-2">
-                  {/* Category Filter */}
-                  <select
-                    value={filterCategory}
-                    onChange={(e) => setFilterCategory(e.target.value)}
-                    className="bg-white border border-gray-200 text-xs font-bold text-gray-600 px-3 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="all">Tất cả Loại</option>
-                    <option value="technical">Technical Skill</option>
-                    <option value="domain">Domain Knowledge</option>
-                    <option value="soft">Soft Skill</option>
-                    <option value="project">Personal Project</option>
-                    <option value="tool">Tool/Software</option>
-                    <option value="certificate">Certificate</option>
-                  </select>
+                 {/* Filters */}
+                 <div className="flex items-center gap-2 flex-nowrap shrink-0">
+                   {/* Category Filter */}
+                   <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 hover:border-indigo-300 hover:bg-white px-2.5 py-1.5 rounded-xl text-gray-600 transition-all shrink-0">
+                     <Tag size={14} className="text-indigo-500 shrink-0" />
+                     <select
+                       value={filterCategory}
+                       onChange={(e) => setFilterCategory(e.target.value)}
+                       className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer pr-1 shrink-0"
+                     >
+                       <option value="all">Tất cả Loại</option>
+                       <option value="technical">Technical Skill</option>
+                       <option value="domain">Domain Knowledge</option>
+                       <option value="soft">Soft Skill</option>
+                       <option value="project">Personal Project</option>
+                       <option value="tool">Tool/Software</option>
+                       <option value="certificate">Certificate</option>
+                     </select>
+                   </div>
 
-                  {/* Status Filter */}
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="bg-white border border-gray-200 text-xs font-bold text-gray-600 px-3 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="all">Tất cả Trạng thái</option>
-                    <option value="not_started">⏳ Chưa bắt đầu</option>
-                    <option value="in_progress">🔄 Đang học/làm</option>
-                    <option value="completed">✅ Hoàn thành</option>
-                    <option value="overdue">⚠️ Quá hạn</option>
-                  </select>
-                </div>
+                   {/* Status Filter */}
+                   <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 hover:border-indigo-300 hover:bg-white px-2.5 py-1.5 rounded-xl text-gray-600 transition-all shrink-0">
+                     <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                     <select
+                       value={filterStatus}
+                       onChange={(e) => setFilterStatus(e.target.value)}
+                       className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer pr-1 shrink-0"
+                     >
+                       <option value="all">Tất cả Trạng thái</option>
+                       <option value="not_started">Chưa bắt đầu</option>
+                       <option value="in_progress">Đang học/làm</option>
+                       <option value="completed">Hoàn thành</option>
+                       <option value="overdue">Quá hạn</option>
+                     </select>
+                   </div>
+                 </div>
 
-                {/* Sorting */}
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400 text-xs font-medium flex items-center gap-1">
-                    <ArrowUpDown size={12} /> Sắp xếp:
-                  </span>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className="bg-white border border-gray-200 text-xs font-bold text-gray-600 px-3 py-2 rounded-xl focus:outline-none"
-                  >
-                    <option value="deadline">Ngày dự kiến</option>
-                    <option value="priority">Mức ưu tiên</option>
-                    <option value="status">Trạng thái</option>
-                    <option value="category">Phân loại</option>
-                  </select>
+                 {/* Sorting */}
+                 <div className="flex items-center gap-2 flex-nowrap shrink-0">
+                   <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 hover:border-indigo-300 hover:bg-white px-2.5 py-1.5 rounded-xl text-gray-600 transition-all shrink-0">
+                     <ArrowUpDown size={14} className="text-purple-500 shrink-0" />
+                     <select
+                       value={sortBy}
+                       onChange={(e) => setSortBy(e.target.value as any)}
+                       className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer pr-1 shrink-0"
+                     >
+                       <option value="deadline">Ngày dự kiến</option>
+                       <option value="priority">Mức ưu tiên</option>
+                       <option value="status">Trạng thái</option>
+                       <option value="category">Phân loại</option>
+                     </select>
+                   </div>
 
-                  <button
-                    onClick={() => setSortAsc(!sortAsc)}
-                    className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-indigo-600 transition-colors"
-                  >
-                    <span className="text-xs font-black">{sortAsc ? '▲' : '▼'}</span>
-                  </button>
-                </div>
+                   <button
+                     onClick={() => setSortAsc(!sortAsc)}
+                     className="p-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-white transition-all shrink-0"
+                     title={sortAsc ? "Sắp xếp tăng dần" : "Sắp xếp giảm dần"}
+                   >
+                     <span className="text-xs font-extrabold px-0.5">{sortAsc ? '▲' : '▼'}</span>
+                   </button>
+                 </div>
 
-              </div>
+               </div>
 
               {/* Career Goal Cards Grid */}
               {processedCareerGoals.length === 0 ? (
@@ -1445,8 +1472,8 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
 
       {/* --- MODAL: AI SKILLS ADVISOR --- */}
       {showAIModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-indigo-100 overflow-hidden flex flex-col max-h-[90vh] transition-all relative">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 pb-24 md:p-6 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-indigo-100 overflow-hidden flex flex-col max-h-[80vh] md:max-h-[90vh] transition-all relative">
 
             {/* Ambient Background Glowing Orbs */}
             <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-indigo-400/10 blur-3xl pointer-events-none" />

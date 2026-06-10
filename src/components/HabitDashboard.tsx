@@ -493,7 +493,7 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex gap-1 md:gap-2 bg-gray-100 p-1 md:p-1.5 rounded-xl md:rounded-2xl w-fit">
+      <div className="flex w-full md:w-fit gap-1 md:gap-2 bg-gray-100 p-1 md:p-1.5 rounded-xl md:rounded-2xl">
         {([
           { key: 'habits', label: '🔥 Habits', icon: Flame },
           { key: 'countdown', label: '⏳ Countdown', icon: Timer },
@@ -501,7 +501,7 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
           { key: 'stars', label: '⭐ Stars', icon: Star },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setSubTab(t.key)}
-            className={`px-2.5 md:px-4 py-1.5 md:py-2.5 rounded-lg md:rounded-xl text-[11px] md:text-sm font-semibold transition-all ${subTab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`flex-1 md:flex-initial text-center px-1.5 md:px-4 py-1.5 md:py-2.5 rounded-lg md:rounded-xl text-[11px] md:text-sm font-semibold transition-all ${subTab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             {t.label}
           </button>
         ))}

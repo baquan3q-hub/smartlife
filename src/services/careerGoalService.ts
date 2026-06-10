@@ -349,7 +349,7 @@ Mỗi lĩnh vực trong mảng JSON phải tuân thủ cấu trúc sau:
 
   async cacheAnalysisResults(userId: string, results: CareerAnalysisResult[]): Promise<void> {
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 1); // 1-day expiration
+    expiresAt.setFullYear(expiresAt.getFullYear() + 100); // 100-year expiration (permanent)
     const cachedAt = new Date().toISOString();
 
     // 1. Save to LocalStorage immediately as a fallback/instant load
@@ -436,5 +436,28 @@ Mỗi lĩnh vực trong mảng JSON phải tuân thủ cấu trúc sau:
     }
 
     return null;
+  },
+
+  async deleteCachedAnalysis(userId: string): Promise<boolean> {
+    // 1. Remove from localStorage
+    try {
+      localStorage.removeItem(`gpa_career_analysis_${userId}`);
+    } catch (err) {
+      console.warn('Failed to delete career analysis from localStorage:', err);
+    }
+
+    // 2. Delete from Supabase DB
+    try {
+      const { error } = await supabase
+        .from('career_analysis_cache')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error deleting career analysis from Supabase:', err);
+      return false;
+    }
   }
 };

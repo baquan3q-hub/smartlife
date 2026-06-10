@@ -542,22 +542,21 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
       `}</style>
 
       {/* Header bar controls (no-print) */}
-      <div className="no-print bg-white border border-gray-100 rounded-3xl p-5 shadow-sm flex justify-between items-center flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-tr from-teal-500 to-cyan-500 rounded-2xl text-white shadow-md shadow-teal-100">
+      <div className="no-print bg-white border border-gray-100 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+          <div className="p-2.5 bg-gradient-to-tr from-teal-500 to-emerald-500 rounded-2xl text-white shadow-md shadow-teal-500/20 shrink-0">
             <FileText size={22} />
           </div>
           <div>
             <h3 className="font-extrabold text-gray-800 text-lg">Thiết kế CV thông minh</h3>
-            <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 mt-0.5">
-              <Clock size={12} />
-              <span>Thời gian lưu CV:</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-center sm:justify-start gap-2 text-xs font-semibold text-gray-400 mt-0.5">
+              <span className="flex items-center gap-1 justify-center"><Clock size={12} /> Thời gian lưu CV:</span>
               {isPro ? (
-                <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 font-extrabold flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 font-extrabold flex items-center gap-1 w-fit mx-auto sm:mx-0">
                   👑 Vĩnh viễn (Pro)
                 </span>
               ) : (
-                <>
+                <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
                   <span className={`px-2 py-0.5 rounded-full ${expired ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-teal-50 text-teal-600 border border-teal-100'}`}>
                     {expired ? 'Đã hết hạn' : `${daysLeft} ngày còn lại`}
                   </span>
@@ -570,13 +569,13 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
                       {renewing ? 'Đang gia hạn...' : 'Gia hạn thêm 7 ngày'}
                     </button>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center flex-wrap gap-3 w-full md:w-auto">
           {/* Mode Switcher */}
           <div className="bg-gray-100 p-1 rounded-xl flex gap-1">
             <button
@@ -585,8 +584,10 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
                 }`}
+              title="Chỉnh sửa"
             >
-              <Edit3 size={14} /> Chỉnh sửa
+              <Edit3 size={14} />
+              <span className="hidden sm:inline">Chỉnh sửa</span>
             </button>
             <button
               onClick={() => setMode('preview')}
@@ -594,8 +595,10 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
                 }`}
+              title="Xem trước & In"
             >
-              <Eye size={14} /> Xem trước & In
+              <Eye size={14} />
+              <span className="hidden sm:inline">Xem trước & In</span>
             </button>
           </div>
 
@@ -603,9 +606,10 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
             onClick={handleSave}
             disabled={saving || expired}
             className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-sm rounded-xl transition-all shadow-md shadow-indigo-100 hover:scale-[1.02] active:scale-[0.98]"
+            title="Lưu CV"
           >
             {saving ? <RefreshCw className="animate-spin" size={14} /> : <Save size={14} />}
-            Lưu CV
+            <span className="hidden sm:inline">Lưu CV</span>
           </button>
 
           {mode === 'preview' && (
@@ -613,9 +617,10 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
               onClick={handleExportPDF}
               disabled={exporting}
               className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:opacity-95 disabled:opacity-75 text-white font-extrabold text-sm rounded-xl transition-all shadow-md shadow-teal-100 hover:scale-[1.02] active:scale-[0.98]"
+              title="Tải PDF"
             >
               {exporting ? <RefreshCw className="animate-spin" size={14} /> : <Download size={14} />}
-              {exporting ? 'Đang tạo PDF...' : 'Tải PDF'}
+              <span className="hidden sm:inline">{exporting ? 'Đang tạo PDF...' : 'Tải PDF'}</span>
             </button>
           )}
         </div>
@@ -660,9 +665,9 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
           <div className="lg:col-span-2 space-y-6">
 
             {/* Autofill Helper Block */}
-            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-center sm:text-left items-center">
               <div className="space-y-1">
-                <h4 className="text-sm font-extrabold text-emerald-800 flex items-center gap-1.5">
+                <h4 className="text-sm font-extrabold text-emerald-800 flex items-center justify-center sm:justify-start gap-1.5">
                   <Compass className="animate-spin-slow text-teal-600" size={16} />
                   Tính năng tự động điền thông tin (Auto-fill)
                 </h4>
@@ -673,10 +678,11 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
               <button
                 onClick={handleAutofill}
                 disabled={autofilling || expired}
-                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm rounded-xl flex items-center gap-2 transition-all shadow-md shadow-emerald-200 shrink-0"
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-200 shrink-0"
+                title="Tự động điền Profile-Goals"
               >
                 {autofilling ? <RefreshCw className="animate-spin" size={16} /> : <Compass size={16} />}
-                Fill Profile-Goals
+                <span className="hidden sm:inline">Fill Profile-Goals</span>
               </button>
             </div>
 
@@ -793,9 +799,10 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
                   onClick={handleGenerateObjective}
                   disabled={generatingObjective || expired}
                   className="px-3 py-1.5 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100 font-extrabold text-xs text-purple-700 rounded-xl hover:from-purple-100 hover:to-indigo-100 transition-all flex items-center gap-1 shadow-sm disabled:opacity-50"
+                  title="AI viết hộ"
                 >
                   {generatingObjective ? <RefreshCw className="animate-spin" size={12} /> : <Sparkles size={12} />}
-                  AI viết hộ ✨
+                  <span className="hidden sm:inline">AI viết hộ ✨</span>
                 </button>
               </div>
 
@@ -820,16 +827,18 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
                 <button
                   onClick={() => {
                     setCvData(prev => {
-                      if (!prev) return null;
-                      return {
-                        ...prev,
-                        education: [...prev.education, { university: '', major: '', gpa: undefined, graduation_year: undefined, top_courses: [] }]
-                      };
+                       if (!prev) return null;
+                       return {
+                         ...prev,
+                         education: [...prev.education, { university: '', major: '', gpa: undefined, graduation_year: undefined, top_courses: [] }]
+                       };
                     });
                   }}
                   className="px-3 py-1 bg-gray-50 border border-gray-200 hover:bg-gray-100 font-bold text-xs text-gray-600 rounded-xl transition-all flex items-center gap-1"
+                  title="Thêm trường học"
                 >
-                  <PlusCircle size={12} /> Thêm trường học
+                  <PlusCircle size={12} />
+                  <span className="hidden sm:inline">Thêm trường học</span>
                 </button>
               </div>
 
@@ -943,16 +952,18 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
                 <button
                   onClick={() => {
                     setCvData(prev => {
-                      if (!prev) return null;
-                      return {
-                        ...prev,
-                        experience: [...prev.experience, { position: '', company: '', start_date: '', end_date: '', description: '' }]
-                      };
+                       if (!prev) return null;
+                       return {
+                         ...prev,
+                         experience: [...prev.experience, { position: '', company: '', start_date: '', end_date: '', description: '' }]
+                       };
                     });
                   }}
                   className="px-3 py-1 bg-gray-50 border border-gray-200 hover:bg-gray-100 font-bold text-xs text-gray-600 rounded-xl transition-all flex items-center gap-1"
+                  title="Thêm kinh nghiệm"
                 >
-                  <PlusCircle size={12} /> Thêm kinh nghiệm
+                  <PlusCircle size={12} />
+                  <span className="hidden sm:inline">Thêm kinh nghiệm</span>
                 </button>
               </div>
 
@@ -1065,16 +1076,18 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
                 <button
                   onClick={() => {
                     setCvData(prev => {
-                      if (!prev) return null;
-                      return {
-                        ...prev,
-                        projects: [...prev.projects, { title: '', description: '', technologies: '', link: '' }]
-                      };
+                       if (!prev) return null;
+                       return {
+                         ...prev,
+                         projects: [...prev.projects, { title: '', description: '', technologies: '', link: '' }]
+                       };
                     });
                   }}
                   className="px-3 py-1 bg-gray-50 border border-gray-200 hover:bg-gray-100 font-bold text-xs text-gray-600 rounded-xl transition-all flex items-center gap-1"
+                  title="Thêm dự án"
                 >
-                  <PlusCircle size={12} /> Thêm dự án
+                  <PlusCircle size={12} />
+                  <span className="hidden sm:inline">Thêm dự án</span>
                 </button>
               </div>
 
@@ -1198,16 +1211,18 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
                 <button
                   onClick={() => {
                     setCvData(prev => {
-                      if (!prev) return null;
-                      return {
-                        ...prev,
-                        certificates: [...prev.certificates, { title: '', issuer: '', date: '' }]
-                      };
+                       if (!prev) return null;
+                       return {
+                         ...prev,
+                         certificates: [...prev.certificates, { title: '', issuer: '', date: '' }]
+                       };
                     });
                   }}
                   className="px-2 py-0.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 font-bold text-[10px] text-gray-600 rounded-xl transition-all flex items-center gap-1"
+                  title="Thêm chứng chỉ"
                 >
-                  <PlusCircle size={10} /> Thêm
+                  <PlusCircle size={10} />
+                  <span className="hidden sm:inline">Thêm</span>
                 </button>
               </div>
 
@@ -1285,16 +1300,18 @@ export const CVBuilder: React.FC<CVBuilderProps> = ({
                 <button
                   onClick={() => {
                     setCvData(prev => {
-                      if (!prev) return null;
-                      return {
-                        ...prev,
-                        activities: [...prev.activities, { title: '', organization: '', description: '' }]
-                      };
+                       if (!prev) return null;
+                       return {
+                         ...prev,
+                         activities: [...prev.activities, { title: '', organization: '', description: '' }]
+                       };
                     });
                   }}
                   className="px-2 py-0.5 bg-gray-50 border border-gray-200 hover:bg-gray-100 font-bold text-[10px] text-gray-600 rounded-xl transition-all flex items-center gap-1"
+                  title="Thêm hoạt động"
                 >
-                  <PlusCircle size={10} /> Thêm
+                  <PlusCircle size={10} />
+                  <span className="hidden sm:inline">Thêm</span>
                 </button>
               </div>
 

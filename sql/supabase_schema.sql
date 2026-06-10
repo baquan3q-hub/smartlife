@@ -44,5 +44,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_cv_data_user ON cv_data(user_id);
 ALTER TABLE cv_data ENABLE ROW LEVEL SECURITY;
 
 -- Tạo policy cho phép người dùng CRUD trên CV chính họ
+DROP POLICY IF EXISTS "Users can manage their own CV" ON cv_data;
 CREATE POLICY "Users can manage their own CV" ON cv_data
   FOR ALL USING (auth.uid() = user_id);
+
+-- 5. Kích hoạt Row Level Security (RLS) cho career_analysis_cache
+ALTER TABLE career_analysis_cache ENABLE ROW LEVEL SECURITY;
+
+-- Tạo policy cho phép người dùng CRUD trên kết quả phân tích nghề nghiệp của chính họ
+DROP POLICY IF EXISTS "Users can manage their own career analysis cache" ON career_analysis_cache;
+CREATE POLICY "Users can manage their own career analysis cache" ON career_analysis_cache
+  FOR ALL USING (auth.uid() = user_id);
+
+
