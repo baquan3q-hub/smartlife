@@ -120,6 +120,8 @@ export interface Transaction {
   type: TransactionType;
   description: string;
   created_at?: string;
+  wallet_id?: string | null;
+  debt_id?: string | null;
 }
 
 export interface Goal {
@@ -201,6 +203,8 @@ export interface AppState {
   gpaTargetCredits: number;
   gpaTargetGPA: number | null;       // GPA mục tiêu tốt nghiệp
   gpaTargetSemesters: number;        // Số kỳ còn lại dự kiến
+  wallets: Wallet[];                 // Thêm Ví
+  debts: Debt[];                     // Thêm Khoản nợ
 }
 
 
@@ -629,4 +633,44 @@ export interface UserNotification {
   is_read: boolean;
   metadata?: Record<string, any>;
   created_at: string;
+}
+
+// 15. Wallet & Debt Interfaces
+export interface Wallet {
+  id: string;
+  user_id?: string;
+  name: string;
+  type: 'cash' | 'bank' | 'credit' | 'e-wallet' | 'savings' | 'fund';
+  balance: number;
+  initial_balance: number;
+  color: string;
+  icon: string;
+  include_in_total: boolean;
+  created_at?: string;
+}
+
+export interface Debt {
+  id: string;
+  user_id?: string;
+  partner_name: string;
+  type: 'lend' | 'borrow'; // lend: cho vay, borrow: đi vay
+  amount: number;
+  remaining_amount: number;
+  date_lent: string; // YYYY-MM-DD
+  due_date?: string | null; // YYYY-MM-DD
+  description?: string;
+  status: 'pending' | 'partial' | 'paid';
+  wallet_id?: string | null;
+  created_at?: string;
+}
+
+export interface DebtRepayment {
+  id: string;
+  debt_id: string;
+  amount: number;
+  payment_date: string; // YYYY-MM-DD
+  wallet_id?: string | null;
+  note?: string;
+  transaction_id?: string | null;
+  created_at?: string;
 }

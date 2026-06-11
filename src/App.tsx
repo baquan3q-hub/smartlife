@@ -1,6 +1,6 @@
 // File: src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, CalendarDays, Wallet, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target, Grid2X2 } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Wallet as WalletIcon, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target, Grid2X2 } from 'lucide-react';
 import { NotificationPopupModal } from './components/NotificationPopupModal';
 import { getUnreadCount, getUserNotifications } from './services/adminNotificationService';
 
@@ -49,8 +49,11 @@ import { Lang, t } from './i18n/i18n';
 import { useTheme } from './utils/theme';
 
 // Types và Constants (Khớp với file đã sửa)
-import { AppState, Transaction, Todo, TaskPriority, SmartInsight, GPASemester, GPACourse, GPATemplateType, UserNotification } from './types';
+import { TaskPriority, GPATemplateType, TransactionType } from './types';
+import type { AppState, Transaction, Todo, SmartInsight, GPASemester, GPACourse, UserNotification, Wallet, Debt } from './types';
 import { INITIAL_BUDGET, INITIAL_GOALS, INITIAL_TRANSACTIONS, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './constants';
+import { walletService } from './services/walletService';
+import { debtService } from './services/debtService';
 
 const RealtimeClock: React.FC = () => {
     const [time, setTime] = useState(new Date());
@@ -162,6 +165,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         gpaTargetCredits: 135,
         gpaTargetGPA: null,
         gpaTargetSemesters: 4,
+        wallets: [],
+        debts: [],
     });
 
     const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals' | 'expand'>('visual');
@@ -191,7 +196,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     // Fixed mobile navbar tabs (4 items only)
     const MOBILE_NAV_TABS = [
         { id: 'visual', labelVi: 'Tổng quan', labelEn: 'Overview', labelKo: '개요', icon: LayoutDashboard, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', icon: Wallet, color: 'text-orange-600', bg: 'bg-orange-50' },
+        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', icon: WalletIcon, color: 'text-orange-600', bg: 'bg-orange-50' },
         { id: 'schedule', labelVi: 'Lịch trình', labelEn: 'Schedule', labelKo: '일정', icon: CalendarDays, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         { id: 'expand', labelVi: 'Mở rộng', labelEn: 'More', labelKo: '더보기', icon: Grid2X2, color: 'text-violet-600', bg: 'bg-violet-50' },
     ];
@@ -395,8 +400,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         if (!user) return;
         if (!silent) setIsLoadingData(true);
         try {
-            // Gọi song song 6 bảng dữ liệu (added calendar_events)
-            const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes, gpaSemRes, gpaCourseRes] = await Promise.all([
+            // Gọi song song các bảng dữ liệu bao gồm wallets và debts
+            const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes, gpaSemRes, gpaCourseRes, walletRes, debtRes] = await Promise.all([
                 supabase.from('transactions').select('*').order('date', { ascending: false }),
                 supabase.from('goals').select('*').order('deadline', { ascending: true }),
                 supabase.from('timetable').select('*').order('start_time', { ascending: true }),
@@ -406,6 +411,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 supabase.from('budgets').select('*'),
                 supabase.from('gpa_semesters').select('*').order('academic_year', { ascending: true }),
                 supabase.from('gpa_courses').select('*').order('created_at', { ascending: true }),
+                supabase.from('wallets').select('*'),
+                supabase.from('debts').select('*'),
             ]);
 
             if (txRes.error) throw txRes.error;
@@ -421,7 +428,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     date: t.date,
                     type: t.type,
                     description: t.description || '',
-                    created_at: t.created_at
+                    created_at: t.created_at,
+                    wallet_id: t.wallet_id || null,
+                    debt_id: t.debt_id || null,
                 })),
                 goals: goalRes.data || [],
                 budgets: budgetRes.data || [],
@@ -436,6 +445,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 gpaTargetCredits: Number(localStorage.getItem(`gpaTargetCredits_${user.id}`)) || 135,
                 gpaTargetGPA: localStorage.getItem(`gpaTargetGPA_${user.id}`) ? Number(localStorage.getItem(`gpaTargetGPA_${user.id}`)) : null,
                 gpaTargetSemesters: Number(localStorage.getItem(`gpaTargetSemesters_${user.id}`)) || 4,
+                wallets: walletRes.data || [],
+                debts: debtRes.data || [],
             }));
 
             // Parse Custom Categories from Profile
@@ -611,6 +622,22 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
         setAppState((prev: AppState) => ({ ...prev, transactions: [optimisticTx, ...prev.transactions] }));
 
+        // Cập nhật số dư ví trong local state & database nếu giao dịch có liên kết ví
+        if (newTx.wallet_id) {
+            const wallet = appState.wallets.find(w => w.id === newTx.wallet_id);
+            if (wallet) {
+                const balanceChange = newTx.type === 'income' ? newTx.amount : -newTx.amount;
+                const updatedWallet = { ...wallet, balance: Number(wallet.balance) + balanceChange };
+                
+                setAppState(prev => ({
+                    ...prev,
+                    wallets: prev.wallets.map(w => w.id === wallet.id ? updatedWallet : w)
+                }));
+                
+                supabase.from('wallets').update({ balance: updatedWallet.balance }).eq('id', wallet.id).then();
+            }
+        }
+
         try {
             const { data, error } = await supabase.from('transactions').insert([{
                 user_id: user.id, ...newTx
@@ -620,35 +647,120 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (data) {
                 setAppState((prev: AppState) => ({
                     ...prev,
-                    transactions: prev.transactions.map(t => t.id === tempId ? { ...data, amount: Number(data.amount) } : t)
+                    transactions: prev.transactions.map(t => t.id === tempId ? { 
+                        ...data, 
+                        amount: Number(data.amount),
+                        wallet_id: data.wallet_id || null,
+                        debt_id: data.debt_id || null
+                    } : t)
                 }));
             }
         } catch (error: any) {
             console.error('Lỗi thêm giao dịch:', error);
             alert(`Lỗi: ${error.message}`);
+            // Rollback ví & giao dịch
+            if (newTx.wallet_id) {
+                const wallet = appState.wallets.find(w => w.id === newTx.wallet_id);
+                if (wallet) {
+                    const balanceChange = newTx.type === 'income' ? -newTx.amount : newTx.amount;
+                    const revertedWallet = { ...wallet, balance: Number(wallet.balance) + balanceChange };
+                    setAppState(prev => ({
+                        ...prev,
+                        wallets: prev.wallets.map(w => w.id === wallet.id ? revertedWallet : w)
+                    }));
+                    supabase.from('wallets').update({ balance: revertedWallet.balance }).eq('id', wallet.id).then();
+                }
+            }
             setAppState((prev: AppState) => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== tempId) }));
         }
     };
 
     const handleUpdateTransaction = async (updatedTx: Transaction) => {
         const previousTransactions = [...appState.transactions];
+        const oldTx = appState.transactions.find(t => t.id === updatedTx.id);
+
         setAppState((prev: AppState) => ({ ...prev, transactions: prev.transactions.map(t => t.id === updatedTx.id ? updatedTx : t) }));
+
+        // Cập nhật lại số dư của ví cũ và ví mới
+        if (oldTx) {
+            let walletsToUpdate = [...appState.wallets];
+            let isChanged = false;
+
+            if (oldTx.wallet_id) {
+                const oldWallet = walletsToUpdate.find(w => w.id === oldTx.wallet_id);
+                if (oldWallet) {
+                    const oldBalanceChange = oldTx.type === 'income' ? -oldTx.amount : oldTx.amount;
+                    oldWallet.balance = Number(oldWallet.balance) + oldBalanceChange;
+                    isChanged = true;
+                }
+            }
+
+            if (updatedTx.wallet_id) {
+                const newWallet = walletsToUpdate.find(w => w.id === updatedTx.wallet_id);
+                if (newWallet) {
+                    const newBalanceChange = updatedTx.type === 'income' ? updatedTx.amount : -updatedTx.amount;
+                    newWallet.balance = Number(newWallet.balance) + newBalanceChange;
+                    isChanged = true;
+                }
+            }
+
+            if (isChanged) {
+                setAppState(prev => ({ ...prev, wallets: walletsToUpdate }));
+                
+                const updatePromises = [];
+                if (oldTx.wallet_id) {
+                    const oldW = walletsToUpdate.find(w => w.id === oldTx.wallet_id);
+                    if (oldW) updatePromises.push(supabase.from('wallets').update({ balance: oldW.balance }).eq('id', oldW.id));
+                }
+                if (updatedTx.wallet_id && updatedTx.wallet_id !== oldTx.wallet_id) {
+                    const newW = walletsToUpdate.find(w => w.id === updatedTx.wallet_id);
+                    if (newW) updatePromises.push(supabase.from('wallets').update({ balance: newW.balance }).eq('id', newW.id));
+                }
+                Promise.all(updatePromises).then();
+            }
+        }
 
         try {
             const { error } = await supabase.from('transactions').update({
-                amount: updatedTx.amount, category: updatedTx.category, date: updatedTx.date, type: updatedTx.type, description: updatedTx.description
+                amount: updatedTx.amount, 
+                category: updatedTx.category, 
+                date: updatedTx.date, 
+                type: updatedTx.type, 
+                description: updatedTx.description,
+                wallet_id: updatedTx.wallet_id || null,
+                debt_id: updatedTx.debt_id || null
             }).eq('id', updatedTx.id);
             if (error) throw error;
         } catch (error: any) {
             alert(`Lỗi cập nhật: ${error.message}`);
             setAppState((prev: AppState) => ({ ...prev, transactions: previousTransactions }));
+            // Reload lại để phục hồi đúng số dư ví từ DB
+            fetchData(true);
         }
     };
 
     const handleDeleteTransaction = async (id: string) => {
         if (!window.confirm('Bạn có chắc chắn muốn xóa?')) return;
         const previousTransactions = [...appState.transactions];
+        const txToDelete = appState.transactions.find(t => t.id === id);
+
         setAppState((prev: AppState) => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
+
+        // Hoàn tác số dư ví
+        if (txToDelete && txToDelete.wallet_id) {
+            const wallet = appState.wallets.find(w => w.id === txToDelete.wallet_id);
+            if (wallet) {
+                const balanceChange = txToDelete.type === 'income' ? -txToDelete.amount : txToDelete.amount;
+                const updatedWallet = { ...wallet, balance: Number(wallet.balance) + balanceChange };
+                
+                setAppState(prev => ({
+                    ...prev,
+                    wallets: prev.wallets.map(w => w.id === wallet.id ? updatedWallet : w)
+                }));
+                
+                supabase.from('wallets').update({ balance: updatedWallet.balance }).eq('id', wallet.id).then();
+            }
+        }
 
         try {
             const { error } = await supabase.from('transactions').delete().eq('id', id);
@@ -656,6 +768,97 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         } catch (error) {
             alert('Lỗi xóa giao dịch.');
             setAppState((prev: AppState) => ({ ...prev, transactions: previousTransactions }));
+            fetchData(true);
+        }
+    };
+
+    // --- WALLET & DEBT CALLBACKS ---
+    const handleAddWallet = async (newWallet: Omit<Wallet, 'id' | 'user_id' | 'created_at'>) => {
+        if (!user) return;
+        const result = await walletService.createWallet(user.id, newWallet);
+        if (result) {
+            setAppState(prev => ({ ...prev, wallets: [...prev.wallets, result] }));
+        }
+    };
+
+    const handleUpdateWallet = async (updatedWallet: Wallet) => {
+        const result = await walletService.updateWallet(updatedWallet);
+        if (result) {
+            setAppState(prev => ({
+                ...prev,
+                wallets: prev.wallets.map(w => w.id === updatedWallet.id ? result : w)
+            }));
+        }
+    };
+
+    const handleDeleteWallet = async (id: string) => {
+        if (!window.confirm('Bạn có chắc muốn xóa ví này? Tất cả giao dịch liên kết sẽ mất liên kết với ví.')) return;
+        const success = await walletService.deleteWallet(id);
+        if (success) {
+            setAppState(prev => ({
+                ...prev,
+                wallets: prev.wallets.filter(w => w.id !== id),
+                transactions: prev.transactions.map(t => t.wallet_id === id ? { ...t, wallet_id: null } : t)
+            }));
+        }
+    };
+
+    const handleTransferMoney = async (fromWalletId: string, toWalletId: string, amount: number, note?: string) => {
+        if (!user) return;
+        const success = await walletService.transferMoney(user.id, fromWalletId, toWalletId, amount, note);
+        if (success) {
+            await fetchData(true); // Tải lại toàn bộ dữ liệu để cập nhật số dư & giao dịch chuyển tiền
+        }
+    };
+
+    const handleAddDebt = async (newDebt: Omit<Debt, 'id' | 'user_id' | 'created_at'>) => {
+        if (!user) return;
+        const result = await debtService.createDebt(user.id, newDebt);
+        if (result) {
+            setAppState(prev => ({ ...prev, debts: [result, ...prev.debts] }));
+            
+            // Nếu có liên kết với ví, tạo giao dịch chi tiêu/thu nhập tương ứng để khấu trừ ví
+            if (newDebt.wallet_id) {
+                const isLend = newDebt.type === 'lend';
+                const txCategory = isLend ? 'Cho vay 💸' : 'Đi vay 💰';
+                const txType = isLend ? TransactionType.EXPENSE : TransactionType.INCOME;
+                const txDesc = isLend 
+                    ? `Cho vay: ${newDebt.partner_name} (${newDebt.description || 'Giải ngân'})` 
+                    : `Đi vay từ: ${newDebt.partner_name} (${newDebt.description || 'Giải ngân'})`;
+
+                await handleAddTransaction({
+                    amount: newDebt.amount,
+                    category: txCategory,
+                    date: newDebt.date_lent,
+                    type: txType,
+                    description: txDesc,
+                    wallet_id: newDebt.wallet_id,
+                    debt_id: result.id
+                });
+            } else {
+                await fetchData(true);
+            }
+        }
+    };
+
+    const handleDeleteDebt = async (id: string) => {
+        if (!window.confirm('Bạn có chắc muốn xóa khoản nợ này? Lịch sử trả nợ liên quan cũng sẽ bị xóa.')) return;
+        const success = await debtService.deleteDebt(id);
+        if (success) {
+            setAppState(prev => ({
+                ...prev,
+                debts: prev.debts.filter(d => d.id !== id),
+                transactions: prev.transactions.map(t => t.debt_id === id ? { ...t, debt_id: null } : t)
+            }));
+            await fetchData(true);
+        }
+    };
+
+    const handleRepayDebt = async (debtId: string, amount: number, date: string, walletId?: string | null, note?: string) => {
+        if (!user) return;
+        const { repayment, updatedDebt } = await debtService.repayDebt(user.id, debtId, amount, date, walletId, note);
+        if (updatedDebt) {
+            await fetchData(true);
         }
     };
 
@@ -1118,7 +1321,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>
                     <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'finance' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.finance', lang) : ''}>
-                        <Wallet size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.finance', lang)}</span>}
+                        <WalletIcon size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.finance', lang)}</span>}
                     </button>
                     <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.schedule_goals', lang) : ''}>
                         <CalendarDays size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.schedule_goals', lang)}</span>}
@@ -1281,6 +1484,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             onNavigateToCashFlow={() => setActiveTab('cashflow')}
                             onNavigateToAI={() => setActiveTab('ai-advisor')}
                             onRefresh={async () => { await fetchData(true); }}
+                            onAddWallet={handleAddWallet}
+                            onUpdateWallet={handleUpdateWallet}
+                            onDeleteWallet={handleDeleteWallet}
+                            onTransferMoney={handleTransferMoney}
+                            onAddDebt={handleAddDebt}
+                            onDeleteDebt={handleDeleteDebt}
+                            onRepayDebt={handleRepayDebt}
                         />
                     )}
                     {deferredTab === 'cashflow' && (
