@@ -55,14 +55,14 @@ export interface ActionHandlers {
 const TOOL_DECLARATIONS: ToolDeclaration[] = [
     {
         name: 'query_database',
-        description: 'Truy vấn dữ liệu chi tiết từ database Supabase. Dùng khi cần lọc, phân tích dữ liệu cụ thể ngoài context tóm tắt để cá nhân hóa. Các bảng khả dụng: transactions (giao dịch), goals (mục tiêu), budgets (ngân sách), timetable (lịch trình), todos (việc cần làm), profiles (hồ sơ), calendar_events (sự kiện lịch).',
+        description: 'Truy vấn dữ liệu chi tiết từ database Supabase. Dùng khi cần lọc, phân tích dữ liệu cụ thể ngoài context tóm tắt để cá nhân hóa. Các bảng khả dụng: transactions (giao dịch), goals (mục tiêu), budgets (ngân sách), timetable (lịch trình), todos (việc cần làm), profiles (hồ sơ), calendar_events (sự kiện lịch), wallets (danh sách ví), debts (khoản nợ và cho vay), debt_repayments (lịch sử trả nợ).',
         parameters: {
             type: 'object',
             properties: {
                 table: {
                     type: 'string',
                     description: 'Tên bảng cần truy vấn',
-                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events', 'gpa_semesters', 'gpa_courses', 'habits', 'habit_logs', 'countdown_items', 'countup_items', 'journal_entries', 'journal_tags']
+                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events', 'gpa_semesters', 'gpa_courses', 'habits', 'habit_logs', 'countdown_items', 'countup_items', 'journal_entries', 'journal_tags', 'wallets', 'debts', 'debt_repayments']
                 },
                 select: {
                     type: 'string',
@@ -330,6 +330,9 @@ const DATE_COLUMNS: Record<string, string> = {
     countup_items: 'start_date',
     journal_entries: 'entry_date',
     journal_tags: 'created_at',
+    wallets: 'created_at',
+    debts: 'date_lent',
+    debt_repayments: 'payment_date',
 };
 
 async function executeQueryDatabase(args: any): Promise<any> {
@@ -600,7 +603,37 @@ export async function chatWithAI(
             }
 
             const candidate = data?.candidates?.[0];
-            if (!candidate?.content?.parts) {
+            
+            // Kiểm tra trường hợp Prompt bị hệ thống Google chặn ngay lập tức (Safety / Policy Block)
+            if (!candidate) {
+                let blockMsg = 'Không nhận được phản hồi từ AI.';
+                if (data?.promptFeedback?.blockReason) {
+                    blockMsg = `⚠️ Yêu cầu bị hệ thống kiểm duyệt tự động chặn (Lý do: ${data.promptFeedback.blockReason}). Vui lòng điều chỉnh hoặc diễn đạt lại câu hỏi phù hợp hơn.`;
+                }
+                return { text: blockMsg, charts, actions, updatedHistory: cleanChatHistory(contents) };
+            }
+
+            // Kiểm tra finishReason của candidate
+            if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+                if (candidate.finishReason === 'SAFETY') {
+                    return {
+                        text: '⚠️ Phản hồi bị chặn bởi bộ lọc an toàn tự động của Google (Lý do: SAFETY). Điều này có thể xảy ra nếu thông tin thói quen, nhật ký hoặc dữ liệu liên quan của bạn có từ ngữ quá nhạy cảm. Vui lòng kiểm tra lại dữ liệu hoặc diễn đạt câu hỏi theo cách khác.',
+                        charts,
+                        actions,
+                        updatedHistory: cleanChatHistory(contents)
+                    };
+                }
+                if (candidate.finishReason === 'RECITATION') {
+                    return {
+                        text: '⚠️ Phản hồi bị chặn do phát hiện nội dung sao chép tài liệu có bản quyền (Lý do: RECITATION). Vui lòng đặt câu hỏi khác hoặc diễn đạt theo cách khác.',
+                        charts,
+                        actions,
+                        updatedHistory: cleanChatHistory(contents)
+                    };
+                }
+            }
+
+            if (!candidate.content?.parts) {
                 return { text: 'Không nhận được phản hồi từ AI.', charts, actions, updatedHistory: cleanChatHistory(contents) };
             }
 
