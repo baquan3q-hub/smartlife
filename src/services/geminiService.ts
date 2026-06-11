@@ -119,9 +119,23 @@ export function buildFinanceContext(state: AppState): string {
 
     const recentTx = [...transactions]
         .sort((a, b) => b.date.localeCompare(a.date))
-        .slice(0, 10)
+        .slice(0, 30)
         .map(t => `  - ${t.date}: ${t.type === TransactionType.INCOME ? '+' : '-'}${formatCurrency(t.amount)} [${t.category}]${t.description ? ` "${t.description}"` : ''}`)
         .join('\n');
+
+    // Wallets context
+    const walletsInfo = state.wallets && state.wallets.length > 0
+        ? state.wallets.map(w => `  - ${w.icon} ${w.name} (${w.type}): ${formatCurrency(w.balance)}${w.include_in_total ? '' : ' [Không tính vào tổng số dư]'}`).join('\n')
+        : '  (Chưa thiết lập ví nào)';
+
+    // Debts context
+    const debtsInfo = state.debts && state.debts.length > 0
+        ? state.debts.map(d => {
+            const typeLabel = d.type === 'lend' ? 'Cho vay (Con nợ)' : 'Đi vay (Chủ nợ)';
+            const statusLabel = d.status === 'paid' ? 'Đã trả' : d.status === 'partial' ? 'Đã trả một phần' : 'Chưa trả';
+            return `  - ${d.partner_name} [${typeLabel}]: ${formatCurrency(d.amount)} (Còn lại: ${formatCurrency(d.remaining_amount)}) | Trạng thái: ${statusLabel}${d.due_date ? ` | Hạn: ${d.due_date}` : ''}`;
+        }).join('\n')
+        : '  (Chưa có khoản nợ/cho vay nào)';
 
     return `
 📊 TÀI CHÍNH THÁNG ${now.getMonth() + 1}/${now.getFullYear()}:
@@ -136,10 +150,16 @@ ${categoryBreakdown || '  (Chưa có dữ liệu)'}
 💰 NGÂN SÁCH:
 ${budgetStatus || '  (Chưa thiết lập ngân sách)'}
 
+💳 DANH SÁCH VÍ:
+${walletsInfo}
+
+🤝 KHOẢN NỢ & CHO VAY:
+${debtsInfo}
+
 📈 XU HƯỚNG 6 THÁNG:
 ${monthlyTrend.join('\n')}
 
-🧾 10 GIAO DỊCH GẦN NHẤT:
+🧾 30 GIAO DỊCH GẦN NHẤT:
 ${recentTx || '  (Chưa có giao dịch)'}`;
 }
 
@@ -311,7 +331,7 @@ export async function buildHabitContext(): Promise<string> {
         return ctx;
     } catch (e) {
         console.error('[SmartLife] Error building habit context:', e);
-        return '';
+        return '\n🔥 THÓI QUEN: Lỗi hệ thống khi tải dữ liệu thói quen.';
     }
 }
 
@@ -329,7 +349,7 @@ export async function buildCountdownContext(): Promise<string> {
         const countdowns: CountdownItem[] = cdRes.data || [];
         const countups: CountUpItem[] = cuRes.data || [];
 
-        if (countdowns.length === 0 && countups.length === 0) return '';
+        if (countdowns.length === 0 && countups.length === 0) return '\n⏳ ĐẾM NGƯỢC & ĐẾM TIẾN: Chưa thiết lập sự kiện nào';
 
         let ctx = '';
         const today = new Date();
@@ -359,7 +379,7 @@ export async function buildCountdownContext(): Promise<string> {
         return ctx;
     } catch (e) {
         console.error('[SmartLife] Error building countdown context:', e);
-        return '';
+        return '\n⏳ ĐẾM NGƯỢC & ĐẾM TIẾN: Lỗi hệ thống khi tải dữ liệu sự kiện.';
     }
 }
 
@@ -403,7 +423,7 @@ export async function buildJournalContext(): Promise<string> {
         return ctx;
     } catch (e) {
         console.error('[SmartLife] Error building journal context:', e);
-        return '';
+        return '\n📔 NHẬT KÝ GẦN ĐÂY: Lỗi hệ thống khi tải dữ liệu nhật ký.';
     }
 }
 
@@ -444,18 +464,24 @@ export const SYSTEM_INSTRUCTION = `Bạn là **SmartLife Advisor** — trợ lý
 QUY TẮC BẢO MẬT & TIẾT KIỆM TOKEN:
 - Hồ sơ cá nhân của người dùng (tên, tuổi, MBTI, DISC, nghề nghiệp, định hướng...) đã được nhúng sẵn ở prompt hệ thống dưới đây để giúp bạn cá nhân hóa xưng hô và phong cách giao tiếp từ câu đầu tiên. Bạn KHÔNG cần gọi hàm get_user_profile nữa trừ khi muốn refresh thông tin từ database.
 - Hãy chủ động gọi các công cụ truy vấn (Function Calling) tương ứng dưới đây khi cần dữ liệu động để trả lời người dùng (ví dụ: giao dịch tài chính, điểm số, thói quen, công việc):
-  • Gọi \`get_financial_report\` khi hỏi về tài chính cá nhân, số dư, chi tiêu danh mục, ngân sách, xu hướng chi tiêu 6 tháng.
+  • Gọi \`get_financial_report\` khi hỏi tổng quan về tài chính, số dư ví, nợ nần, ngân sách, chi tiêu danh mục của tháng hiện tại.
   • Gọi \`get_todos_and_schedule\` khi hỏi về việc cần làm (todos) và thời khóa biểu cố định.
   • Gọi \`get_academic_gpa_record\` khi hỏi về điểm số học tập, các học kỳ, môn học, tín chỉ, tính GPA tích lũy.
   • Gọi \`get_habits_tracker\` khi hỏi về thói quen cá nhân, streaks thói quen, tỷ lệ check-in hoàn thành.
   • Gọi \`get_countdown_events\` khi hỏi về các sự kiện đếm ngược hoặc mốc đếm tiến.
   • Gọi \`get_journal_entries\` khi hỏi về nội dung nhật ký gần đây hoặc phân tích cảm xúc dạo gần đây.
-  • Gọi \`query_database\` khi cần thực hiện các truy vấn lọc Supabase phức tạp hơn trên các bảng.
+  • Gọi \`query_database\` khi cần lấy dữ liệu chi tiết, danh sách đầy đủ hoặc lọc theo mốc thời gian cụ thể (ví dụ: truy vấn tất cả giao dịch trong quá khứ của tháng trước, lọc danh sách việc đã xong, tìm kiếm nội dung...). BẮT BUỘC dùng tool này thay vì \`get_financial_report\` khi người dùng hỏi các thông tin lịch sử tài chính chi tiết ngoài 30 giao dịch gần nhất hoặc ngoài tháng hiện tại.
 - Bạn phải LUÔN gọi các công cụ này trước khi trả lời, KHÔNG tự bịa số liệu hay đoán bừa nếu chưa gọi tool tương ứng.
 
 ĐỊNH DẠNG BÁO CÁO CHI TIẾT (ARTIFACTS):
 - Chỉ sử dụng cặp thẻ <artifact title="Tiêu đề ngắn gọn của báo cáo">...</artifact> khi người dùng có yêu cầu rõ ràng như "tạo báo cáo", "lập tài liệu", "tạo tài liệu riêng", "lập báo cáo phân tích riêng", hoặc "tải báo cáo".
 - Đối với mọi câu hỏi bình thường khác (kể cả câu trả lời dài dòng, phân tích chi tiết, bảng biểu lớn, hay kế hoạch học tập/tài chính), bạn TUYỆT ĐỐI KHÔNG tự ý sử dụng thẻ <artifact>. Thay vào đó, bạn phải phản hồi trực tiếp bằng văn bản Markdown bình thường trong đoạn chat để hiển thị inline trực tiếp cho người dùng ở cả giao diện máy tính và điện thoại.
+
+🧠 PHÂN TÍCH LOGIC & CHUỖI SUY NGHĨ (CHAIN OF THOUGHT):
+1. **Suy nghĩ từng bước (Think step-by-step)**: Khi người dùng hỏi các câu liên quan đến tính toán số liệu (VD: tổng tiền chi tiêu, dự báo ngân sách, tính GPA tích lũy, số tín chỉ cần học), bạn phải thực hiện phân tích và tính toán từng bước logic trước khi đưa ra kết quả. Tránh đưa ra kết luận vội vã mà không kiểm tra độ chính xác của các con số.
+2. **Xử lý dữ liệu rỗng & Lỗi hệ thống**: 
+   - Khi dữ liệu trả về từ tool báo trống (ví dụ: chưa có thói quen, chưa có sự kiện đếm ngược, chưa có nhật ký), **tuyệt đối không chỉ trả lời cụt lủn** mà hãy gợi ý, hướng dẫn người dùng cách thêm mới trên ứng dụng (VD: *"Bạn chưa thiết lập thói quen nào. Hãy bấm nút '+' hoặc gõ 'Thêm thói quen tập thể dục hàng ngày' để bắt đầu nhé!"*).
+   - Nếu dữ liệu trả về thông báo "Lỗi hệ thống khi tải...", hãy thông báo lịch sự cho người dùng biết kết nối đang bị gián đoạn và gợi ý họ thử lại sau.
 
 NGUYÊN TẮC PHÂN TÍCH & TRÌNH BÀY (QUAN TRỌNG):
 1. Luôn phân tích dựa trên DỮ LIỆU THỰC của người dùng thu được từ các công cụ gọi hàm.
@@ -524,7 +550,7 @@ export async function callGeminiRaw(body: object, retryCount = 0): Promise<any> 
         const err = await res.json().catch(() => ({}));
         const status = res.status;
 
-        if (status === 429 || status === 500 || status === 503 || status === 504) {
+        if (status === 429 || status === 403 || status === 500 || status === 503 || status === 504) {
             if (retryCount < Math.max(3, API_KEYS.length)) {
                 if (API_KEYS.length > 1) {
                     currentKeyIndex++;
