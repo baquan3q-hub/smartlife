@@ -30,10 +30,14 @@ SmartLife ra đời với 3 giá trị cốt lõi:
 * Đồng bộ trực tiếp kết quả học tập từ GPA Dashboard sang CV.
 * Hỗ trợ biên soạn thông tin cá nhân, kinh nghiệm, dự án, chứng chỉ và xuất bản tệp PDF chuẩn ATS chuyên nghiệp chỉ trong một click.
 
-### 4. 💳 Quản Lý Tài Chính & Máy Tính Số Học (Finance Dashboard)
+### 4. 💳 Quản Lý Tài chính & Máy Tính Số Học (Finance Dashboard)
 * Ghi chép chi tiêu/thu nhập với danh mục đa dạng, tự động gán icon và màu sắc phù hợp dựa trên phân tích từ khóa tiếng Việt.
 * Tích hợp bộ giải biểu thức toán học trực tiếp trong ô nhập số tiền (hỗ trợ các toán tử `+`, `-`, `*`, `/`, viết tắt `k`, `tr`, `m`, `t` như `50k + 1.5tr`).
 * Tích hợp bàn phím toán học ảo trượt lên mượt mà (Custom Keypad) độc quyền.
+* **Quản lý Ví tài chính & Quỹ chi tiêu mục đích**: Tạo và theo dõi số dư các tài khoản thực tế (tiền mặt, thẻ ngân hàng, ví điện tử) cùng quỹ mục đích riêng biệt (quỹ du lịch, tiết kiệm, học tập...).
+* **Chuyển tiền nội bộ (Internal Transfer)**: Cho phép thực hiện chuyển tiền qua lại linh hoạt giữa các tài khoản thanh toán và các quỹ chi tiêu.
+* **Sổ ghi nợ & Vay mượn mini (Debtor Ledger)**: Ghi chép lịch sử vay mượn nợ và hỗ trợ tự động khấu trừ/cộng vào số dư tài khoản/ví được liên kết khi thu nợ hoặc trả nợ.
+* **Hiển thị số dư nhanh trên di động**: Tiện ích Ví & Quỹ trên điện thoại tự động hiển thị số dư thực tế khả dụng cho từng loại (Ví/Quỹ) giúp theo dõi nhanh chóng.
 
 ### 5. 📂 Ví Tài Liệu Số Cá Nhân & Thay Ảnh Đại Diện (New ✨)
 * **Tải ảnh đại diện trực tiếp**: Người dùng có thể chạm vào ảnh đại diện trong phần Cài đặt để chụp hoặc chọn ảnh từ thiết bị, hệ thống tự động nén chất lượng cao.
@@ -107,6 +111,8 @@ src/
 │   ├── careerGoalService.ts  # Bộ xử lý gợi ý công việc dựa trên khảo sát tính cách và GPA
 │   ├── cvService.ts          # Xử lý dữ liệu CV và xuất tệp tin
 │   ├── gpaCalculator.ts      # Bộ logic quy đổi điểm và kịch bản mục tiêu GPA VNU
+│   ├── walletService.ts      # Quản lý số dư, tạo/sửa ví và quỹ và chuyển tiền nội bộ
+│   ├── debtService.ts        # Quản lý các khoản vay/nợ, trả nợ và khấu trừ tự động
 │   └── ...                   # Quản lý lịch trình, thông báo, nhật ký...
 │
 ├── hooks/              # Custom React hooks dùng chung
@@ -162,6 +168,7 @@ Các file schema SQL dùng để khởi tạo cơ sở dữ liệu nằm trong t
 * `sql/add_documents_columns.sql`: Thêm các cột lưu trữ ảnh đại diện, QR và ảnh tài liệu (CCCD/Thẻ SV) mã hóa Base64 dưới dạng text tối ưu.
 * `sql/add_ai_personalization_columns.sql`: Cập nhật các trường thông tin MBTI/DISC cá nhân hóa AI.
 * `sql/journal_schema.sql`: Định nghĩa bảng nhật ký số và kích hoạt khóa mã PIN.
+* `sql/wallet_debt_schema.sql`: Định nghĩa các bảng `wallets`, `debts`, và `debt_repayments` cho hệ thống Ví tài chính, Quỹ chi tiêu, Chuyển khoản nội bộ, và Sổ ghi nợ mini liên kết dòng tiền.
 
 ### Cơ chế bảo mật RLS:
 Bảng `profiles` được bảo vệ nghiêm ngặt:

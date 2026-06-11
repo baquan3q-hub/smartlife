@@ -115,8 +115,8 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = ({
             </span>
           )}
           {countdown && !todo.is_completed && (
-            <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-bold border flex items-center gap-0.5 ${countdown.color} ${countdown.isOverdue ? 'animate-pulse' : ''}`}>
-              <Clock size={8} /> {countdown.text}
+            <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-bold border flex items-center gap-1.5 ${countdown.color} ${countdown.isOverdue ? 'animate-pulse' : ''}`}>
+              <Clock size={12} className="shrink-0" /> {countdown.text}
             </span>
           )}
           {todo.time_spent !== undefined && todo.time_spent > 0 && (
@@ -810,14 +810,14 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             />
 
             <div className="custom-picker-input relative w-full group">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-emerald-500 transition-colors z-20">
-                <Clock size={14} />
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-emerald-500 transition-colors z-20">
+                <Clock size={16} />
               </div>
               <input
                 type="datetime-local"
                 value={newTodoDeadline}
                 onChange={(e) => setNewTodoDeadline(e.target.value)}
-                className="w-full bg-white/70 backdrop-blur-sm border border-gray-200/80 rounded-2xl pl-10 pr-3 py-2.5 text-xs focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none text-gray-700 font-semibold min-w-0 transition-all shadow-sm"
+                className="w-full bg-white/70 backdrop-blur-sm border border-gray-200/80 rounded-2xl pl-11 pr-4 py-3 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none text-gray-700 font-semibold min-w-0 transition-all shadow-sm"
               />
             </div>
 

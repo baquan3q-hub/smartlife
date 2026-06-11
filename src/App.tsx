@@ -196,7 +196,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     // Fixed mobile navbar tabs (4 items only)
     const MOBILE_NAV_TABS = [
         { id: 'visual', labelVi: 'Tổng quan', labelEn: 'Overview', labelKo: '개요', icon: LayoutDashboard, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', icon: WalletIcon, color: 'text-orange-600', bg: 'bg-orange-50' },
+        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', icon: WalletIcon, color: 'text-blue-900', bg: 'bg-blue-50' },
         { id: 'schedule', labelVi: 'Lịch trình', labelEn: 'Schedule', labelKo: '일정', icon: CalendarDays, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         { id: 'expand', labelVi: 'Mở rộng', labelEn: 'More', labelKo: '더보기', icon: Grid2X2, color: 'text-violet-600', bg: 'bg-violet-50' },
     ];

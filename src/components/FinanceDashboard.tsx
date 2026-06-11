@@ -937,7 +937,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         return (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 md:p-6 mb-6 animate-fade-in">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-gray-800">Ngân sách Tháng {selectedMonth + 1}</h3>
+                    <h3 className="text-lg font-bold text-gray-800">Ngân sách tháng {selectedMonth + 1}</h3>
                     <button
                         onClick={() => {
                             setEditingBudget(null);
@@ -2004,14 +2004,14 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             </div>
 
             {/* Top Header & Actions */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
-                <div>
-                    <div className="flex items-center gap-3">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4 w-full">
+                <div className="w-full md:w-auto">
+                    <div className="flex items-center justify-between md:justify-start gap-3 w-full">
                         <h2 className="text-2xl font-bold text-gray-800"> Tổng quan tài chính </h2>
                         {/* Notebook Gray Circular Background Icon for Debtor Ledger */}
                         <button
                             onClick={() => setIsDebtorLedgerOpen(true)}
-                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 p-2 rounded-xl transition-all duration-200 shadow-sm flex items-center justify-center"
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 p-2 rounded-xl transition-all duration-200 shadow-sm flex items-center justify-center shrink-0"
                             title="Sổ nợ mini"
                         >
                             <BookOpen size={18} />
@@ -2196,30 +2196,50 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             {viewMode === 'overview' && renderBudgets()}
 
             {/* Mobile Wallet Widget */}
-            {viewMode === 'overview' && (
-                <div className="md:hidden w-full px-1">
-                    <button
-                        onClick={() => setViewMode('wallets')}
-                        className="w-full bg-gradient-to-r from-sky-500/10 via-indigo-500/10 to-purple-500/10 hover:from-sky-500/20 hover:to-purple-500/20 text-gray-800 p-4 rounded-2xl border border-indigo-100 flex justify-between items-center transition-all duration-300 shadow-sm active:scale-98 text-left"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-white/80 text-sky-600 flex items-center justify-center shadow-sm">
-                                <WalletIcon size={18} className="text-sky-600" />
-                            </div>
-                            <div>
-                                <div className="text-sm font-bold text-gray-800">💳 Ví & Quỹ chi tiêu</div>
-                                <div className="text-[11px] text-gray-500 font-medium">
-                                    Đang quản lý {state.wallets.length} ví & quỹ mục đích
+            {viewMode === 'overview' && (() => {
+                const totalWalletsBalance = state.wallets
+                    .filter(w => w.type !== 'fund')
+                    .reduce((sum, w) => sum + Number(w.balance), 0);
+                const totalFundsBalance = state.wallets
+                    .filter(w => w.type === 'fund')
+                    .reduce((sum, w) => sum + Number(w.balance), 0);
+                
+                const walletLabel = lang === 'vi' ? 'Ví' : lang === 'ko' ? '지갑' : 'Wallets';
+                const fundLabel = lang === 'vi' ? 'Quỹ' : lang === 'ko' ? '기금' : 'Funds';
+                const walletsAndFundsTitle = lang === 'vi' ? 'Ví & Quỹ chi tiêu' : lang === 'ko' ? '지갑 및 기금' : 'Wallets & Funds';
+                const viewDetailLabel = lang === 'vi' ? 'Xem chi tiết' : lang === 'ko' ? '자세히 보기' : 'View Details';
+
+                return (
+                    <div className="md:hidden w-full px-1">
+                        <button
+                            onClick={() => setViewMode('wallets')}
+                            className="w-full bg-white text-gray-800 p-4 rounded-2xl border border-gray-100 hover:border-sky-100 hover:shadow-md flex justify-between items-center transition-all duration-300 shadow-sm active:scale-98 text-left"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-sm">
+                                    <WalletIcon size={18} className="text-sky-600" />
+                                </div>
+                                <div>
+                                    <div className="text-sm font-bold text-gray-800">{walletsAndFundsTitle}</div>
+                                    <div className="text-[11px] text-gray-500 font-semibold mt-0.5 flex items-center gap-1.5">
+                                        <span>
+                                            {walletLabel}: <span className="text-emerald-600">{hideBalance ? '••••••' : formatCurrency(totalWalletsBalance, lang)}</span>
+                                        </span>
+                                        <span className="text-gray-300">|</span>
+                                        <span>
+                                            {fundLabel}: <span className="text-indigo-600">{hideBalance ? '••••••' : formatCurrency(totalFundsBalance, lang)}</span>
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <span className="text-xs font-extrabold text-indigo-600">Xem chi tiết</span>
-                            <ChevronDown size={14} className="text-indigo-600 -rotate-90" />
-                        </div>
-                    </button>
-                </div>
-            )}
+                            <div className="flex items-center gap-1">
+                                <span className="text-xs font-extrabold text-indigo-600">{viewDetailLabel}</span>
+                                <ChevronDown size={14} className="text-indigo-600 -rotate-90" />
+                            </div>
+                        </button>
+                    </div>
+                );
+            })()}
 
             {/* AI Analysis Modal */}
             {
@@ -3416,7 +3436,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
                                                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block ml-1 mb-1">Ngày ghi nợ</label>
                                                 <input
@@ -3467,7 +3487,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             type="submit"
                                             className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-98"
                                         >
-                                            Xác nhận tạo nợ 💾
+                                            Xác nhận tạo nợ
                                         </button>
                                     </form>
                                 </div>
@@ -3529,7 +3549,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
                                                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block ml-1 mb-1">Ngày trả tiền</label>
                                                 <input
@@ -3569,7 +3589,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             type="submit"
                                             className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold text-xs shadow-md transition-all active:scale-98"
                                         >
-                                            Xác nhận trả nợ 💰
+                                            Xác nhận trả nợ
                                         </button>
                                     </form>
                                 </div>
@@ -3579,7 +3599,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     {/* Receivables & Payables KPI */}
                                     <div className="grid grid-cols-2 gap-3.5">
                                         <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 text-center">
-                                            <p className="text-[10px] text-rose-500 font-extrabold uppercase tracking-wide">💵 Khoản Cho Vay (Cần Thu)</p>
+                                            <p className="text-[10px] text-rose-500 font-extrabold uppercase tracking-wide">💵 Khoản Cho Vay</p>
                                             <h4 className="text-lg font-black text-rose-600 mt-1">
                                                 {formatCurrency(
                                                     state.debts
@@ -3590,7 +3610,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             </h4>
                                         </div>
                                         <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-center">
-                                            <p className="text-[10px] text-emerald-500 font-extrabold uppercase tracking-wide">💸 Khoản Đi Vay (Phải Trả)</p>
+                                            <p className="text-[10px] text-emerald-500 font-extrabold uppercase tracking-wide">💸 Khoản Đi Vay </p>
                                             <h4 className="text-lg font-black text-emerald-600 mt-1">
                                                 {formatCurrency(
                                                     state.debts
