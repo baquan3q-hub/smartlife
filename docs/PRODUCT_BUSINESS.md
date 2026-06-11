@@ -98,10 +98,14 @@ SmartLife tạo giá trị theo 4 lớp:
 **Vấn đề:** Nhiều sinh viên không biết tiền đi đâu, khó bám ngân sách, dễ chi tiêu theo cảm xúc và ít theo dõi mục tiêu tiết kiệm.
 
 **Cách SmartLife giải quyết:** `FinanceDashboard` cho phép thêm/sửa/xóa giao dịch, phân loại thu/chi, quản lý danh mục mặc định và danh mục tự tạo, đặt mục tiêu tài chính, đặt ngân sách theo danh mục/tháng, xem thống kê và biểu đồ.
+*   **Ví tài chính & Quỹ chi tiêu**: Người dùng có thể phân chia nguồn lực tài chính vào các tài khoản/ví thực tế (tiền mặt, ATM ngân hàng, ví điện tử Momo) hoặc các quỹ tích lũy mục đích (quỹ du lịch, tiết kiệm, học tập...).
+*   **Chuyển tiền nội bộ (Internal Transfer)**: Hỗ trợ chuyển tiền qua lại mượt mà giữa các ví hoặc tài khoản để phản ánh đúng dòng tiền luân chuyển.
+*   **Sổ ghi nợ & Vay mượn mini (Debtor Ledger)**: Cho phép tạo hồ sơ vay mượn với bạn bè, tự động khấu trừ vào số dư Ví được liên kết khi thực hiện giao dịch thu nợ/trả nợ.
+*   **Widget số dư trên di động**: Widget Ví & Quỹ trên điện thoại tự động hiển thị số dư thực tế tương ứng của Ví và Quỹ một cách trực quan, hỗ trợ chế độ ẩn số dư bảo mật.
 
-**Dữ liệu sử dụng:** `transactions`, `goals`, `budgets`, `profiles.custom_categories`, `EXPENSE_CATEGORIES`, `INCOME_CATEGORIES`.
+**Dữ liệu sử dụng:** `transactions`, `goals`, `budgets`, `profiles.custom_categories`, `wallets`, `debts`, `debt_repayments`, `EXPENSE_CATEGORIES`, `INCOME_CATEGORIES`.
 
-**Giá trị mang lại:** Người dùng thấy rõ dòng tiền, nhóm chi tiêu lớn, tiến độ mục tiêu và mức độ bám ngân sách. Với business, finance là tính năng có giá trị cao vì tạo thói quen nhập liệu lặp lại.
+**Giá trị mang lại:** Người dùng thấy rõ dòng tiền, nhóm chi tiêu lớn, tiến độ mục tiêu, số tiền thực tế trong tài khoản và mức độ bám ngân sách. Việc thêm Ví & Quỹ cùng Sổ nợ giúp nâng cao khả năng quản trị tài chính thiết thực hơn cho sinh viên.
 
 ### 5.6. CashFlowDashboard
 
@@ -337,4 +341,4 @@ Trọng tâm nên đặt vào 3 lời hứa sản phẩm:
 
 ## 9. AI Context Summary
 
-SmartLife là ứng dụng React/TypeScript/Vite dùng Supabase, Firebase Messaging, Gemini và PWA để hỗ trợ sinh viên tự quản. Các tính năng chính đang chạy gồm auth, landing/login, VisualBoard, tài chính, cashflow, lịch trình, todo, mục tiêu, focus timer, music, MySpotify, GPA, AI Advisor, habit/countdown/count-up, storage, settings, Pro subscription và admin. Dữ liệu chính nằm ở Supabase tables như `profiles`, `transactions`, `goals`, `budgets`, `timetable`, `todos`, `calendar_events`, `gpa_semesters`, `gpa_courses`, `ai_conversations`, `ai_messages`, `ai_memory`, `api_logs`, `my_storage`, `my_playlists`, `my_tracks`, `subscription_orders`, `countdown_items`, `countup_items`, `habits`, `habit_logs`. Các phần cần cẩn trọng khi mô tả là `/api` backend đang rỗng, một số service legacy chưa nối hoàn chỉnh, FocusTimer còn lưu localStorage, và behavioral analytics chưa phải pipeline nghiên cứu hoàn chỉnh.
+SmartLife là ứng dụng React/TypeScript/Vite dùng Supabase, Firebase Messaging, Gemini và PWA để hỗ trợ sinh viên tự quản. Các tính năng chính đang chạy gồm auth, landing/login, VisualBoard, tài chính, cashflow, lịch trình, todo, mục tiêu, focus timer, music, MySpotify, GPA, AI Advisor, habit/countdown/count-up, storage, settings, Pro subscription và admin. Dữ liệu chính nằm ở Supabase tables như `profiles`, `transactions`, `goals`, `budgets`, `timetable`, `todos`, `calendar_events`, `gpa_semesters`, `gpa_courses`, `ai_conversations`, `ai_messages`, `ai_memory`, `api_logs`, `my_storage`, `my_playlists`, `my_tracks`, `subscription_orders`, `countdown_items`, `countup_items`, `habits`, `habit_logs`, `wallets`, `debts`, `debt_repayments`. Các phần cần cẩn trọng khi mô tả là `/api` backend đang rỗng, một số service legacy chưa nối hoàn chỉnh, FocusTimer còn lưu localStorage, và behavioral analytics chưa phải pipeline nghiên cứu hoàn chỉnh.

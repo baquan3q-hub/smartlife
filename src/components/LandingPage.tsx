@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen, Target, CheckCircle2, Star, Facebook, FileText, Image, AudioLines, Users, ChevronUp } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen, Target, CheckCircle2, Star, Facebook, FileText, Image, AudioLines, Users, ChevronUp, BarChart3, ArrowRightLeft, Bot } from 'lucide-react';
 import InstallGuideModal from './InstallGuideModal';
 import { Lang } from '../i18n/i18n';
 
@@ -28,9 +28,15 @@ const translations = {
         featAiDesc: 'Trợ lý AI đa năng phân tích dữ liệu cá nhân, đọc hiểu file/ảnh/audio, cá nhân hóa dựa trên tính cách MBTI & DISC và đưa ra lời khuyên thông minh.',
         featAiItems: ['Phân tích chi tiêu chi tiết theo yêu cầu', 'Truy xuất toàn bộ dữ liệu để phản hồi cá nhân hóa', 'AI đọc và phân tích được file tài liệu đa định dạng', 'AI phân tích hình ảnh và nhận diện nội dung trực quan', 'AI xử lý và phân tích audio, ghi chú giọng nói', 'Cá nhân hóa dựa trên tính cách MBTI & DISC của người dùng', 'Thêm nhanh nhiều giao dịch thu chi cùng lúc bằng câu lệnh tự nhiên', 'Thêm và cập nhật lịch trình bằng ngôn ngữ đơn giản'],
 
-        featFinanceTitle: 'Tài chính minh bạch,\nTiết kiệm tối đa.',
-        featFinanceDesc: 'Theo dõi thu chi chi tiết, xem báo cáo trực quan và nhận phân tích thông minh từ AI để tối ưu hóa ngân sách của bạn.',
-        featFinanceItems: ['Báo cáo thu chi hàng tháng/quý/năm', 'Quản lý và theo dõi thu chi chi tiết minh bạch', 'Đặt mục tiêu tiết kiệm'],
+        featFinanceTitle: 'Tài chính minh bạch,\nQuản lý Ví & Sổ nợ.',
+        featFinanceDesc: 'Theo dõi thu chi, quản lý các ví tài khoản thực tế & quỹ chi tiêu mục đích, ghi chép vay mượn nợ và tự động khấu trừ dòng tiền thông minh.',
+        featFinanceItems: [
+            'Báo cáo thu chi trực quan theo tuần/tháng/năm',
+            'Hiển thị rõ số dư Ví & Quỹ trên điện thoại và máy tính',
+            'Sổ ghi nợ mini tự động liên kết với dòng tiền thực tế',
+            'Chuyển tiền nội bộ linh hoạt giữa các ví và tài khoản',
+            'Phân tích & gợi ý ngân sách thông minh từ Trợ lý AI'
+        ],
 
         featScheduleTitle: 'Làm chủ thời gian,\nNâng cao hiệu suất.',
         featScheduleDesc: 'Thời khóa biểu trực quan, To-do list ưu tiên thông minh và chế độ Focus mode giúp bạn tập trung hoàn thành mọi công việc.',
@@ -129,9 +135,15 @@ const translations = {
         featAiDesc: 'A versatile AI assistant that analyzes personal data, reads files/images/audio, personalizes advice based on your MBTI & DISC personality, and provides smart recommendations.',
         featAiItems: ['Detailed expense analysis on demand', 'Full data retrieval for personalized feedback', 'AI reads & analyzes documents in multiple formats', 'AI analyzes images and recognizes visual content', 'AI processes and analyzes audio & voice notes', 'Personalized based on your MBTI & DISC personality type', 'Batch add multiple transactions via natural language', 'Manage schedule using simple language'],
 
-        featFinanceTitle: 'Transparent Finance,\nMaximize Savings.',
-        featFinanceDesc: 'Track expenses in detail, view visual reports, and get smart AI analysis to optimize your budget.',
-        featFinanceItems: ['Monthly expense reports', 'Smart AI Analysis', 'Set savings goals'],
+        featFinanceTitle: 'Smart Finance,\nWallets & Debts.',
+        featFinanceDesc: 'Track cash flow, manage real bank accounts & purpose-based funds, log loans/debts with automatic balance updates and smart AI insights.',
+        featFinanceItems: [
+            'Visual income & expense reports by week/month/year',
+            'View Wallets & Funds balances on mobile and desktop',
+            'Mini Debtor Ledger automatically linked to cash flow',
+            'Flexible internal money transfers between wallets & accounts',
+            'Smart budget analysis & recommendations from AI Assistant'
+        ],
 
         featScheduleTitle: 'Master Your Time,\nBoost Productivity.',
         featScheduleDesc: 'Visual timetable, smart prioritized To-do list, and Focus mode to help you concentrate on getting things done.',
@@ -239,9 +251,15 @@ const translations = {
             '간단한 대화로 일정 및 To-do 추가/업데이트'
         ],
 
-        featFinanceTitle: '투명한 자산 관리,\n최대 저축 실현.',
-        featFinanceDesc: '상세 입출금 내역을 추적하고 직관적인 보고서를 보며, AI 분석을 통해 예산을 최적화하세요.',
-        featFinanceItems: ['월/분기/연간 입출금 보고서', '투명한 자산 흐름 기록 및 모니터링', '저축 목표 설정'],
+        featFinanceTitle: '스마트 자산 관리,\n지갑 및 채무 관리.',
+        featFinanceDesc: '현금 흐름을 추적하고, 실자산 지갑 및 목적별 예산 지출 quỹ를 관리하며, 대출 및 채무 기록과 스마트 AI 조언을 제공합니다.',
+        featFinanceItems: [
+            '주/월/년 단위 입출금 분석 시각화 보고서',
+            '모바일 및 PC 화면에서 실자산 지갑 및 quỹ 잔액 확인',
+            '자산 흐름과 연동되어 자동 삭감되는 미니 채무 대장',
+            '지갑과 예산/계좌 간의 유연한 내부 이체 기능',
+            'AI 비서가 제공하는 스마트 지출 분석 및 예산 권장'
+        ],
 
         featScheduleTitle: '시간 지배하기,\n생산성 향상.',
         featScheduleDesc: '직관적인 일정표, 스마트 우선순위 할일 목록 및 집중 타스크 완수를 위한 뽀모도로 타이머.',
@@ -866,20 +884,24 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
                             </div>
                         </div>
                         <div className="order-1 md:order-2 space-y-6">
-                            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
-                                <Wallet size={28} />
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Sparkles size={14} className="animate-pulse" /> {lang === 'vi' ? 'Nâng cấp đột phá' : lang === 'ko' ? '대규모 업데이트' : 'Major Upgrade'}
                             </div>
                             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featFinanceTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featFinanceDesc}
                             </p>
                             <ul className="space-y-3">
-                                {t.featFinanceItems.map((item, i) => (
-                                    <li key={i} className="flex items-start gap-3 text-gray-700 font-medium">
-                                        <ShieldCheck className="text-emerald-500 shrink-0 mt-1" size={20} />
-                                        <span>{item}</span>
-                                    </li>
-                                ))}
+                                {t.featFinanceItems.map((item, i) => {
+                                    const financeIcons = [BarChart3, Wallet, BookOpen, ArrowRightLeft, Bot];
+                                    const Icon = financeIcons[i] || ShieldCheck;
+                                    return (
+                                        <li key={i} className="flex items-start gap-3 text-gray-700 font-medium">
+                                            <Icon className="text-emerald-500 shrink-0 mt-1" size={20} />
+                                            <span>{item}</span>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         </div>
                     </div>
