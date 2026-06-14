@@ -134,9 +134,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminEmail, admi
         log('⚠️ api_logs chưa tồn tại — bỏ qua');
       }
 
-      // API keys
-      const envKeys = import.meta.env.VITE_GEMINI_API_KEYS || import.meta.env.VITE_GEMINI_API_KEY || '';
-      setApiKeyCount(envKeys.split(',').filter(Boolean).length);
+      // API keys — quản lý phía server (không expose ra frontend)
+      setApiKeyCount(-1); // -1 = server-managed
 
       setLastRefresh(new Date());
     } catch (err: any) {
