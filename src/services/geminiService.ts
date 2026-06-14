@@ -14,19 +14,15 @@ import { supabase } from './supabase';
 // ────────────────────────────────────────
 // API Configuration
 // ────────────────────────────────────────
-const envKeys = import.meta.env.VITE_GEMINI_API_KEYS || import.meta.env.VITE_GEMINI_API_KEY || '';
-const API_KEYS = envKeys.split(',').map((k: string) => k.trim()).filter(Boolean);
-let currentKeyIndex = 0;
+// API key được quản lý an toàn phía server (Vercel Serverless Function)
+// Frontend chỉ gọi proxy endpoint — KHÔNG bao giờ chứa key
+const GEMINI_PROXY_URL = '/api/gemini';
 
-// Model thống nhất duy nhất
+// Model name — chỉ dùng để hiển thị, server tự quyết định model
 const MODEL = 'gemini-2.5-flash';
 
-function getGeminiUrl(): string {
-    const key = API_KEYS[currentKeyIndex % API_KEYS.length] || '';
-    return `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
-}
-
 export function getCurrentModel(): string { return MODEL; }
+
 
 // ────────────────────────────────────────
 // Request Queue — throttled to prevent burst rate limits
@@ -538,9 +534,7 @@ Hãy đọc thông tin MBTI và DISC của người dùng sau khi gọi công c�
 // Core API Call — single model, but cycles API keys on 429
 // ────────────────────────────────────────
 export async function callGeminiRaw(body: object, retryCount = 0): Promise<any> {
-    const url = getGeminiUrl();
-
-    const res = await fetch(url, {
+    const res = await fetch(GEMINI_PROXY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -550,27 +544,20 @@ export async function callGeminiRaw(body: object, retryCount = 0): Promise<any> 
         const err = await res.json().catch(() => ({}));
         const status = res.status;
 
-        if (status === 429 || status === 403 || status === 500 || status === 503 || status === 504) {
-            if (retryCount < Math.max(3, API_KEYS.length)) {
-                if (API_KEYS.length > 1) {
-                    currentKeyIndex++;
-                    console.warn(`[SmartLife] Status ${status}. Switching to key #${(currentKeyIndex % API_KEYS.length) + 1} and retrying...`);
-                } else {
-                    console.warn(`[SmartLife] Status ${status}. Retrying request...`);
-                }
-                const delay = 1500 * (retryCount + 1); // 1.5s, 3s, 4.5s...
-                await new Promise(r => setTimeout(r, delay));
-                return callGeminiRaw(body, retryCount + 1);
-            }
-            if (status === 429) {
-                throw new Error('Hệ thống AI đang bị quá tải (429). Đã hết sạch khóa dự phòng. Vui lòng đợi một lát rồi thử lại. 🔄');
-            } else {
-                throw new Error(`Dịch vụ AI tạm thời gặp sự cố (${status}). Vui lòng thử lại sau. 🔄`);
-            }
+        // Retry cho lỗi tạm thời (server đã xử lý key rotation)
+        if ((status === 429 || status === 500 || status === 503 || status === 504) && retryCount < 3) {
+            console.warn(`[SmartLife] Proxy returned ${status}. Retrying (${retryCount + 1}/3)...`);
+            const delay = 2000 * (retryCount + 1);
+            await new Promise(r => setTimeout(r, delay));
+            return callGeminiRaw(body, retryCount + 1);
         }
 
-        console.error(`[SmartLife] ${MODEL} Error ${status}:`, err);
-        throw new Error(err?.error?.message || `Gemini API Error ${status}`);
+        if (status === 429) {
+            throw new Error('Hệ thống AI đang bị quá tải (429). Vui lòng đợi một lát rồi thử lại. 🔄');
+        }
+
+        console.error(`[SmartLife] Proxy Error ${status}:`, err);
+        throw new Error(err?.error || `Gemini API Error ${status}`);
     }
 
     return await res.json();

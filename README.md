@@ -144,8 +144,11 @@ src/
    ```env
    VITE_SUPABASE_URL=your_supabase_project_url
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   VITE_GEMINI_API_KEY=your_gemini_api_key
+
+   # Gemini API Key (server-side only — KHÔNG có prefix VITE_)
+   GEMINI_API_KEYS=your_gemini_api_key
    ```
+   > ⚠️ **Lưu ý bảo mật:** `GEMINI_API_KEYS` **không có prefix `VITE_`** để Vite không embed key vào client bundle. Key chỉ được đọc bởi Vercel Serverless Function (`/api/gemini.js`). Khi deploy lên Vercel, hãy thêm `GEMINI_API_KEYS` vào **Vercel Dashboard → Settings → Environment Variables**.
 
 3. **Chạy ứng dụng trong chế độ Development:**
    ```bash

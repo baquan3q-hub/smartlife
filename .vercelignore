@@ -1,4 +1,3 @@
-api/
 venv/
 *.py
 requirements.txt
