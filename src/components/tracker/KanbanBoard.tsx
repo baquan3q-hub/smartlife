@@ -16,7 +16,7 @@ import {
   useSortable 
 } from '@dnd-kit/sortable';
 import { Todo, TodoStatus } from '../../types';
-import { Plus, Trash2, Calendar, CheckSquare } from 'lucide-react';
+import { Plus, Trash2, CheckSquare } from 'lucide-react';
 
 interface KanbanBoardProps {
   todos: Todo[];
@@ -354,26 +354,13 @@ const SortableCard: React.FC<SortableCardProps> = ({
         </p>
       )}
 
-      {/* Footer Info (Deadline, Checklist) */}
-      {(todo.deadline || totalSubtasks > 0) && (
+      {/* Footer Info (Checklist only) */}
+      {totalSubtasks > 0 && (
         <div className="flex items-center gap-2 mt-1 flex-wrap select-none">
-          {todo.deadline && (
-            <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold flex items-center gap-1 border ${
-              isOverdue(todo.deadline)
-                ? 'text-rose-600 border-rose-100 bg-rose-50/50'
-                : 'text-slate-500 border-slate-100 bg-slate-50'
-            }`}>
-              <Calendar size={9} />
-              {formatDate(todo.deadline)}
-            </span>
-          )}
-
-          {totalSubtasks > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md border text-slate-500 border-slate-100 bg-slate-50 font-bold flex items-center gap-1">
-              <CheckSquare size={9} />
-              {completedSubtasks}/{totalSubtasks}
-            </span>
-          )}
+          <span className="text-[9px] px-1.5 py-0.5 rounded-md border text-slate-500 border-slate-100 bg-slate-50 font-bold flex items-center gap-1">
+            <CheckSquare size={9} />
+            {completedSubtasks}/{totalSubtasks}
+          </span>
         </div>
       )}
 
@@ -449,26 +436,13 @@ const DragOverlayCard: React.FC<DragOverlayCardProps> = ({ todo, width }) => {
         </p>
       )}
 
-      {/* Footer Info (Deadline, Checklist) */}
-      {(todo.deadline || totalSubtasks > 0) && (
+      {/* Footer Info (Checklist only) */}
+      {totalSubtasks > 0 && (
         <div className="flex items-center gap-2 mt-1 flex-wrap select-none">
-          {todo.deadline && (
-            <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold flex items-center gap-1 border ${
-              isOverdue(todo.deadline)
-                ? 'text-rose-600 border-rose-100 bg-rose-50/50'
-                : 'text-slate-500 border-slate-100 bg-slate-50'
-            }`}>
-              <Calendar size={9} />
-              {formatDate(todo.deadline)}
-            </span>
-          )}
-
-          {totalSubtasks > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md border text-slate-500 border-slate-100 bg-slate-50 font-bold flex items-center gap-1">
-              <CheckSquare size={9} />
-              {completedSubtasks}/{totalSubtasks}
-            </span>
-          )}
+          <span className="text-[9px] px-1.5 py-0.5 rounded-md border text-slate-500 border-slate-100 bg-slate-50 font-bold flex items-center gap-1">
+            <CheckSquare size={9} />
+            {completedSubtasks}/{totalSubtasks}
+          </span>
         </div>
       )}
     </div>
