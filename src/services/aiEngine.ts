@@ -242,7 +242,7 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
     },
     {
         name: 'get_todos_and_schedule',
-        description: 'Lấy danh sách công việc cần làm (todos) và lịch trình cố định của người dùng.',
+        description: 'Lấy toàn bộ Kanban board (4 cột: Backlog, Todo, Doing, Done) với chi tiết từng nhiệm vụ (mô tả, subtasks, hạn chót) và lịch trình cố định hàng tuần.',
         parameters: { type: 'object', properties: {} }
     },
     {

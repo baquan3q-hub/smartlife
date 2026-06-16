@@ -190,15 +190,53 @@ export function buildGoalsContext(state: AppState): string {
 export function buildScheduleContext(state: AppState): string {
     const { todos, timetable } = state;
     let ctx = '';
-    const pending = (todos || []).filter(t => !t.is_completed);
-    const done = (todos || []).filter(t => t.is_completed);
+    const allTodos = todos || [];
 
-    if (pending.length > 0 || done.length > 0) {
-        ctx += `\n📋 CÔNG VIỆC: ${done.length}/${(todos || []).length} hoàn thành\n`;
-        pending.slice(0, 8).forEach(t => {
-            ctx += `  - ⬜ ${t.content} [${t.priority}]${t.deadline ? ` (Hạn: ${new Date(t.deadline).toLocaleDateString('vi-VN')})` : ''}\n`;
+    // Group todos by Kanban column status
+    const columns: { status: string; label: string; emoji: string }[] = [
+        { status: 'backlog', label: 'Backlog', emoji: '📦' },
+        { status: 'todo', label: 'Todo', emoji: '📋' },
+        { status: 'doing', label: 'Đang làm', emoji: '🔨' },
+        { status: 'done', label: 'Hoàn thành', emoji: '✅' },
+    ];
+
+    const totalDone = allTodos.filter(t => t.status === 'done' || t.is_completed).length;
+
+    if (allTodos.length > 0) {
+        ctx += `\n📋 KANBAN BOARD — CÔNG VIỆC: ${totalDone}/${allTodos.length} hoàn thành\n`;
+
+        columns.forEach(col => {
+            const colTodos = allTodos.filter(t => {
+                if (col.status === 'done') return t.status === 'done' || t.is_completed;
+                if (col.status === 'todo') return t.status === 'todo' || (!t.status && !t.is_completed);
+                return t.status === col.status;
+            });
+
+            ctx += `\n  ${col.emoji} CỘT "${col.label}" (${colTodos.length} task):\n`;
+
+            if (colTodos.length === 0) {
+                ctx += `    (trống)\n`;
+            } else {
+                colTodos.forEach(t => {
+                    ctx += `    - ${t.content}`;
+                    if (t.deadline) {
+                        ctx += ` [Hạn: ${new Date(t.deadline).toLocaleDateString('vi-VN')}]`;
+                    }
+                    if (t.description) {
+                        const desc = t.description.substring(0, 80).replace(/\n/g, ' ');
+                        ctx += ` — Mô tả: "${desc}${t.description.length > 80 ? '...' : ''}"`;
+                    }
+                    if (t.subtasks && t.subtasks.length > 0) {
+                        const completed = t.subtasks.filter(s => s.is_completed).length;
+                        ctx += ` | Checklist: ${completed}/${t.subtasks.length}`;
+                        t.subtasks.forEach(s => {
+                            ctx += `\n      ${s.is_completed ? '✅' : '⬜'} ${s.title}`;
+                        });
+                    }
+                    ctx += '\n';
+                });
+            }
         });
-        done.slice(0, 3).forEach(t => { ctx += `  - ✅ ${t.content}\n`; });
     }
 
     if (timetable && timetable.length > 0) {
@@ -461,7 +499,7 @@ QUY TẮC BẢO MẬT & TIẾT KIỆM TOKEN:
 - Hồ sơ cá nhân của người dùng (tên, tuổi, MBTI, DISC, nghề nghiệp, định hướng...) đã được nhúng sẵn ở prompt hệ thống dưới đây để giúp bạn cá nhân hóa xưng hô và phong cách giao tiếp từ câu đầu tiên. Bạn KHÔNG cần gọi hàm get_user_profile nữa trừ khi muốn refresh thông tin từ database.
 - Hãy chủ động gọi các công cụ truy vấn (Function Calling) tương ứng dưới đây khi cần dữ liệu động để trả lời người dùng (ví dụ: giao dịch tài chính, điểm số, thói quen, công việc):
   • Gọi \`get_financial_report\` khi hỏi tổng quan về tài chính, số dư ví, nợ nần, ngân sách, chi tiêu danh mục của tháng hiện tại.
-  • Gọi \`get_todos_and_schedule\` khi hỏi về việc cần làm (todos) và thời khóa biểu cố định.
+  • Gọi \`get_todos_and_schedule\` khi hỏi về công việc cần làm, Kanban board (gồm 4 cột: Backlog, Todo, Doing, Done), chi tiết nhiệm vụ, subtasks, và thời khóa biểu cố định.
   • Gọi \`get_academic_gpa_record\` khi hỏi về điểm số học tập, các học kỳ, môn học, tín chỉ, tính GPA tích lũy.
   • Gọi \`get_habits_tracker\` khi hỏi về thói quen cá nhân, streaks thói quen, tỷ lệ check-in hoàn thành.
   • Gọi \`get_countdown_events\` khi hỏi về các sự kiện đếm ngược hoặc mốc đếm tiến.

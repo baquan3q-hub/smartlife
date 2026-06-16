@@ -1102,30 +1102,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 />
               </div>
 
-              {/* Deadline Input */}
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">
-                  HẠN CHÓT
-                </label>
-                <div className="relative">
-                  <input
-                    type="datetime-local"
-                    value={modalDeadline}
-                    onChange={(e) => setModalDeadline(e.target.value)}
-                    className="w-full pl-3.5 pr-9 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400 text-xs text-slate-650 bg-white font-semibold"
-                  />
-                  {modalDeadline && (
-                    <button
-                      type="button"
-                      onClick={() => setModalDeadline('')}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
-                      title="Xóa hạn chót"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
+
+
 
               {/* Description Input */}
               <div>
