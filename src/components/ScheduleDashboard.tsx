@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { AppState, TimetableEvent, Goal, Todo, TaskPriority } from '../types';
-import { Calendar, Clock, CheckCircle2, Circle, Target, Plus, Trash2, Edit2, X, MapPin, AlertCircle, Zap, Coffee, Layers, Star, Download, Image as ImageIcon, GripVertical, ArrowUpToLine, ArrowDownToLine, Save, Loader2, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { AppState, TimetableEvent, Goal, Todo, TodoStatus } from '../types';
+import { Calendar, Clock, Target, Plus, Trash2, Edit2, X, MapPin, Star, ChevronDown, ChevronUp, Download, CheckCircle, RefreshCw, BarChart2, ListTodo, LayoutGrid, Settings } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import CalendarWidget from './CalendarWidget';
-import FocusTimer from './FocusTimer';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-
 import MusicSpace from './MusicSpace';
 
+// Import our new tracker widgets
+import { KanbanBoard } from './tracker/KanbanBoard';
+import { PomodoroWidget } from './tracker/PomodoroWidget';
+import { BookmarkWidget } from './tracker/BookmarkWidget';
+import { HabitsWidget } from './tracker/HabitsWidget';
+import { QuickNotesWidget } from './tracker/QuickNotesWidget';
+import ConfirmModal from './ConfirmModal';
 
 interface ScheduleDashboardProps {
   state: AppState;
@@ -19,10 +21,11 @@ interface ScheduleDashboardProps {
   onAddTimetable: (t: any) => void;
   onUpdateTimetable: (t: any) => void;
   onDeleteTimetable: (id: string) => void;
-  onAddTodo: (content: string, priority: TaskPriority, deadline?: string) => void;
+  onAddTodo: (content: string, priority: any, deadline?: string, status?: TodoStatus, description?: string, subtasks?: any[]) => void;
   onUpdateTodo: (t: any) => void;
   onDeleteTodo: (id: string) => void;
   onReorderTodos: (reordered: Todo[]) => void;
+  onMoveTodoStatus: (id: string, status: TodoStatus) => void;
   initialFocusMode?: boolean;
   onResetFocusMode?: () => void;
   activeTaskId?: string | null;
@@ -30,124 +33,6 @@ interface ScheduleDashboardProps {
   onRefresh?: () => Promise<void>;
 }
 
-
-// --- Sortable Todo Item Component ---
-interface SortableTodoItemProps {
-  todo: Todo;
-  config: any;
-  countdown: { text: string; color: string; isOverdue?: boolean } | null;
-  onToggle: (todo: Todo) => void;
-  onDelete: (id: string) => void;
-  onEdit: (todo: Todo) => void;
-  onMoveToTop: (id: string) => void;
-  onMoveToBottom: (id: string) => void;
-  isActive: boolean;
-  onStartTracking: (todo: Todo) => void;
-}
-
-const SortableTodoItem: React.FC<SortableTodoItemProps> = ({ 
-  todo, config, countdown, onToggle, onDelete, onEdit, onMoveToTop, onMoveToBottom, isActive, onStartTracking 
-}) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: todo.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 50 : 'auto' as any,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const formatTimeSpent = (seconds?: number) => {
-    if (!seconds || seconds <= 0) return null;
-    const mins = Math.floor(seconds / 60);
-    const hrs = Math.floor(mins / 60);
-    if (hrs > 0) {
-      const remainingMins = mins % 60;
-      return `${hrs}h ${remainingMins}p`;
-    }
-    if (mins > 0) {
-      return `${mins} phút`;
-    }
-    return `${seconds}s`;
-  };
-
-  const borderClass = isActive
-    ? 'border-blue-500 ring-2 ring-blue-500/50 bg-blue-50/20 shadow-md animate-pulse-subtle'
-    : isDragging
-      ? 'shadow-2xl ring-2 ring-indigo-400 bg-indigo-50/80 scale-[1.02]'
-      : todo.is_completed
-        ? 'bg-gray-50 border-transparent opacity-60'
-        : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-md';
-
-  return (
-    <div ref={setNodeRef} style={style} className={`group flex items-start gap-2 p-3.5 rounded-2xl border transition-all ${borderClass}`}>
-      {/* Drag Handle */}
-      <button
-        {...attributes}
-        {...listeners}
-        className="mt-1 p-1 cursor-grab active:cursor-grabbing text-gray-300 hover:text-indigo-500 transition-colors touch-none"
-        title="Kéo để sắp xếp"
-      >
-        <GripVertical size={16} />
-      </button>
-
-      {/* Toggle */}
-      <button onClick={() => onToggle(todo)} className={`mt-0.5 transition-colors ${todo.is_completed ? 'text-emerald-500' : 'text-gray-300 hover:text-emerald-500'}`}>
-        {todo.is_completed ? <CheckCircle2 size={22} /> : <Circle size={22} />}
-      </button>
-
-      {/* Content */}
-      <div 
-        onClick={() => !todo.is_completed && onStartTracking?.(todo)}
-        className={`flex-1 min-w-0 ${!todo.is_completed ? 'cursor-pointer hover:text-blue-600 transition-colors' : ''}`}
-        title={!todo.is_completed ? "Click để bắt đầu thực hiện việc này" : undefined}
-      >
-        <div className="flex justify-between items-start gap-2">
-          <p className={`text-sm font-medium leading-snug ${todo.is_completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{todo.content}</p>
-        </div>
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide border flex items-center gap-1 w-fit ${config.color}`}>
-            {config.label}
-          </span>
-          {todo.deadline && (
-            <span className="text-[10px] px-2 py-0.5 rounded-md font-bold border flex items-center gap-1 w-fit text-gray-400 border-gray-100 bg-gray-50">
-              {new Date(todo.deadline).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
-            </span>
-          )}
-          {countdown && !todo.is_completed && (
-            <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-bold border flex items-center gap-1.5 ${countdown.color} ${countdown.isOverdue ? 'animate-pulse' : ''}`}>
-              <Clock size={12} className="shrink-0" /> {countdown.text}
-            </span>
-          )}
-          {todo.time_spent !== undefined && todo.time_spent > 0 && (
-            <span className="text-[10px] px-2 py-0.5 rounded-md font-bold border flex items-center gap-1 w-fit text-blue-600 border-blue-100 bg-blue-50/50" title="Thời gian đã thực hiện">
-              ⏱ {formatTimeSpent(todo.time_spent)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button onClick={() => onMoveToTop(todo.id)} className="p-1 text-gray-300 hover:text-indigo-500 transition-colors" title="Lên đầu">
-          <ArrowUpToLine size={14} />
-        </button>
-        <button onClick={() => onMoveToBottom(todo.id)} className="p-1 text-gray-300 hover:text-indigo-500 transition-colors" title="Xuống cuối">
-          <ArrowDownToLine size={14} />
-        </button>
-        <button onClick={() => onEdit(todo)} className="p-1 text-gray-300 hover:text-blue-500 transition-colors" title="Sửa">
-          <Edit2 size={14} />
-        </button>
-        <button onClick={() => onDelete(todo.id)} className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Xóa">
-          <X size={14} />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-
-// Reordered: Mon (1) -> Sat (6) -> Sun (0)
 const DISPLAY_DAYS = [
   { value: 1, label: 'Thứ 2' },
   { value: 2, label: 'Thứ 3' },
@@ -158,21 +43,17 @@ const DISPLAY_DAYS = [
   { value: 0, label: 'Chủ Nhật' },
 ];
 
-const PRIORITY_CONFIG = {
-  [TaskPriority.URGENT]: { label: 'Ưu tiên', color: 'bg-red-100 text-red-700 border-red-200', icon: AlertCircle },
-  [TaskPriority.FOCUS]: { label: 'Tập trung', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: Zap },
-  [TaskPriority.CHILL]: { label: 'Chill', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: Coffee },
-  [TaskPriority.TEMP]: { label: 'Tạm thời', color: 'bg-gray-100 text-gray-700 border-gray-200', icon: Layers },
-  // Map DB values to same config
-  'high': { label: 'Ưu tiên', color: 'bg-red-100 text-red-700 border-red-200', icon: AlertCircle },
-  'medium': { label: 'Tập trung', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: Zap },
-  'low': { label: 'Chill', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: Coffee },
-};
+const COLUMNS: { id: TodoStatus; label: string; bg: string; border: string; dot: string; text: string }[] = [
+  { id: 'backlog', label: 'Backlog', bg: 'bg-slate-50/70', border: 'border-slate-200', dot: 'bg-slate-400', text: 'text-slate-700' },
+  { id: 'todo', label: 'Todo', bg: 'bg-blue-50/40', border: 'border-blue-100', dot: 'bg-blue-500', text: 'text-blue-700' },
+  { id: 'doing', label: 'Doing', bg: 'bg-amber-50/40', border: 'border-amber-100', dot: 'bg-amber-500', text: 'text-amber-700' },
+  { id: 'done', label: 'Done', bg: 'bg-emerald-50/40', border: 'border-emerald-100', dot: 'bg-emerald-500', text: 'text-emerald-700' },
+];
 
 const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   state,
   onAddGoal, onUpdateGoal, onDeleteGoal,
-  onAddTodo, onUpdateTodo, onDeleteTodo, onReorderTodos,
+  onAddTodo, onUpdateTodo, onDeleteTodo, onReorderTodos, onMoveTodoStatus,
   initialFocusMode = false, onResetFocusMode,
   onAddTimetable, onUpdateTimetable, onDeleteTimetable,
   activeTaskId = null,
@@ -182,15 +63,66 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const { timetable, goals, todos } = state;
   const { timer, onOpenMusic } = state as any;
 
-  const [activeTab, setActiveTab] = useState<'calendar' | 'goals'>('calendar');
+  // View state: 'board' (Kanban) or 'list' (Calendar Grid view for todos)
+  const [todoView, setTodoView] = useState<'board' | 'list'>(() => {
+    const saved = localStorage.getItem(`smartlife_todo_view_${state.profile?.id}`);
+    return (saved === 'board' || saved === 'list') ? saved : 'board';
+  });
+
   const [isFocusMode, setIsFocusMode] = useState(false);
-  const [todoFilter, setTodoFilter] = useState<'active' | 'completed'>('active');
+
+  // Accordion collapses
+  const [isTimetableCollapsed, setIsTimetableCollapsed] = useState(true);
+  const [isRoadmapCollapsed, setIsRoadmapCollapsed] = useState(true);
+  const [isCalendarCollapsed, setIsCalendarCollapsed] = useState(true);
+  const [isGoalsCollapsed, setIsGoalsCollapsed] = useState(true);
 
   // Pull to Refresh state
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const startY = React.useRef(0);
   const isDragging = React.useRef(false);
+
+  // Unified Task creation/edit modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
+  const [todoToDeleteId, setTodoToDeleteId] = useState<string | null>(null);
+
+  const [modalContent, setModalContent] = useState('');
+  const [modalStatus, setModalStatus] = useState<TodoStatus>('todo');
+  const [modalDeadline, setModalDeadline] = useState('');
+  const [modalDescription, setModalDescription] = useState('');
+  const [modalSubtasks, setModalSubtasks] = useState<{ id: string; title: string; is_completed: boolean }[]>([]);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+  // Calendar states
+  const [calendarDate, setCalendarDate] = useState(new Date());
+
+  // Goals/Timetable dialog states
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+  const [goalFilter, setGoalFilter] = useState<'ALL' | 'PRIORITY' | 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM'>('ALL');
+
+  const [isTimeModalOpen, setIsTimeModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<TimetableEvent | null>(null);
+  const timetableRef = React.useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Save view state preference
+  useEffect(() => {
+    if (state.profile?.id) {
+      localStorage.setItem(`smartlife_todo_view_${state.profile.id}`, todoView);
+    }
+  }, [todoView, state.profile?.id]);
+
+  // Handle focus mode triggers
+  useEffect(() => {
+    if (initialFocusMode) {
+      setIsFocusMode(true);
+      onResetFocusMode?.();
+    }
+  }, [initialFocusMode, onResetFocusMode]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const mainScroll = document.querySelector('main');
@@ -235,74 +167,6 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     }
   };
 
-
-  // Handle initial focus mode triggers (e.g. from Dashboard)
-  useEffect(() => {
-    if (initialFocusMode) {
-      setIsFocusMode(true);
-      onResetFocusMode?.();
-    }
-  }, [initialFocusMode, onResetFocusMode]);
-
-  // Modals
-  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
-  const [goalFilter, setGoalFilter] = useState<'ALL' | 'PRIORITY' | 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM'>('ALL');
-
-
-
-  const [isTimeModalOpen, setIsTimeModalOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<TimetableEvent | null>(null);
-
-  // Export State
-  const timetableRef = React.useRef<HTMLDivElement>(null);
-  const [isExporting, setIsExporting] = useState(false);
-
-  // Todo Input
-  const [newTodoContent, setNewTodoContent] = useState('');
-  const [newTodoPriority, setNewTodoPriority] = useState<TaskPriority>(TaskPriority.FOCUS);
-  const [newTodoDeadline, setNewTodoDeadline] = useState('');
-
-  // Todo Inline Edit State
-  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
-  const [editContent, setEditContent] = useState('');
-  const [editPriority, setEditPriority] = useState<string>('medium');
-  const [editDeadline, setEditDeadline] = useState('');
-
-  // DnD Sensors (pointer for desktop, touch for mobile, keyboard for a11y)
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  // Motivational Feedback State
-  const [showMotivation, setShowMotivation] = useState(false);
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    audioRef.current = new Audio('/sounds/clapping.mp3');
-  }, []);
-
-
-
-  // Filter Goals Logic
-  const filteredGoals = goals.filter(g => {
-    if (goalFilter === 'ALL') return true;
-    if (goalFilter === 'PRIORITY') return g.is_priority;
-    return g.type === goalFilter;
-  });
-
-  // Countdown Tick
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-
-
-  // -- HELPERS --
   const getTimeRemaining = (deadline: string) => {
     const end = new Date(deadline).getTime();
     const now = new Date().getTime();
@@ -325,12 +189,11 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const handleExportTimetable = async () => {
     if (!timetableRef.current) return;
     setIsExporting(true);
-    // Wait for render
     setTimeout(async () => {
       try {
         if (!timetableRef.current) return;
         const canvas = await html2canvas(timetableRef.current, {
-          scale: 2, // High resolution
+          scale: 2,
           useCORS: true,
           backgroundColor: '#ffffff',
           allowTaint: true,
@@ -349,7 +212,6 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     }, 100);
   };
 
-  // -- HANDLERS --
   const handleGoalSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -358,34 +220,15 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
       deadline: fd.get('deadline'),
       type: fd.get('type'),
       is_priority: fd.get('is_priority') === 'on',
-      // progress removed
     };
     if (editingGoal) onUpdateGoal({ ...editingGoal, ...data });
     else onAddGoal(data);
     setIsGoalModalOpen(false);
   };
 
-  const handleToggleTodo = (todo: Todo) => {
-    const isNowCompleted = !todo.is_completed;
-    onUpdateTodo({ ...todo, is_completed: isNowCompleted });
-
-    if (isNowCompleted) {
-      // Play Sound
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(e => console.log('Audio play failed (user interaction needed first?)', e));
-      }
-      // Show Motivation
-      setShowMotivation(true);
-      setTimeout(() => setShowMotivation(false), 3000);
-    }
-  };
-
   const handleTimeSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-
-    // Fix Time Format (HH:MM -> HH:MM:00) for Supabase Time type
     let start = fd.get('start_time') as string;
     let end = fd.get('end_time') as string;
 
@@ -404,111 +247,222 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     setIsTimeModalOpen(false);
   };
 
-  const handleTodoSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTodoContent.trim()) return;
+  // Open Unified Modal for Creation
+  const handleOpenCreateModal = (status?: TodoStatus, defaultDate?: Date) => {
+    setModalMode('create');
+    setSelectedTodo(null);
+    setModalContent('');
+    setModalStatus(status || 'todo');
+    setModalDescription('');
+    setModalSubtasks([]);
+    setNewSubtaskTitle('');
 
-    // Map UI Priority to standard DB Priority values
-    let dbPriority: any = 'medium';
-    if (newTodoPriority === TaskPriority.URGENT) dbPriority = 'high';
-    else if (newTodoPriority === TaskPriority.CHILL || newTodoPriority === TaskPriority.TEMP) dbPriority = 'low';
-
-    // Default deadline to "End of Today" if not selected
-    const deadlineToUse = newTodoDeadline
-      ? new Date(newTodoDeadline).toISOString()
-      : new Date(new Date().setHours(23, 59, 59, 999)).toISOString();
-
-    // Use the mapped priority to avoid SQL Constraint check failure
-    onAddTodo(newTodoContent, dbPriority, deadlineToUse);
-    setNewTodoContent('');
-    setNewTodoDeadline('');
+    if (defaultDate) {
+      const year = defaultDate.getFullYear();
+      const month = String(defaultDate.getMonth() + 1).padStart(2, '0');
+      const day = String(defaultDate.getDate()).padStart(2, '0');
+      // Set to 08:00 of selected date
+      setModalDeadline(`${year}-${month}-${day}T08:00`);
+    } else {
+      setModalDeadline('');
+    }
+    setIsModalOpen(true);
   };
 
-  // -- RENDERERS --
+  // Open Unified Modal for Editing
+  const handleOpenEditModal = (todo: Todo) => {
+    setModalMode('edit');
+    setSelectedTodo(todo);
+    setModalContent(todo.content);
+    setModalStatus(todo.status || (todo.is_completed ? 'done' : 'todo'));
+    setModalDescription(todo.description || '');
+    setModalSubtasks(todo.subtasks || []);
+    setNewSubtaskTitle('');
 
-  // 1. Timetable View (Colorful & Bigger)
-  const renderTimetable = () => {
-    // Colors for different days to make it vibrant
-    const DAY_COLORS = [
-      'bg-rose-50 border-rose-100 text-rose-700',      // Sun
-      'bg-amber-50 border-amber-100 text-amber-700',   // Mon
-      'bg-emerald-50 border-emerald-100 text-emerald-700', // Tue
-      'bg-sky-50 border-sky-100 text-sky-700',         // Wed
-      'bg-violet-50 border-violet-100 text-violet-700', // Thu
-      'bg-pink-50 border-pink-100 text-pink-700',      // Fri
-      'bg-indigo-50 border-indigo-100 text-indigo-700' // Sat
-    ];
+    if (todo.deadline) {
+      const d = new Date(todo.deadline);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      setModalDeadline(`${year}-${month}-${day}T${hours}:${minutes}`);
+    } else {
+      setModalDeadline('');
+    }
+    setIsModalOpen(true);
+  };
 
+  // Subtask Actions inside Modal
+  const handleCreateSubtask = () => {
+    if (!newSubtaskTitle.trim()) return;
+    const newSub = {
+      id: crypto.randomUUID(),
+      title: newSubtaskTitle.trim(),
+      is_completed: false,
+    };
+    setModalSubtasks([...modalSubtasks, newSub]);
+    setNewSubtaskTitle('');
+  };
+
+  const handleToggleSubtask = (id: string) => {
+    setModalSubtasks(
+      modalSubtasks.map((st) => (st.id === id ? { ...st, is_completed: !st.is_completed } : st))
+    );
+  };
+
+  const handleDeleteSubtask = (id: string) => {
+    setModalSubtasks(modalSubtasks.filter((st) => st.id !== id));
+  };
+
+  // Modal Save & Delete Submissions
+  const handleModalSave = () => {
+    if (!modalContent.trim()) return;
+
+    const formattedDeadline = modalDeadline ? new Date(modalDeadline).toISOString() : undefined;
+
+    if (modalMode === 'create') {
+      onAddTodo(
+        modalContent.trim(),
+        'medium',
+        formattedDeadline,
+        modalStatus,
+        modalDescription.trim() || undefined,
+        modalSubtasks
+      );
+    } else if (modalMode === 'edit' && selectedTodo) {
+      onUpdateTodo({
+        ...selectedTodo,
+        content: modalContent.trim(),
+        status: modalStatus,
+        deadline: formattedDeadline || null,
+        description: modalDescription.trim() || null,
+        subtasks: modalSubtasks,
+      });
+    }
+    setIsModalOpen(false);
+  };
+
+  const handleModalDelete = () => {
+    if (modalMode === 'edit' && selectedTodo) {
+      setTodoToDeleteId(selectedTodo.id);
+      setIsModalOpen(false);
+    }
+  };
+
+  const filteredGoals = goals.filter(g => {
+    if (goalFilter === 'ALL') return true;
+    if (goalFilter === 'PRIORITY') return g.is_priority;
+    return g.type === goalFilter;
+  });
+
+  // Calendar dates logic
+  const daysInMonth = useMemo(() => {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    const firstDayIndex = new Date(year, month, 1).getDay(); // 0 (Sun) - 6 (Sat)
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
+    // Shift first day index so 0 is Mon, 6 is Sun
+    const startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+    const days = [];
+    // Empty cells for leading offset
+    for (let i = 0; i < startOffset; i++) {
+      days.push(null);
+    }
+    // Days of month
+    for (let d = 1; d <= totalDays; d++) {
+      days.push(new Date(year, month, d));
+    }
+    return days;
+  }, [calendarDate]);
+
+  const getTodosForDate = (date: Date) => {
+    const targetStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return todos.filter((t) => {
+      if (!t.deadline) return false;
+      const d = new Date(t.deadline);
+      const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return dStr === targetStr;
+    });
+  };
+
+  const getStatusConfig = (status?: TodoStatus, isCompleted?: boolean) => {
+    const s = status || (isCompleted ? 'done' : 'todo');
+    return COLUMNS.find((col) => col.id === s) || COLUMNS[1];
+  };
+
+  const handleMonthPrev = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
+  };
+
+  const handleMonthNext = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
+  };
+
+  // Render weekly timetable grid
+  const renderTimetableGrid = () => {
     return (
-      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden h-full flex flex-col">
-        <div className="p-4 md:p-6 border-b border-gray-100 flex justify-between items-center bg-white">
+      <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden flex flex-col">
+        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
           <div>
-            <h3 className="text-lg md:text-xl font-bold text-gray-800 flex items-center gap-1.5 md:gap-2">
-              <Calendar className="text-indigo-600 w-5 h-5 md:w-6 md:h-6" />
-              Thời khóa biểu tuần
-            </h3>
-            <p className="text-sm text-gray-500 pl-8">Quản lý lịch học và làm việc cố định</p>
+            <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <Calendar className="text-indigo-600 w-4 h-4" />
+              Thời khóa biểu tuần cố định
+            </h4>
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleExportTimetable}
-              className="px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition font-bold flex items-center gap-1.5"
-              title="Tải ảnh lịch về máy"
+              className="px-3 py-1.5 text-xs bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition font-bold flex items-center gap-1.5"
             >
-              <Download size={16} className="md:w-5 md:h-5" />
-              <span className="hidden md:inline">Tải ảnh</span>
+              <Download size={14} />
+              Tải ảnh lịch
             </button>
-            <button onClick={() => { setEditingEvent(null); setIsTimeModalOpen(true); }} className="px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition font-bold flex items-center gap-1.5">
-              <Plus size={16} className="md:w-5 md:h-5" />
-              <span className="hidden md:inline">Thêm lịch</span>
-              <span className="hidden md:inline">mới</span>
-              <span className="md:hidden">Thêm</span>
+            <button onClick={() => { setEditingEvent(null); setIsTimeModalOpen(true); }} className="px-3 py-1.5 text-xs bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition font-bold flex items-center gap-1.5">
+              <Plus size={14} />
+              Thêm lịch mới
             </button>
           </div>
         </div>
 
-
-
-        <div className="flex-1 overflow-x-auto custom-scrollbar">
-          <div className="grid grid-cols-7 h-full min-h-[600px] min-w-[1000px] divide-x divide-gray-100 bg-white" ref={timetableRef}>
-            {DISPLAY_DAYS.map((day, index) => {
+        <div className="overflow-x-auto custom-scrollbar">
+          <div className="grid grid-cols-7 min-h-[450px] min-w-[850px] divide-x divide-slate-100 bg-white" ref={timetableRef}>
+            {DISPLAY_DAYS.map((day) => {
               const dayEvents = timetable.filter(e => e.day_of_week === day.value).sort((a, b) => a.start_time.localeCompare(b.start_time));
               const isToday = new Date().getDay() === day.value;
-              const dayColor = DAY_COLORS[day.value];
 
               return (
-                <div key={day.value} className={`flex flex-col h-full group transition-colors ${isToday ? 'bg-indigo-50/20' : ''}`}>
-                  <div className={`text-center py-4 border-b border-gray-100 ${isToday ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-50/50'}`}>
-                    <span className={`text-sm font-bold block ${isToday ? 'text-white' : 'text-gray-600'}`}>{day.label}</span>
+                <div key={day.value} className={`flex flex-col h-full ${isToday ? 'bg-indigo-50/15' : ''}`}>
+                  <div className={`text-center py-3 border-b border-slate-100 ${isToday ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-50/80 text-slate-600'}`}>
+                    <span className="text-xs tracking-wide">{day.label}</span>
                   </div>
-                  <div className="p-3 space-y-3 flex-1">
+                  <div className="p-2.5 space-y-2.5 flex-1">
                     {dayEvents.map(e => (
                       <div
                         key={e.id}
                         onClick={() => { setEditingEvent(e); setIsTimeModalOpen(true); }}
-                        className={`relative p-3 rounded-2xl border-l-4 shadow-sm hover:shadow-lg cursor-pointer transition-all hover:-translate-y-1 bg-white border-gray-100 hover:border-indigo-400`}
+                        className={`relative group p-2.5 rounded-xl border border-slate-150 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 bg-white hover:border-indigo-400`}
                       >
-                        <div className="font-bold text-gray-800 text-sm leading-tight mb-1">{e.title}</div>
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <Clock size={12} className="text-indigo-500" />
-                          <span className="font-medium bg-gray-50 px-1.5 rounded">{e.start_time.slice(0, 5)} - {e.end_time?.slice(0, 5)}</span>
+                        <div className="font-bold text-slate-800 text-xs leading-snug mb-1">{e.title}</div>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                          <Clock size={10} />
+                          <span>{e.start_time.slice(0, 5)} - {e.end_time?.slice(0, 5)}</span>
                         </div>
                         {e.location && (
-                          <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-1">
-                            <MapPin size={12} /> {e.location}
+                          <div className="flex items-center gap-1 text-[9px] text-slate-400 mt-1">
+                            <MapPin size={10} /> {e.location}
                           </div>
                         )}
                         <button
                           onClick={(event) => {
                             event.stopPropagation();
-                            if (window.confirm('Bạn có chắc chắn muốn xóa lịch này không?')) {
-                              onDeleteTimetable(e.id);
-                            }
+                            onDeleteTimetable(e.id);
                           }}
-                          className="absolute top-2 right-2 p-1.5 bg-white/80 rounded-lg text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-sm"
-                          title="Xóa lịch"
+                          className="absolute top-1 right-1 p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          <Trash2 size={14} />
+                          <X size={10} />
                         </button>
                       </div>
                     ))}
@@ -518,97 +472,56 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             })}
           </div>
         </div>
-
-        {/* Watermark for Export (Hidden normally) */}
-        {isExporting && (
-          <div className="flex justify-between items-center p-6 border-t border-gray-100 bg-white">
-            <div className="flex items-center gap-3">
-              {state.profile?.avatar_url ? (
-                <img src={state.profile.avatar_url} alt="Owner" className="w-12 h-12 rounded-full border-2 border-indigo-100 object-cover" />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                  {state.profile?.full_name?.charAt(0) || 'U'}
-                </div>
-              )}
-              <div>
-                <h4 className="text-xl font-bold text-indigo-800">SmartLife <span className="text-base font-medium text-gray-500">by BaQuan</span></h4>
-                <p className="text-sm text-gray-400">Được tạo tự động từ SmartLife App</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-bold text-gray-600">{new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            </div>
-          </div>
-        )}
       </div>
-
     );
   };
 
-
-  // 1.5. Today's Roadmap
-  const renderRoadmap = () => {
+  // Render roadmap timeline today
+  const renderRoadmapTimeline = () => {
     const todayIndex = new Date().getDay();
     const todayEvents = timetable
       .filter(t => t.day_of_week === todayIndex)
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
-
-    // Calculate current time position? For now just static list.
     const now = new Date();
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
     return (
-      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 mt-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-indigo-100 rounded-xl text-indigo-600">
-            <MapPin size={24} />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-gray-800">Lịch trình Hôm nay</h3>
-            <p className="text-sm text-gray-500">
-              {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
-          </div>
-        </div>
+      <div className="bg-white rounded-3xl border border-slate-100 p-5 mt-4">
+        <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2 mb-4">
+          <Clock size={16} className="text-indigo-600 animate-pulse" />
+          Tiến trình hoạt động hôm nay
+        </h4>
 
         {todayEvents.length === 0 ? (
-          <div className="text-center py-10 text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-            <p>Hôm nay bạn thảnh thơi! Không có lịch trình.</p>
+          <div className="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            Không có lịch trình cố định cho ngày hôm nay.
           </div>
         ) : (
-          <div className="relative pl-4 space-y-8 before:absolute before:inset-0 before:ml-4 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-indigo-200 before:to-transparent">
-            {todayEvents.map((event, index) => {
+          <div className="relative pl-3 space-y-6 before:absolute before:inset-0 before:left-3 before:-translate-x-px before:h-full before:w-0.5 before:bg-indigo-100">
+            {todayEvents.map((event) => {
               const isPast = event.end_time ? event.end_time < currentTime : event.start_time < currentTime;
               const isHappening = event.start_time <= currentTime && (!event.end_time || event.end_time >= currentTime);
 
               return (
-                <div key={event.id} className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group ${isHappening ? 'scale-105 transition-transform' : ''}`}>
-                  {/* Icon/Dot */}
-                  <div className={`flex items-center justify-center w-8 h-8 rounded-full border-4 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10
-                                    ${isHappening ? 'bg-indigo-600 border-indigo-100 ring-4 ring-indigo-50' : isPast ? 'bg-gray-200 border-gray-50' : 'bg-white border-indigo-200'}
-                                `}>
-                    {isHappening ? <Zap size={14} className="text-white" /> : <div className={`w-2 h-2 rounded-full ${isPast ? 'bg-gray-400' : 'bg-indigo-400'}`}></div>}
+                <div key={event.id} className="relative flex items-start gap-4">
+                  {/* Bullet Node */}
+                  <div className={`absolute left-0 flex items-center justify-center w-6 h-6 -translate-x-1/2 rounded-full border-2 shadow-sm z-10 ${
+                    isHappening ? 'bg-indigo-600 border-white ring-4 ring-indigo-100' : isPast ? 'bg-slate-200 border-white' : 'bg-white border-indigo-300'
+                  }`}>
+                    {isHappening ? <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" /> : <div className={`w-1.5 h-1.5 rounded-full ${isPast ? 'bg-slate-400' : 'bg-indigo-400'}`} />}
                   </div>
 
-                  {/* Content Card */}
-                  <div className={`w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-2xl border shadow-sm transition-all
-                                    ${isHappening ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-indigo-200 border-transparent' : 'bg-white border-gray-100 hover:shadow-md'}
-                                `}>
-                    <div className="flex justify-between items-start mb-1">
-                      <h4 className={`font-bold text-lg ${isHappening ? 'text-white' : 'text-gray-800'}`}>{event.title}</h4>
-                      <span className={`text-xs font-bold px-2 py-1 rounded-lg ${isHappening ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                  {/* Activity Card */}
+                  <div className="flex-1 ml-6 p-3 rounded-2xl border border-slate-100 bg-white">
+                    <div className="flex justify-between items-center mb-0.5">
+                      <h5 className="text-xs font-bold text-slate-800">{event.title}</h5>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500">
                         {event.start_time.slice(0, 5)}
                       </span>
                     </div>
-                    <div className={`text-sm flex items-center gap-2 ${isHappening ? 'text-indigo-100' : 'text-gray-500'}`}>
-                      <Clock size={14} />
-                      {event.start_time.slice(0, 5)} - {event.end_time?.slice(0, 5)}
+                    <div className="text-[10px] text-slate-500">
+                      {event.start_time.slice(0, 5)} - {event.end_time?.slice(0, 5)} {event.location && `· ${event.location}`}
                     </div>
-                    {event.location && (
-                      <div className={`text-xs mt-2 flex items-center gap-1.5 ${isHappening ? 'text-indigo-200' : 'text-gray-400'}`}>
-                        <MapPin size={12} /> {event.location}
-                      </div>
-                    )}
                   </div>
                 </div>
               );
@@ -618,760 +531,715 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
       </div>
     );
   };
-
-  // Helper for Todo Countdown
-  const getTodoCountdown = (deadline: string) => {
-    const end = new Date(deadline).getTime();
-    const now = new Date().getTime();
-    const diff = end - now;
-
-    if (diff < 0) {
-      const absDiff = Math.abs(diff);
-      const days = Math.floor(absDiff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((absDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
-
-      let text = 'Trễ ';
-      if (days > 0) text += `${days} ngày `;
-      if (hours > 0) text += `${hours}h `;
-      text += `${minutes}p`;
-
-      return { text, color: 'bg-red-100 text-red-700 border-red-200', isOverdue: true };
-    }
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-    if (days > 0) {
-      return { text: `Còn ${days} ngày ${hours}h`, color: 'bg-emerald-50 text-emerald-600 border-emerald-200', isOverdue: false };
-    }
-
-    // Less than 24h
-    let color = 'bg-blue-50 text-blue-600 border-blue-200';
-    if (hours < 1) color = 'bg-amber-50 text-amber-600 border-amber-200'; // Warning < 1h
-
-    return { text: `Còn ${hours}h ${minutes}p`, color, isOverdue: false };
-  };
-
-  // 2. Todos View (Drag & Drop + Inline Edit)
-  const renderTodos = () => {
-    const activeTodos = todos.filter(t => !t.is_completed);
-    const completedTodos = todos.filter(t => t.is_completed);
-
-    const displayTodos = todoFilter === 'active'
-      ? [...activeTodos].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-      : [...completedTodos].sort((a, b) => (b.sort_order ?? 0) - (a.sort_order ?? 0));
-
-    const totalTodos = todos.length;
-    const completedCount = completedTodos.length;
-    const progressPercentage = totalTodos === 0 ? 0 : Math.round((completedCount / totalTodos) * 100);
-
-    // DnD handler
-    const handleDragEnd = (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
-
-      const displayActiveTodos = [...activeTodos].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-      const oldIndex = displayActiveTodos.findIndex(t => t.id === active.id);
-      const newIndex = displayActiveTodos.findIndex(t => t.id === over.id);
-      if (oldIndex === -1 || newIndex === -1) return;
-
-      const reorderedActive = arrayMove(displayActiveTodos, oldIndex, newIndex);
-      const fullList = [...reorderedActive, ...completedTodos];
-      onReorderTodos(fullList);
-    };
-
-    // Quick Move handlers
-    const handleMoveToTop = (todoId: string) => {
-      const displayActiveTodos = [...activeTodos].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-      const idx = displayActiveTodos.findIndex(t => t.id === todoId);
-      if (idx <= 0) return;
-      const reorderedActive = arrayMove(displayActiveTodos, idx, 0);
-      const fullList = [...reorderedActive, ...completedTodos];
-      onReorderTodos(fullList);
-    };
-
-    const handleMoveToBottom = (todoId: string) => {
-      const displayActiveTodos = [...activeTodos].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-      const idx = displayActiveTodos.findIndex(t => t.id === todoId);
-      if (idx === -1 || idx === displayActiveTodos.length - 1) return;
-      const reorderedActive = arrayMove(displayActiveTodos, idx, displayActiveTodos.length - 1);
-      const fullList = [...reorderedActive, ...completedTodos];
-      onReorderTodos(fullList);
-    };
-
-    // Open Edit Modal
-    const handleOpenEdit = (todo: Todo) => {
-      setEditingTodo(todo);
-      setEditContent(todo.content);
-      setEditPriority(todo.priority);
-      setEditDeadline(todo.deadline ? new Date(todo.deadline).toISOString().slice(0, 16) : '');
-    };
-
-    // Save Edit
-    const handleSaveEdit = () => {
-      if (!editingTodo) return;
-      // Map UI priority to DB priority
-      let dbPriority = editPriority;
-      if (editPriority === 'urgent' || editPriority === TaskPriority.URGENT) dbPriority = 'high';
-      else if (editPriority === 'focus' || editPriority === TaskPriority.FOCUS) dbPriority = 'medium';
-      else if (editPriority === 'chill' || editPriority === TaskPriority.CHILL) dbPriority = 'low';
-      else if (editPriority === 'temp' || editPriority === TaskPriority.TEMP) dbPriority = 'temp';
-      else if (['high', 'medium', 'low'].includes(editPriority)) dbPriority = editPriority;
-
-      onUpdateTodo({
-        ...editingTodo,
-        content: editContent,
-        priority: dbPriority,
-        deadline: editDeadline ? new Date(editDeadline).toISOString() : undefined,
-      });
-      setEditingTodo(null);
-    };
-
-    // Map priority to UI display config
-    const getPriorityDisplayKey = (p: string): string => {
-      if (p === 'high') return 'urgent';
-      if (p === 'medium') return 'focus';
-      if (p === 'low') return 'chill';
-      return p;
-    };
-
-    // Edit priority options for the modal
-    const EDIT_PRIORITY_OPTIONS = [
-      { value: 'high', label: 'Ưu tiên', color: 'bg-red-100 text-red-700 border-red-200', icon: AlertCircle },
-      { value: 'medium', label: 'Tập trung', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: Zap },
-      { value: 'low', label: 'Chill', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: Coffee },
-      { value: 'temp', label: 'Tạm thời', color: 'bg-gray-100 text-gray-700 border-gray-200', icon: Layers },
-    ];
-
-    return (
-      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 flex flex-col">
-        <div className="mb-4">
-          <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-1">
-            <CheckCircle2 size={24} className="text-emerald-500" />Todo list
-            {todoFilter === 'active' && activeTodos.length > 0 && (
-              <span className="text-xs font-medium text-gray-400 ml-auto flex items-center gap-1"><GripVertical size={12} /> Kéo để sắp xếp</span>
-            )}
-          </h3>
-
-          {/* Progress Bar */}
-          <div className="mt-2">
-            <div className="flex justify-between text-xs font-bold text-gray-500 mb-1">
-              <span>Đã xong {completedCount}/{totalTodos} việc</span>
-              <span>{progressPercentage}%</span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-              <div
-                className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${progressPercentage}%` }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Todo Filter Tabs */}
-          <div className="flex bg-gray-100/50 p-1 rounded-xl gap-1 mt-4 border border-gray-100/30">
-            <button
-              type="button"
-              onClick={() => setTodoFilter('active')}
-              className={`flex-grow py-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
-                todoFilter === 'active'
-                  ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              📌 Todo ({activeTodos.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setTodoFilter('completed')}
-              className={`flex-grow py-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
-                todoFilter === 'completed'
-                  ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              ✅ Done ({completedTodos.length})
-            </button>
-          </div>
-        </div>
-
-        {todoFilter === 'active' && (
-          <form onSubmit={handleTodoSubmit} className="space-y-4 mb-6 bg-gradient-to-br from-indigo-500/5 via-transparent to-emerald-500/5 p-5 rounded-3xl border border-gray-100/80 shadow-sm relative overflow-hidden">
-            <div className="absolute -right-6 -top-6 w-20 h-20 bg-indigo-500/10 rounded-full blur-xl pointer-events-none"></div>
-            <div className="absolute -left-6 -bottom-6 w-20 h-20 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
-            
-            <input
-              type="text"
-              value={newTodoContent}
-              onChange={e => setNewTodoContent(e.target.value)}
-              placeholder="Nhập công việc mới..."
-              className="w-full bg-white/70 backdrop-blur-sm border border-gray-200/80 rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none font-semibold transition-all shadow-sm"
-            />
-
-            <div className="custom-picker-input relative w-full group">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-emerald-500 transition-colors z-20">
-                <Clock size={16} />
-              </div>
-              <input
-                type="datetime-local"
-                value={newTodoDeadline}
-                onChange={(e) => setNewTodoDeadline(e.target.value)}
-                className="w-full bg-white/70 backdrop-blur-sm border border-gray-200/80 rounded-2xl pl-11 pr-4 py-3 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none text-gray-700 font-semibold min-w-0 transition-all shadow-sm"
-              />
-            </div>
-
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-              {Object.values(TaskPriority).map(p => {
-                const config = PRIORITY_CONFIG[p];
-                const Icon = config.icon;
-                const isSelected = newTodoPriority === p;
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setNewTodoPriority(p)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border
-                                      ${isSelected ? config.color + ' ring-2 ring-offset-1 ring-gray-200' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}
-                                  `}
-                  >
-                    <Icon size={12} /> {config.label}
-                  </button>
-                )
-              })}
-            </div>
-            <button type="submit" className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-95 text-white font-bold py-3 rounded-2xl transition-all shadow-md shadow-emerald-100/30 flex justify-center items-center gap-2">
-              <Plus size={18} /> Thêm việc
-            </button>
-          </form>
-        )}
-
-        {/* Sortable Todo List */}
-        {todoFilter === 'active' ? (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={displayTodos.map(t => t.id)} strategy={verticalListSortingStrategy}>
-              <div className="space-y-2 flex-1 pr-1 overflow-y-auto max-h-[400px] custom-scrollbar">
-                {displayTodos.map(t => {
-                  const displayKey = getPriorityDisplayKey(t.priority);
-                  const config = PRIORITY_CONFIG[displayKey as TaskPriority] || PRIORITY_CONFIG[t.priority as TaskPriority] || PRIORITY_CONFIG[TaskPriority.FOCUS];
-                  const countdown = t.deadline ? getTodoCountdown(t.deadline) : null;
-
-                  return (
-                    <SortableTodoItem
-                      key={t.id}
-                      todo={t}
-                      config={config}
-                      countdown={countdown}
-                      onToggle={handleToggleTodo}
-                      onDelete={onDeleteTodo}
-                      onEdit={handleOpenEdit}
-                      onMoveToTop={handleMoveToTop}
-                      onMoveToBottom={handleMoveToBottom}
-                      isActive={t.id === activeTaskId}
-                      onStartTracking={onStartTracking}
-                    />
-                  );
-                })}
-                {displayTodos.length === 0 && <p className="text-center text-sm text-gray-400 italic py-10">Bạn đã dọn dẹp sạch sẽ công việc! 🎉</p>}
-              </div>
-            </SortableContext>
-          </DndContext>
-        ) : (
-          <div className="space-y-2 flex-1 pr-1 overflow-y-auto max-h-[400px] custom-scrollbar">
-            {displayTodos.map(t => {
-              const displayKey = getPriorityDisplayKey(t.priority);
-              const config = PRIORITY_CONFIG[displayKey as TaskPriority] || PRIORITY_CONFIG[t.priority as TaskPriority] || PRIORITY_CONFIG[TaskPriority.FOCUS];
-
-              return (
-                <div key={t.id} className="group flex items-start gap-3.5 p-3.5 rounded-2xl border border-transparent bg-gray-50/70 hover:bg-gray-50/100 transition-all">
-                  {/* Done Checkbox Toggle back to active */}
-                  <button 
-                    onClick={() => handleToggleTodo(t)} 
-                    className="mt-0.5 text-emerald-500 hover:text-gray-400 transition-colors shrink-0"
-                    title="Đánh dấu chưa hoàn thành"
-                  >
-                    <CheckCircle2 size={20} />
-                  </button>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium leading-snug text-gray-450 line-through truncate">{t.content}</p>
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide border flex items-center gap-1 w-fit ${config.color}`}>
-                        {config.label}
-                      </span>
-                      {t.deadline && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold border flex items-center gap-1 w-fit text-gray-400 border-gray-150 bg-gray-50">
-                          Hạn: {new Date(t.deadline).toLocaleDateString('vi-VN')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Delete Option */}
-                  <button 
-                    onClick={() => onDeleteTodo(t.id)} 
-                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0" 
-                    title="Xóa công việc này"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              );
-            })}
-            {displayTodos.length === 0 && <p className="text-center text-sm text-gray-400 italic py-10">Chưa có công việc nào hoàn thành.</p>}
-          </div>
-        )}
-
-        {/* Edit Todo Modal */}
-        {editingTodo && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setEditingTodo(null)}>
-            <div className="premium-glass-modal rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-fade-in relative z-50 overflow-hidden" onClick={e => e.stopPropagation()}>
-              <div className="modal-glow-bubble-1 -top-16 -right-16 animate-pulse-slow"></div>
-              <div className="modal-glow-bubble-2 -bottom-16 -left-16 animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
-              
-              <div className="relative z-10 flex justify-between items-center mb-5">
-                <h3 className="font-extrabold text-lg text-gray-800 flex items-center gap-2"><Edit2 size={18} className="text-indigo-500" /> Sửa công việc</h3>
-                <button onClick={() => setEditingTodo(null)} className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors"><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
-              </div>
-
-              <div className="relative z-10 space-y-4">
-                {/* Content */}
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Nội dung</label>
-                  <input
-                    type="text"
-                    value={editContent}
-                    onChange={e => setEditContent(e.target.value)}
-                    className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
-                  />
-                </div>
-
-                {/* Priority */}
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1.5">Mức ưu tiên</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {EDIT_PRIORITY_OPTIONS.map(opt => {
-                      const Icon = opt.icon;
-                      const isSelected = editPriority === opt.value;
-                      return (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setEditPriority(opt.value)}
-                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border
-                            ${isSelected ? opt.color + ' ring-2 ring-offset-1 ring-gray-200 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}
-                          `}
-                        >
-                          <Icon size={14} /> {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Deadline */}
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Thời hạn</label>
-                  <div className="custom-picker-input relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors z-20">
-                      <Clock size={16} />
-                    </div>
-                    <input
-                      type="datetime-local"
-                      value={editDeadline}
-                      onChange={e => setEditDeadline(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-700 min-w-0"
-                    />
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-3 pt-3">
-                  <button
-                    onClick={() => setEditingTodo(null)}
-                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200/85 text-gray-600 rounded-2xl font-bold transition-all active:scale-95"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleSaveEdit}
-                    className="flex-[2] py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-95 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100/30 transition-all flex items-center justify-center gap-2 active:scale-95"
-                  >
-                    <Save size={16} /> Lưu thay đổi
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Mobile Tabs
-  const [mobileTab, setMobileTab] = useState<'SCHEDULE' | 'GOALS'>('SCHEDULE');
 
   return (
-    <div 
+    <div
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className="animate-fade-in pb-20 relative min-h-[500px]"
+      className="w-full max-w-none min-h-screen px-0 py-2 md:py-3 pt-16 md:pt-3 relative"
     >
-      {/* Pull to Refresh Spinner */}
-      <div 
-        className="absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-200 z-[100]"
-        style={{ 
-          top: `${pullDistance - 40}px`, 
-          opacity: pullDistance > 10 ? Math.min(pullDistance / 50, 1) : 0 
-        }}
-      >
-        <div className="bg-white rounded-full p-2.5 shadow-lg border border-gray-100 flex items-center justify-center">
-          <Loader2 
-            className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`} 
-            size={20} 
-            style={{ transform: `rotate(${pullDistance * 4}deg)` }} 
-          />
-        </div>
-      </div>
-
-      {/* Motivational Toast */}
-      {showMotivation && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-bounce-in">
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-4 border-white/30 backdrop-blur-md">
-            <span className="text-2xl">👏</span>
-            <span className="font-bold text-lg">Cố lên nào, hoàn thành công việc tiếp theo thôi!</span>
+      {/* Pull To Refresh Indicator */}
+      {pullDistance > 0 && (
+        <div className="absolute left-0 right-0 flex justify-center z-50 pointer-events-none transition-all duration-75" style={{ top: `${pullDistance}px` }}>
+          <div className="bg-white p-2.5 rounded-full shadow-lg border border-slate-100 flex items-center gap-2">
+            <RefreshCw size={14} className={`text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `rotate(${pullDistance * 4}deg)` }} />
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+              {isRefreshing ? 'Đang cập nhật...' : 'Kéo thêm để tải lại'}
+            </span>
           </div>
         </div>
       )}
 
-      {/* Mobile Tab Navigation (Visible < xl) */}
-      <div className="xl:hidden flex p-1 bg-gray-200/50 rounded-xl mb-6 mx-auto max-w-md">
-        <button
-          onClick={() => setMobileTab('SCHEDULE')}
-          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mobileTab === 'SCHEDULE' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          Lịch trình
-        </button>
-        <button
-          onClick={() => setMobileTab('GOALS')}
-          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mobileTab === 'GOALS' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          Mục tiêu
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-
-        {/* LEFT: Timetable (8 cols) - Show if Desktop OR (Mobile & Tab=SCHEDULE) */}
-        <div className={`xl:col-span-8 h-full flex flex-col gap-6 ${mobileTab !== 'SCHEDULE' ? 'hidden xl:flex' : 'flex'}`}>
-          {renderTimetable()}
-          {renderRoadmap()}
-          <CalendarWidget />
-        </div>
-
-        {/* RIGHT: Goals & Todos (4 cols) - Show if Desktop OR (Mobile & Tab=GOALS) */}
-        <div className={`xl:col-span-4 space-y-8 ${mobileTab !== 'GOALS' ? 'hidden xl:block' : 'block'}`}>
-
-          {/* 1. Todos - Moved to Top */}
-          {renderTodos()}
-
-          {/* 2. Focus Timer */}
-          <FocusTimer timer={timer} onOpenMusic={() => setIsFocusMode(true)} />
-
-          {/* 2.5 Music Player (Embedded or Fullscreen) */}
-          {isFocusMode && (
-            <MusicSpace
-              timer={timer}
-              onBack={() => setIsFocusMode(false)}
-              formatTime={(s: number) => {
-                const h = Math.floor(s / 3600);
-                const m = Math.floor((s % 3600) / 60);
-                const sec = s % 60;
-                if (h > 0) {
-                  return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-                }
-                return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-              }}
-              todos={todos}
-              activeTaskId={activeTaskId}
-              onUpdateTodo={onUpdateTodo}
-              onStartTracking={onStartTracking}
-              onAddTodo={onAddTodo}
-            />
-          )}
 
 
+      {/* Widget Dashboard layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(280px,330px)] gap-3 md:gap-4 items-stretch w-full max-w-none">
+        
+        {/* Left Column (Flex-grow width on desktop) */}
+        <div className="flex flex-col gap-3 md:gap-4 w-full">
+          {/* Kanban / Calendar Card Container */}
+          <div className="bg-white rounded-3xl border border-slate-100 p-2.5 flex flex-col h-fit">
+            
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3.5 pb-2.5 border-b border-slate-50 select-none">
+              <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                <ListTodo size={16} className="text-slate-700" />
+                Todo
+              </h3>
+              
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {/* View switcher: Board / Lịch */}
+                <div className="flex bg-slate-100 p-0.5 rounded-full">
+                  <button
+                    onClick={() => setTodoView('board')}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-extrabold tracking-wide transition-all flex items-center gap-1.5 ${
+                      todoView === 'board' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-750'
+                    }`}
+                  >
+                    <LayoutGrid size={12} />
+                    Board
+                  </button>
+                  <button
+                    onClick={() => setTodoView('list')}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-extrabold tracking-wide transition-all flex items-center gap-1.5 ${
+                      todoView === 'list' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-755'
+                    }`}
+                  >
+                    <Calendar size={12} />
+                    Lịch
+                  </button>
+                </div>
 
-          {/* 3. Goals */}
-          <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Target size={24} className="text-amber-500" /> Mục tiêu</h3>
-              <button onClick={() => { setEditingGoal(null); setIsGoalModalOpen(true); }} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition">Thêm mới</button>
-            </div>
-
-            {/* Goal Filters */}
-            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar mb-4">
-              {['ALL', 'PRIORITY', 'SHORT_TERM', 'MEDIUM_TERM', 'LONG_TERM'].map((filter) => (
+                {/* + Thêm task button */}
                 <button
-                  key={filter}
-                  onClick={() => setGoalFilter(filter as any)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all border
-                    ${goalFilter === filter
-                      ? 'bg-amber-100 text-amber-700 border-amber-200'
-                      : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}
-                  `}
+                  onClick={() => handleOpenCreateModal('todo')}
+                  className="bg-black hover:bg-slate-900 text-white font-extrabold text-[10px] px-3.5 py-1.5 rounded-full flex items-center gap-1 transition-all duration-200 active:scale-95 shrink-0"
                 >
-                  {filter === 'ALL' ? 'Tất cả' :
-                    filter === 'PRIORITY' ? 'Ưu tiên' :
-                      filter === 'SHORT_TERM' ? 'Ngắn hạn' :
-                        filter === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
+                  <Plus size={12} className="stroke-[3]" />
+                  Thêm task
                 </button>
-              ))}
+              </div>
             </div>
 
-            <div className="space-y-4">
-              {filteredGoals.length === 0 ? (
-                <p className="text-center text-gray-400 text-sm py-4 italic">Không có mục tiêu nào trong danh mục này.</p>
-              ) : (
-                filteredGoals.map(g => {
-                  const timeLeft = getTimeRemaining(g.deadline);
-                  return (
-                    <div key={g.id} className={`relative group p-4 rounded-2xl border transition-all ${g.is_priority ? 'bg-amber-50 border-amber-200 shadow-sm' : 'bg-gray-50 border-gray-100 hover:border-indigo-200'}`}>
-                      {/* Outer Border Deadline for High Visibility */}
-                      <div className={`absolute -right-2 top-4 px-3 py-1 rounded-l-lg text-[10px] font-bold shadow-sm z-10 ${timeLeft.color}`}>
-                        {timeLeft.text}
-                      </div>
+            {/* Content view render */}
+            {todoView === 'board' ? (
+              <KanbanBoard
+                todos={todos}
+                onMoveTodoStatus={onMoveTodoStatus}
+                onReorderTodos={onReorderTodos}
+                onEditTodo={handleOpenEditModal}
+                onDeleteTodo={(id) => setTodoToDeleteId(id)}
+                onQuickAddTodo={(status) => handleOpenCreateModal(status)}
+              />
+            ) : (
+              // Calendar Monthly view of Todos
+              <div className="flex-1 flex flex-col min-h-[400px]">
+                {/* Calendar View Month Navigation */}
+                <div className="flex justify-between items-center mb-4 select-none">
+                  <span className="text-xs font-black text-slate-850 uppercase tracking-wider">
+                    {`Tháng ${calendarDate.getMonth() + 1} ${calendarDate.getFullYear()}`}
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={handleMonthPrev}
+                      className="w-7 h-7 flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-500 rounded-lg border border-slate-100 transition-colors font-bold text-xs"
+                    >
+                      &lt;
+                    </button>
+                    <button
+                      onClick={handleMonthNext}
+                      className="w-7 h-7 flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-500 rounded-lg border border-slate-100 transition-colors font-bold text-xs"
+                    >
+                      &gt;
+                    </button>
+                  </div>
+                </div>
 
-                      <div className="flex justify-between items-start mb-2 pr-12">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            {g.is_priority && <Star size={14} className="text-amber-500 fill-amber-500" />}
-                            <h4 className="font-bold text-gray-800 text-sm">{g.title}</h4>
+                {/* Calendar Grid Container with scroll */}
+                <div className="overflow-y-auto max-h-[480px] custom-scrollbar pr-0.5">
+                  <div className="grid grid-cols-7 gap-1 md:gap-1.5 text-center mb-1 select-none">
+                    {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(h => (
+                      <span key={h} className="text-[10px] font-black text-slate-400 tracking-wider py-1 uppercase">{h}</span>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1 md:gap-1.5">
+                    {daysInMonth.map((day, idx) => {
+                      if (!day) {
+                        return <div key={`empty-${idx}`} className="bg-slate-50/20 rounded-2xl min-h-[75px] md:min-h-[85px] border border-transparent" />;
+                      }
+
+                      const dateTodos = getTodosForDate(day);
+                      const isToday = new Date().toLocaleDateString() === day.toLocaleDateString();
+
+                      return (
+                        <div
+                          key={day.toISOString()}
+                          onClick={() => handleOpenCreateModal('todo', day)}
+                          className={`min-h-[75px] md:min-h-[85px] rounded-2xl p-1.5 border flex flex-col items-start gap-1 cursor-pointer transition-all duration-200 ${
+                            isToday
+                              ? 'bg-slate-50 border-slate-350 shadow-sm ring-1 ring-slate-200'
+                              : 'bg-slate-50/40 border-slate-100/40 hover:bg-slate-50 hover:border-slate-200'
+                          }`}
+                        >
+                          {/* Day number */}
+                          <span className={`text-[10px] font-extrabold flex items-center justify-center ${
+                            isToday
+                              ? 'w-5 h-5 bg-slate-600 text-white rounded-full text-[9px] font-black shadow-sm'
+                              : 'text-slate-500 pl-1'
+                          }`}>
+                            {day.getDate()}
+                          </span>
+
+                          {/* Day Todo list strips */}
+                          <div className="w-full flex-1 flex flex-col gap-0.5 overflow-hidden">
+                            {dateTodos.slice(0, 3).map(t => {
+                              const sConf = getStatusConfig(t.status, t.is_completed);
+                              return (
+                                <div
+                                  key={t.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenEditModal(t);
+                                  }}
+                                  className={`text-[8px] md:text-[9px] font-bold px-1 py-0.5 rounded-md border truncate leading-tight transition-all active:scale-95 ${sConf.bg} ${sConf.border} ${sConf.text} ${t.is_completed ? 'line-through opacity-70' : ''}`}
+                                  title={t.content}
+                                >
+                                  {t.content}
+                                </div>
+                              );
+                            })}
+                            {dateTodos.length > 3 && (
+                              <span className="text-[7.5px] font-extrabold text-slate-400 pl-1 mt-0.5">
+                                +{dateTodos.length - 3} thẻ nữa
+                              </span>
+                            )}
                           </div>
-
-                          <div className="flex flex-col gap-2 mt-2">
-                            <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-                              <Calendar size={12} className="text-indigo-400" />
-                              Hạn chót: <span className="text-gray-700">{new Date(g.deadline).toLocaleDateString('vi-VN')}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {(() => {
-                                    const currentStatus = g.status || (g.progress === 100 ? 'COMPLETED' : (g.progress && g.progress > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'));
-                                    const handleStatusClick = (e: React.MouseEvent) => {
-                                        e.stopPropagation();
-                                        let nextStatus: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED' = 'NOT_STARTED';
-                                        let nextProgress = g.progress || 0;
-                                        if (currentStatus === 'NOT_STARTED') { nextStatus = 'IN_PROGRESS'; nextProgress = 50; }
-                                        else if (currentStatus === 'IN_PROGRESS') { nextStatus = 'COMPLETED'; nextProgress = 100; }
-                                        else if (currentStatus === 'COMPLETED') { nextStatus = 'NOT_STARTED'; nextProgress = 0; }
-                                        onUpdateGoal({ ...g, status: nextStatus, progress: nextProgress });
-                                    };
-                                    
-                                    if (currentStatus === 'COMPLETED') return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium border border-emerald-200 whitespace-nowrap hover:bg-emerald-200 transition-colors cursor-pointer">Đã hoàn thành</button>;
-                                    if (currentStatus === 'IN_PROGRESS') return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium border border-blue-200 whitespace-nowrap hover:bg-blue-200 transition-colors cursor-pointer">Đang hoàn thành</button>;
-                                    return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium border border-gray-200 whitespace-nowrap hover:bg-gray-200 transition-colors cursor-pointer">Chưa hoàn thành</button>;
-                                })()}
-                                {g.type && g.type !== 'PERSONAL' && (
-                                  <span className="text-[10px] px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-500 font-bold w-fit">
-                                    {g.type === 'SHORT_TERM' ? 'Ngắn hạn' : g.type === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
-                                  </span>
-                                )}
-                            </div>
-                          </div>
-
                         </div>
-                      </div>
-
-                      <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                        <button onClick={() => { setEditingGoal(g); setIsGoalModalOpen(true); }} className="p-1.5 bg-white rounded-lg text-gray-400 hover:text-indigo-600 shadow-sm transition-colors border border-gray-100"><Edit2 size={14} /></button>
-                        <button onClick={() => onDeleteGoal(g.id)} className="p-1.5 bg-white rounded-lg text-gray-400 hover:text-red-600 shadow-sm transition-colors border border-gray-100"><Trash2 size={14} /></button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* Bookmarks and Habits widgets side-by-side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 items-stretch">
+            <BookmarkWidget userId={state.profile?.id || ''} />
+            <HabitsWidget userId={state.profile?.id || ''} />
+          </div>
         </div>
 
-        {/* --- MODALS --- */}
+        {/* Right Column (Stable sidebar width on desktop) */}
+        <div className="flex flex-col gap-3 md:gap-4 w-full">
+          <PomodoroWidget timer={timer} onOpenMusic={onOpenMusic} />
+          <div className="flex-1">
+            <QuickNotesWidget userId={state.profile?.id || ''} />
+          </div>
+        </div>
 
-        {/* Goal Modal */}
-        {isGoalModalOpen && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="premium-glass-modal rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-fade-in relative z-50 overflow-hidden">
-              <div className="modal-glow-bubble-1 -top-16 -right-16 animate-pulse-slow"></div>
-              <div className="modal-glow-bubble-2 -bottom-16 -left-16 animate-pulse-slow" style={{ animationDelay: '1.5s' }}></div>
-              
-              <div className="relative z-10 flex justify-between items-center mb-5">
-                <h3 className="font-extrabold text-lg text-gray-800">{editingGoal ? 'Sửa mục tiêu' : 'Mục tiêu mới'}</h3>
-                <button onClick={() => setIsGoalModalOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors"><X size={20} className="text-gray-400" /></button>
+      </div>
+
+      {/* Accordions bottom section: Weekly Timetable, Daily Roadmap, Goals, Calendar */}
+      <div className="mt-8 space-y-4">
+        {/* Weekly Timetable accordion */}
+        <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+          <button
+            onClick={() => setIsTimetableCollapsed(!isTimetableCollapsed)}
+            className="w-full px-5 py-4 flex items-center justify-between font-bold text-slate-800 text-sm hover:bg-slate-50 transition-colors bg-white border-b border-transparent"
+          >
+            <span className="flex items-center gap-2">
+              <Calendar size={16} className="text-slate-700" />
+              Thời khóa biểu tuần cố định
+            </span>
+            {isTimetableCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
+          {!isTimetableCollapsed && (
+            <div className="p-5 pt-0 border-t border-slate-50 animate-in fade-in duration-250 bg-slate-50/20">
+              <div className="pt-4">
+                {renderTimetableGrid()}
               </div>
-              <form onSubmit={handleGoalSubmit} className="relative z-10 space-y-4">
+            </div>
+          )}
+        </div>
+
+        {/* Daily activity roadmap accordion */}
+        <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+          <button
+            onClick={() => setIsRoadmapCollapsed(!isRoadmapCollapsed)}
+            className="w-full px-5 py-4 flex items-center justify-between font-bold text-slate-800 text-sm hover:bg-slate-50 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Clock size={16} className="text-slate-700" />
+              Lịch trình sự kiện hôm nay
+            </span>
+            {isRoadmapCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
+          {!isRoadmapCollapsed && (
+            <div className="p-5 pt-0 border-t border-slate-50 animate-in fade-in duration-250 bg-slate-50/20">
+              {renderRoadmapTimeline()}
+            </div>
+          )}
+        </div>
+
+        {/* Monthly Calendar accordion */}
+        <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+          <button
+            onClick={() => setIsCalendarCollapsed(!isCalendarCollapsed)}
+            className="w-full px-5 py-4 flex items-center justify-between font-bold text-slate-800 text-sm hover:bg-slate-50 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Calendar size={16} className="text-slate-700" />
+              Lịch biểu tháng chi tiết
+            </span>
+            {isCalendarCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
+          {!isCalendarCollapsed && (
+            <div className="p-5 pt-0 border-t border-slate-50 animate-in fade-in duration-250 bg-slate-50/20">
+              <div className="pt-4">
+                <CalendarWidget />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Goals accordion */}
+        <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+          <button
+            onClick={() => setIsGoalsCollapsed(!isGoalsCollapsed)}
+            className="w-full px-5 py-4 flex items-center justify-between font-bold text-slate-800 text-sm hover:bg-slate-50 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Target size={16} className="text-slate-700" />
+              Mục tiêu học tập & cá nhân
+            </span>
+            {isGoalsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
+          {!isGoalsCollapsed && (
+            <div className="p-5 pt-0 border-t border-slate-50 animate-in fade-in duration-250 bg-slate-50/20">
+              <div className="pt-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-bold text-slate-850 text-xs">Mục tiêu của tôi</h4>
+                  <button
+                    onClick={() => { setEditingGoal(null); setIsGoalModalOpen(true); }}
+                    className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-xl hover:bg-indigo-100 transition"
+                  >
+                    + Mới
+                  </button>
+                </div>
+
+                {/* Goal Filter Buttons */}
+                <div className="flex gap-1 overflow-x-auto pb-2 mb-3 scrollbar-hide">
+                  {['ALL', 'PRIORITY', 'SHORT_TERM', 'MEDIUM_TERM', 'LONG_TERM'].map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => setGoalFilter(filter as any)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                        goalFilter === filter
+                          ? 'bg-amber-50 border-amber-200 text-amber-700 font-extrabold'
+                          : 'bg-white border-slate-150 text-slate-400 hover:bg-slate-50'
+                      }`}
+                    >
+                      {filter === 'ALL' ? 'Tất cả' : filter === 'PRIORITY' ? 'Ưu tiên' : filter === 'SHORT_TERM' ? 'Ngắn hạn' : filter === 'MEDIUM_TERM' ? 'Trung' : 'Dài'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Goals list */}
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {filteredGoals.length === 0 ? (
+                    <p className="text-center text-slate-400 text-xs py-4 italic">Chưa có mục tiêu trong danh mục này.</p>
+                  ) : (
+                    filteredGoals.map(g => {
+                      const timeLeft = getTimeRemaining(g.deadline);
+                      const currentStatus = g.status || (g.progress === 100 ? 'COMPLETED' : 'NOT_STARTED');
+
+                      return (
+                        <div key={g.id} className="relative group p-3 rounded-xl border border-slate-100 hover:border-slate-350 bg-slate-50/50 hover:bg-white transition-all">
+                          <div className="flex justify-between items-start pr-1">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                {g.is_priority && <Star size={12} className="text-amber-500 fill-amber-500 shrink-0" />}
+                                <span className="font-bold text-slate-700 text-xs">{g.title}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-1">Hạn chót: {new Date(g.deadline).toLocaleDateString('vi-VN')}</div>
+                            </div>
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${timeLeft.color}`}>
+                              {timeLeft.text}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100/50">
+                            <button 
+                              onClick={() => {
+                                let nextStatus: any = 'NOT_STARTED';
+                                if (currentStatus === 'NOT_STARTED') nextStatus = 'IN_PROGRESS';
+                                else if (currentStatus === 'IN_PROGRESS') nextStatus = 'COMPLETED';
+                                onUpdateGoal({ ...g, status: nextStatus });
+                              }}
+                              className={`text-[9px] px-2 py-0.5 rounded font-bold border transition-colors ${
+                                currentStatus === 'COMPLETED'
+                                  ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                                  : currentStatus === 'IN_PROGRESS'
+                                    ? 'bg-blue-50 border-blue-100 text-blue-600'
+                                    : 'bg-slate-100 border-slate-200 text-slate-500'
+                              }`}
+                            >
+                              {currentStatus === 'COMPLETED' ? 'Hoàn thành' : currentStatus === 'IN_PROGRESS' ? 'Đang chạy' : 'Chưa chạy'}
+                            </button>
+                            
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1.5">
+                              <button onClick={() => { setEditingGoal(g); setIsGoalModalOpen(true); }} className="p-0.5 text-slate-400 hover:text-indigo-600"><Edit2 size={11} /></button>
+                              <button onClick={() => onDeleteGoal(g.id)} className="p-0.5 text-slate-400 hover:text-red-500"><Trash2 size={11} /></button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Interactive Music Player space */}
+      {isFocusMode && (
+        <MusicSpace
+          timer={timer}
+          onBack={() => setIsFocusMode(false)}
+          formatTime={(s: number) => {
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+            return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+          }}
+          todos={todos}
+          activeTaskId={activeTaskId}
+          onUpdateTodo={onUpdateTodo}
+          onStartTracking={onStartTracking}
+          onAddTodo={onAddTodo}
+        />
+      )}
+
+      {/* MODALS: Goal creation modal */}
+      {isGoalModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="font-bold text-slate-800 text-base">{editingGoal ? 'Chỉnh sửa mục tiêu' : 'Mục tiêu học tập mới'}</h3>
+              <button onClick={() => setIsGoalModalOpen(false)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleGoalSubmit} className="space-y-4">
+              <div>
                 <input
                   name="title"
                   required
                   defaultValue={editingGoal?.title}
-                  placeholder="Tên mục tiêu"
-                  className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
+                  placeholder="Tên mục tiêu..."
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none font-semibold text-xs focus:ring-1 focus:ring-indigo-400 bg-white"
                 />
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Hạn chót</label>
-                  <div className="custom-picker-input relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors z-20">
-                      <Calendar size={16} />
-                    </div>
-                    <input
-                      type="date"
-                      name="deadline"
-                      required
-                      defaultValue={editingGoal?.deadline}
-                      className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Loại thời hạn</label>
-                  <div className="relative group">
-                    <select
-                      name="type"
-                      defaultValue={editingGoal?.type || 'SHORT_TERM'}
-                      className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750 appearance-none"
-                    >
-                      <option value="SHORT_TERM">Ngắn hạn</option>
-                      <option value="MEDIUM_TERM">Trung hạn</option>
-                      <option value="LONG_TERM">Dài hạn</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 z-20">
-                      <ChevronRight size={14} className="rotate-90" />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 p-1">
-                  <input type="checkbox" name="is_priority" id="is_priority" defaultChecked={editingGoal?.is_priority} className="w-5 h-5 accent-indigo-600 rounded-lg cursor-pointer" />
-                  <label htmlFor="is_priority" className="text-sm font-bold text-gray-700 cursor-pointer">Đánh dấu quan trọng/ưu tiên</label>
-                </div>
-
-                <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-95 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100/30 mt-2 transition-all active:scale-95">Lưu Mục Tiêu</button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Time Modal */}
-        {isTimeModalOpen && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="premium-glass-modal rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-fade-in relative z-50 overflow-hidden">
-              <div className="modal-glow-bubble-1 -top-16 -right-16 animate-pulse-slow"></div>
-              <div className="modal-glow-bubble-2 -bottom-16 -left-16 animate-pulse-slow" style={{ animationDelay: '1s' }}></div>
-              
-              <div className="relative z-10 flex justify-between items-center mb-5">
-                <h3 className="font-extrabold text-lg text-gray-800">{editingEvent ? 'Sửa lịch' : 'Thêm lịch mới'}</h3>
-                <button onClick={() => setIsTimeModalOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors"><X size={20} className="text-gray-400" /></button>
               </div>
-              <form onSubmit={handleTimeSubmit} className="relative z-10 space-y-4">
+              <div>
+                <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Hạn chót</label>
+                <input
+                  type="date"
+                  name="deadline"
+                  required
+                  defaultValue={editingGoal?.deadline}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none font-semibold text-xs focus:ring-1 focus:ring-indigo-400 bg-white text-slate-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Loại thời hạn</label>
+                <select
+                  name="type"
+                  defaultValue={editingGoal?.type || 'SHORT_TERM'}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none font-semibold text-xs focus:ring-1 focus:ring-indigo-400 bg-white text-slate-600"
+                >
+                  <option value="SHORT_TERM">Ngắn hạn (tuần)</option>
+                  <option value="MEDIUM_TERM">Trung hạn (tháng)</option>
+                  <option value="LONG_TERM">Dài hạn (học kỳ)</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" name="is_priority" id="is_priority" defaultChecked={editingGoal?.is_priority} className="w-4.5 h-4.5 accent-indigo-600 rounded cursor-pointer" />
+                <label htmlFor="is_priority" className="text-xs font-bold text-slate-600 cursor-pointer">Đánh dấu ưu tiên cao</label>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setIsGoalModalOpen(false)} className="flex-1 py-3 border border-slate-200 rounded-2xl text-slate-500 hover:bg-slate-50 font-bold text-xs">Hủy</button>
+                <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 font-bold text-xs shadow-sm hover:shadow active:scale-95 transition-all">Lưu mục tiêu</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODALS: Weekly timetable event creation modal */}
+      {isTimeModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="font-bold text-slate-800 text-base">{editingEvent ? 'Chỉnh sửa sự kiện' : 'Thêm lịch biểu cố định'}</h3>
+              <button onClick={() => setIsTimeModalOpen(false)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleTimeSubmit} className="space-y-4">
+              <div>
                 <input
                   name="title"
                   required
                   defaultValue={editingEvent?.title}
-                  placeholder="Tên sự kiện"
-                  className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
+                  placeholder="Tên môn học / công việc..."
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none font-semibold text-xs focus:ring-1 focus:ring-indigo-400 bg-white"
                 />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Thứ tự lặp lại</label>
+                <select
+                  name="day_of_week"
+                  defaultValue={editingEvent?.day_of_week ?? 1}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none font-semibold text-xs focus:ring-1 focus:ring-indigo-400 bg-white text-slate-600"
+                >
+                  {DISPLAY_DAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Thứ trong tuần</label>
-                  <div className="relative group">
-                    <select
-                      name="day_of_week"
-                      defaultValue={editingEvent?.day_of_week ?? 1}
-                      className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750 appearance-none"
-                    >
-                      {DISPLAY_DAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 z-20">
-                      <ChevronRight size={14} className="rotate-90" />
-                    </div>
-                  </div>
+                  <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Bắt đầu</label>
+                  <input
+                    type="time"
+                    name="start_time"
+                    required
+                    defaultValue={editingEvent?.start_time}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none font-semibold text-xs focus:ring-1 focus:ring-indigo-400 bg-white text-slate-500"
+                  />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Bắt đầu</label>
-                    <div className="custom-picker-input relative group">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors z-20">
-                        <Clock size={14} />
-                      </div>
-                      <input
-                        type="time"
-                        name="start_time"
-                        required
-                        defaultValue={editingEvent?.start_time}
-                        className="w-full pl-9 pr-3 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Kết thúc</label>
-                    <div className="custom-picker-input relative group">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors z-20">
-                        <Clock size={14} />
-                      </div>
-                      <input
-                        type="time"
-                        name="end_time"
-                        defaultValue={editingEvent?.end_time}
-                        className="w-full pl-9 pr-3 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
-                      />
-                    </div>
-                  </div>
-                </div>
-                
                 <div>
-                  <label className="text-xs text-gray-400 uppercase font-bold ml-1.5 block mb-1">Địa điểm</label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors">
-                      <MapPin size={16} />
-                    </div>
-                    <input
-                      name="location"
-                      defaultValue={editingEvent?.location}
-                      placeholder="Địa điểm (Tùy chọn)"
-                      className="w-full pl-10 pr-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-2xl outline-none font-semibold text-sm transition-all focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 shadow-sm text-gray-750"
-                    />
-                  </div>
+                  <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Kết thúc</label>
+                  <input
+                    type="time"
+                    name="end_time"
+                    defaultValue={editingEvent?.end_time}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none font-semibold text-xs focus:ring-1 focus:ring-indigo-400 bg-white text-slate-500"
+                  />
                 </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Địa điểm</label>
+                <input
+                  name="location"
+                  defaultValue={editingEvent?.location}
+                  placeholder="Phòng học / online link..."
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none font-semibold text-xs focus:ring-1 focus:ring-indigo-400 bg-white"
+                />
+              </div>
 
-                <div className="flex gap-3 mt-3">
-                  {editingEvent && (
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setIsTimeModalOpen(false)} className="flex-1 py-3 border border-slate-200 rounded-2xl text-slate-500 hover:bg-slate-50 font-bold text-xs">Hủy</button>
+                <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 font-bold text-xs shadow-sm hover:shadow active:scale-95 transition-all">Lưu lịch trình</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* UNIFIED TASK CREATION/DETAIL MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col animate-in zoom-in-95 duration-200 relative max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center mb-4 select-none pb-2">
+              <span className="text-sm font-black text-slate-800">
+                {modalMode === 'edit' ? 'Chi tiết công việc' : 'Tạo công việc mới'}
+              </span>
+              <div className="flex items-center gap-1.5">
+                {modalMode === 'edit' && (
+                  <button
+                    type="button"
+                    onClick={handleModalDelete}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded-full transition-colors"
+                    title="Xóa công việc"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <X size={17} />
+                </button>
+              </div>
+            </div>
+
+            {/* Status Pills Selection */}
+            <div className="flex gap-1.5 mb-5 select-none flex-wrap">
+              {COLUMNS.map((col) => {
+                const isActive = modalStatus === col.id;
+                return (
+                  <button
+                    key={col.id}
+                    type="button"
+                    onClick={() => setModalStatus(col.id)}
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-extrabold transition-all flex items-center gap-1.5 border leading-none ${
+                      isActive
+                        ? col.id === 'todo'
+                          ? 'bg-blue-600 border-blue-600 text-white font-black shadow-sm'
+                          : col.id === 'doing'
+                          ? 'bg-orange-500 border-orange-500 text-white font-black shadow-sm'
+                          : col.id === 'done'
+                          ? 'bg-emerald-600 border-emerald-600 text-white font-black shadow-sm'
+                          : 'bg-slate-600 border-slate-600 text-white font-black shadow-sm'
+                        : 'bg-slate-50 border-slate-200/80 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-white' : col.dot}`} />
+                    {col.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Form Fields */}
+            <div className="space-y-4">
+              {/* Title Input */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">
+                  TIÊU ĐỀ
+                </label>
+                <input
+                  type="text"
+                  value={modalContent}
+                  onChange={(e) => setModalContent(e.target.value)}
+                  placeholder="Tên task..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400 text-xs font-bold bg-white text-slate-800"
+                  required
+                />
+              </div>
+
+              {/* Deadline Input */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">
+                  HẠN CHÓT
+                </label>
+                <div className="relative">
+                  <input
+                    type="datetime-local"
+                    value={modalDeadline}
+                    onChange={(e) => setModalDeadline(e.target.value)}
+                    className="w-full pl-3.5 pr-9 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400 text-xs text-slate-650 bg-white font-semibold"
+                  />
+                  {modalDeadline && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (window.confirm('Bạn có chắc chắn muốn xóa lịch này không?')) {
-                          onDeleteTimetable(editingEvent.id);
-                          setIsTimeModalOpen(false);
-                        }
-                      }}
-                      className="flex-1 py-3.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl font-bold transition-all active:scale-95 border border-red-100"
+                      onClick={() => setModalDeadline('')}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                      title="Xóa hạn chót"
                     >
-                      Xóa
+                      <X size={12} />
                     </button>
                   )}
-                  <button type="submit" className="flex-[2] py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-95 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100/30 transition-all active:scale-95">
-                    {editingEvent ? 'Cập nhật' : 'Lưu mới'}
+                </div>
+              </div>
+
+              {/* Description Input */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">
+                  MÔ TẢ
+                </label>
+                <textarea
+                  value={modalDescription}
+                  onChange={(e) => setModalDescription(e.target.value)}
+                  placeholder="Thêm chi tiết (không bắt buộc)..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400 text-xs font-semibold bg-slate-50/50 text-slate-750 resize-none h-20"
+                />
+              </div>
+
+              {/* Subtasks (Checklist) Input & List */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">
+                  VIỆC CẦN LÀM
+                </label>
+                
+                {/* Subtask list */}
+                {modalSubtasks.length > 0 && (
+                  <div className="space-y-1.5 mb-3 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                    {modalSubtasks.map((st) => (
+                      <div key={st.id} className="group flex items-center justify-between p-2.5 bg-slate-50/70 hover:bg-slate-50 rounded-xl border border-slate-100 transition-all">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={st.is_completed}
+                            onChange={() => handleToggleSubtask(st.id)}
+                            className="w-4 h-4 accent-slate-800 rounded cursor-pointer shrink-0"
+                          />
+                          <span className={`text-xs font-bold truncate ${st.is_completed ? 'line-through text-slate-400' : 'text-slate-705'}`}>
+                            {st.title}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSubtask(st.id)}
+                          className="p-1 hover:bg-slate-200 text-slate-400 hover:text-rose-600 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          title="Xóa việc cần làm"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Subtask Inline Input */}
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    placeholder="Thêm việc cần làm..."
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateSubtask();
+                      }
+                    }}
+                    className="flex-1 p-2.5 text-xs rounded-xl border border-slate-150 focus:outline-none focus:ring-1 focus:ring-slate-350 bg-slate-50/50 placeholder-slate-400 font-medium text-slate-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateSubtask}
+                    className="w-8 h-8 rounded-full bg-black hover:bg-slate-900 text-white flex items-center justify-center transition-all duration-200 active:scale-90 shrink-0"
+                  >
+                    <Plus size={14} className="stroke-[3]" />
                   </button>
                 </div>
-              </form>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-slate-100 mt-2 select-none">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold text-xs rounded-2xl hover:bg-slate-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleModalSave}
+                  disabled={!modalContent.trim()}
+                  className="flex-1 py-3 bg-black hover:bg-slate-900 text-white font-bold text-xs rounded-2xl transition-all shadow-md active:scale-95 disabled:opacity-50"
+                >
+                  {modalMode === 'create' ? 'Thêm task' : 'Lưu thay đổi'}
+                </button>
+              </div>
+
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-
-
-      </div>
-
-      {/* AI Advisor - Floating Chat */}
-
+      {todoToDeleteId !== null && (
+        <ConfirmModal
+          isOpen={todoToDeleteId !== null}
+          title="Xác nhận xóa nhiệm vụ"
+          message="Bạn có chắc chắn muốn xóa nhiệm vụ này không? Hành động này không thể hoàn tác."
+          confirmText="Xóa"
+          cancelText="Hủy"
+          onConfirm={() => {
+            if (todoToDeleteId) {
+              onDeleteTodo(todoToDeleteId);
+              setTodoToDeleteId(null);
+            }
+          }}
+          onCancel={() => setTodoToDeleteId(null)}
+        />
+      )}
     </div>
   );
 };

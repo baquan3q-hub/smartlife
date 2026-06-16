@@ -50,7 +50,7 @@ import { useTheme } from './utils/theme';
 
 // Types và Constants (Khớp với file đã sửa)
 import { TaskPriority, GPATemplateType, TransactionType } from './types';
-import type { AppState, Transaction, Todo, SmartInsight, GPASemester, GPACourse, UserNotification, Wallet, Debt } from './types';
+import type { AppState, Transaction, Todo, TodoStatus, SmartInsight, GPASemester, GPACourse, UserNotification, Wallet, Debt } from './types';
 import { INITIAL_BUDGET, INITIAL_GOALS, INITIAL_TRANSACTIONS, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './constants';
 import { walletService } from './services/walletService';
 import { debtService } from './services/debtService';
@@ -169,11 +169,49 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         debts: [],
     });
 
-    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals' | 'expand'>('visual');
+    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals' | 'expand'>(() => {
+        const hash = window.location.hash;
+        const cleanHash = hash.replace(/^#\/?/, '');
+        const validTabs = ['visual', 'finance', 'schedule', 'music', 'cashflow', 'ai-advisor', 'gpa', 'admin', 'habit', 'journal', 'goals', 'expand'];
+        if (validTabs.includes(cleanHash)) {
+            if (cleanHash === 'music') {
+                return 'schedule';
+            }
+            return cleanHash as any;
+        }
+        return 'visual';
+    });
+
+    useEffect(() => {
+        const handleHashChange = () => {
+            const hash = window.location.hash;
+            const cleanHash = hash.replace(/^#\/?/, '');
+            const validTabs = ['visual', 'finance', 'schedule', 'music', 'cashflow', 'ai-advisor', 'gpa', 'admin', 'habit', 'journal', 'goals', 'expand'];
+            if (cleanHash === 'music') {
+                setStartInFocusMode(true);
+                setActiveTab('schedule');
+            } else if (validTabs.includes(cleanHash)) {
+                setActiveTab(cleanHash as any);
+            }
+        };
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
+
+    useEffect(() => {
+        const targetHash = `#/${activeTab}`;
+        if (window.location.hash !== targetHash) {
+            window.location.hash = targetHash;
+        }
+    }, [activeTab]);
+
     const deferredTab = React.useDeferredValue(activeTab);
     const [gpaInitialView, setGpaInitialView] = useState<string | null>(null);
     const [goalsInitialView, setGoalsInitialView] = useState<'career' | 'life' | 'cv' | null>(null);
-    const [startInFocusMode, setStartInFocusMode] = useState(false); // New state for auto-opening focus
+    const [startInFocusMode, setStartInFocusMode] = useState(() => {
+        const hash = window.location.hash;
+        return hash === '#/music' || hash === '#music';
+    }); // New state for auto-opening focus
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isSpotifyOpen, setIsSpotifyOpen] = useState(false);
@@ -217,6 +255,15 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         };
         window.addEventListener('open-music-space', handleOpenMusic);
         return () => window.removeEventListener('open-music-space', handleOpenMusic);
+    }, []);
+
+    // Custom Event Listener to open settings modal
+    useEffect(() => {
+        const handleOpenSettings = () => {
+            setIsSettingsOpen(true);
+        };
+        window.addEventListener('open-settings-modal', handleOpenSettings);
+        return () => window.removeEventListener('open-settings-modal', handleOpenSettings);
     }, []);
 
     // Task Tracker Engine
@@ -264,7 +311,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     };
 
     // Navigation state
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
     const [isWelcomeTourOpen, setIsWelcomeTourOpen] = useState(false);
 
     useEffect(() => {
@@ -1017,6 +1064,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     };
 
     const handleDeleteTimetable = async (id: string) => {
+        if (!window.confirm("Bạn có chắc chắn muốn xóa lịch này không?")) return;
         const prevTimetable = [...appState.timetable];
         setAppState((prev: AppState) => ({ ...prev, timetable: prev.timetable.filter(t => t.id !== id) }));
         try {
@@ -1027,13 +1075,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             setAppState((prev: AppState) => ({ ...prev, timetable: prevTimetable }));
         }
     };
-    const handleAddTodo = async (content: string, priority: any, deadline?: string) => {
+    const handleAddTodo = async (content: string, priority: any, deadline?: string, status: TodoStatus = 'todo', description?: string, subtasks?: any[]) => {
         if (!user) return;
         const tempId = crypto.randomUUID();
         // New todos get sort_order = 0 (top), existing items shift up
         const minOrder = appState.todos.length > 0 ? Math.min(...appState.todos.map(t => t.sort_order ?? 0)) : 0;
         const newSortOrder = minOrder - 1;
-        const newItem = { id: tempId, content, priority, is_completed: false, user_id: user.id, deadline, sort_order: newSortOrder };
+        const newItem = { id: tempId, content, priority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder, description, subtasks };
 
         setAppState((prev: AppState) => ({ ...prev, todos: [newItem, ...prev.todos] }));
 
@@ -1048,16 +1096,34 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         else if (priority === 'temp' || priority === TaskPriority.TEMP) dbPriority = 'temp';
 
         try {
-            const { data, error } = await supabase.from('todos').insert([{
-                content, priority: dbPriority, is_completed: false, user_id: user.id, deadline, sort_order: newSortOrder
-            }]).select().single();
+            const insertPayload: any = {
+                content, priority: dbPriority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder,
+                description, subtasks
+            };
+            let data = null;
+            let error = null;
 
-            if (error) throw error;
+            const res = await supabase.from('todos').insert([insertPayload]).select().single();
+            data = res.data;
+            error = res.error;
+
+            if (error) {
+                if (error.code === '42703') {
+                    console.warn("[SmartLife] description/subtasks columns not found. Retrying insertion without them.");
+                    const fallbackPayload = {
+                        content, priority: dbPriority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder
+                    };
+                    const fallbackRes = await supabase.from('todos').insert([fallbackPayload]).select().single();
+                    data = fallbackRes.data;
+                    error = fallbackRes.error;
+                }
+                if (error) throw error;
+            }
 
             if (data) {
                 setAppState((prev: AppState) => ({
                     ...prev,
-                    todos: prev.todos.map(t => t.id === tempId ? data : t)
+                    todos: prev.todos.map(t => t.id === tempId ? { ...t, ...data } : t)
                 }));
             }
         } catch (error: any) {
@@ -1069,19 +1135,29 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     const handleUpdateTodo = async (item: any) => {
         const prevTodos = [...appState.todos];
-        setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.map(t => t.id === item.id ? { ...t, ...item } : t) }));
+        
+        let updatedItem = { ...item };
+        if (item.status !== undefined) {
+            updatedItem.is_completed = item.status === 'done';
+        } else if (item.is_completed !== undefined) {
+            updatedItem.status = item.is_completed ? 'done' : 'todo';
+        }
+
+        setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.map(t => t.id === item.id ? { ...t, ...updatedItem } : t) }));
 
         try {
             // Only send DB-safe fields
-            const { id, user_id, created_at, ...updateFields } = item;
+            const { id, user_id, created_at, ...updateFields } = updatedItem;
             const { error } = await supabase.from('todos').update(updateFields).eq('id', item.id);
             if (error) {
-                // If the error code indicates an undefined column, and 'time_spent' is present,
-                // retry the update without the 'time_spent' field.
-                if (error.code === '42703' && 'time_spent' in updateFields) {
-                    console.warn("[SmartLife] 'time_spent' column not found on Supabase todos table. Retrying update without it.");
-                    const { time_spent, ...fallbackFields } = updateFields;
-                    const { error: retryError } = await supabase.from('todos').update(fallbackFields).eq('id', item.id);
+                if (error.code === '42703') {
+                    console.warn("[SmartLife] Column error. Retrying update with only core fields.");
+                    const safeFields: any = {};
+                    const allowed = ['content', 'is_completed', 'status', 'priority', 'deadline', 'sort_order'];
+                    allowed.forEach(k => {
+                        if (k in updateFields) safeFields[k] = (updateFields as any)[k];
+                    });
+                    const { error: retryError } = await supabase.from('todos').update(safeFields).eq('id', item.id);
                     if (retryError) throw retryError;
                 } else {
                     throw error;
@@ -1094,7 +1170,12 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     };
 
+    const handleMoveTodoStatus = async (id: string, status: TodoStatus) => {
+        await handleUpdateTodo({ id, status });
+    };
+
     const handleDeleteTodo = async (id: string) => {
+        if (!window.confirm("Bạn có chắc chắn muốn xóa công việc này không?")) return;
         const prevTodos = [...appState.todos];
         setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.filter(t => t.id !== id) }));
 
@@ -1116,9 +1197,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         setAppState((prev: AppState) => ({ ...prev, todos: withOrder }));
 
         try {
-            // Batch update sort_order for each item
+            // Batch update sort_order, status, and is_completed for each item
             const updates = withOrder.map(t =>
-                supabase.from('todos').update({ sort_order: t.sort_order }).eq('id', t.id)
+                supabase.from('todos').update({ 
+                    sort_order: t.sort_order,
+                    status: t.status || (t.is_completed ? 'done' : 'todo'),
+                    is_completed: t.status === 'done'
+                }).eq('id', t.id)
             );
             const results = await Promise.all(updates);
             const failed = results.find(r => r.error);
@@ -1161,6 +1246,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     };
 
     const handleDeleteGPASemester = async (id: string) => {
+        if (!window.confirm("Bạn có chắc chắn muốn xóa học kỳ này không? Tất cả môn học thuộc học kỳ cũng sẽ bị xóa.")) return;
         const prev = appState.gpaSemesters;
         setAppState(p => ({ ...p, gpaSemesters: p.gpaSemesters.filter(s => s.id !== id) }));
         try {
@@ -1268,6 +1354,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     };
 
     const handleDeleteGPACourse = async (id: string) => {
+        if (!window.confirm("Bạn có chắc chắn muốn xóa môn học này không?")) return;
         const prevState = appState.gpaSemesters;
         setAppState(prev => ({
             ...prev, gpaSemesters: prev.gpaSemesters.map(s => ({ ...s, courses: s.courses.filter(c => c.id !== id) }))
@@ -1281,9 +1368,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     return (
         <div className="h-[100dvh] w-screen overflow-hidden bg-[#F8F9FC] font-sans text-gray-900 flex flex-col md:flex-row">
             {/* Sidebar Desktop */}
-            <aside className={`hidden md:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 fixed h-full z-20 shadow-sm transition-all duration-300 ease-in-out`}>
-                <div className={`p-6 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} gap-3 relative`}>
-                    <div className="flex items-center gap-3 overflow-hidden">
+            <aside 
+                onMouseEnter={() => setIsSidebarCollapsed(false)}
+                onMouseLeave={() => setIsSidebarCollapsed(true)}
+                className={`hidden md:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 fixed h-full z-20 ${isSidebarCollapsed ? 'shadow-sm' : 'shadow-lg'} transition-all duration-300 ease-in-out`}
+            >
+                <div className={`pt-6 pb-4 flex items-center ${isSidebarCollapsed ? 'px-4 justify-center' : 'px-6 justify-between'} gap-3 relative`}>
+                    <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-100 border border-gray-100 shrink-0">
                             <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
                         </div>
@@ -1389,7 +1480,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             </aside>
 
             {/* Main Content */}
-            <main className={`flex-1 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} h-full overflow-y-auto scrollbar-hide relative bg-[#F8F9FC] transition-all duration-300 ease-in-out ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-28 md:pb-8'}`}>
+            <main className={`flex-1 md:ml-20 h-full overflow-y-auto scrollbar-hide relative bg-[#F8F9FC] transition-all duration-300 ease-in-out ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-28 md:pb-8'}`}>
                 {activeTab !== 'ai-advisor' && <header className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 z-30 transition-all h-16">
                     <div className="flex items-center justify-between px-4 h-full">
                         <div className="flex items-center gap-2">
@@ -1432,7 +1523,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     </div>
                 </header>}
 
-                <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8 relative'}`}> {/* AI Advisor gets full screen, others get dynamic fluid layout */}
+                <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative'}`}> {/* AI Advisor gets full screen, others get dynamic fluid layout */}
                     {deferredTab === 'visual' && (
                         proAccess.hasAccess ? (
                             <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
@@ -1512,7 +1603,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 onImportGPAData={handleImportGPAData}
                             />
                         ) : (
-                            <div className="max-w-7xl mx-auto p-4 md:p-8 pt-20 md:pt-8">
+                            <div className="w-full max-w-none min-h-screen p-4 md:p-8 pt-20 md:pt-8">
                                 <ProGateOverlay featureName="AI Advisor" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
                             </div>
                         )
@@ -1527,6 +1618,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
                                 onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
                                 onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onReorderTodos={handleReorderTodos}
+                                onMoveTodoStatus={handleMoveTodoStatus}
                                 initialFocusMode={startInFocusMode}
                                 onResetFocusMode={() => setStartInFocusMode(false)}
                                 activeTaskId={taskTracker.activeTask?.id || null}
