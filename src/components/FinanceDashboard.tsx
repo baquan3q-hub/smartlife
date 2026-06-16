@@ -1984,7 +1984,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            className="space-y-4 md:space-y-6 animate-fade-in pb-36 md:pb-20 relative min-h-[500px]"
+            className="w-full overflow-x-hidden px-3 md:px-8 pt-4 md:pt-8 space-y-4 md:space-y-6 animate-fade-in pb-36 md:pb-20 relative min-h-[500px]"
         >
             {/* Pull to Refresh Spinner */}
             <div

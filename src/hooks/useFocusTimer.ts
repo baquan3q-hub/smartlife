@@ -217,8 +217,21 @@ export const useFocusTimer = () => {
         }
     };
 
+    const skipSession = () => {
+        if (engineMode !== 'TIMER') return;
+        setStatus('IDLE');
+        localStorage.removeItem('focus_timer_target');
+
+        const nextMode = mode === 'WORK' ? 'BREAK' : 'WORK';
+        setMode(nextMode);
+        const nextSec = (nextMode === 'WORK' ? currentPreset.work : currentPreset.break) * 60;
+        setTimeLeft(nextSec);
+        setTotalTime(nextSec);
+        localStorage.setItem('focus_timer_remaining', nextSec.toString());
+    };
+
     return {
         status, mode, timeLeft, totalTime, currentPreset, engineMode,
-        toggleTimer, resetTimer, selectPreset, startCustom, switchEngineMode
+        toggleTimer, resetTimer, selectPreset, startCustom, switchEngineMode, skipSession
     };
 };

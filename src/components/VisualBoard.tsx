@@ -790,7 +790,10 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                 <ArrowUpRight size={18} className="text-white/30 group-hover:text-white transition-colors" />
                             </div>
 
-                            <div className="space-y-3 flex-1">
+                            <div 
+                                onClick={(e) => e.stopPropagation()} 
+                                className="space-y-3 flex-1 max-h-[160px] md:max-h-[200px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/20"
+                            >
                                 {priorityTodos.length > 0 ? priorityTodos.map((todo, idx) => (
                                     <div key={todo.id} className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 flex items-start gap-3 hover:bg-white/20 transition-colors cursor-pointer group/item">
                                         <div className={`mt-1 w-5 h-5 rounded-full border-2 border-white/30 flex items-center justify-center transition-colors ${idx === 0 ? 'group-hover/item:border-yellow-400' : ''}`}>

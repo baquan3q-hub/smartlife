@@ -167,15 +167,26 @@ export interface Task {
   day_of_week?: string; // Dùng cho thời khóa biểu lặp lại
 }
 
+export type TodoStatus = 'backlog' | 'todo' | 'doing' | 'done';
+
 // Interface cho Todo (Việc cần làm đơn giản)
 export interface Todo {
   id: string;
   content: string;
   is_completed: boolean;
+  status?: TodoStatus;
   priority: 'low' | 'medium' | 'high' | 'urgent' | 'focus' | 'chill' | 'temp';
   deadline?: string;
   sort_order?: number;
   time_spent?: number; // Tổng thời gian đã dùng (seconds)
+  description?: string;
+  subtasks?: { id: string; title: string; is_completed: boolean }[];
+}
+
+export interface QuickNote {
+  id: string;
+  content: string;
+  created_at: string;
 }
 
 // Interface cho Ngân sách (Budget)
