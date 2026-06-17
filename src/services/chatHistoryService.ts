@@ -21,6 +21,7 @@ export interface AIMessage {
     charts?: ChartData[];
     actions?: ActionResult[];
     created_at: string;
+    tokens_used?: number;
 }
 
 export const chatHistoryService = {
@@ -109,20 +110,48 @@ export const chatHistoryService = {
         role: 'user' | 'assistant',
         content: string,
         charts?: ChartData[],
-        actions?: ActionResult[]
+        actions?: ActionResult[],
+        tokens_used?: number
     ): Promise<AIMessage | null> {
         try {
+            const payload: any = {
+                conversation_id: conversationId,
+                role,
+                content,
+                charts: charts?.length ? charts : null,
+                actions: actions?.length ? actions : null
+            };
+
+            if (tokens_used !== undefined && tokens_used !== null) {
+                payload.tokens_used = tokens_used;
+            }
+
             const { data, error } = await supabase
                 .from('ai_messages')
-                .insert([{
-                    conversation_id: conversationId,
-                    role,
-                    content,
-                    charts: charts?.length ? charts : null,
-                    actions: actions?.length ? actions : null
-                }])
+                .insert([payload])
                 .select()
                 .single();
+
+            // Nếu lỗi do cột tokens_used chưa tồn tại (chưa chạy migration)
+            if (error && tokens_used !== undefined) {
+                console.warn('[chatHistoryService] Failed to insert with tokens_used, retrying without it...', error.message);
+                delete payload.tokens_used;
+                const { data: retryData, error: retryError } = await supabase
+                    .from('ai_messages')
+                    .insert([payload])
+                    .select()
+                    .single();
+
+                if (retryError) return null;
+
+                // Cập nhật updated_at của conversation
+                await supabase
+                    .from('ai_conversations')
+                    .update({ updated_at: new Date().toISOString() })
+                    .eq('id', conversationId);
+
+                return retryData;
+            }
 
             if (error) return null;
 

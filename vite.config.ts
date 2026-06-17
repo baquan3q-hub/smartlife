@@ -246,38 +246,42 @@ function geminiProxyPlugin(env: Record<string, string>): Plugin {
           const todayRequests = usage ? usage.requests_today : 0;
           const todayTokens = usage ? usage.tokens_today : 0;
 
-          if (todayRequests >= limits.requests_per_day) {
-            res.statusCode = 429;
-            res.end(JSON.stringify({
-              error: 'quota_exceeded',
-              type: 'daily_requests_exceeded',
-              message: `Bạn đã dùng hết ${limits.requests_per_day} lượt yêu cầu AI hôm nay. Vui lòng quay lại vào ngày mai! ⏰`
-            }));
-            return;
-          }
+          // Đọc isToolCall từ body (mặc định false)
+          const isToolCall = body?.isToolCall || false;
 
-          if (todayTokens >= limits.tokens_per_day) {
-            res.statusCode = 429;
-            res.end(JSON.stringify({
-              error: 'quota_exceeded',
-              type: 'daily_tokens_exceeded',
-              message: `Bạn đã dùng hết giới hạn ${limits.tokens_per_day.toLocaleString()} token hôm nay. Vui lòng quay lại vào ngày mai! ⚡`
-            }));
-            return;
-          }
+          // Kiểm tra xem hạn mức có bị vượt không
+          const isDailyRequestsExceeded = todayRequests >= limits.requests_per_day;
+          const isDailyTokensExceeded = todayTokens >= limits.tokens_per_day;
+          const isMonthlyTokensExceeded = limits.tokens_per_month !== Infinity && totalTokensMonth >= limits.tokens_per_month;
 
-          let isMonthlyExceeded = limits.tokens_per_month !== Infinity && totalTokensMonth >= limits.tokens_per_month;
           let usingBoost = false;
 
-          if (isMonthlyExceeded) {
+          // Chỉ kiểm tra giới hạn lượt yêu cầu nếu không phải cuộc gọi con (isToolCall === false)
+          const isRequestLimitHit = !isToolCall && isDailyRequestsExceeded;
+
+          if (isRequestLimitHit || isDailyTokensExceeded || isMonthlyTokensExceeded) {
             const hasBoost = await checkAndConsumeBoostTokens(supabaseClient, userId, 0);
             if (!hasBoost) {
               res.statusCode = 429;
-              res.end(JSON.stringify({
-                error: 'quota_exceeded',
-                type: 'monthly_tokens_exceeded',
-                message: `Bạn đã dùng hết giới hạn ${limits.tokens_per_month.toLocaleString()} token của tháng này. Vui lòng mua thêm gói AI Boost Pack để tiếp tục sử dụng! 🚀`
-              }));
+              if (isRequestLimitHit) {
+                res.end(JSON.stringify({
+                  error: 'quota_exceeded',
+                  type: 'daily_requests_exceeded',
+                  message: `Bạn đã dùng hết ${limits.requests_per_day} lượt yêu cầu AI hôm nay. Vui lòng mua thêm gói AI Boost Pack hoặc quay lại vào ngày mai! ⏰`
+                }));
+              } else if (isDailyTokensExceeded) {
+                res.end(JSON.stringify({
+                  error: 'quota_exceeded',
+                  type: 'daily_tokens_exceeded',
+                  message: `Bạn đã dùng hết giới hạn ${limits.tokens_per_day.toLocaleString()} token hôm nay. Vui lòng mua thêm gói AI Boost Pack hoặc quay lại vào ngày mai! ⚡`
+                }));
+              } else {
+                res.end(JSON.stringify({
+                  error: 'quota_exceeded',
+                  type: 'monthly_tokens_exceeded',
+                  message: `Bạn đã dùng hết giới hạn ${limits.tokens_per_month.toLocaleString()} token của tháng này. Vui lòng mua thêm gói AI Boost Pack để tiếp tục sử dụng! 🚀`
+                }));
+              }
               return;
             }
             usingBoost = true;
@@ -298,7 +302,7 @@ function geminiProxyPlugin(env: Record<string, string>): Plugin {
           const responseTokens = data?.usageMetadata?.totalTokenCount || 0;
 
           if (supabaseClient && userId) {
-            const newRequestsToday = todayRequests + 1;
+            const newRequestsToday = isToolCall ? todayRequests : todayRequests + 1;
             const newTokensToday = todayTokens + responseTokens;
 
             const { error: upsertError } = await supabaseClient
