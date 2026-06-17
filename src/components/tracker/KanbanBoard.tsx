@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   DndContext, 
   DragEndEvent, 
-  DragOverEvent, 
+  DragOverEvent,
   DragStartEvent, 
   useSensor, 
   useSensors, 
   PointerSensor, 
   DragOverlay, 
-  useDroppable 
+  useDroppable,
+  closestCorners
 } from '@dnd-kit/core';
 import { 
   SortableContext, 
@@ -34,6 +35,23 @@ const COLUMNS: { id: TodoStatus; label: string; dot: string }[] = [
   { id: 'done', label: 'Done', dot: 'bg-slate-500' },
 ];
 
+const COLUMN_IDS: string[] = COLUMNS.map(c => c.id);
+
+/** Determine the effective status of a todo */
+const getEffectiveStatus = (t: Todo): TodoStatus => {
+  if (t.status) return t.status;
+  return t.is_completed ? 'done' : 'todo';
+};
+
+/** Filter todos for a column */
+const getTodosForColumn = (allTodos: Todo[], colId: TodoStatus): Todo[] => {
+  return allTodos.filter((t) => {
+    if (colId === 'done') return t.status === 'done' || t.is_completed;
+    if (colId === 'todo') return t.status === 'todo' || (!t.status && !t.is_completed);
+    return t.status === colId;
+  });
+};
+
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   todos,
   onMoveTodoStatus,
@@ -42,133 +60,194 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onDeleteTodo,
   onQuickAddTodo,
 }) => {
+  // Local copy for real-time visual feedback during drag
   const [localTodos, setLocalTodos] = useState<Todo[]>(todos);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeWidth, setActiveWidth] = useState<number | null>(null);
+  const activeTodoRef = useRef<Todo | null>(null);
+  const isDraggingRef = useRef(false);
 
-  // Synchronize local todos when props change, but not during dragging
+  // Sync from props when NOT dragging
   useEffect(() => {
-    if (!activeId) {
+    if (!isDraggingRef.current) {
       setLocalTodos(todos);
     }
-  }, [todos, activeId]);
+  }, [todos]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Drag starts only after moving 8px, preserving normal clicks
+        distance: 8,
       },
     })
   );
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-    const element = document.getElementById(event.active.id as string);
+    const id = event.active.id as string;
+    isDraggingRef.current = true;
+    activeTodoRef.current = todos.find(t => t.id === id) || null;
+    setActiveId(id);
+    const element = document.getElementById(id);
     if (element) {
       setActiveWidth(element.getBoundingClientRect().width);
     }
   };
 
+  /**
+   * onDragOver: ONLY handles CROSS-COLUMN moves.
+   * Same-column reordering animation is handled by SortableContext/useSortable.
+   *
+   * ANTI-LOOP MECHANISM:
+   * - If active item is already in the target column → return `prev` (same ref) → no re-render → loop broken
+   * - Only creates a new array when the item actually changes columns
+   */
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     if (!over) return;
 
-    const activeId = active.id as string;
+    const dragId = active.id as string;
     const overId = over.id as string;
 
-    if (activeId === overId) return;
+    if (dragId === overId) return;
 
-    // Check if the over target is a column (droppable container)
-    const isOverAColumn = COLUMNS.some((col) => col.id === overId);
+    setLocalTodos((prev) => {
+      const activeTodo = prev.find(t => t.id === dragId);
+      if (!activeTodo) return prev;
 
-    setLocalTodos((prevTodos) => {
-      const activeTask = prevTodos.find((t) => t.id === activeId);
-      if (!activeTask) return prevTodos;
+      const activeColumn = getEffectiveStatus(activeTodo);
 
-      const activeStatus = activeTask.status || (activeTask.is_completed ? 'done' : 'todo');
-
-      if (isOverAColumn) {
-        const destStatus = overId as TodoStatus;
-        if (activeStatus === destStatus) return prevTodos;
-
-        // Move active task to the destination column
-        return prevTodos.map((t) => {
-          if (t.id === activeId) {
-            return {
-              ...t,
-              status: destStatus,
-              is_completed: destStatus === 'done',
-            };
-          }
-          return t;
-        });
+      // Determine target column
+      let targetColumn: TodoStatus;
+      if (COLUMN_IDS.includes(overId)) {
+        targetColumn = overId as TodoStatus;
       } else {
-        // Over target is a card
-        const overTask = prevTodos.find((t) => t.id === overId);
-        if (!overTask) return prevTodos;
+        const overTodo = prev.find(t => t.id === overId);
+        if (!overTodo) return prev;
+        targetColumn = getEffectiveStatus(overTodo);
+      }
 
-        const overStatus = overTask.status || (overTask.is_completed ? 'done' : 'todo');
+      // ★ CRITICAL: Same column → bail out with same reference → NO re-render → NO loop
+      if (activeColumn === targetColumn) return prev;
 
-        if (activeStatus !== overStatus) {
-          // Move task to the new column and insert near the over card
-          const updatedTodos = prevTodos.map((t) => {
-            if (t.id === activeId) {
-              return {
-                ...t,
-                status: overStatus,
-                is_completed: overStatus === 'done',
-              };
-            }
-            return t;
-          });
+      // Cross-column move: update status
+      const updated = prev.map(t => {
+        if (t.id === dragId) {
+          return { ...t, status: targetColumn, is_completed: targetColumn === 'done' };
+        }
+        return t;
+      });
 
-          const activeIndex = updatedTodos.findIndex((t) => t.id === activeId);
-          const overIndex = updatedTodos.findIndex((t) => t.id === overId);
-
-          const result = [...updatedTodos];
-          const [removed] = result.splice(activeIndex, 1);
-          result.splice(overIndex, 0, removed);
-          return result;
-        } else {
-          // Same column reordering
-          const activeIndex = prevTodos.findIndex((t) => t.id === activeId);
-          const overIndex = prevTodos.findIndex((t) => t.id === overId);
-
-          if (activeIndex !== overIndex) {
-            const result = [...prevTodos];
-            const [removed] = result.splice(activeIndex, 1);
-            result.splice(overIndex, 0, removed);
-            return result;
-          }
-          return prevTodos;
+      // If hovering over a specific card, also reposition near it
+      if (!COLUMN_IDS.includes(overId)) {
+        const aIdx = updated.findIndex(t => t.id === dragId);
+        const oIdx = updated.findIndex(t => t.id === overId);
+        if (aIdx !== -1 && oIdx !== -1 && aIdx !== oIdx) {
+          const [removed] = updated.splice(aIdx, 1);
+          updated.splice(oIdx, 0, removed);
         }
       }
+
+      return updated;
     });
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    isDraggingRef.current = false;
     setActiveId(null);
     setActiveWidth(null);
-    onReorderTodos(localTodos);
+    activeTodoRef.current = null;
+
+    if (!over) {
+      // Drag cancelled - reset to original props
+      setLocalTodos(todos);
+      return;
+    }
+
+    const draggedId = active.id as string;
+    const overId = over.id as string;
+
+    if (draggedId === overId) {
+      setLocalTodos(todos);
+      return;
+    }
+
+    // Start from localTodos which has cross-column moves already applied
+    let finalTodos = [...localTodos];
+
+    const draggedTodo = finalTodos.find(t => t.id === draggedId);
+    if (!draggedTodo) {
+      setLocalTodos(todos);
+      return;
+    }
+
+    const isOverAColumn = COLUMN_IDS.includes(overId);
+
+    if (isOverAColumn) {
+      // Dropped on an empty column area
+      const destStatus = overId as TodoStatus;
+      finalTodos = finalTodos.map(t => {
+        if (t.id === draggedId) {
+          return { ...t, status: destStatus, is_completed: destStatus === 'done' };
+        }
+        return t;
+      });
+    } else {
+      // Dropped on a card - handle same-column reorder
+      const overTodo = finalTodos.find(t => t.id === overId);
+      if (overTodo) {
+        const draggedColumn = getEffectiveStatus(draggedTodo);
+        const overColumn = getEffectiveStatus(overTodo);
+
+        // Update status if needed (cross-column move not yet applied)
+        if (draggedColumn !== overColumn) {
+          finalTodos = finalTodos.map(t => {
+            if (t.id === draggedId) {
+              return { ...t, status: overColumn, is_completed: overColumn === 'done' };
+            }
+            return t;
+          });
+        }
+
+        // Reorder within the final array
+        const dIdx = finalTodos.findIndex(t => t.id === draggedId);
+        const oIdx = finalTodos.findIndex(t => t.id === overId);
+        if (dIdx !== -1 && oIdx !== -1 && dIdx !== oIdx) {
+          const [removed] = finalTodos.splice(dIdx, 1);
+          finalTodos.splice(oIdx, 0, removed);
+        }
+      }
+    }
+
+    onReorderTodos(finalTodos);
   };
+
+  const handleDragCancel = () => {
+    isDraggingRef.current = false;
+    setActiveId(null);
+    setActiveWidth(null);
+    activeTodoRef.current = null;
+    setLocalTodos(todos);
+  };
+
+  // Use localTodos for rendering (has real-time drag state)
+  const displayTodos = localTodos;
 
   return (
     <DndContext 
       sensors={sensors} 
-      onDragStart={handleDragStart} 
-      onDragOver={handleDragOver} 
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="w-full">
         {/* Board Columns Horizontal Container with Uniform Gaps */}
         <div className="flex flex-col md:flex-row gap-2.5 overflow-x-auto pb-4 scrollbar-thin items-stretch w-full select-none">
           {COLUMNS.map((col) => {
-            const colTodos = localTodos.filter((t) => {
-              // Backward compatibility for old completed todos
-              if (col.id === 'done') return t.status === 'done' || t.is_completed;
-              if (col.id === 'todo') return t.status === 'todo' || (!t.status && !t.is_completed);
-              return t.status === col.id;
-            });
+            const colTodos = getTodosForColumn(displayTodos, col.id);
 
             return (
               <ColumnContainer
@@ -205,9 +284,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       </div>
 
       <DragOverlay adjustScale={false}>
-        {activeId ? (
+        {activeId && activeTodoRef.current ? (
           <DragOverlayCard
-            todo={localTodos.find((t) => t.id === activeId)!}
+            todo={activeTodoRef.current}
             width={activeWidth || undefined}
           />
         ) : null}
