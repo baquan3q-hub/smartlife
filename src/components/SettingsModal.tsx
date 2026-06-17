@@ -71,6 +71,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const [notiSettings, setNotiSettings] = useState(DEFAULT_NOTI_SETTINGS);
     const [tempHeaderShortcuts, setTempHeaderShortcuts] = useState<{ spotify: boolean; habit: boolean }>({ spotify: true, habit: true });
     const [tempTheme, setTempTheme] = useState<ThemeMode>('system');
+    const [todoExpiryEnabled, setTodoExpiryEnabled] = useState(false);
+    const [todoExpiryDays, setTodoExpiryDays] = useState(90);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [hobbiesInput, setHobbiesInput] = useState('');
@@ -196,6 +198,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             setTempHeaderShortcuts({ ...headerShortcuts });
             // Load theme setting
             setTempTheme(getSavedTheme());
+            // Load todo expiry settings
+            const expiryEnabled = localStorage.getItem('smartlife_todo_expiry_enabled') === 'true';
+            const expiryDays = parseInt(localStorage.getItem('smartlife_todo_expiry_days') || '90', 10);
+            setTodoExpiryEnabled(expiryEnabled);
+            setTodoExpiryDays(expiryDays);
         }
     }, [isOpen, userId, headerShortcuts]);
 
@@ -298,6 +305,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
             // 4. Save Theme Setting
             saveTheme(tempTheme);
+
+            // Save Todo Expiry settings
+            localStorage.setItem('smartlife_todo_expiry_enabled', todoExpiryEnabled ? 'true' : 'false');
+            localStorage.setItem('smartlife_todo_expiry_days', todoExpiryDays.toString());
 
             // Dispatch event so other components can pick up changes immediately
             window.dispatchEvent(new Event('storage'));
@@ -903,6 +914,49 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                             <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform duration-300 ease-in-out ${tempHeaderShortcuts.habit ? 'translate-x-5' : 'translate-x-0'}`} />
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Cài đặt Todo Expiry */}
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                                    <Clock size={14} />
+                                    Tự động ẩn Todo đã hoàn thành
+                                </h4>
+                                <p className="text-xs text-gray-400 font-medium -mt-1">
+                                    Tự động ẩn các nhiệm vụ đã hoàn thành ra khỏi danh sách sau một khoảng thời gian nhất định.
+                                </p>
+
+                                <div className="bg-gray-50 rounded-2xl p-2.5 border border-gray-100 space-y-2.5">
+                                    <div 
+                                        className="flex items-center justify-between hover:bg-white p-3.5 rounded-xl transition-all cursor-pointer group"
+                                        onClick={() => setTodoExpiryEnabled(!todoExpiryEnabled)}
+                                    >
+                                        <div className="flex-1 pr-4">
+                                            <div className="font-bold text-sm text-gray-800 group-hover:text-indigo-600 transition-colors">Bật tự động ẩn</div>
+                                            <div className="text-xs text-gray-400 font-medium mt-0.5">Ẩn nhiệm vụ done sau số ngày cấu hình bên dưới</div>
+                                        </div>
+                                        <div className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ease-in-out shrink-0 ${todoExpiryEnabled ? 'bg-indigo-500' : 'bg-gray-200'}`}>
+                                            <div className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform duration-300 ease-in-out ${todoExpiryEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        </div>
+                                    </div>
+
+                                    {todoExpiryEnabled && (
+                                        <div className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-gray-100 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <label className="font-bold text-sm text-gray-800">Ẩn sau số ngày:</label>
+                                            <select
+                                                value={todoExpiryDays}
+                                                onChange={(e) => setTodoExpiryDays(parseInt(e.target.value, 10))}
+                                                className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 font-bold text-xs outline-none text-gray-700 focus:border-indigo-300"
+                                            >
+                                                <option value={30}>30 ngày</option>
+                                                <option value={60}>60 ngày</option>
+                                                <option value={90}>90 ngày</option>
+                                                <option value={180}>180 ngày</option>
+                                                <option value={365}>365 ngày</option>
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
