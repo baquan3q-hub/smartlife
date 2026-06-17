@@ -50,7 +50,17 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, order, onC
 
   if (!isOpen || !order) return null;
 
-  const plan = SUBSCRIPTION_PLANS.find(p => p.id === order.plan_type);
+  const getPlanLabel = (planType: string) => {
+    const boostLabels: Record<string, string> = {
+      boost_s: 'AI Boost S (+500k tokens)',
+      boost_m: 'AI Boost M (+1M tokens)',
+      boost_l: 'AI Boost L (+3M tokens)',
+    };
+    if (boostLabels[planType]) return boostLabels[planType];
+    const plan = SUBSCRIPTION_PLANS.find(p => p.id === planType);
+    return plan?.label || planType;
+  };
+
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
 
@@ -112,7 +122,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, order, onC
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-bold text-gray-900">Thông tin đơn hàng</span>
             <span className="text-xs bg-indigo-100 text-indigo-700 font-bold px-3 py-1 rounded-full">
-              {plan?.label || order.plan_type}
+              {getPlanLabel(order.plan_type)}
             </span>
           </div>
           <div className="text-2xl font-black text-gray-900 text-center py-2">

@@ -23,11 +23,10 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
 
   const features = [
     { icon: <LayoutDashboard size={18} />, color: 'text-indigo-600', bgColor: 'bg-indigo-50', text: 'Visual Board — toàn cảnh cuộc sống đại học trong 1 giao diện' },
-    { icon: <CalendarDays size={18} />, color: 'text-blue-600', bgColor: 'bg-blue-50', text: 'Lịch trình, Thời khóa biểu & Todo — quản lý deadline hiệu quả' },
     { icon: <Flame size={18} />, color: 'text-orange-600', bgColor: 'bg-orange-50', text: 'Habit Tracker — theo dõi thói quen với streak, countdown & count-up' },
     { icon: <Star size={18} />, color: 'text-amber-500', bgColor: 'bg-amber-50', text: 'StarBrain ⭐ — hệ thống sao thưởng & cửa hàng đổi quà khi hoàn thành thói quen' },
     { icon: <BookOpen size={18} />, color: 'text-teal-600', bgColor: 'bg-teal-50', text: 'Nhật ký cá nhân — không gian chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
-    { icon: <Brain size={18} />, color: 'text-violet-600', bgColor: 'bg-violet-50', text: 'AI Cố vấn riêng — phân tích & gợi ý cá nhân hóa' },
+    { icon: <Brain size={18} />, color: 'text-violet-600', bgColor: 'bg-violet-50', text: 'AI Cố vấn riêng — 600.000 token/tháng included' },
     { icon: <Target size={18} />, color: 'text-purple-600', bgColor: 'bg-purple-50', text: 'Lộ trình Sự nghiệp & Mục tiêu 5 năm — AI cố vấn kỹ năng dựa trên GPA' },
     { icon: <Zap size={18} />, color: 'text-pink-600', bgColor: 'bg-pink-50', text: 'Focus Timer & Lofi Music — chế độ tập trung tối đa' },
     { icon: <TrendingUp size={18} />, color: 'text-emerald-600', bgColor: 'bg-emerald-50', text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },

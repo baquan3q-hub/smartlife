@@ -8,7 +8,7 @@ import {
     TrendingDown, Target, ListChecks, BarChart3, Wallet,
     PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight, ChevronDown, ChevronUp,
     CheckCircle2, AlertCircle, History, X, Plus, Trash2, GraduationCap,
-    Heart, Pin, Copy, Check, Download, FileText, LayoutGrid, Mic, MicOff
+    Heart, Pin, Copy, Check, Download, FileText, LayoutGrid, Mic, MicOff, Zap
 } from 'lucide-react';
 
 import { AppState, TransactionType } from '../types';
@@ -16,6 +16,8 @@ import { generateQuickInsight, getCurrentModel, type ChatMessage } from '../serv
 import { chatWithAI, type ActionHandlers, type ChartData, type ActionResult, type AIAttachment } from '../services/aiEngine';
 import { chatHistoryService, type AIConversation, type AIMessage } from '../services/chatHistoryService';
 import { memoryService } from '../services/memoryService';
+import { aiQuotaService, type UserQuotaStatus } from '../services/aiQuotaService';
+import AIBoostModal from './AIBoostModal';
 import InlineChatChart from './InlineChatChart';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -35,6 +37,7 @@ interface AIAdvisorPageProps {
     onAddTodo?: (content: string, priority: string, deadline?: string) => Promise<void>;
     onAddTransaction?: (tx: any) => Promise<void>;
     onImportGPAData?: (semesters: any[]) => Promise<void>;
+    onSelectBoostPack?: (packType: 'boost_s' | 'boost_m' | 'boost_l') => void;
 }
 
 interface UIMessage {
@@ -183,7 +186,8 @@ const getMimeTypeFromExtension = (ext: string): string => {
 // ────────────────────────────────────────
 const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     appState, lang, onBack,
-    onAddTimetable, onAddTodo, onAddTransaction, onImportGPAData
+    onAddTimetable, onAddTodo, onAddTransaction, onImportGPAData,
+    onSelectBoostPack
 }) => {
     const [messages, setMessages] = useState<UIMessage[]>([
         {
@@ -196,6 +200,21 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [activeArtifact, setActiveArtifact] = useState<{ title: string; content: string } | null>(null);
     const [copied, setCopied] = useState(false);
+
+    // AI Quota states (Phase 4 & 5)
+    const [quotaStatus, setQuotaStatus] = useState<UserQuotaStatus | null>(null);
+    const [showQuotaDetail, setShowQuotaDetail] = useState(false);
+    const [showBoostModal, setShowBoostModal] = useState(false);
+
+    const refreshQuota = useCallback(async () => {
+        if (!appState.profile?.id) return;
+        const status = await aiQuotaService.getUserQuotaStatus(appState.profile.id, appState.profile.plan);
+        setQuotaStatus(status);
+    }, [appState.profile?.id, appState.profile?.plan]);
+
+    useEffect(() => {
+        refreshQuota();
+    }, [refreshQuota]);
 
     // Sidebar cards layout states (Collapse/Hide)
     const [isStatsCollapsed, setIsStatsCollapsed] = useState(false);
@@ -618,6 +637,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             }]);
         } finally {
             setIsLoading(false);
+            refreshQuota();
         }
     };
 
@@ -816,6 +836,92 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         </div>
                     </div>
                     <div className="flex items-center gap-1">
+                        {/* Quota Indicator Chip */}
+                        {quotaStatus && (
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowQuotaDetail(!showQuotaDetail)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-indigo-50 border border-gray-100 rounded-xl transition-all cursor-pointer text-xs font-semibold text-gray-700 active:scale-95"
+                                    title="Nhấp để xem chi tiết Quota AI"
+                                >
+                                    <Zap size={14} className={quotaStatus.tokensToday >= quotaStatus.tokensTodayLimit * 0.8 ? 'text-amber-500 animate-pulse fill-amber-500' : 'text-indigo-600'} />
+                                    <span className="hidden sm:inline">AI Quota:</span>
+                                    <span>{Math.min(100, Math.round((quotaStatus.tokensToday / (quotaStatus.tokensTodayLimit || 1)) * 100))}%</span>
+                                </button>
+                                
+                                {showQuotaDetail && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setShowQuotaDetail(false)} />
+                                        <div className="absolute right-0 top-10 w-72 bg-white border border-gray-150 rounded-2xl shadow-xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-200 text-left">
+                                            <h3 className="font-bold text-gray-800 text-xs mb-3 flex items-center justify-between">
+                                                <span className="flex items-center gap-1"><Brain size={14} className="text-indigo-600" /> Hạn mức sử dụng AI</span>
+                                                <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full uppercase tracking-wider">{quotaStatus.plan}</span>
+                                            </h3>
+                                            
+                                            <div className="space-y-3 text-[11px]">
+                                                {/* Requests */}
+                                                <div>
+                                                    <div className="flex justify-between text-gray-500 mb-1 font-medium">
+                                                        <span>💬 Lượt yêu cầu (ngày):</span>
+                                                        <span className="font-bold text-gray-800">{quotaStatus.requestsToday}/{quotaStatus.requestsLimit}</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                                                        <div 
+                                                            className="h-1.5 rounded-full bg-indigo-500" 
+                                                            style={{ width: `${Math.min((quotaStatus.requestsToday / (quotaStatus.requestsLimit || 1)) * 100, 100)}%` }} 
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Tokens Today */}
+                                                <div>
+                                                    <div className="flex justify-between text-gray-500 mb-1 font-medium">
+                                                        <span>⚡ Token hôm nay:</span>
+                                                        <span className="font-bold text-gray-800">{(quotaStatus.tokensToday / 1000).toFixed(1)}k/{(quotaStatus.tokensTodayLimit / 1000).toFixed(0)}k</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                                                        <div 
+                                                            className={`h-1.5 rounded-full ${quotaStatus.tokensToday >= quotaStatus.tokensTodayLimit * 0.8 ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                                                            style={{ width: `${Math.min((quotaStatus.tokensToday / (quotaStatus.tokensTodayLimit || 1)) * 100, 100)}%` }} 
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Tokens Month */}
+                                                {quotaStatus.tokensMonthLimit !== Infinity && quotaStatus.tokensMonthLimit > 0 && (
+                                                    <div>
+                                                        <div className="flex justify-between text-gray-500 mb-1 font-medium">
+                                                            <span>📅 Token tháng này:</span>
+                                                            <span className="font-bold text-gray-800">{(quotaStatus.tokensMonth / 1000).toFixed(0)}k/{(quotaStatus.tokensMonthLimit / 1000).toFixed(0)}k</span>
+                                                        </div>
+                                                        <div className="w-full bg-gray-100 rounded-full h-1.5">
+                                                            <div 
+                                                                className={`h-1.5 rounded-full ${quotaStatus.tokensMonth >= quotaStatus.tokensMonthLimit * 0.8 ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                                                style={{ width: `${Math.min((quotaStatus.tokensMonth / (quotaStatus.tokensMonthLimit || 1)) * 100, 100)}%` }} 
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Boost info */}
+                                                <div className="pt-2.5 border-t border-gray-100 flex items-center justify-between text-[10px] font-semibold">
+                                                    <span className="text-gray-500">🚀 Token Boost khả dụng:</span>
+                                                    <span className="font-bold text-emerald-600">+{quotaStatus.boostTokensRemaining.toLocaleString()} tokens</span>
+                                                </div>
+
+                                                <button
+                                                    onClick={() => { setShowQuotaDetail(false); setShowBoostModal(true); }}
+                                                    className="w-full py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-bold hover:shadow-lg hover:shadow-emerald-100 text-center transition-all block mt-2 text-[10px]"
+                                                >
+                                                    🚀 Mua thêm AI Boost Pack
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
                         <button
                             onClick={() => setShowPopupHint(!showPopupHint)}
                             className={`p-2 rounded-xl transition-colors flex items-center gap-1.5 text-sm font-medium ${showPopupHint ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-amber-500 hover:text-amber-600'}`}
@@ -1565,6 +1671,18 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 message={confirmDialog.message}
                 onConfirm={confirmDialog.onConfirm}
                 onCancel={() => setConfirmDialog(p => ({ ...p, isOpen: false }))}
+            />
+            <AIBoostModal
+                isOpen={showBoostModal}
+                onClose={() => setShowBoostModal(false)}
+                onSelectPack={(packType) => {
+                    setShowBoostModal(false);
+                    if (onSelectBoostPack) {
+                        onSelectBoostPack(packType);
+                    } else {
+                        alert('Chức năng mua gói bổ sung chưa sẵn sàng. Vui lòng liên hệ Admin.');
+                    }
+                }}
             />
         </div>
     );

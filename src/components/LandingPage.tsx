@@ -39,8 +39,8 @@ const translations = {
         ],
 
         featScheduleTitle: 'Làm chủ thời gian,\nNâng cao hiệu suất.',
-        featScheduleDesc: 'Thời khóa biểu trực quan, To-do list ưu tiên thông minh và chế độ Focus mode giúp bạn tập trung hoàn thành mọi công việc.',
-        featScheduleItems: ['Thời khóa biểu tuần/ngày', 'Todo list theo mức độ ưu tiên', 'Focus Timer tích hợp'],
+        featScheduleDesc: 'Tích hợp toàn diện các siêu công cụ giúp tối ưu hóa thời gian học tập và làm việc của bạn: từ bảng Kanban quản lý dự án, lưu trữ liên kết Bookmark, rèn luyện thói quen (Habits) đến bộ đếm giờ Pomodoro tập trung cao độ.',
+        featScheduleItems: ['Lịch trình & Thời khóa biểu tuần/ngày trực quan', 'Bảng Kanban thông minh & Danh sách công việc ưu tiên', 'Bấm giờ Pomodoro tăng năng suất & Ghi chú nhanh', 'Lưu trữ Bookmark tiện ích cho liên kết học tập', 'Theo dõi thói quen (Habits Widget) kỷ luật bản thân'],
 
         featJournalTitle: 'Nhật ký cá nhân,\nChữa lành & Tự kiến tạo.',
         featJournalDesc: 'Không gian ghi chép an toàn, riêng tư. Giúp bạn nhìn nhận lại cảm xúc, ghi nhận lòng biết ơn hàng ngày và xây dựng thói quen viết lách lành mạnh.',
@@ -146,8 +146,8 @@ const translations = {
         ],
 
         featScheduleTitle: 'Master Your Time,\nBoost Productivity.',
-        featScheduleDesc: 'Visual timetable, smart prioritized To-do list, and Focus mode to help you concentrate on getting things done.',
-        featScheduleItems: ['Weekly/Daily timetable', 'Priority-based Todo list', 'Integrated Focus Timer'],
+        featScheduleDesc: 'A comprehensive suite of productivity tools designed to optimize your studying and work: featuring a Kanban project board, Bookmark manager, Habit tracking streaks, and a Pomodoro focus timer.',
+        featScheduleItems: ['Visual daily/weekly schedules & timetables', 'Smart Kanban Board & prioritized task list', 'Productivity Pomodoro Timer & Quick Notes widget', 'Bookmark manager for saving learning resources', 'Habit tracker widget to build self-discipline'],
 
         featJournalTitle: 'Personal Digital Journal,\nHeal & Grow.',
         featJournalDesc: 'Capture every moment, mood, and 3 gratitudes daily. An intuitive Word-like editor and StarBrain rewards help you maintain your writing habits.',
@@ -262,8 +262,8 @@ const translations = {
         ],
 
         featScheduleTitle: '시간 지배하기,\n생산성 향상.',
-        featScheduleDesc: '직관적인 일정표, 스마트 우선순위 할일 목록 및 집중 타스크 완수를 위한 뽀모도로 타이머.',
-        featScheduleItems: ['주간/일간 시간표', '우선순위별 할일 목록', '통합 집중 타이머'],
+        featScheduleDesc: '프로젝트 관리를 위한 Kanban 보드, 학습 리소스 저장을 위한 북마크, 자기관리를 위한 습관 형성, 집중력 극대화를 위한 뽀모도로 타이머까지 시간과 효율성을 지배할 수 있는 올인원 도구를 제공합니다.',
+        featScheduleItems: ['직관적인 일간/주간 시간표 및 일정 관리', '스마트 Kanban 보드 및 우선순위별 할 일 목록', '생산성 향상을 위한 뽀모도로 타이머 및 퀵 메모', '학습 리소스 관리를 위한 북마크 위젯', '자기 관리를 돕는 습관 추적기 위젯'],
 
         featJournalTitle: '개인 일기장,\n치유와 성장.',
         featJournalDesc: '안전하고 프라이빗한 기록 공간. 감정을 돌아보고 감사 일기를 쓰며 꾸준한 기록 습관을 기릅니다.',
@@ -358,6 +358,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
         { name: 'GPA Tracker VNU 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
         { name: 'Nghe nhạc Spotify 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
         { name: 'Kỷ luật Thói quen 🔥', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
+        { name: 'Bảng Kanban 📋', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
+        { name: 'Lưu trữ Bookmark 🔖', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
         { name: 'Tập trung Pomodoro ⏳', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
         { name: 'Quản lý Tài chính 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-250', targetId: 'finance' },
         { name: 'Thời khóa biểu 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
@@ -371,6 +373,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
         { name: 'GPA 트래커 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
         { name: '스포티파이 음악 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
         { name: '습관 관리 🔥', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
+        { name: 'Kanban 보드 📋', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
+        { name: '북마크 관리자 🔖', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
         { name: '뽀모도로 타이머 ⏳', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
         { name: '자산 관리 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
         { name: '시각적 일정표 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
@@ -384,6 +388,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
         { name: 'GPA Tracker 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
         { name: 'Spotify Music Player 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
         { name: 'Habit & Streaks 🔥', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
+        { name: 'Kanban Board 📋', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
+        { name: 'Bookmark Manager 🔖', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
         { name: 'Pomodoro Focus ⏳', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
         { name: 'Finance Manager 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
         { name: 'Visual Schedule 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },

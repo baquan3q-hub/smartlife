@@ -282,7 +282,7 @@ export interface SmartInsight {
 }
 
 // 6. Subscription & Pro Plan
-export type SubscriptionPlanDuration = '1_month' | '3_months' | '12_months' | 'lifetime';
+export type SubscriptionPlanDuration = '1_month' | '3_months' | '12_months' | 'lifetime' | 'boost_s' | 'boost_m' | 'boost_l';
 
 export interface SubscriptionPlan {
   id: SubscriptionPlanDuration;

@@ -9,6 +9,7 @@ import {
     buildScheduleContext, buildGPAContext, buildHabitContext,
     buildCountdownContext, buildJournalContext,
     SYSTEM_INSTRUCTION,
+    estimateGeminiCost,
     type ChatMessage, type MessagePart, type ToolDeclaration
 } from './geminiService';
 import { AppState } from '../types';
@@ -586,7 +587,7 @@ export async function chatWithAI(
             const body = buildRequest(contents);
             const data = await callGeminiRaw(body);
 
-            // Log token usage
+            // Log token usage with detailed tracking (Phase 1)
             if (data?.usageMetadata?.totalTokenCount) {
                 supabase.auth.getUser().then(({ data: authData }) => {
                     const uid = authData?.user?.id;
@@ -594,7 +595,12 @@ export async function chatWithAI(
                     supabase.from('api_logs').insert([{
                         user_id: uid,
                         action: 'chat',
-                        tokens_used: data.usageMetadata.totalTokenCount
+                        tokens_used: data.usageMetadata.totalTokenCount,
+                        prompt_tokens: data.usageMetadata.promptTokenCount || 0,
+                        candidates_tokens: data.usageMetadata.candidatesTokenCount || 0,
+                        thoughts_tokens: data.usageMetadata.thoughtsTokenCount || data.usageMetadata.thinkingTokenCount || 0,
+                        estimated_cost_vnd: estimateGeminiCost(data.usageMetadata.promptTokenCount || 0, data.usageMetadata.candidatesTokenCount || 0),
+                        model: 'gemini-2.5-flash'
                     }]).then(({ error }) => {
                         if (error) console.error('[SmartLife] ❌ Token log failed:', error.message);
                         else console.info(`[SmartLife] ✅ Logged ${data.usageMetadata.totalTokenCount} tokens`);

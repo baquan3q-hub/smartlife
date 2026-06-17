@@ -7,32 +7,32 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: '1_month',
     label: '1 Tháng',
-    price: 49000,
+    price: 59000,
     duration_days: 30,
-    monthly_price: 49000,
+    monthly_price: 59000,
     save_percent: 0,
   },
   {
     id: '3_months',
     label: '3 Tháng',
-    price: 99000,
+    price: 139000,
     duration_days: 90,
-    monthly_price: Math.round(99000 / 3),
-    save_percent: Math.round(100 - ((99000 / 3) / 49000) * 100), // ~33%
+    monthly_price: Math.round(139000 / 3),
+    save_percent: Math.round(100 - ((139000 / 3) / 59000) * 100), // ~21%
     is_popular: true,
   },
   {
     id: '12_months',
     label: '12 Tháng',
-    price: 349000,
+    price: 399000,
     duration_days: 365,
-    monthly_price: Math.round(349000 / 12),
-    save_percent: Math.round(100 - ((349000 / 12) / 49000) * 100), // ~41%
+    monthly_price: Math.round(399000 / 12),
+    save_percent: Math.round(100 - ((399000 / 12) / 59000) * 100), // ~44%
   },
   {
     id: 'lifetime',
     label: 'Vĩnh viễn',
-    price: 499000,
+    price: 899000,
     duration_days: null,
     monthly_price: 0,
     save_percent: 100,
@@ -65,7 +65,20 @@ export const createSubscriptionOrder = async (
   userId: string,
   planType: SubscriptionPlanDuration
 ): Promise<SubscriptionOrder | null> => {
-  const plan = SUBSCRIPTION_PLANS.find(p => p.id === planType);
+  let plan: SubscriptionPlan | null = null;
+  const isBoostPack = planType.startsWith('boost_');
+
+  if (isBoostPack) {
+    const boostConfigs: Record<string, SubscriptionPlan> = {
+      boost_s: { id: 'boost_s', label: 'AI Boost S', price: 29000, duration_days: 30, monthly_price: 0, save_percent: 0 },
+      boost_m: { id: 'boost_m', label: 'AI Boost M', price: 49000, duration_days: 60, monthly_price: 0, save_percent: 0 },
+      boost_l: { id: 'boost_l', label: 'AI Boost L', price: 119000, duration_days: 90, monthly_price: 0, save_percent: 0 },
+    };
+    plan = boostConfigs[planType] || null;
+  } else {
+    plan = SUBSCRIPTION_PLANS.find(p => p.id === planType) || null;
+  }
+
   if (!plan) return null;
 
   const transferContent = generateTransferContent(userId);
@@ -160,6 +173,9 @@ export const confirmOrder = async (
   adminId: string
 ): Promise<boolean> => {
   try {
+    const isValidUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const confirmedBy = adminId && isValidUuid(adminId) ? adminId : null;
+
     // 1. Get order details
     const { data: order, error: orderError } = await supabase
       .from('subscription_orders')
@@ -169,10 +185,63 @@ export const confirmOrder = async (
 
     if (orderError || !order) throw new Error('Order not found');
 
-    const plan = SUBSCRIPTION_PLANS.find(p => p.id === order.plan_type);
+    const isBoostPack = order.plan_type.startsWith('boost_');
+    let plan: SubscriptionPlan | null = null;
+    
+    if (isBoostPack) {
+      const boostConfigs: Record<string, SubscriptionPlan> = {
+        boost_s: { id: 'boost_s', label: 'AI Boost S', price: 29000, duration_days: 30, monthly_price: 0, save_percent: 0 },
+        boost_m: { id: 'boost_m', label: 'AI Boost M', price: 49000, duration_days: 60, monthly_price: 0, save_percent: 0 },
+        boost_l: { id: 'boost_l', label: 'AI Boost L', price: 119000, duration_days: 90, monthly_price: 0, save_percent: 0 },
+      };
+      plan = boostConfigs[order.plan_type] || null;
+    } else {
+      plan = SUBSCRIPTION_PLANS.find(p => p.id === order.plan_type) || null;
+    }
+    
     if (!plan) throw new Error('Invalid plan type');
 
-    // 2. Calculate expiry date
+    if (isBoostPack) {
+      // Calculate token count based on pack type
+      const tokensMap: Record<string, number> = {
+        boost_s: 500000,
+        boost_m: 1000000,
+        boost_l: 3000000,
+      };
+      const tokensTotal = tokensMap[order.plan_type] || 0;
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + (plan.duration_days || 30));
+
+      // Update order status
+      const { error: updateOrderError } = await supabase
+        .from('subscription_orders')
+        .update({
+          status: 'confirmed',
+          confirmed_at: new Date().toISOString(),
+          confirmed_by: confirmedBy,
+        })
+        .eq('id', orderId);
+
+      if (updateOrderError) throw updateOrderError;
+
+      // Activate Boost Pack in user_ai_boost table
+      const { error: insertBoostError } = await supabase
+        .from('user_ai_boost')
+        .insert([{
+          user_id: order.user_id,
+          pack_type: order.plan_type,
+          tokens_total: tokensTotal,
+          tokens_used: 0,
+          expires_at: expiry.toISOString(),
+          status: 'active'
+        }]);
+
+      if (insertBoostError) throw insertBoostError;
+
+      return true;
+    }
+
+    // 2. Calculate expiry date for normal plans
     let proExpiryDate: string | null = null;
     if (plan.duration_days !== null) {
       // Check if user already has active Pro — extend from current expiry
@@ -203,7 +272,7 @@ export const confirmOrder = async (
       .update({
         status: 'confirmed',
         confirmed_at: new Date().toISOString(),
-        confirmed_by: adminId,
+        confirmed_by: confirmedBy,
       })
       .eq('id', orderId);
 

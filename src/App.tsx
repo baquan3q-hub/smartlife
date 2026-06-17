@@ -1,33 +1,31 @@
-// File: src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, CalendarDays, Wallet as WalletIcon, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target, Grid2X2 } from 'lucide-react';
 import { NotificationPopupModal } from './components/NotificationPopupModal';
 import { getUnreadCount, getUserNotifications } from './services/adminNotificationService';
 
-// Import các Components (Đảm bảo bạn đã tạo file trong thư mục components)
+// Static imports for all components to ensure instant loading and refresh in development mode
 import FinanceDashboard from './components/FinanceDashboard';
-import CashFlowDashboard from './components/CashFlowDashboard';
 import AIAdvisorPage from './components/AIAdvisorPage';
 import ScheduleDashboard from './components/ScheduleDashboard';
 import VisualBoard from './components/VisualBoard';
-import SettingsModal from './components/SettingsModal';
-import Login from './components/Login';
-import { PWAInstallPrompt } from './components/PWAInstallPrompt';
-import WelcomeTourModal from './components/WelcomeTourModal';
-// Import FocusSpace
-import MusicSpace from './components/MusicSpace';
 import GPADashboard from './components/GPADashboard';
 import AdminDashboard from './components/AdminDashboard';
-import PricingModal from './components/PricingModal';
-import InvoiceModal from './components/InvoiceModal';
-import ProGateOverlay from './components/ProGateOverlay';
-import { GlobalLoader } from './components/GlobalLoader';
-import MySpotify from './components/MySpotify';
 import HabitDashboard from './components/HabitDashboard';
 import JournalDashboard from './components/JournalDashboard';
-import ClickRippleEffect from './components/ClickRippleEffect';
 import GoalsDashboard from './components/GoalsDashboard';
+import CashFlowDashboard from './components/CashFlowDashboard';
+import SettingsModal from './components/SettingsModal';
+import Login from './components/Login';
+import WelcomeTourModal from './components/WelcomeTourModal';
+import MusicSpace from './components/MusicSpace';
+import PricingModal from './components/PricingModal';
+import InvoiceModal from './components/InvoiceModal';
+import MySpotify from './components/MySpotify';
 import ExpandSection from './components/ExpandSection';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import ProGateOverlay from './components/ProGateOverlay';
+import { GlobalLoader } from './components/GlobalLoader';
+import ClickRippleEffect from './components/ClickRippleEffect';
 import { careerGoalService } from './services/careerGoalService';
 
 
@@ -447,20 +445,29 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         if (!user) return;
         if (!silent) setIsLoadingData(true);
         try {
+            function withTimeout<T>(promise: Promise<T>, timeoutMs = 8000): Promise<T> {
+                return Promise.race([
+                    promise,
+                    new Promise<never>((_, reject) => 
+                        setTimeout(() => reject(new Error('Yêu cầu dữ liệu quá thời gian (Timeout)')), timeoutMs)
+                    )
+                ]);
+            }
+
             // Gọi song song các bảng dữ liệu bao gồm wallets và debts
-            const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes, gpaSemRes, gpaCourseRes, walletRes, debtRes] = await Promise.all([
-                supabase.from('transactions').select('*').order('date', { ascending: false }),
-                supabase.from('goals').select('*').order('deadline', { ascending: true }),
-                supabase.from('timetable').select('*').order('start_time', { ascending: true }),
-                supabase.from('todos').select('*').order('created_at', { ascending: false }),
+            const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes, gpaSemRes, gpaCourseRes, walletRes, debtRes] = await withTimeout(Promise.all([
+                supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
+                supabase.from('goals').select('*').eq('user_id', user.id).order('deadline', { ascending: true }),
+                supabase.from('timetable').select('*').eq('user_id', user.id).order('start_time', { ascending: true }),
+                supabase.from('todos').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
                 supabase.from('profiles').select('*').eq('id', user.id).single(),
-                supabase.from('calendar_events').select('*'),
-                supabase.from('budgets').select('*'),
-                supabase.from('gpa_semesters').select('*').order('academic_year', { ascending: true }),
-                supabase.from('gpa_courses').select('*').order('created_at', { ascending: true }),
-                supabase.from('wallets').select('*'),
-                supabase.from('debts').select('*'),
-            ]);
+                supabase.from('calendar_events').select('*').eq('user_id', user.id),
+                supabase.from('budgets').select('*').eq('user_id', user.id),
+                supabase.from('gpa_semesters').select('*').eq('user_id', user.id).order('academic_year', { ascending: true }),
+                supabase.from('gpa_courses').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
+                supabase.from('wallets').select('*').eq('user_id', user.id),
+                supabase.from('debts').select('*').eq('user_id', user.id),
+            ]), 8000);
 
             if (txRes.error) throw txRes.error;
 
@@ -1416,7 +1423,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     </button>
                     <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.schedule_goals', lang) : ''}>
                         <CalendarDays size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.schedule_goals', lang)}</span>}
-                        {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>
                     <button onClick={() => setActiveTab('habit')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'habit' ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.habit', lang) : ''}>
                         <Flame size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.habit', lang)}</span>}
@@ -1524,7 +1530,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 </header>}
 
                 <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative'}`}> {/* AI Advisor gets full screen, others get dynamic fluid layout */}
-                    {deferredTab === 'visual' && (
+                        {deferredTab === 'visual' && (
                         proAccess.hasAccess ? (
                             <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
                                 if (tab === 'music') {
@@ -1601,6 +1607,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 onAddTodo={handleAddTodo}
                                 onAddTransaction={handleAddTransaction}
                                 onImportGPAData={handleImportGPAData}
+                                onSelectBoostPack={handleSelectPlan}
                             />
                         ) : (
                             <div className="w-full max-w-none min-h-screen p-4 md:p-8 pt-20 md:pt-8">
@@ -1609,25 +1616,21 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         )
                     )}
                     {deferredTab === 'admin' && user?.email === 'baquan3q@gmail.com' && (
-                        <AdminDashboard adminEmail={user.email} />
+                        <AdminDashboard adminEmail={user.email} adminId={user.id} />
                     )}
                     {deferredTab === 'schedule' && (
-                        proAccess.hasAccess ? (
-                            <ScheduleDashboard
-                                state={{ ...appState, timer, onOpenMusic: () => setActiveTab('music') } as any}
-                                onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
-                                onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
-                                onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onReorderTodos={handleReorderTodos}
-                                onMoveTodoStatus={handleMoveTodoStatus}
-                                initialFocusMode={startInFocusMode}
-                                onResetFocusMode={() => setStartInFocusMode(false)}
-                                activeTaskId={taskTracker.activeTask?.id || null}
-                                onStartTracking={taskTracker.startTracking}
-                                onRefresh={async () => { await fetchData(true); }}
-                            />
-                        ) : (
-                            <ProGateOverlay featureName="Lịch trình" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
-                        )
+                        <ScheduleDashboard
+                            state={{ ...appState, timer, onOpenMusic: () => setActiveTab('music') } as any}
+                            onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
+                            onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
+                            onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onReorderTodos={handleReorderTodos}
+                            onMoveTodoStatus={handleMoveTodoStatus}
+                            initialFocusMode={startInFocusMode}
+                            onResetFocusMode={() => setStartInFocusMode(false)}
+                            activeTaskId={taskTracker.activeTask?.id || null}
+                            onStartTracking={taskTracker.startTracking}
+                            onRefresh={async () => { await fetchData(true); }}
+                        />
                     )}
                     {deferredTab === 'gpa' && (
                         <GPADashboard

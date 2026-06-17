@@ -96,6 +96,33 @@
       scrollbar-width: none;
     }
   </style>
+  <script>
+    // Tự động hủy đăng ký Service Worker và xóa Cache trên localhost để tránh lỗi đọng cache của PWA khi phát triển
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          for (let registration of registrations) {
+            registration.unregister().then(function (success) {
+              if (success) {
+                console.log('[Dev Cache Clean] Đã hủy đăng ký Service Worker thành công:', registration.active?.scriptURL);
+              }
+            });
+          }
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(function (names) {
+          for (let name of names) {
+            caches.delete(name).then(function (success) {
+              if (success) {
+                console.log('[Dev Cache Clean] Đã xóa bộ nhớ cache:', name);
+              }
+            });
+          }
+        });
+      }
+    }
+  </script>
 </head>
 
 <body>
