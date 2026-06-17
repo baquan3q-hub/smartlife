@@ -343,7 +343,9 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       host: '0.0.0.0',
-      // Proxy không cần nữa — geminiProxyPlugin xử lý /api/gemini trực tiếp
+      hmr: {
+        timeout: 300000, // Tăng timeout WebSocket lên 5 phút tránh tự động reload khi tab chạy ẩn
+      }
     },
     build: {
       emptyOutDir: true,

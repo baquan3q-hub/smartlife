@@ -6,7 +6,8 @@ import {
   DragStartEvent, 
   useSensor, 
   useSensors, 
-  PointerSensor, 
+  MouseSensor,
+  TouchSensor,
   DragOverlay, 
   useDroppable,
   closestCorners
@@ -75,9 +76,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }, [todos]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
       },
     })
   );
@@ -231,13 +238,54 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     setLocalTodos(todos);
   };
 
+  // Custom collision detection: fallback to closest column horizontally when pointer is in gaps/outside
+  const customCollisionDetection = (args: any) => {
+    // 1. Try standard closestCorners first
+    const collisions = closestCorners(args);
+    if (collisions && collisions.length > 0) {
+      return collisions;
+    }
+
+    // 2. Fallback: Find the column closest to the pointer's X coordinate
+    const { pointerCoordinates, droppableContainers } = args;
+    if (!pointerCoordinates) return [];
+
+    const x = pointerCoordinates.x;
+    const columns = droppableContainers.filter((container: any) =>
+      COLUMN_IDS.includes(container.id)
+    );
+
+    if (columns.length === 0) return [];
+
+    let closestColumn = null;
+    let minDistance = Infinity;
+
+    for (const container of columns) {
+      const rect = container.rect.current;
+      if (rect) {
+        const columnCenterX = rect.left + rect.width / 2;
+        const distance = Math.abs(x - columnCenterX);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestColumn = container;
+        }
+      }
+    }
+
+    if (closestColumn) {
+      return [{ id: closestColumn.id }];
+    }
+
+    return [];
+  };
+
   // Use localTodos for rendering (has real-time drag state)
   const displayTodos = localTodos;
 
   return (
     <DndContext 
       sensors={sensors} 
-      collisionDetection={closestCorners}
+      collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -417,7 +465,7 @@ const SortableCard: React.FC<SortableCardProps> = ({
       onClick={() => onEdit(todo)}
       {...attributes}
       {...listeners}
-      className="group relative flex flex-col gap-2 p-2.5 rounded-[18px] bg-white border border-slate-100 cursor-grab active:cursor-grabbing select-none hover:border-slate-300 transition-all shadow-sm"
+      className="group relative flex flex-col gap-2 p-2.5 rounded-[18px] bg-white border border-slate-100 cursor-grab active:cursor-grabbing select-none hover:border-slate-300 transition-colors duration-150 shadow-sm"
     >
       {/* Content */}
       <div className="flex items-start justify-between gap-3">

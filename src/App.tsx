@@ -1,19 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { LayoutDashboard, CalendarDays, Wallet as WalletIcon, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target, Grid2X2 } from 'lucide-react';
 import { NotificationPopupModal } from './components/NotificationPopupModal';
 import { getUnreadCount, getUserNotifications } from './services/adminNotificationService';
 
-// Static imports for all components to ensure instant loading and refresh in development mode
-import FinanceDashboard from './components/FinanceDashboard';
-import AIAdvisorPage from './components/AIAdvisorPage';
-import ScheduleDashboard from './components/ScheduleDashboard';
-import VisualBoard from './components/VisualBoard';
-import GPADashboard from './components/GPADashboard';
-import AdminDashboard from './components/AdminDashboard';
-import HabitDashboard from './components/HabitDashboard';
-import JournalDashboard from './components/JournalDashboard';
-import GoalsDashboard from './components/GoalsDashboard';
-import CashFlowDashboard from './components/CashFlowDashboard';
+// Lightweight components — static imports (always needed immediately)
 import SettingsModal from './components/SettingsModal';
 import Login from './components/Login';
 import WelcomeTourModal from './components/WelcomeTourModal';
@@ -21,11 +11,34 @@ import MusicSpace from './components/MusicSpace';
 import PricingModal from './components/PricingModal';
 import InvoiceModal from './components/InvoiceModal';
 import MySpotify from './components/MySpotify';
-import ExpandSection from './components/ExpandSection';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import ProGateOverlay from './components/ProGateOverlay';
 import { GlobalLoader } from './components/GlobalLoader';
 import ClickRippleEffect from './components/ClickRippleEffect';
+
+// Heavy Dashboard components — lazy loaded (only when tab is active)
+const FinanceDashboard = lazy(() => import('./components/FinanceDashboard'));
+const AIAdvisorPage = lazy(() => import('./components/AIAdvisorPage'));
+const ScheduleDashboard = lazy(() => import('./components/ScheduleDashboard'));
+const VisualBoard = lazy(() => import('./components/VisualBoard'));
+const GPADashboard = lazy(() => import('./components/GPADashboard'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const HabitDashboard = lazy(() => import('./components/HabitDashboard'));
+const JournalDashboard = lazy(() => import('./components/JournalDashboard'));
+const GoalsDashboard = lazy(() => import('./components/GoalsDashboard'));
+const CashFlowDashboard = lazy(() => import('./components/CashFlowDashboard'));
+const ExpandSection = lazy(() => import('./components/ExpandSection'));
+const LandingPage = lazy(() => import('./components/LandingPage'));
+
+// Lightweight inline loading spinner for tab switches
+const TabLoadingSpinner = () => (
+    <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+            <div className="w-10 h-10 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+            <span className="text-sm text-gray-400 font-medium">Đang tải...</span>
+        </div>
+    </div>
+);
 import { careerGoalService } from './services/careerGoalService';
 
 
@@ -53,7 +66,15 @@ import { INITIAL_BUDGET, INITIAL_GOALS, INITIAL_TRANSACTIONS, EXPENSE_CATEGORIES
 import { walletService } from './services/walletService';
 import { debtService } from './services/debtService';
 
-const RealtimeClock: React.FC = () => {
+// Cached Intl formatters — created once, reused every second
+const clockTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+});
+const clockDateFormatter = new Intl.DateTimeFormat('vi-VN', {
+    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+});
+
+const RealtimeClock: React.FC = React.memo(() => {
     const [time, setTime] = useState(new Date());
 
     useEffect(() => {
@@ -61,29 +82,17 @@ const RealtimeClock: React.FC = () => {
         return () => clearInterval(timer);
     }, []);
 
-    const formatTime = (date: Date) => {
-        return new Intl.DateTimeFormat('vi-VN', {
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
-        }).format(date);
-    };
-
-    const formatDate = (date: Date) => {
-        return new Intl.DateTimeFormat('vi-VN', {
-            weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
-        }).format(date);
-    };
-
     return (
         <div className="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100 text-center">
             <div className="text-lg font-bold text-indigo-700 capitalize">
-                {formatDate(time)}
+                {clockDateFormatter.format(time)}
             </div>
             <div className="text-base font-medium text-gray-500 font-mono mt-1">
-                {formatTime(time)}
+                {clockTimeFormatter.format(time)}
             </div>
         </div>
     );
-};
+});
 
 interface AuthenticatedAppProps {
     lang: Lang;
@@ -203,7 +212,17 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     }, [activeTab]);
 
-    const deferredTab = React.useDeferredValue(activeTab);
+    const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set([activeTab]));
+
+    useEffect(() => {
+        setVisitedTabs(prev => {
+            if (prev.has(activeTab)) return prev;
+            const next = new Set(prev);
+            next.add(activeTab);
+            return next;
+        });
+    }, [activeTab]);
+
     const [gpaInitialView, setGpaInitialView] = useState<string | null>(null);
     const [goalsInitialView, setGoalsInitialView] = useState<'career' | 'life' | 'cv' | null>(null);
     const [startInFocusMode, setStartInFocusMode] = useState(() => {
@@ -440,41 +459,72 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     }, [user, appState.profile?.plan]);
 
-    // Fetch Data từ Supabase khi user đăng nhập
     const fetchData = async (silent = false) => {
         if (!user) return;
         if (!silent) setIsLoadingData(true);
         try {
-            function withTimeout<T>(promise: Promise<T>, timeoutMs = 8000): Promise<T> {
-                return Promise.race([
-                    promise,
-                    new Promise<never>((_, reject) => 
-                        setTimeout(() => reject(new Error('Yêu cầu dữ liệu quá thời gian (Timeout)')), timeoutMs)
-                    )
-                ]);
+            // 1. Fetch profile first
+            const profileRes = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            let profileData: any = null;
+            if (profileRes.error) {
+                console.warn('[SmartLife] Error loading profile:', profileRes.error.message);
+            } else {
+                profileData = profileRes.data;
             }
 
-            // Gọi song song các bảng dữ liệu bao gồm wallets và debts
-            const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes, gpaSemRes, gpaCourseRes, walletRes, debtRes] = await withTimeout(Promise.all([
-                supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
-                supabase.from('goals').select('*').eq('user_id', user.id).order('deadline', { ascending: true }),
-                supabase.from('timetable').select('*').eq('user_id', user.id).order('start_time', { ascending: true }),
-                supabase.from('todos').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-                supabase.from('profiles').select('*').eq('id', user.id).single(),
-                supabase.from('calendar_events').select('*').eq('user_id', user.id),
-                supabase.from('budgets').select('*').eq('user_id', user.id),
-                supabase.from('gpa_semesters').select('*').eq('user_id', user.id).order('academic_year', { ascending: true }),
-                supabase.from('gpa_courses').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
-                supabase.from('wallets').select('*').eq('user_id', user.id),
-                supabase.from('debts').select('*').eq('user_id', user.id),
-            ]), 8000);
+            // Sync/update custom categories if profile loaded
+            if (profileData) {
+                if (profileData.custom_categories) {
+                    const customCats = profileData.custom_categories;
+                    if (customCats.expense) setCustomExpenseCats(customCats.expense);
+                    if (customCats.income) setCustomIncomeCats(customCats.income);
+                } else {
+                    // Initialize empty custom categories if not present
+                    await supabase.from('profiles').update({
+                        custom_categories: { expense: [], income: [] }
+                    }).eq('id', user.id);
+                }
+            }
 
-            if (txRes.error) throw txRes.error;
+            // 2. Fetch other tables in parallel safely
+            const fetchTableSafe = async (table: string, queryBuilder: any, transform?: (data: any) => any) => {
+                try {
+                    const { data, error } = await queryBuilder;
+                    if (error) {
+                        console.warn(`[SmartLife] Error loading ${table}:`, error.message);
+                        return [];
+                    }
+                    return data ? (transform ? transform(data) : data) : [];
+                } catch (e) {
+                    console.error(`[SmartLife] Failed to fetch ${table}:`, e);
+                    return [];
+                }
+            };
 
-            // Cập nhật State
-            setAppState((prev: AppState) => ({
-                ...prev,
-                transactions: txRes.data.map(t => ({
+            const transactionsQuery = supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false });
+            const goalsQuery = supabase.from('goals').select('*').eq('user_id', user.id).order('deadline', { ascending: true });
+            const timetableQuery = supabase.from('timetable').select('*').eq('user_id', user.id).order('start_time', { ascending: true });
+            const todosQuery = supabase.from('todos').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+            const budgetsQuery = supabase.from('budgets').select('*').eq('user_id', user.id);
+            const walletsQuery = supabase.from('wallets').select('*').eq('user_id', user.id);
+            const debtsQuery = supabase.from('debts').select('*').eq('user_id', user.id);
+            const calendarEventsQuery = supabase.from('calendar_events').select('*').eq('user_id', user.id);
+            const gpaSemestersQuery = supabase.from('gpa_semesters').select('*').eq('user_id', user.id).order('academic_year', { ascending: true });
+            const gpaCoursesQuery = supabase.from('gpa_courses').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
+
+            const [
+                transactions,
+                goals,
+                timetable,
+                todos,
+                budgets,
+                wallets,
+                debts,
+                calendarEvents,
+                gpaSemestersRaw,
+                gpaCoursesRaw
+            ] = await Promise.all([
+                fetchTableSafe('transactions', transactionsQuery, (data) => data.map((t: any) => ({
                     id: t.id,
                     user_id: t.user_id,
                     amount: Number(t.amount),
@@ -485,40 +535,50 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     created_at: t.created_at,
                     wallet_id: t.wallet_id || null,
                     debt_id: t.debt_id || null,
-                })),
-                goals: goalRes.data || [],
-                budgets: budgetRes.data || [],
-                timetable: timeRes.data || [],
-                todos: todoRes.data || [],
-                profile: profileRes.data || null,
-                // GPA: Combine semesters with their courses
-                gpaSemesters: (gpaSemRes.data || []).map((sem: any) => ({
-                    ...sem,
-                    courses: (gpaCourseRes.data || []).filter((c: any) => c.semester_id === sem.id),
-                })),
-                gpaTargetCredits: Number(localStorage.getItem(`gpaTargetCredits_${user.id}`)) || 135,
-                gpaTargetGPA: localStorage.getItem(`gpaTargetGPA_${user.id}`) ? Number(localStorage.getItem(`gpaTargetGPA_${user.id}`)) : null,
-                gpaTargetSemesters: Number(localStorage.getItem(`gpaTargetSemesters_${user.id}`)) || 4,
-                wallets: walletRes.data || [],
-                debts: debtRes.data || [],
+                }))),
+                fetchTableSafe('goals', goalsQuery),
+                fetchTableSafe('timetable', timetableQuery),
+                fetchTableSafe('todos', todosQuery),
+                fetchTableSafe('budgets', budgetsQuery),
+                fetchTableSafe('wallets', walletsQuery),
+                fetchTableSafe('debts', debtsQuery),
+                fetchTableSafe('calendar_events', calendarEventsQuery),
+                fetchTableSafe('gpa_semesters', gpaSemestersQuery),
+                fetchTableSafe('gpa_courses', gpaCoursesQuery)
+            ]);
+
+            // Transform GPA Semesters
+            const gpaSemesters = gpaSemestersRaw.map((sem: any) => ({
+                ...sem,
+                courses: gpaCoursesRaw.filter((c: any) => c.semester_id === sem.id)
             }));
 
-            // Parse Custom Categories from Profile
-            if (profileRes.data?.custom_categories) {
-                const customCats = profileRes.data.custom_categories;
-                if (customCats.expense) setCustomExpenseCats(customCats.expense);
-                if (customCats.income) setCustomIncomeCats(customCats.income);
-            } else {
-                if (profileRes.data && !profileRes.data.custom_categories) {
-                    await supabase.from('profiles').update({
-                        custom_categories: { expense: [], income: [] }
-                    }).eq('id', user.id);
-                }
+            // Update calendar events state
+            if (calendarEvents) {
+                setCalendarEvents(calendarEvents);
             }
 
-            if (eventsRes.data) {
-                setCalendarEvents(eventsRes.data);
-            }
+            // Atomic update to App State
+            setAppState((prev: AppState) => {
+                const nextState: AppState = {
+                    ...prev,
+                    transactions,
+                    goals,
+                    timetable,
+                    todos,
+                    budgets,
+                    wallets,
+                    debts,
+                    gpaSemesters,
+                };
+                if (profileData) {
+                    nextState.profile = profileData;
+                    nextState.gpaTargetCredits = Number(localStorage.getItem(`gpaTargetCredits_${user.id}`)) || 135;
+                    nextState.gpaTargetGPA = localStorage.getItem(`gpaTargetGPA_${user.id}`) ? Number(localStorage.getItem(`gpaTargetGPA_${user.id}`)) : null;
+                    nextState.gpaTargetSemesters = Number(localStorage.getItem(`gpaTargetSemesters_${user.id}`)) || 4;
+                }
+                return nextState;
+            });
 
         } catch (error) {
             console.error('Lỗi tải dữ liệu:', error);
@@ -1529,176 +1589,241 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     </div>
                 </header>}
 
-                <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative'}`}> {/* AI Advisor gets full screen, others get dynamic fluid layout */}
-                        {deferredTab === 'visual' && (
-                        proAccess.hasAccess ? (
-                            <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
-                                if (tab === 'music') {
-                                    setStartInFocusMode(true);
-                                    setActiveTab('schedule');
-                                } else if (tab === 'gpa-career') {
-                                    setGpaInitialView('career');
-                                    setActiveTab('gpa');
-                                } else if (tab === 'goals-cv') {
-                                    setGoalsInitialView('cv');
-                                    setActiveTab('goals');
-                                } else {
-                                    setActiveTab(tab as any);
-                                }
-                            }} onRefresh={async () => { await fetchData(true); }} />
-                        ) : (
-                            <ProGateOverlay featureName="Visual Board" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
-                        )
-                    )}
-                    {deferredTab === 'finance' && (
-                        <FinanceDashboard
-                            state={appState}
-                            onAddTransaction={handleAddTransaction}
-                            onUpdateTransaction={handleUpdateTransaction}
-                            onDeleteTransaction={handleDeleteTransaction}
-                            onAddGoal={handleAddGoal}
-                            onUpdateGoal={handleUpdateGoal}
-                            onDeleteGoal={handleDeleteGoal}
-                            isLoading={isLoadingData}
-                            lang={lang}
-                            expenseCategories={allExpenseCategories}
-                            incomeCategories={allIncomeCategories}
-                            onAddCategory={handleAddCategory}
-                            onDeleteCategory={handleDeleteCategory}
-                            onAddBudget={async (b) => {
-                                if (!user) return;
-                                const { data, error } = await supabase.from('budgets').insert([{ ...b, user_id: user.id }]).select().single();
-                                if (data) setAppState(prev => ({ ...prev, budgets: [...prev.budgets, data] }));
-                            }}
-                            onUpdateBudget={async (b) => {
-                                const { error } = await supabase.from('budgets').update(b).eq('id', b.id);
-                                if (!error) setAppState(prev => ({ ...prev, budgets: prev.budgets.map(item => item.id === b.id ? { ...item, ...b } : item) }));
-                            }}
-                            onDeleteBudget={async (id) => {
-                                const { error } = await supabase.from('budgets').delete().eq('id', id);
-                                if (!error) setAppState(prev => ({ ...prev, budgets: prev.budgets.filter(item => item.id !== id) }));
-                            }}
-                            onNavigateToCashFlow={() => setActiveTab('cashflow')}
-                            onNavigateToAI={() => setActiveTab('ai-advisor')}
-                            onRefresh={async () => { await fetchData(true); }}
-                            onAddWallet={handleAddWallet}
-                            onUpdateWallet={handleUpdateWallet}
-                            onDeleteWallet={handleDeleteWallet}
-                            onTransferMoney={handleTransferMoney}
-                            onAddDebt={handleAddDebt}
-                            onDeleteDebt={handleDeleteDebt}
-                            onRepayDebt={handleRepayDebt}
-                        />
-                    )}
-                    {deferredTab === 'cashflow' && (
-                        <CashFlowDashboard
-                            state={appState}
-                            lang={lang}
-                            onBack={() => setActiveTab('finance')}
-                        />
-                    )}
-                    {deferredTab === 'ai-advisor' && (
-                        proAccess.hasAccess ? (
-                            <AIAdvisorPage
-                                appState={appState}
+                {/* Tab Containers with Keep-Alive */}
+                
+                {/* Visual Board */}
+                {visitedTabs.has('visual') && (
+                    <div style={{ display: activeTab === 'visual' ? 'block' : 'none' }} className="w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            {proAccess.hasAccess ? (
+                                <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
+                                    if (tab === 'music') {
+                                        setStartInFocusMode(true);
+                                        setActiveTab('schedule');
+                                    } else if (tab === 'gpa-career') {
+                                        setGpaInitialView('career');
+                                        setActiveTab('gpa');
+                                    } else if (tab === 'goals-cv') {
+                                        setGoalsInitialView('cv');
+                                        setActiveTab('goals');
+                                    } else {
+                                        setActiveTab(tab as any);
+                                    }
+                                }} onRefresh={async () => { await fetchData(true); }} />
+                            ) : (
+                                <ProGateOverlay featureName="Visual Board" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
+                            )}
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* Finance Dashboard */}
+                {visitedTabs.has('finance') && (
+                    <div style={{ display: activeTab === 'finance' ? 'block' : 'none' }} className="w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            <FinanceDashboard
+                                state={appState}
+                                onAddTransaction={handleAddTransaction}
+                                onUpdateTransaction={handleUpdateTransaction}
+                                onDeleteTransaction={handleDeleteTransaction}
+                                onAddGoal={handleAddGoal}
+                                onUpdateGoal={handleUpdateGoal}
+                                onDeleteGoal={handleDeleteGoal}
+                                isLoading={isLoadingData}
+                                lang={lang}
+                                expenseCategories={allExpenseCategories}
+                                incomeCategories={allIncomeCategories}
+                                onAddCategory={handleAddCategory}
+                                onDeleteCategory={handleDeleteCategory}
+                                onAddBudget={async (b) => {
+                                    if (!user) return;
+                                    const { data, error } = await supabase.from('budgets').insert([{ ...b, user_id: user.id }]).select().single();
+                                    if (data) setAppState(prev => ({ ...prev, budgets: [...prev.budgets, data] }));
+                                }}
+                                onUpdateBudget={async (b) => {
+                                    const { error } = await supabase.from('budgets').update(b).eq('id', b.id);
+                                    if (!error) setAppState(prev => ({ ...prev, budgets: prev.budgets.map(item => item.id === b.id ? { ...item, ...b } : item) }));
+                                }}
+                                onDeleteBudget={async (id) => {
+                                    const { error } = await supabase.from('budgets').delete().eq('id', id);
+                                    if (!error) setAppState(prev => ({ ...prev, budgets: prev.budgets.filter(item => item.id !== id) }));
+                                }}
+                                onNavigateToCashFlow={() => setActiveTab('cashflow')}
+                                onNavigateToAI={() => setActiveTab('ai-advisor')}
+                                onRefresh={async () => { await fetchData(true); }}
+                                onAddWallet={handleAddWallet}
+                                onUpdateWallet={handleUpdateWallet}
+                                onDeleteWallet={handleDeleteWallet}
+                                onTransferMoney={handleTransferMoney}
+                                onAddDebt={handleAddDebt}
+                                onDeleteDebt={handleDeleteDebt}
+                                onRepayDebt={handleRepayDebt}
+                            />
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* CashFlow Dashboard */}
+                {visitedTabs.has('cashflow') && (
+                    <div style={{ display: activeTab === 'cashflow' ? 'block' : 'none' }} className="w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            <CashFlowDashboard
+                                state={appState}
                                 lang={lang}
                                 onBack={() => setActiveTab('finance')}
-                                onAddTimetable={handleAddTimetable}
-                                onAddTodo={handleAddTodo}
-                                onAddTransaction={handleAddTransaction}
-                                onImportGPAData={handleImportGPAData}
-                                onSelectBoostPack={handleSelectPlan}
                             />
-                        ) : (
-                            <div className="w-full max-w-none min-h-screen p-4 md:p-8 pt-20 md:pt-8">
-                                <ProGateOverlay featureName="AI Advisor" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
-                            </div>
-                        )
-                    )}
-                    {deferredTab === 'admin' && user?.email === 'baquan3q@gmail.com' && (
-                        <AdminDashboard adminEmail={user.email} adminId={user.id} />
-                    )}
-                    {deferredTab === 'schedule' && (
-                        <ScheduleDashboard
-                            state={{ ...appState, timer, onOpenMusic: () => setActiveTab('music') } as any}
-                            onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
-                            onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
-                            onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onReorderTodos={handleReorderTodos}
-                            onMoveTodoStatus={handleMoveTodoStatus}
-                            initialFocusMode={startInFocusMode}
-                            onResetFocusMode={() => setStartInFocusMode(false)}
-                            activeTaskId={taskTracker.activeTask?.id || null}
-                            onStartTracking={taskTracker.startTracking}
-                            onRefresh={async () => { await fetchData(true); }}
-                        />
-                    )}
-                    {deferredTab === 'gpa' && (
-                        <GPADashboard
-                            semesters={appState.gpaSemesters}
-                            onAddSemester={handleAddGPASemester}
-                            onUpdateSemester={handleUpdateGPASemester}
-                            onDeleteSemester={handleDeleteGPASemester}
-                            onAddCourse={handleAddGPACourse}
-                            onUpdateCourse={handleUpdateGPACourse}
-                            onDeleteCourse={handleDeleteGPACourse}
-                            onImportGPAData={handleImportGPAData}
-                            targetCredits={appState.gpaTargetCredits}
-                            onUpdateTargetCredits={handleUpdateGPATargetCredits}
-                            targetGPA={appState.gpaTargetGPA}
-                            targetSemesters={appState.gpaTargetSemesters}
-                            onUpdateGPATarget={handleUpdateGPATarget}
-                            isLoading={isLoadingData}
-                            lang={lang}
-                            userId={user?.id || ''}
-                            initialViewMode={gpaInitialView}
-                            onResetInitialView={() => setGpaInitialView(null)}
-                            onCreatePosition={async (domain) => {
-                                if (user?.id) {
-                                    await careerGoalService.addPosition(user.id, domain);
-                                    setActiveTab('goals');
-                                }
-                            }}
-                            isPro={proAccess.hasAccess}
-                            onUpgrade={handleOpenPricing}
-                        />
-                    )}
-                    {deferredTab === 'goals' && (
-                        <GoalsDashboard
-                            userId={user?.id || ''}
-                            isPro={proAccess.hasAccess}
-                            onUpgrade={handleOpenPricing}
-                            onNavigateToGPACareer={() => {
-                                setGpaInitialView('career');
-                                setActiveTab('gpa');
-                            }}
-                            initialViewMode={goalsInitialView}
-                            onResetInitialView={() => setGoalsInitialView(null)}
-                        />
-                    )}
-                    {deferredTab === 'habit' && (
-                        <HabitDashboard userId={user?.id || ''} onNavigateToSchedule={() => setActiveTab('schedule')} />
-                    )}
-                    {deferredTab === 'journal' && (
-                        <JournalDashboard userId={user?.id || ''} />
-                    )}
-                    {deferredTab === 'expand' && (
-                        <ExpandSection
-                            userId={user?.id || ''}
-                            profile={appState.profile}
-                            onNavigate={(tab) => {
-                                if (tab === 'music') {
-                                    setStartInFocusMode(true);
-                                    setActiveTab('schedule');
-                                } else {
-                                    setActiveTab(tab as any);
-                                }
-                            }}
-                            onOpenSettings={() => setIsSettingsOpen(true)}
-                            onOpenSpotify={() => setIsSpotifyOpen(true)}
-                            onRefreshProfile={async () => { await fetchData(true); }}
-                        />
-                    )}
-                </div>
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* AI Advisor Page */}
+                {visitedTabs.has('ai-advisor') && (
+                    <div style={{ display: activeTab === 'ai-advisor' ? 'block' : 'none' }} className="h-full">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            {proAccess.hasAccess ? (
+                                <AIAdvisorPage
+                                    appState={appState}
+                                    lang={lang}
+                                    onBack={() => setActiveTab('finance')}
+                                    onAddTimetable={handleAddTimetable}
+                                    onAddTodo={handleAddTodo}
+                                    onAddTransaction={handleAddTransaction}
+                                    onImportGPAData={handleImportGPAData}
+                                    onSelectBoostPack={handleSelectPlan}
+                                />
+                            ) : (
+                                <div className="w-full max-w-none min-h-screen p-4 md:p-8 pt-20 md:pt-8">
+                                    <ProGateOverlay featureName="AI Advisor" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
+                                </div>
+                            )}
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* Admin Dashboard */}
+                {visitedTabs.has('admin') && user?.email === 'baquan3q@gmail.com' && (
+                    <div style={{ display: activeTab === 'admin' ? 'block' : 'none' }} className="w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            <AdminDashboard adminEmail={user.email} adminId={user.id} />
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* Schedule Dashboard */}
+                {visitedTabs.has('schedule') && (
+                    <div style={{ display: activeTab === 'schedule' ? 'block' : 'none' }} className="w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            <ScheduleDashboard
+                                state={{ ...appState, timer, onOpenMusic: () => setActiveTab('music') } as any}
+                                onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
+                                onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
+                                onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onReorderTodos={handleReorderTodos}
+                                onMoveTodoStatus={handleMoveTodoStatus}
+                                initialFocusMode={startInFocusMode}
+                                onResetFocusMode={() => setStartInFocusMode(false)}
+                                activeTaskId={taskTracker.activeTask?.id || null}
+                                onStartTracking={taskTracker.startTracking}
+                                onRefresh={async () => { await fetchData(true); }}
+                            />
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* GPA Dashboard */}
+                {visitedTabs.has('gpa') && (
+                    <div style={{ display: activeTab === 'gpa' ? 'block' : 'none' }} className="w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            <GPADashboard
+                                semesters={appState.gpaSemesters}
+                                onAddSemester={handleAddGPASemester}
+                                onUpdateSemester={handleUpdateGPASemester}
+                                onDeleteSemester={handleDeleteGPASemester}
+                                onAddCourse={handleAddGPACourse}
+                                onUpdateCourse={handleUpdateGPACourse}
+                                onDeleteCourse={handleDeleteGPACourse}
+                                onImportGPAData={handleImportGPAData}
+                                targetCredits={appState.gpaTargetCredits}
+                                onUpdateTargetCredits={handleUpdateGPATargetCredits}
+                                targetGPA={appState.gpaTargetGPA}
+                                targetSemesters={appState.gpaTargetSemesters}
+                                onUpdateGPATarget={handleUpdateGPATarget}
+                                isLoading={isLoadingData}
+                                lang={lang}
+                                userId={user?.id || ''}
+                                initialViewMode={gpaInitialView}
+                                onResetInitialView={() => setGpaInitialView(null)}
+                                onCreatePosition={async (domain) => {
+                                    if (user?.id) {
+                                        await careerGoalService.addPosition(user.id, domain);
+                                        setActiveTab('goals');
+                                    }
+                                }}
+                                isPro={proAccess.hasAccess}
+                                onUpgrade={handleOpenPricing}
+                            />
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* Goals Dashboard */}
+                {visitedTabs.has('goals') && (
+                    <div style={{ display: activeTab === 'goals' ? 'block' : 'none' }} className="w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            <GoalsDashboard
+                                userId={user?.id || ''}
+                                isPro={proAccess.hasAccess}
+                                onUpgrade={handleOpenPricing}
+                                onNavigateToGPACareer={() => {
+                                    setGpaInitialView('career');
+                                    setActiveTab('gpa');
+                                }}
+                                initialViewMode={goalsInitialView}
+                                onResetInitialView={() => setGoalsInitialView(null)}
+                            />
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* Habit Dashboard */}
+                {visitedTabs.has('habit') && (
+                    <div style={{ display: activeTab === 'habit' ? 'block' : 'none' }} className="w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            <HabitDashboard userId={user?.id || ''} onNavigateToSchedule={() => setActiveTab('schedule')} />
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* Journal Dashboard */}
+                {visitedTabs.has('journal') && (
+                    <div style={{ display: activeTab === 'journal' ? 'block' : 'none' }} className="w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            <JournalDashboard userId={user?.id || ''} />
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* Expand Section */}
+                {visitedTabs.has('expand') && (
+                    <div style={{ display: activeTab === 'expand' ? 'block' : 'none' }} className="w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative">
+                        <Suspense fallback={<TabLoadingSpinner />}>
+                            <ExpandSection
+                                userId={user?.id || ''}
+                                profile={appState.profile}
+                                onNavigate={(tab) => {
+                                    if (tab === 'music') {
+                                        setStartInFocusMode(true);
+                                        setActiveTab('schedule');
+                                    } else {
+                                        setActiveTab(tab as any);
+                                    }
+                                }}
+                                onOpenSettings={() => setIsSettingsOpen(true)}
+                                onOpenSpotify={() => setIsSpotifyOpen(true)}
+                                onRefreshProfile={async () => { await fetchData(true); }}
+                            />
+                        </Suspense>
+                    </div>
+                )}
             </main>
 
 
@@ -1798,7 +1923,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     );
 };
 
-import LandingPage from './components/LandingPage';
+// LandingPage is lazy-loaded above
 
 const AppWrapper: React.FC = () => {
     useTheme();
@@ -1810,7 +1935,6 @@ const AppWrapper: React.FC = () => {
     });
 
     const [hash, setHash] = useState(window.location.hash);
-    const timer = useFocusTimer();
 
     useEffect(() => {
         const handleHashChange = () => {
@@ -1851,11 +1975,9 @@ const AppWrapper: React.FC = () => {
 
     if (hash === '#/focus' || hash === '#/study') {
         return (
-            <MusicSpace
-                timer={timer}
+            <StandaloneMusicRoute
                 onBack={() => { window.location.hash = ''; }}
                 formatTime={formatTime}
-                isStandalone={true}
                 onLoginRedirect={() => {
                     setShowLogin(true);
                     window.location.hash = '';
@@ -1868,7 +1990,29 @@ const AppWrapper: React.FC = () => {
 
     if (showLogin) return <Login onBack={() => setShowLogin(false)} />;
 
-    return <LandingPage onLogin={() => setShowLogin(true)} lang={lang} setLang={setLang} />;
+    return (
+        <Suspense fallback={<GlobalLoader />}>
+            <LandingPage onLogin={() => setShowLogin(true)} lang={lang} setLang={setLang} />
+        </Suspense>
+    );
+};
+
+// Separate component to lazily initialize useFocusTimer only when MusicSpace route is active
+const StandaloneMusicRoute: React.FC<{
+    onBack: () => void;
+    formatTime: (s: number) => string;
+    onLoginRedirect: () => void;
+}> = ({ onBack, formatTime, onLoginRedirect }) => {
+    const timer = useFocusTimer();
+    return (
+        <MusicSpace
+            timer={timer}
+            onBack={onBack}
+            formatTime={formatTime}
+            isStandalone={true}
+            onLoginRedirect={onLoginRedirect}
+        />
+    );
 };
 
 const App: React.FC = () => (
