@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  closestCenter,
   closestCorners,
   DndContext,
   DragEndEvent,
   DragOverEvent,
   DragOverlay,
   DragStartEvent,
-  PointerSensor,
+  MouseSensor,
+  rectIntersection,
   TouchSensor,
   useDroppable,
   useSensor,
@@ -74,10 +76,19 @@ const moveTodoInBoard = (items: Todo[], activeId: string, overId: string): Todo[
   if (!overIsColumn && !overTodo) return items;
 
   const targetStatus = overIsColumn ? overId as TodoStatus : getEffectiveStatus(overTodo as Todo);
+
+  // Custom fallback: if dragging over the column background of its own column, do nothing.
+  if (overIsColumn && getEffectiveStatus(activeTodo) === targetStatus) {
+    return items;
+  }
+
   const movedTodo = {
     ...activeTodo,
     status: targetStatus,
     is_completed: targetStatus === 'done',
+    completed_at: targetStatus === 'done' 
+      ? (activeTodo.completed_at || new Date().toISOString()) 
+      : null,
   };
   const withoutActive = items.filter(todo => todo.id !== activeId);
 
@@ -133,13 +144,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     });
   };
 
+  const mouseSensorOptions = useMemo(() => ({
+    activationConstraint: { distance: 8 },
+  }), []);
+  const touchSensorOptions = useMemo(() => ({
+    activationConstraint: { delay: 180, tolerance: 8 },
+  }), []);
+
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 180, tolerance: 8 },
-    }),
+    useSensor(MouseSensor, mouseSensorOptions),
+    useSensor(TouchSensor, touchSensorOptions),
   );
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -201,10 +215,18 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     updateLocalTodos(sortedTodos);
   };
 
+  const collisionDetectionStrategy = React.useCallback((args: any) => {
+    const intersections = rectIntersection(args);
+    if (intersections.length > 0) {
+      return intersections;
+    }
+    return closestCorners(args);
+  }, []);
+
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={collisionDetectionStrategy}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -237,7 +259,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     ))}
                     {colTodos.length === 0 && (
                       <div className="flex min-h-[112px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-xs font-semibold text-slate-400">
-                        Chua co the nao
+                        Trống
                       </div>
                     )}
                   </div>
@@ -310,7 +332,7 @@ interface SortableCardProps {
   onDelete: (id: string) => void;
 }
 
-const SortableCard: React.FC<SortableCardProps> = ({
+const SortableCard = React.memo<SortableCardProps>(({
   todo,
   onEdit,
   onDelete,
@@ -330,8 +352,10 @@ const SortableCard: React.FC<SortableCardProps> = ({
       <div
         ref={setNodeRef}
         style={style}
-        className="w-full min-h-[82px] p-2.5 rounded-[18px] border border-dashed border-slate-300 bg-slate-50/50 pointer-events-none"
-      />
+        className="w-full opacity-30 pointer-events-none"
+      >
+        <TaskCardShell todo={todo} />
+      </div>
     );
   }
 
@@ -348,7 +372,9 @@ const SortableCard: React.FC<SortableCardProps> = ({
       <TaskCardShell todo={todo} onDelete={onDelete} />
     </div>
   );
-};
+});
+
+SortableCard.displayName = 'SortableCard';
 
 interface TaskCardShellProps {
   todo: Todo;
@@ -357,20 +383,20 @@ interface TaskCardShellProps {
   onDelete?: (id: string) => void;
 }
 
-const TaskCardShell: React.FC<TaskCardShellProps> = ({ todo, width, isOverlay = false, onDelete }) => {
+const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay = false, onDelete }) => {
   const completedSubtasks = todo.subtasks?.filter((subtask) => subtask.is_completed).length || 0;
   const totalSubtasks = todo.subtasks?.length || 0;
 
   return (
     <div
       style={width ? { width: `${width}px` } : undefined}
-      className={`relative flex min-h-[82px] flex-col gap-2 rounded-[18px] bg-white p-2.5 select-none ${
+      className={`relative flex min-h-[38px] flex-col gap-1 rounded-xl bg-white px-2.5 py-1.5 select-none ${
         isOverlay
           ? 'border border-slate-300 shadow-2xl cursor-grabbing pointer-events-none opacity-95'
           : 'border border-slate-100 shadow-sm hover:border-slate-300 transition-all'
       }`}
     >
-      <p className="text-[12px] font-bold text-slate-800 leading-snug break-words pr-6">
+      <p className="text-[11px] font-semibold text-slate-800 leading-tight break-words pr-6">
         {todo.content}
       </p>
 
@@ -420,7 +446,9 @@ const TaskCardShell: React.FC<TaskCardShellProps> = ({ todo, width, isOverlay = 
       )}
     </div>
   );
-};
+});
+
+TaskCardShell.displayName = 'TaskCardShell';
 
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return '';
