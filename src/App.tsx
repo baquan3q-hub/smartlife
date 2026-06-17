@@ -209,6 +209,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         setStartInFocusMode(false);
     }, []);
 
+    const lastReorderTimeRef = React.useRef(0);
+    const lastFetchTimeRef = React.useRef(0);
+    const isCompletedAtSupportedRef = React.useRef(true);
+
     const [settingsTrigger, setSettingsTrigger] = useState(0);
     useEffect(() => {
         const handleStorageChange = () => {
@@ -229,7 +233,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             const isCompleted = todo.status === 'done' || todo.is_completed;
             if (!isCompleted) return true;
 
-            const completedTimeStr = todo.completed_at || (todo as any).updated_at || todo.created_at;
+            const completedTimeStr = todo.completed_at || localStorage.getItem(`todo_completed_at_${todo.id}`) || (todo as any).updated_at || todo.created_at;
             if (!completedTimeStr) return true;
 
             const completedTime = new Date(completedTimeStr).getTime();
@@ -506,36 +510,43 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (txRes.error) throw txRes.error;
 
             // Cập nhật State
-            setAppState((prev: AppState) => ({
-                ...prev,
-                transactions: txRes.data.map(t => ({
-                    id: t.id,
-                    user_id: t.user_id,
-                    amount: Number(t.amount),
-                    category: t.category,
-                    date: t.date,
-                    type: t.type,
-                    description: t.description || '',
-                    created_at: t.created_at,
-                    wallet_id: t.wallet_id || null,
-                    debt_id: t.debt_id || null,
-                })),
-                goals: goalRes.data || [],
-                budgets: budgetRes.data || [],
-                timetable: timeRes.data || [],
-                todos: todoRes.data || [],
-                profile: profileRes.data || null,
-                // GPA: Combine semesters with their courses
-                gpaSemesters: (gpaSemRes.data || []).map((sem: any) => ({
-                    ...sem,
-                    courses: (gpaCourseRes.data || []).filter((c: any) => c.semester_id === sem.id),
-                })),
-                gpaTargetCredits: Number(localStorage.getItem(`gpaTargetCredits_${user.id}`)) || 135,
-                gpaTargetGPA: localStorage.getItem(`gpaTargetGPA_${user.id}`) ? Number(localStorage.getItem(`gpaTargetGPA_${user.id}`)) : null,
-                gpaTargetSemesters: Number(localStorage.getItem(`gpaTargetSemesters_${user.id}`)) || 4,
-                wallets: walletRes.data || [],
-                debts: debtRes.data || [],
-            }));
+            setAppState((prev: AppState) => {
+                const now = Date.now();
+                const shouldSkipTodos = now - lastReorderTimeRef.current < 3000;
+                return {
+                    ...prev,
+                    transactions: txRes.data.map(t => ({
+                        id: t.id,
+                        user_id: t.user_id,
+                        amount: Number(t.amount),
+                        category: t.category,
+                        date: t.date,
+                        type: t.type,
+                        description: t.description || '',
+                        created_at: t.created_at,
+                        wallet_id: t.wallet_id || null,
+                        debt_id: t.debt_id || null,
+                    })),
+                    goals: goalRes.data || [],
+                    budgets: budgetRes.data || [],
+                    timetable: timeRes.data || [],
+                    todos: shouldSkipTodos ? prev.todos : (todoRes.data || []).map((t: any) => ({
+                        ...t,
+                        completed_at: t.completed_at || localStorage.getItem(`todo_completed_at_${t.id}`) || null
+                    })),
+                    profile: profileRes.data || null,
+                    // GPA: Combine semesters with their courses
+                    gpaSemesters: (gpaSemRes.data || []).map((sem: any) => ({
+                        ...sem,
+                        courses: (gpaCourseRes.data || []).filter((c: any) => c.semester_id === sem.id),
+                    })),
+                    gpaTargetCredits: Number(localStorage.getItem(`gpaTargetCredits_${user.id}`)) || 135,
+                    gpaTargetGPA: localStorage.getItem(`gpaTargetGPA_${user.id}`) ? Number(localStorage.getItem(`gpaTargetGPA_${user.id}`)) : null,
+                    gpaTargetSemesters: Number(localStorage.getItem(`gpaTargetSemesters_${user.id}`)) || 4,
+                    wallets: walletRes.data || [],
+                    debts: debtRes.data || [],
+                };
+            });
 
             // Parse Custom Categories from Profile
             if (profileRes.data?.custom_categories) {
@@ -553,6 +564,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (eventsRes.data) {
                 setCalendarEvents(eventsRes.data);
             }
+            lastFetchTimeRef.current = Date.now();
 
         } catch (error) {
             console.error('Lỗi tải dữ liệu:', error);
@@ -617,7 +629,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     useEffect(() => {
         if (!user?.id) return;
         const handleWindowFocus = () => {
-            fetchData(true); // Quiet background refresh on focus
+            const now = Date.now();
+            if (now - lastFetchTimeRef.current > 30000) {
+                fetchData(true); // Quiet background refresh on focus
+            }
         };
         window.addEventListener('focus', handleWindowFocus);
         return () => window.removeEventListener('focus', handleWindowFocus);
@@ -1187,12 +1202,29 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         const prevTodos = [...appState.todos];
         
         let updatedItem = { ...item };
+        const existingTodo = appState.todos.find(t => t.id === item.id);
+        const wasAlreadyDone = existingTodo && (existingTodo.status === 'done' || existingTodo.is_completed);
+
         if (item.status !== undefined) {
             updatedItem.is_completed = item.status === 'done';
-            updatedItem.completed_at = item.status === 'done' ? new Date().toISOString() : null;
+            if (item.status === 'done') {
+                const ts = (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
+                updatedItem.completed_at = ts;
+                localStorage.setItem(`todo_completed_at_${item.id}`, ts);
+            } else {
+                updatedItem.completed_at = null;
+                localStorage.removeItem(`todo_completed_at_${item.id}`);
+            }
         } else if (item.is_completed !== undefined) {
             updatedItem.status = item.is_completed ? 'done' : 'todo';
-            updatedItem.completed_at = item.is_completed ? new Date().toISOString() : null;
+            if (item.is_completed) {
+                const ts = (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
+                updatedItem.completed_at = ts;
+                localStorage.setItem(`todo_completed_at_${item.id}`, ts);
+            } else {
+                updatedItem.completed_at = null;
+                localStorage.removeItem(`todo_completed_at_${item.id}`);
+            }
         }
 
         setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.map(t => t.id === item.id ? { ...t, ...updatedItem } : t) }));
@@ -1200,12 +1232,16 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         try {
             // Only send DB-safe fields
             const { id, user_id, created_at, ...updateFields } = updatedItem;
+            if (!isCompletedAtSupportedRef.current) {
+                delete updateFields.completed_at;
+            }
             const { error } = await supabase.from('todos').update(updateFields).eq('id', item.id);
             if (error) {
                 if (error.code === '42703') {
-                    console.warn("[SmartLife] Column error. Retrying update with only core fields.");
+                    console.warn("[SmartLife] Column error. Retrying update with only core fields (omitting completed_at).");
+                    isCompletedAtSupportedRef.current = false;
                     const safeFields: any = {};
-                    const allowed = ['content', 'is_completed', 'status', 'priority', 'deadline', 'sort_order', 'completed_at'];
+                    const allowed = ['content', 'is_completed', 'status', 'priority', 'deadline', 'sort_order'];
                     allowed.forEach(k => {
                         if (k in updateFields) safeFields[k] = (updateFields as any)[k];
                     });
@@ -1223,6 +1259,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     }, [appState.todos]);
 
     const handleMoveTodoStatus = React.useCallback(async (id: string, status: TodoStatus) => {
+        lastReorderTimeRef.current = Date.now();
         await handleUpdateTodo({ id, status });
     }, [handleUpdateTodo]);
 
@@ -1243,23 +1280,77 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     // Batch reorder todos after drag-drop (optimistic + persist)
     const handleReorderTodos = React.useCallback(async (reorderedTodos: Todo[]) => {
+        lastReorderTimeRef.current = Date.now();
         const prevTodos = [...appState.todos];
+        
         // Assign fresh sort_order based on array position
-        const withOrder = reorderedTodos.map((t, idx) => ({ ...t, sort_order: idx }));
+        const withOrder = reorderedTodos.map((t, idx) => {
+            const nextTodo = { ...t, sort_order: idx };
+            const existingTodo = prevTodos.find(prevTodo => prevTodo.id === t.id);
+            const wasAlreadyDone = existingTodo && (existingTodo.status === 'done' || existingTodo.is_completed);
+
+            if (nextTodo.status === 'done') {
+                if (!nextTodo.completed_at) {
+                    nextTodo.completed_at = (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
+                }
+                localStorage.setItem(`todo_completed_at_${nextTodo.id}`, nextTodo.completed_at);
+            } else {
+                nextTodo.completed_at = null;
+                localStorage.removeItem(`todo_completed_at_${nextTodo.id}`);
+            }
+            return nextTodo;
+        });
+
         setAppState((prev: AppState) => ({ ...prev, todos: withOrder }));
 
+        // Only update todos that actually changed in DB to minimize request count and avoid rate limits
+        const prevTodosMap = new Map(prevTodos.map(t => [t.id, t]));
+        const changedTodos = withOrder.filter(t => {
+            const prev = prevTodosMap.get(t.id);
+            if (!prev) return true;
+            return (
+                prev.sort_order !== t.sort_order ||
+                (prev.status || (prev.is_completed ? 'done' : 'todo')) !== (t.status || (t.is_completed ? 'done' : 'todo')) ||
+                prev.is_completed !== t.is_completed ||
+                prev.completed_at !== t.completed_at
+            );
+        });
+
+        if (changedTodos.length === 0) return;
+
         try {
-            // Batch update sort_order, status, and is_completed for each item
-            const updates = withOrder.map(t =>
-                supabase.from('todos').update({ 
+            // Batch update sort_order, status, is_completed, and completed_at for each changed item
+            const updates = changedTodos.map(t => {
+                const updateFields: any = { 
                     sort_order: t.sort_order,
                     status: t.status || (t.is_completed ? 'done' : 'todo'),
-                    is_completed: t.status === 'done'
-                }).eq('id', t.id)
-            );
+                    is_completed: t.status === 'done',
+                };
+                if (isCompletedAtSupportedRef.current) {
+                    updateFields.completed_at = t.completed_at;
+                }
+                return supabase.from('todos').update(updateFields).eq('id', t.id);
+            });
             const results = await Promise.all(updates);
             const failed = results.find(r => r.error);
-            if (failed?.error) throw failed.error;
+            if (failed?.error) {
+                if (failed.error.code === '42703') {
+                    console.warn("[SmartLife] Column error during reorder. Retrying without completed_at.");
+                    isCompletedAtSupportedRef.current = false;
+                    const retryUpdates = changedTodos.map(t =>
+                        supabase.from('todos').update({ 
+                            sort_order: t.sort_order,
+                            status: t.status || (t.is_completed ? 'done' : 'todo'),
+                            is_completed: t.status === 'done',
+                        }).eq('id', t.id)
+                    );
+                    const retryResults = await Promise.all(retryUpdates);
+                    const retryFailed = retryResults.find(r => r.error);
+                    if (retryFailed?.error) throw retryFailed.error;
+                } else {
+                    throw failed.error;
+                }
+            }
         } catch (error: any) {
             console.error('Reorder failed:', error);
             alert("Lỗi sắp xếp việc: " + error.message);
@@ -1450,7 +1541,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     </div>
                 )}
 
-                <nav className={`flex-1 overflow-y-auto px-4 space-y-2 mt-2 scrollbar-thin scrollbar-thumb-gray-200 hover:scrollbar-thumb-gray-300`}>
+                <nav className="flex-1 overflow-y-auto overflow-x-hidden px-4 space-y-2 mt-2 scrollbar-thin">
                     {/* Language Toggle Desktop */}
                     <button onClick={() => setLang(lang === 'vi' ? 'en' : lang === 'en' ? 'ko' : 'vi')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm text-gray-500 hover:bg-gray-50 cursor-pointer border border-dashed border-gray-200 mb-2`}>
                         <div className="flex items-center gap-3">
