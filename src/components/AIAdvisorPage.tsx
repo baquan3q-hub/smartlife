@@ -8,7 +8,7 @@ import {
     TrendingDown, Target, ListChecks, BarChart3, Wallet,
     PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight, ChevronDown, ChevronUp,
     CheckCircle2, AlertCircle, History, X, Plus, Trash2, GraduationCap,
-    Heart, Pin, Copy, Check, Download, FileText, LayoutGrid, Mic, MicOff, Zap
+    Heart, Pin, Copy, Check, Download, FileText, LayoutGrid, Mic, MicOff, Zap, Square
 } from 'lucide-react';
 
 import { AppState, TransactionType } from '../types';
@@ -46,6 +46,7 @@ interface UIMessage {
     charts?: ChartData[];
     actions?: ActionResult[];
     files?: Array<{ name: string; type: string; size: number }>;
+    tokens_used?: number;
 }
 
 // ────────────────────────────────────────
@@ -200,6 +201,15 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [activeArtifact, setActiveArtifact] = useState<{ title: string; content: string } | null>(null);
     const [copied, setCopied] = useState(false);
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    const handleStopResponse = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setIsLoading(false);
+    };
 
     // AI Quota states (Phase 4 & 5)
     const [quotaStatus, setQuotaStatus] = useState<UserQuotaStatus | null>(null);
@@ -367,7 +377,12 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         const timer = setTimeout(() => {
             setShowPopupHint(false);
         }, 8000);
-        return () => clearTimeout(timer);
+        return () => {
+            clearTimeout(timer);
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
     }, []);
 
     useEffect(() => {
@@ -566,6 +581,10 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         const newMessages: UIMessage[] = [...messages, { role: 'user', content: visibleMessageContent, files: filesMetadata }];
         setMessages(newMessages);
 
+        // Initialize AbortController for request cancellation
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         try {
             // Save conversation & user message to DB
             let currentConvId = conversationId;
@@ -588,7 +607,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             };
             const historyToSend = [...geminiChatHistory, newUserMsg];
 
-            const response = await chatWithAI(historyToSend, appState, actionHandlers, memoryContext, attachmentsToSend);
+            const response = await chatWithAI(historyToSend, appState, actionHandlers, memoryContext, attachmentsToSend, controller.signal);
 
             // Save AI response to DB
             if (currentConvId) {
@@ -597,7 +616,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     'assistant',
                     response.text,
                     response.charts.length > 0 ? response.charts : undefined,
-                    response.actions.length > 0 ? response.actions : undefined
+                    response.actions.length > 0 ? response.actions : undefined,
+                    response.tokens_used
                 );
             }
 
@@ -628,15 +648,24 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 content: response.text,
                 charts: response.charts.length > 0 ? response.charts : undefined,
                 actions: response.actions.length > 0 ? response.actions : undefined,
+                tokens_used: response.tokens_used
             }]);
         } catch (error: any) {
-            console.error(error);
-            setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: `⚠️ Xin lỗi, đã có lỗi xảy ra: ${error.message}\n\nVui lòng thử lại.`
-            }]);
+            if (error.name === 'AbortError') {
+                setMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `🛑 Đã dừng phản hồi từ AI theo yêu cầu.`
+                }]);
+            } else {
+                console.error(error);
+                setMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `⚠️ Xin lỗi, đã có lỗi xảy ra: ${error.message}\n\nVui lòng thử lại.`
+                }]);
+            }
         } finally {
             setIsLoading(false);
+            abortControllerRef.current = null;
             refreshQuota();
         }
     };
@@ -668,7 +697,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 role: m.role,
                 content: m.content,
                 charts: m.charts || undefined,
-                actions: m.actions || undefined
+                actions: m.actions || undefined,
+                tokens_used: m.tokens_used
             }));
             setMessages(uiMsgs.length > 0 ? uiMsgs : [{
                 role: 'assistant',
@@ -1343,7 +1373,14 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                 ))}
                                             </div>
                                         )}
-                                    </div>
+                                         {/* Token Counter */}
+                                         {msg.role === 'assistant' && msg.tokens_used !== undefined && msg.tokens_used !== null && (
+                                             <div className="text-[10px] text-gray-400 mt-1 ml-1 flex items-center gap-1 select-none animate-fade-in">
+                                                 <Zap size={10} className="text-gray-400 shrink-0" />
+                                                 <span>Tiêu tốn: <strong>{msg.tokens_used.toLocaleString()}</strong> tokens</span>
+                                             </div>
+                                         )}
+                                     </div>
                                 </div>
                             );
                         })}
@@ -1510,11 +1547,17 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                 rows={1}
                             />
                             <button
-                                onClick={() => handleSend()}
-                                disabled={(!input.trim() && attachedFiles.length === 0) || isLoading}
-                                className="m-1 p-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:shadow-lg hover:shadow-blue-200 disabled:opacity-40 disabled:hover:shadow-none transition-all shrink-0"
+                                type="button"
+                                onClick={isLoading ? handleStopResponse : () => handleSend()}
+                                disabled={!isLoading && !input.trim() && attachedFiles.length === 0}
+                                className={`m-1 p-2 rounded-xl transition-all shrink-0 ${
+                                    isLoading 
+                                        ? 'bg-red-500 hover:bg-red-600 text-white hover:shadow-lg hover:shadow-red-200 animate-pulse' 
+                                        : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg hover:shadow-blue-200 disabled:opacity-40 disabled:hover:shadow-none'
+                                }`}
+                                title={isLoading ? 'Dừng phản hồi' : 'Gửi tin nhắn'}
                             >
-                                {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                                {isLoading ? <Square size={16} className="fill-white text-white" /> : <Send size={16} />}
                             </button>
                         </div>
                         <p className="text-[9px] text-center text-gray-400 mt-2">

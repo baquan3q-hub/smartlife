@@ -40,6 +40,7 @@ export interface AIResponse {
     charts: ChartData[];
     actions: ActionResult[];
     updatedHistory?: ChatMessage[];
+    tokens_used?: number;
 }
 
 // Action handlers passed from App.tsx
@@ -526,7 +527,8 @@ export async function chatWithAI(
     appState: AppState,
     handlers: ActionHandlers = {},
     memoryContext: string = '',
-    attachments?: AIAttachment[]
+    attachments?: AIAttachment[],
+    signal?: AbortSignal
 ): Promise<AIResponse> {
     const userName = appState.profile?.full_name || 'Người dùng';
     const now = new Date();
@@ -578,17 +580,35 @@ export async function chatWithAI(
         }
 
         let toolCallCount = 0;
+        let totalTokensConsumed = 0;
 
         while (toolCallCount < MAX_TOOL_CALLS) {
+            if (signal?.aborted) {
+                throw new DOMException('Request aborted', 'AbortError');
+            }
+
             if (toolCallCount > 0) {
                 // Tránh gọi API liên tục quá nhanh gây nghẽn burst limit (lỗi 503)
-                await new Promise(r => setTimeout(r, 1200));
+                await new Promise<void>((resolve, reject) => {
+                    const timer = setTimeout(resolve, 1200);
+                    if (signal) {
+                        signal.addEventListener('abort', () => {
+                            clearTimeout(timer);
+                            reject(new DOMException('Request aborted', 'AbortError'));
+                        });
+                    }
+                });
             }
-            const body = buildRequest(contents);
-            const data = await callGeminiRaw(body);
+
+            const body = {
+                ...buildRequest(contents),
+                isToolCall: toolCallCount > 0
+            };
+            const data = await callGeminiRaw(body, 0, signal);
 
             // Log token usage with detailed tracking (Phase 1)
             if (data?.usageMetadata?.totalTokenCount) {
+                totalTokensConsumed += data.usageMetadata.totalTokenCount;
                 supabase.auth.getUser().then(({ data: authData }) => {
                     const uid = authData?.user?.id;
                     if (!uid) { console.warn('[SmartLife] Token log skipped: no user'); return; }
@@ -616,7 +636,7 @@ export async function chatWithAI(
                 if (data?.promptFeedback?.blockReason) {
                     blockMsg = `⚠️ Yêu cầu bị hệ thống kiểm duyệt tự động chặn (Lý do: ${data.promptFeedback.blockReason}). Vui lòng điều chỉnh hoặc diễn đạt lại câu hỏi phù hợp hơn.`;
                 }
-                return { text: blockMsg, charts, actions, updatedHistory: cleanChatHistory(contents) };
+                return { text: blockMsg, charts, actions, updatedHistory: cleanChatHistory(contents), tokens_used: totalTokensConsumed };
             }
 
             // Kiểm tra finishReason của candidate
@@ -626,7 +646,8 @@ export async function chatWithAI(
                         text: '⚠️ Phản hồi bị chặn bởi bộ lọc an toàn tự động của Google (Lý do: SAFETY). Điều này có thể xảy ra nếu thông tin thói quen, nhật ký hoặc dữ liệu liên quan của bạn có từ ngữ quá nhạy cảm. Vui lòng kiểm tra lại dữ liệu hoặc diễn đạt câu hỏi theo cách khác.',
                         charts,
                         actions,
-                        updatedHistory: cleanChatHistory(contents)
+                        updatedHistory: cleanChatHistory(contents),
+                        tokens_used: totalTokensConsumed
                     };
                 }
                 if (candidate.finishReason === 'RECITATION') {
@@ -634,13 +655,14 @@ export async function chatWithAI(
                         text: '⚠️ Phản hồi bị chặn do phát hiện nội dung sao chép tài liệu có bản quyền (Lý do: RECITATION). Vui lòng đặt câu hỏi khác hoặc diễn đạt theo cách khác.',
                         charts,
                         actions,
-                        updatedHistory: cleanChatHistory(contents)
+                        updatedHistory: cleanChatHistory(contents),
+                        tokens_used: totalTokensConsumed
                     };
                 }
             }
 
             if (!candidate.content?.parts) {
-                return { text: 'Không nhận được phản hồi từ AI.', charts, actions, updatedHistory: cleanChatHistory(contents) };
+                return { text: 'Không nhận được phản hồi từ AI.', charts, actions, updatedHistory: cleanChatHistory(contents), tokens_used: totalTokensConsumed };
             }
 
             const responseParts: MessagePart[] = candidate.content.parts;
@@ -660,7 +682,8 @@ export async function chatWithAI(
                     text: textParts.join('\n') || 'Không có phản hồi.',
                     charts,
                     actions,
-                    updatedHistory: cleanChatHistory(contents)
+                    updatedHistory: cleanChatHistory(contents),
+                    tokens_used: totalTokensConsumed
                 };
             }
 
@@ -773,7 +796,8 @@ export async function chatWithAI(
             text: '⚠️ AI đã thực hiện quá nhiều truy vấn. Vui lòng thử câu hỏi đơn giản hơn.',
             charts,
             actions,
-            updatedHistory: cleanChatHistory(contents)
+            updatedHistory: cleanChatHistory(contents),
+            tokens_used: totalTokensConsumed
         };
     });
 }

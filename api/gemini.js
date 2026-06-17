@@ -245,32 +245,37 @@ export default async function handler(req, res) {
     const todayRequests = usage ? usage.requests_today : 0;
     const todayTokens = usage ? usage.tokens_today : 0;
 
-    // 4. Kiểm tra giới hạn số lượt yêu cầu trong ngày (daily requests)
-    if (todayRequests >= limits.requests_per_day) {
-        return res.status(429).json({
-            error: 'quota_exceeded',
-            type: 'daily_requests_exceeded',
-            message: `Bạn đã dùng hết ${limits.requests_per_day} lượt yêu cầu AI hôm nay. Vui lòng quay lại vào ngày mai! ⏰`
-        });
-    }
+    // Đọc isToolCall từ body (mặc định false)
+    const isToolCall = req.body?.isToolCall || false;
 
-    // 5. Kiểm tra giới hạn token hàng ngày (daily tokens)
-    if (todayTokens >= limits.tokens_per_day) {
-        return res.status(429).json({
-            error: 'quota_exceeded',
-            type: 'daily_tokens_exceeded',
-            message: `Bạn đã dùng hết giới hạn ${limits.tokens_per_day.toLocaleString()} token hôm nay. Vui lòng quay lại vào ngày mai! ⚡`
-        });
-    }
+    // Kiểm tra xem hạn mức có bị vượt không
+    const isDailyRequestsExceeded = todayRequests >= limits.requests_per_day;
+    const isDailyTokensExceeded = todayTokens >= limits.tokens_per_day;
+    const isMonthlyTokensExceeded = limits.tokens_per_month !== Infinity && totalTokensMonth >= limits.tokens_per_month;
 
-    // 6. Kiểm tra giới hạn token hàng tháng (monthly tokens)
-    let isMonthlyExceeded = limits.tokens_per_month !== Infinity && totalTokensMonth >= limits.tokens_per_month;
     let usingBoost = false;
 
-    if (isMonthlyExceeded) {
-        // Nếu vượt hạn tháng, kiểm tra xem có Boost Pack không
+    // Chỉ kiểm tra giới hạn lượt yêu cầu nếu không phải cuộc gọi con (isToolCall === false)
+    const isRequestLimitHit = !isToolCall && isDailyRequestsExceeded;
+
+    if (isRequestLimitHit || isDailyTokensExceeded || isMonthlyTokensExceeded) {
+        // Nếu vượt hạn mức, kiểm tra xem có Boost Pack khả dụng không
         const hasBoost = await checkAndConsumeBoostTokens(supabaseClient, userId, 0);
         if (!hasBoost) {
+            if (isRequestLimitHit) {
+                return res.status(429).json({
+                    error: 'quota_exceeded',
+                    type: 'daily_requests_exceeded',
+                    message: `Bạn đã dùng hết ${limits.requests_per_day} lượt yêu cầu AI hôm nay. Vui lòng mua thêm gói AI Boost Pack hoặc quay lại vào ngày mai! ⏰`
+                });
+            }
+            if (isDailyTokensExceeded) {
+                return res.status(429).json({
+                    error: 'quota_exceeded',
+                    type: 'daily_tokens_exceeded',
+                    message: `Bạn đã dùng hết giới hạn ${limits.tokens_per_day.toLocaleString()} token hôm nay. Vui lòng mua thêm gói AI Boost Pack hoặc quay lại vào ngày mai! ⚡`
+                });
+            }
             return res.status(429).json({
                 error: 'quota_exceeded',
                 type: 'monthly_tokens_exceeded',
@@ -303,7 +308,7 @@ export default async function handler(req, res) {
 
         if (supabaseClient && userId) {
             // Cập nhật bảng quota hàng ngày
-            const newRequestsToday = todayRequests + 1;
+            const newRequestsToday = isToolCall ? todayRequests : todayRequests + 1;
             const newTokensToday = todayTokens + responseTokens;
 
             const { error: upsertError } = await supabaseClient
