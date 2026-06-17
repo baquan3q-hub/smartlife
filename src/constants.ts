@@ -134,3 +134,11 @@ Tone & Style: Chuyên nghiệp, ngắn gọn, đi thẳng vào vấn đề. Luô
    - Sắp xếp lịch trình logic.
    - Cảnh báo xung đột.
 `;
+
+// AI Quotas per user plan (Phase 2 & 3)
+export const AI_QUOTA = {
+  free: { requests_per_day: 0, tokens_per_day: 0, tokens_per_month: 0 },
+  trial: { requests_per_day: 3, tokens_per_day: 30000, tokens_per_month: 0 },
+  pro: { requests_per_day: 10, tokens_per_day: 50000, tokens_per_month: 600000 },
+  lifetime: { requests_per_day: 10, tokens_per_day: 50000, tokens_per_month: 600000 },
+} as const;

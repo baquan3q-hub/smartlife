@@ -14,9 +14,89 @@ function geminiProxyPlugin(env: Record<string, string>): Plugin {
   const MODEL = 'gemini-2.5-flash';
   let currentKeyIndex = 0;
 
+  const QUOTA_LIMITS = {
+    free: { requests_per_day: 0, tokens_per_day: 0, tokens_per_month: 0 },
+    trial: { requests_per_day: 3, tokens_per_day: 30000, tokens_per_month: Infinity },
+    pro: { requests_per_day: 10, tokens_per_day: 50000, tokens_per_month: 600000 },
+    lifetime: { requests_per_day: 10, tokens_per_day: 50000, tokens_per_month: 600000 },
+  };
+
   function getApiKeys(): string[] {
     const raw = env.GEMINI_API_KEYS || env.GEMINI_API_KEY || '';
     return raw.split(',').map(k => k.trim()).filter(Boolean);
+  }
+
+  function determineActualPlan(profile: any, email: string | null | undefined): string {
+    if (email === 'baquan3q@gmail.com') return 'lifetime';
+    if (!profile) return 'free';
+    if (profile.plan === 'lifetime') return 'lifetime';
+    
+    const now = new Date();
+    
+    if (profile.plan === 'trial' && profile.trial_started_at) {
+        const trialStart = new Date(profile.trial_started_at);
+        const trialEnd = new Date(trialStart);
+        trialEnd.setDate(trialEnd.getDate() + 7);
+        const graceEnd = new Date(trialEnd);
+        graceEnd.setDate(graceEnd.getDate() + 3); // 3 ngày grace
+        
+        if (now < graceEnd) return 'trial';
+    }
+    
+    if (profile.plan === 'pro' && profile.pro_expiry_date) {
+        const expiryDate = new Date(profile.pro_expiry_date);
+        const graceEnd = new Date(expiryDate);
+        graceEnd.setDate(graceEnd.getDate() + 3); // 3 ngày grace
+        
+        if (now < graceEnd) return 'pro';
+    }
+    
+    return 'free';
+  }
+
+  async function checkAndConsumeBoostTokens(supabaseClient: any, userId: string, tokensToDeduct: number): Promise<boolean> {
+    if (!supabaseClient) return false;
+    
+    const { data: boosts, error } = await supabaseClient
+        .from('user_ai_boost')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .gt('expires_at', new Date().toISOString())
+        .order('purchased_at', { ascending: true }); // FIFO
+        
+    if (error || !boosts || boosts.length === 0) return false;
+    
+    // Nếu chỉ kiểm tra khả dụng (tokensToDeduct === 0)
+    if (tokensToDeduct === 0) {
+        const totalRemaining = boosts.reduce((sum: number, b: any) => sum + (Number(b.tokens_total) - Number(b.tokens_used)), 0);
+        return totalRemaining > 0;
+    }
+    
+    let remainingToDeduct = tokensToDeduct;
+    for (const boost of boosts) {
+        const available = Number(boost.tokens_total) - Number(boost.tokens_used);
+        if (available <= 0) continue;
+        
+        if (remainingToDeduct <= available) {
+            const newUsed = Number(boost.tokens_used) + remainingToDeduct;
+            const status = newUsed >= Number(boost.tokens_total) ? 'exhausted' : 'active';
+            await supabaseClient
+                .from('user_ai_boost')
+                .update({ tokens_used: newUsed, status })
+                .eq('id', boost.id);
+            remainingToDeduct = 0;
+            break;
+        } else {
+            await supabaseClient
+                .from('user_ai_boost')
+                .update({ tokens_used: boost.tokens_total, status: 'exhausted' })
+                .eq('id', boost.id);
+            remainingToDeduct -= available;
+        }
+    }
+    
+    return remainingToDeduct === 0;
   }
 
   async function callGeminiWithRetry(body: any, retryCount = 0): Promise<any> {
@@ -62,7 +142,7 @@ function geminiProxyPlugin(env: Record<string, string>): Plugin {
         // CORS
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
         if (req.method === 'OPTIONS') {
           res.statusCode = 204;
@@ -91,6 +171,118 @@ function geminiProxyPlugin(env: Record<string, string>): Plugin {
         }
 
         try {
+          // Authentication & Quota logic inside Vite Dev Proxy
+          let userId = null;
+          let userPlan = 'free';
+          let userEmail = null;
+          let supabaseClient: any = null;
+
+          const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
+          const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY;
+
+          const authHeader = req.headers.authorization;
+          if (supabaseUrl && supabaseAnonKey && authHeader && authHeader.startsWith('Bearer ')) {
+            const token = authHeader.split(' ')[1];
+            const { createClient } = await import('@supabase/supabase-js');
+            supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+              global: {
+                headers: {
+                  Authorization: `Bearer ${token}`
+                }
+              }
+            });
+
+            const { data: { user } } = await supabaseClient.auth.getUser(token);
+            if (user) {
+              userId = user.id;
+              userEmail = user.email;
+
+              const { data: profile } = await supabaseClient
+                .from('profiles')
+                .select('plan, pro_expiry_date, trial_started_at')
+                .eq('id', userId)
+                .single();
+
+              userPlan = determineActualPlan(profile, userEmail);
+            }
+          }
+
+          if (userPlan === 'free') {
+            res.statusCode = 403;
+            res.end(JSON.stringify({
+              error: 'quota_exceeded',
+              type: 'free_gate',
+              message: 'Gói Free không bao gồm quyền truy cập AI. Vui lòng nâng cấp lên gói Pro để sử dụng tính năng này! 👑'
+            }));
+            return;
+          }
+
+          const todayStr = new Date().toISOString().split('T')[0];
+          const now = new Date();
+          const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          const limits = QUOTA_LIMITS[userPlan as keyof typeof QUOTA_LIMITS] || QUOTA_LIMITS.free;
+
+          let usage = null;
+          let totalTokensMonth = 0;
+
+          if (supabaseClient && userId) {
+            const { data } = await supabaseClient
+              .from('user_ai_quota')
+              .select('*')
+              .eq('user_id', userId)
+              .eq('date', todayStr)
+              .maybeSingle();
+            usage = data;
+
+            const { data: monthData } = await supabaseClient
+              .from('user_ai_quota')
+              .select('tokens_today')
+              .eq('user_id', userId)
+              .eq('month_key', monthKey);
+
+            totalTokensMonth = (monthData || []).reduce((sum: number, row: any) => sum + Number(row.tokens_today || 0), 0);
+          }
+
+          const todayRequests = usage ? usage.requests_today : 0;
+          const todayTokens = usage ? usage.tokens_today : 0;
+
+          if (todayRequests >= limits.requests_per_day) {
+            res.statusCode = 429;
+            res.end(JSON.stringify({
+              error: 'quota_exceeded',
+              type: 'daily_requests_exceeded',
+              message: `Bạn đã dùng hết ${limits.requests_per_day} lượt yêu cầu AI hôm nay. Vui lòng quay lại vào ngày mai! ⏰`
+            }));
+            return;
+          }
+
+          if (todayTokens >= limits.tokens_per_day) {
+            res.statusCode = 429;
+            res.end(JSON.stringify({
+              error: 'quota_exceeded',
+              type: 'daily_tokens_exceeded',
+              message: `Bạn đã dùng hết giới hạn ${limits.tokens_per_day.toLocaleString()} token hôm nay. Vui lòng quay lại vào ngày mai! ⚡`
+            }));
+            return;
+          }
+
+          let isMonthlyExceeded = limits.tokens_per_month !== Infinity && totalTokensMonth >= limits.tokens_per_month;
+          let usingBoost = false;
+
+          if (isMonthlyExceeded) {
+            const hasBoost = await checkAndConsumeBoostTokens(supabaseClient, userId, 0);
+            if (!hasBoost) {
+              res.statusCode = 429;
+              res.end(JSON.stringify({
+                error: 'quota_exceeded',
+                type: 'monthly_tokens_exceeded',
+                message: `Bạn đã dùng hết giới hạn ${limits.tokens_per_month.toLocaleString()} token của tháng này. Vui lòng mua thêm gói AI Boost Pack để tiếp tục sử dụng! 🚀`
+              }));
+              return;
+            }
+            usingBoost = true;
+          }
+
           const { contents, systemInstruction, generationConfig, safetySettings, tools, toolConfig } = body;
 
           const geminiBody: any = { contents };
@@ -101,6 +293,36 @@ function geminiProxyPlugin(env: Record<string, string>): Plugin {
           if (toolConfig) geminiBody.toolConfig = toolConfig;
 
           const data = await callGeminiWithRetry(geminiBody);
+
+          // Log token usage after successful call
+          const responseTokens = data?.usageMetadata?.totalTokenCount || 0;
+
+          if (supabaseClient && userId) {
+            const newRequestsToday = todayRequests + 1;
+            const newTokensToday = todayTokens + responseTokens;
+
+            const { error: upsertError } = await supabaseClient
+              .from('user_ai_quota')
+              .upsert({
+                user_id: userId,
+                date: todayStr,
+                requests_today: newRequestsToday,
+                tokens_today: newTokensToday,
+                month_key: monthKey,
+                updated_at: new Date().toISOString()
+              }, {
+                onConflict: 'user_id,date'
+              });
+
+            if (upsertError) {
+              console.error('[Vite Gemini Proxy] ❌ Quota upsert error:', upsertError.message);
+            }
+
+            if (usingBoost && responseTokens > 0) {
+              await checkAndConsumeBoostTokens(supabaseClient, userId, responseTokens);
+            }
+          }
+
           res.setHeader('Content-Type', 'application/json');
           res.statusCode = 200;
           res.end(JSON.stringify(data));
@@ -124,6 +346,7 @@ export default defineConfig(({ mode }) => {
       // Proxy không cần nữa — geminiProxyPlugin xử lý /api/gemini trực tiếp
     },
     build: {
+      emptyOutDir: true,
       rollupOptions: {
         output: {
           manualChunks: {
@@ -144,6 +367,7 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         injectRegister: null, // Disable auto-registration to avoid conflict with firebase-messaging-sw.js
         workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,lottie}'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit
           runtimeCaching: [
             {

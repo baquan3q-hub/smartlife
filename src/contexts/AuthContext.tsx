@@ -15,6 +15,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 6000): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Auth Timeout')), timeoutMs)
+        )
+    ]);
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
@@ -22,11 +31,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     useEffect(() => {
         // Check active sessions and sets the user
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-        });
+        withTimeout(supabase.auth.getSession(), 6000)
+            .then(({ data: { session } }) => {
+                setSession(session);
+                setUser(session?.user ?? null);
+            })
+            .catch((error) => {
+                console.error("Supabase getSession error:", error);
+            })
+            .finally(() => {
+                setLoading(false);
+            });
 
         // Listen for changes on auth state (logged in, signed out, etc.)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {

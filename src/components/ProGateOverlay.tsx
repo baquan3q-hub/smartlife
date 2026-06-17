@@ -56,11 +56,7 @@ const ProGateOverlay: React.FC<ProGateOverlayProps> = ({ featureName, featureIco
               <span>Visual Board tổng quan</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <CalendarDays size={16} className="text-indigo-500 shrink-0" />
-              <span>Lịch trình, TKB & Todo</span>
-              <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
-            </div>
+
             <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
               <Flame size={16} className="text-orange-500 shrink-0" />
               <span>Habit Tracker (Streak & Đếm ngược)</span>

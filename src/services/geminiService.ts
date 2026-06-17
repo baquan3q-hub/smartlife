@@ -115,7 +115,7 @@ export function buildFinanceContext(state: AppState): string {
 
     const recentTx = [...transactions]
         .sort((a, b) => b.date.localeCompare(a.date))
-        .slice(0, 30)
+        .slice(0, 15)
         .map(t => `  - ${t.date}: ${t.type === TransactionType.INCOME ? '+' : '-'}${formatCurrency(t.amount)} [${t.category}]${t.description ? ` "${t.description}"` : ''}`)
         .join('\n');
 
@@ -155,7 +155,7 @@ ${debtsInfo}
 📈 XU HƯỚNG 6 THÁNG:
 ${monthlyTrend.join('\n')}
 
-🧾 30 GIAO DỊCH GẦN NHẤT:
+🧾 15 GIAO DỊCH GẦN NHẤT:
 ${recentTx || '  (Chưa có giao dịch)'}`;
 }
 
@@ -572,9 +572,15 @@ Hãy đọc thông tin MBTI và DISC của người dùng sau khi gọi công c�
 // Core API Call — single model, but cycles API keys on 429
 // ────────────────────────────────────────
 export async function callGeminiRaw(body: object, retryCount = 0): Promise<any> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+
     const res = await fetch(GEMINI_PROXY_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
     });
 
@@ -582,7 +588,12 @@ export async function callGeminiRaw(body: object, retryCount = 0): Promise<any> 
         const err = await res.json().catch(() => ({}));
         const status = res.status;
 
-        // Retry cho lỗi tạm thời (server đã xử lý key rotation)
+        // Nếu là lỗi quota_exceeded từ proxy
+        if (err?.error === 'quota_exceeded' || err?.type?.includes('exceeded') || err?.type?.includes('gate')) {
+            throw new Error(err.message || 'Giới hạn sử dụng AI của bạn đã hết.');
+        }
+
+        // Retry cho lỗi tạm thời (server đã xử lý key rotation) - chỉ retry nếu không phải lỗi quota
         if ((status === 429 || status === 500 || status === 503 || status === 504) && retryCount < 3) {
             console.warn(`[SmartLife] Proxy returned ${status}. Retrying (${retryCount + 1}/3)...`);
             const delay = 2000 * (retryCount + 1);
@@ -601,6 +612,22 @@ export async function callGeminiRaw(body: object, retryCount = 0): Promise<any> 
     return await res.json();
 }
 
+// Helper to estimate token usage cost in VND
+export function estimateGeminiCost(promptTokens: number, candidatesTokens: number, model: string = 'gemini-2.5-flash'): number {
+    const USD_TO_VND = 25400;
+    // Pricing for Gemini 2.5 Flash / Gemini 2.0 Flash
+    let inputPricePerMillion = 0.075;
+    let outputPricePerMillion = 0.30;
+
+    if (model.includes('pro')) {
+        inputPricePerMillion = 1.25;
+        outputPricePerMillion = 5.00;
+    }
+
+    const costUsd = (promptTokens * inputPricePerMillion + candidatesTokens * outputPricePerMillion) / 1000000;
+    return costUsd * USD_TO_VND;
+}
+
 // ────────────────────────────────────────
 // Simple chat (backward compat for Quick Insight — no function calling)
 // ────────────────────────────────────────
@@ -608,13 +635,18 @@ export async function chatWithGeminiSimple(
     history: ChatMessage[],
     appState: AppState
 ): Promise<string> {
-    const contextText = buildFullContext(appState);
+    // Phase 5 Context Optimization: For quick insight (strictly financial summary),
+    // we only need profile and finance data. Avoid sending GPA, schedule, and goals context to save tokens.
+    const profileText = buildProfileContext(appState);
+    const financeText = buildFinanceContext(appState);
+    const contextText = [profileText, financeText].join('\n');
+
     const body = {
         systemInstruction: {
-            parts: [{ text: SYSTEM_INSTRUCTION + '\n\n--- DỮ LIỆU NGƯỜI DÙNG ---\n' + contextText }]
+            parts: [{ text: SYSTEM_INSTRUCTION + '\n\n--- DỮ LIỆU TÀI CHÍNH NGƯỜI DÙNG ---\n' + contextText }]
         },
         contents: history.map(m => ({ role: m.role, parts: m.parts })),
-        generationConfig: { temperature: 0.7, topP: 0.95, topK: 40, maxOutputTokens: 2048 },
+        generationConfig: { temperature: 0.7, topP: 0.95, topK: 40, maxOutputTokens: 1024 }, // Optimized from 2048 to 1024
         safetySettings: [
             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
             { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -626,7 +658,7 @@ export async function chatWithGeminiSimple(
     return enqueue(async () => {
         const data = await callGeminiRaw(body);
 
-        // Log token usage for quick insight
+        // Log token usage for quick insight with detailed token tracking (Phase 1)
         if (data?.usageMetadata?.totalTokenCount) {
             supabase.auth.getUser().then(({ data: authData }) => {
                 const uid = authData?.user?.id;
@@ -634,7 +666,12 @@ export async function chatWithGeminiSimple(
                 supabase.from('api_logs').insert([{
                     user_id: uid,
                     action: 'insight',
-                    tokens_used: data.usageMetadata.totalTokenCount
+                    tokens_used: data.usageMetadata.totalTokenCount,
+                    prompt_tokens: data.usageMetadata.promptTokenCount || 0,
+                    candidates_tokens: data.usageMetadata.candidatesTokenCount || 0,
+                    thoughts_tokens: data.usageMetadata.thoughtsTokenCount || data.usageMetadata.thinkingTokenCount || 0,
+                    estimated_cost_vnd: estimateGeminiCost(data.usageMetadata.promptTokenCount || 0, data.usageMetadata.candidatesTokenCount || 0),
+                    model: 'gemini-2.5-flash'
                 }]).then(({ error }) => {
                     if (error) console.error('[SmartLife] ❌ Insight token log failed:', error.message);
                     else console.info(`[SmartLife] ✅ Logged ${data.usageMetadata.totalTokenCount} insight tokens`);
