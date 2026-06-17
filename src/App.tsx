@@ -147,7 +147,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user]);
+    }, [user?.id]);
 
     // App State - Khởi tạo dữ liệu mặc định
     const [appState, setAppState] = useState<AppState>({
@@ -204,6 +204,40 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     }, [activeTab]);
 
     const deferredTab = React.useDeferredValue(activeTab);
+
+    const handleResetFocusMode = React.useCallback(() => {
+        setStartInFocusMode(false);
+    }, []);
+
+    const [settingsTrigger, setSettingsTrigger] = useState(0);
+    useEffect(() => {
+        const handleStorageChange = () => {
+            setSettingsTrigger(prev => prev + 1);
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
+
+    const filteredTodos = React.useMemo(() => {
+        const isExpiryEnabled = localStorage.getItem('smartlife_todo_expiry_enabled') === 'true';
+        if (!isExpiryEnabled) return appState.todos;
+
+        const expiryDays = parseInt(localStorage.getItem('smartlife_todo_expiry_days') || '90', 10);
+        const cutoffTime = Date.now() - expiryDays * 24 * 60 * 60 * 1000;
+
+        return appState.todos.filter(todo => {
+            const isCompleted = todo.status === 'done' || todo.is_completed;
+            if (!isCompleted) return true;
+
+            const completedTimeStr = todo.completed_at || (todo as any).updated_at || todo.created_at;
+            if (!completedTimeStr) return true;
+
+            const completedTime = new Date(completedTimeStr).getTime();
+            if (isNaN(completedTime) || isNaN(cutoffTime)) return true;
+            return completedTime >= cutoffTime;
+        });
+    }, [appState.todos, settingsTrigger]);
+
     const [gpaInitialView, setGpaInitialView] = useState<string | null>(null);
     const [goalsInitialView, setGoalsInitialView] = useState<'career' | 'life' | 'cv' | null>(null);
     const [startInFocusMode, setStartInFocusMode] = useState(() => {
@@ -349,7 +383,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             setIsWelcomeTourOpen(true);
             localStorage.setItem(tourLastShownKey, now.toString());
         }
-    }, [user]);
+    }, [user?.id]);
 
     const handleSignOut = () => {
         if (window.confirm('Bạn có chắc chắn muốn đăng xuất không?')) {
@@ -390,7 +424,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         setIsPricingOpen(true);
     };
 
-    const handleOpenPricing = async () => {
+    const handleOpenPricing = React.useCallback(async () => {
         if (!user) return;
         
         // Kiểm tra hóa đơn hiện tại trong state
@@ -417,7 +451,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
         // Nếu không có hóa đơn nào hợp lệ, mở modal chọn gói
         setIsPricingOpen(true);
-    };
+    }, [user, currentOrder]);
 
     // --- PRO: Setup trial for new users ---
     // Trial 7 ngày tính từ ngày tạo tài khoản (user.created_at)
@@ -438,7 +472,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 }));
             });
         }
-    }, [user, appState.profile?.plan]);
+    }, [user?.id, appState.profile?.plan]);
 
     // Fetch Data từ Supabase khi user đăng nhập
     const fetchData = async (silent = false) => {
@@ -578,7 +612,16 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
 
         fetchData(false);
-    }, [user]);
+    }, [user?.id]);
+
+    useEffect(() => {
+        if (!user?.id) return;
+        const handleWindowFocus = () => {
+            fetchData(true); // Quiet background refresh on focus
+        };
+        window.addEventListener('focus', handleWindowFocus);
+        return () => window.removeEventListener('focus', handleWindowFocus);
+    }, [user?.id]);
 
     // --- FIREBASE MESSAGING LOGIC ---
     useEffect(() => {
@@ -1140,14 +1183,16 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     };
 
-    const handleUpdateTodo = async (item: any) => {
+    const handleUpdateTodo = React.useCallback(async (item: any) => {
         const prevTodos = [...appState.todos];
         
         let updatedItem = { ...item };
         if (item.status !== undefined) {
             updatedItem.is_completed = item.status === 'done';
+            updatedItem.completed_at = item.status === 'done' ? new Date().toISOString() : null;
         } else if (item.is_completed !== undefined) {
             updatedItem.status = item.is_completed ? 'done' : 'todo';
+            updatedItem.completed_at = item.is_completed ? new Date().toISOString() : null;
         }
 
         setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.map(t => t.id === item.id ? { ...t, ...updatedItem } : t) }));
@@ -1160,7 +1205,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 if (error.code === '42703') {
                     console.warn("[SmartLife] Column error. Retrying update with only core fields.");
                     const safeFields: any = {};
-                    const allowed = ['content', 'is_completed', 'status', 'priority', 'deadline', 'sort_order'];
+                    const allowed = ['content', 'is_completed', 'status', 'priority', 'deadline', 'sort_order', 'completed_at'];
                     allowed.forEach(k => {
                         if (k in updateFields) safeFields[k] = (updateFields as any)[k];
                     });
@@ -1175,11 +1220,11 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             alert("Lỗi cập nhật việc: " + error.message);
             setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
         }
-    };
+    }, [appState.todos]);
 
-    const handleMoveTodoStatus = async (id: string, status: TodoStatus) => {
+    const handleMoveTodoStatus = React.useCallback(async (id: string, status: TodoStatus) => {
         await handleUpdateTodo({ id, status });
-    };
+    }, [handleUpdateTodo]);
 
     const handleDeleteTodo = async (id: string) => {
         if (!window.confirm("Bạn có chắc chắn muốn xóa công việc này không?")) return;
@@ -1197,7 +1242,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     };
 
     // Batch reorder todos after drag-drop (optimistic + persist)
-    const handleReorderTodos = async (reorderedTodos: Todo[]) => {
+    const handleReorderTodos = React.useCallback(async (reorderedTodos: Todo[]) => {
         const prevTodos = [...appState.todos];
         // Assign fresh sort_order based on array position
         const withOrder = reorderedTodos.map((t, idx) => ({ ...t, sort_order: idx }));
@@ -1217,9 +1262,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (failed?.error) throw failed.error;
         } catch (error: any) {
             console.error('Reorder failed:', error);
+            alert("Lỗi sắp xếp việc: " + error.message);
             setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
         }
-    };
+    }, [appState.todos]);
 
     // --- GPA HANDLERS ---
     const handleAddGPASemester = async (newSem: Omit<GPASemester, 'id' | 'courses'>) => {
@@ -1620,13 +1666,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     )}
                     {deferredTab === 'schedule' && (
                         <ScheduleDashboard
-                            state={{ ...appState, timer, onOpenMusic: () => setActiveTab('music') } as any}
+                            state={{ ...appState, todos: filteredTodos, timer, onOpenMusic: () => setActiveTab('music') } as any}
                             onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
                             onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
                             onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onReorderTodos={handleReorderTodos}
                             onMoveTodoStatus={handleMoveTodoStatus}
                             initialFocusMode={startInFocusMode}
-                            onResetFocusMode={() => setStartInFocusMode(false)}
+                            onResetFocusMode={handleResetFocusMode}
                             activeTaskId={taskTracker.activeTask?.id || null}
                             onStartTracking={taskTracker.startTracking}
                             onRefresh={async () => { await fetchData(true); }}

@@ -181,6 +181,8 @@ export interface Todo {
   time_spent?: number; // Tổng thời gian đã dùng (seconds)
   description?: string;
   subtasks?: { id: string; title: string; is_completed: boolean }[];
+  completed_at?: string | null;
+  created_at?: string;
 }
 
 export interface QuickNote {

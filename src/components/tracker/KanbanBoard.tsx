@@ -1,23 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  DndContext, 
-  DragEndEvent, 
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  closestCorners,
+  DndContext,
+  DragEndEvent,
   DragOverEvent,
-  DragStartEvent, 
-  useSensor, 
-  useSensors, 
-  PointerSensor, 
-  DragOverlay, 
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  TouchSensor,
   useDroppable,
-  closestCorners
+  useSensor,
+  useSensors,
 } from '@dnd-kit/core';
-import { 
-  SortableContext, 
-  verticalListSortingStrategy, 
-  useSortable 
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import { Calendar, CheckSquare, Plus, Trash2 } from 'lucide-react';
 import { Todo, TodoStatus } from '../../types';
-import { Plus, Trash2, CheckSquare, Calendar } from 'lucide-react';
 
 interface KanbanBoardProps {
   todos: Todo[];
@@ -32,122 +33,137 @@ const COLUMNS: { id: TodoStatus; label: string; dot: string }[] = [
   { id: 'backlog', label: 'Backlog', dot: 'bg-slate-400' },
   { id: 'todo', label: 'Todo', dot: 'bg-blue-500' },
   { id: 'doing', label: 'Doing', dot: 'bg-orange-500' },
-  { id: 'done', label: 'Done', dot: 'bg-slate-500' },
+  { id: 'done', label: 'Done', dot: 'bg-emerald-500' },
 ];
 
-const COLUMN_IDS: string[] = COLUMNS.map(c => c.id);
+const COLUMN_IDS = COLUMNS.map(c => c.id);
 
-/** Determine the effective status of a todo */
-const getEffectiveStatus = (t: Todo): TodoStatus => {
-  if (t.status) return t.status;
-  return t.is_completed ? 'done' : 'todo';
+const getEffectiveStatus = (todo: Todo): TodoStatus => {
+  return todo.status || (todo.is_completed ? 'done' : 'todo');
 };
 
-/** Filter todos for a column */
 const getTodosForColumn = (allTodos: Todo[], colId: TodoStatus): Todo[] => {
-  return allTodos.filter((t) => {
-    if (colId === 'done') return t.status === 'done' || t.is_completed;
-    if (colId === 'todo') return t.status === 'todo' || (!t.status && !t.is_completed);
-    return t.status === colId;
+  return allTodos.filter((todo) => getEffectiveStatus(todo) === colId);
+};
+
+const sortTodosForBoard = (items: Todo[]): Todo[] => {
+  return [...items].sort((a, b) => {
+    const orderA = typeof a.sort_order === 'number' ? a.sort_order : Number.MAX_SAFE_INTEGER;
+    const orderB = typeof b.sort_order === 'number' ? b.sort_order : Number.MAX_SAFE_INTEGER;
+    if (orderA !== orderB) return orderA - orderB;
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
+};
+
+const hasSameBoardState = (a: Todo[], b: Todo[]) => {
+  if (a.length !== b.length) return false;
+  return a.every((todo, index) => {
+    const other = b[index];
+    return other && todo.id === other.id && getEffectiveStatus(todo) === getEffectiveStatus(other);
+  });
+};
+
+const moveTodoInBoard = (items: Todo[], activeId: string, overId: string): Todo[] => {
+  if (activeId === overId) return items;
+
+  const activeTodo = items.find(todo => todo.id === activeId);
+  if (!activeTodo) return items;
+
+  const overIsColumn = COLUMN_IDS.includes(overId as TodoStatus);
+  const overTodo = overIsColumn ? null : items.find(todo => todo.id === overId);
+  if (!overIsColumn && !overTodo) return items;
+
+  const targetStatus = overIsColumn ? overId as TodoStatus : getEffectiveStatus(overTodo as Todo);
+  const movedTodo = {
+    ...activeTodo,
+    status: targetStatus,
+    is_completed: targetStatus === 'done',
+  };
+  const withoutActive = items.filter(todo => todo.id !== activeId);
+
+  if (overIsColumn) {
+    const lastTargetIndex = withoutActive.reduce((lastIndex, todo, index) => {
+      return getEffectiveStatus(todo) === targetStatus ? index : lastIndex;
+    }, -1);
+    const insertIndex = lastTargetIndex + 1;
+    return [
+      ...withoutActive.slice(0, insertIndex),
+      movedTodo,
+      ...withoutActive.slice(insertIndex),
+    ];
+  }
+
+  const overIndex = withoutActive.findIndex(todo => todo.id === overId);
+  if (overIndex === -1) return items;
+
+  return [
+    ...withoutActive.slice(0, overIndex),
+    movedTodo,
+    ...withoutActive.slice(overIndex),
+  ];
 };
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   todos,
-  onMoveTodoStatus,
   onReorderTodos,
   onEditTodo,
   onDeleteTodo,
   onQuickAddTodo,
 }) => {
-  // Local copy for real-time visual feedback during drag
-  const [localTodos, setLocalTodos] = useState<Todo[]>(todos);
+  const sortedTodos = useMemo(() => sortTodosForBoard(todos), [todos]);
+  const [localTodos, setLocalTodos] = useState<Todo[]>(() => sortedTodos);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeWidth, setActiveWidth] = useState<number | null>(null);
   const activeTodoRef = useRef<Todo | null>(null);
+  const localTodosRef = useRef<Todo[]>(sortedTodos);
   const isDraggingRef = useRef(false);
 
-  // Sync from props when NOT dragging
   useEffect(() => {
     if (!isDraggingRef.current) {
-      setLocalTodos(todos);
+      localTodosRef.current = sortedTodos;
+      setLocalTodos(sortedTodos);
     }
-  }, [todos]);
+  }, [sortedTodos]);
+
+  const updateLocalTodos = (next: Todo[] | ((prev: Todo[]) => Todo[])) => {
+    setLocalTodos((prev) => {
+      const resolved = typeof next === 'function' ? (next as (prev: Todo[]) => Todo[])(prev) : next;
+      localTodosRef.current = resolved;
+      return resolved;
+    });
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 180, tolerance: 8 },
+    }),
   );
 
   const handleDragStart = (event: DragStartEvent) => {
     const id = event.active.id as string;
     isDraggingRef.current = true;
-    activeTodoRef.current = todos.find(t => t.id === id) || null;
+    activeTodoRef.current = localTodosRef.current.find(todo => todo.id === id) || null;
     setActiveId(id);
-    const element = document.getElementById(id);
+
+    const element = document.getElementById(`todo-card-${id}`);
     if (element) {
       setActiveWidth(element.getBoundingClientRect().width);
     }
   };
 
-  /**
-   * onDragOver: ONLY handles CROSS-COLUMN moves.
-   * Same-column reordering animation is handled by SortableContext/useSortable.
-   *
-   * ANTI-LOOP MECHANISM:
-   * - If active item is already in the target column → return `prev` (same ref) → no re-render → loop broken
-   * - Only creates a new array when the item actually changes columns
-   */
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     if (!over) return;
 
-    const dragId = active.id as string;
+    const nextActiveId = active.id as string;
     const overId = over.id as string;
 
-    if (dragId === overId) return;
-
-    setLocalTodos((prev) => {
-      const activeTodo = prev.find(t => t.id === dragId);
-      if (!activeTodo) return prev;
-
-      const activeColumn = getEffectiveStatus(activeTodo);
-
-      // Determine target column
-      let targetColumn: TodoStatus;
-      if (COLUMN_IDS.includes(overId)) {
-        targetColumn = overId as TodoStatus;
-      } else {
-        const overTodo = prev.find(t => t.id === overId);
-        if (!overTodo) return prev;
-        targetColumn = getEffectiveStatus(overTodo);
-      }
-
-      // ★ CRITICAL: Same column → bail out with same reference → NO re-render → NO loop
-      if (activeColumn === targetColumn) return prev;
-
-      // Cross-column move: update status
-      const updated = prev.map(t => {
-        if (t.id === dragId) {
-          return { ...t, status: targetColumn, is_completed: targetColumn === 'done' };
-        }
-        return t;
-      });
-
-      // If hovering over a specific card, also reposition near it
-      if (!COLUMN_IDS.includes(overId)) {
-        const aIdx = updated.findIndex(t => t.id === dragId);
-        const oIdx = updated.findIndex(t => t.id === overId);
-        if (aIdx !== -1 && oIdx !== -1 && aIdx !== oIdx) {
-          const [removed] = updated.splice(aIdx, 1);
-          updated.splice(oIdx, 0, removed);
-        }
-      }
-
-      return updated;
+    updateLocalTodos((prev) => {
+      const next = moveTodoInBoard(prev, nextActiveId, overId);
+      return hasSameBoardState(prev, next) ? prev : next;
     });
   };
 
@@ -160,66 +176,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     activeTodoRef.current = null;
 
     if (!over) {
-      // Drag cancelled - reset to original props
-      setLocalTodos(todos);
+      updateLocalTodos(sortedTodos);
       return;
     }
 
-    const draggedId = active.id as string;
+    const nextActiveId = active.id as string;
     const overId = over.id as string;
+    const finalTodos = moveTodoInBoard(localTodosRef.current, nextActiveId, overId);
 
-    if (draggedId === overId) {
-      setLocalTodos(todos);
+    if (hasSameBoardState(sortedTodos, finalTodos)) {
+      updateLocalTodos(sortedTodos);
       return;
     }
 
-    // Start from localTodos which has cross-column moves already applied
-    let finalTodos = [...localTodos];
-
-    const draggedTodo = finalTodos.find(t => t.id === draggedId);
-    if (!draggedTodo) {
-      setLocalTodos(todos);
-      return;
-    }
-
-    const isOverAColumn = COLUMN_IDS.includes(overId);
-
-    if (isOverAColumn) {
-      // Dropped on an empty column area
-      const destStatus = overId as TodoStatus;
-      finalTodos = finalTodos.map(t => {
-        if (t.id === draggedId) {
-          return { ...t, status: destStatus, is_completed: destStatus === 'done' };
-        }
-        return t;
-      });
-    } else {
-      // Dropped on a card - handle same-column reorder
-      const overTodo = finalTodos.find(t => t.id === overId);
-      if (overTodo) {
-        const draggedColumn = getEffectiveStatus(draggedTodo);
-        const overColumn = getEffectiveStatus(overTodo);
-
-        // Update status if needed (cross-column move not yet applied)
-        if (draggedColumn !== overColumn) {
-          finalTodos = finalTodos.map(t => {
-            if (t.id === draggedId) {
-              return { ...t, status: overColumn, is_completed: overColumn === 'done' };
-            }
-            return t;
-          });
-        }
-
-        // Reorder within the final array
-        const dIdx = finalTodos.findIndex(t => t.id === draggedId);
-        const oIdx = finalTodos.findIndex(t => t.id === overId);
-        if (dIdx !== -1 && oIdx !== -1 && dIdx !== oIdx) {
-          const [removed] = finalTodos.splice(dIdx, 1);
-          finalTodos.splice(oIdx, 0, removed);
-        }
-      }
-    }
-
+    updateLocalTodos(finalTodos);
     onReorderTodos(finalTodos);
   };
 
@@ -228,15 +198,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     setActiveId(null);
     setActiveWidth(null);
     activeTodoRef.current = null;
-    setLocalTodos(todos);
+    updateLocalTodos(sortedTodos);
   };
 
-  // Use localTodos for rendering (has real-time drag state)
-  const displayTodos = localTodos;
-
   return (
-    <DndContext 
-      sensors={sensors} 
+    <DndContext
+      sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -244,10 +211,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       onDragCancel={handleDragCancel}
     >
       <div className="w-full">
-        {/* Board Columns Horizontal Container with Uniform Gaps */}
         <div className="flex flex-col md:flex-row gap-2.5 overflow-x-auto pb-4 scrollbar-thin items-stretch w-full select-none">
           {COLUMNS.map((col) => {
-            const colTodos = getTodosForColumn(displayTodos, col.id);
+            const colTodos = getTodosForColumn(localTodos, col.id);
 
             return (
               <ColumnContainer
@@ -257,22 +223,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 onQuickAdd={() => onQuickAddTodo(col.id)}
               >
                 <SortableContext
-                  items={colTodos.map((t) => t.id)}
+                  items={colTodos.map((todo) => todo.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <div className="space-y-3 min-h-[80px] max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="space-y-3 min-h-[120px] max-h-[260px] overflow-y-auto pr-1 custom-scrollbar">
                     {colTodos.map((todo) => (
                       <SortableCard
                         key={todo.id}
                         todo={todo}
                         onEdit={onEditTodo}
                         onDelete={onDeleteTodo}
-                        activeId={activeId}
                       />
                     ))}
                     {colTodos.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-12 px-4 border border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs">
-                        Chưa có thẻ nào
+                      <div className="flex min-h-[112px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-xs font-semibold text-slate-400">
+                        Chua co the nao
                       </div>
                     )}
                   </div>
@@ -285,17 +250,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
       <DragOverlay adjustScale={false}>
         {activeId && activeTodoRef.current ? (
-          <DragOverlayCard
-            todo={activeTodoRef.current}
-            width={activeWidth || undefined}
-          />
+          <TaskCardShell todo={activeTodoRef.current} width={activeWidth || undefined} isOverlay />
         ) : null}
       </DragOverlay>
     </DndContext>
   );
 };
 
-// --- Column Container ---
 interface ColumnContainerProps {
   col: typeof COLUMNS[number];
   count: number;
@@ -314,53 +275,45 @@ const ColumnContainer: React.FC<ColumnContainerProps> = ({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col flex-1 min-w-[185px] md:min-w-[160px] lg:min-w-[170px] xl:min-w-[190px] rounded-[20px] bg-[#f8f9fa] p-2.5 transition-all duration-200 border ${
-        isOver 
-          ? 'ring-2 ring-indigo-500/20 bg-indigo-50/10 border-indigo-200/50 scale-[1.005] shadow-sm' 
+      className={`flex flex-col flex-1 min-w-[185px] md:min-w-[160px] lg:min-w-[170px] xl:min-w-[190px] rounded-[20px] bg-[#f8f9fa] p-2.5 transition-all duration-150 border ${
+        isOver
+          ? 'ring-2 ring-indigo-500/20 bg-indigo-50/10 border-indigo-200/50 shadow-sm'
           : 'border-slate-100/40'
       }`}
     >
-      {/* Column Header */}
       <div className="flex items-center justify-between mb-4 select-none w-full">
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${col.dot}`} />
           <h4 className="font-bold text-slate-800 text-xs">{col.label}</h4>
         </div>
-        <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200/50 text-slate-550 rounded-full">
+        <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200/50 text-slate-500 rounded-full">
           {count}
         </span>
       </div>
 
-      {/* Column Cards */}
-      <div className="flex-1">
-        {children}
-      </div>
+      <div className="flex-1">{children}</div>
 
-      {/* Column Footer Quick Add */}
       <button
         onClick={onQuickAdd}
         className="w-full mt-3 py-2 text-slate-400 hover:text-slate-600 text-xs font-bold flex items-center gap-1.5 hover:bg-slate-200/40 rounded-xl transition-all justify-start px-2.5"
       >
         <Plus size={14} className="stroke-[3]" />
-        Thêm task
+        Them task
       </button>
     </div>
   );
 };
 
-// --- Sortable Card ---
 interface SortableCardProps {
   todo: Todo;
   onEdit: (todo: Todo) => void;
   onDelete: (id: string) => void;
-  activeId: string | null;
 }
 
 const SortableCard: React.FC<SortableCardProps> = ({
   todo,
   onEdit,
   onDelete,
-  activeId,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: todo.id,
@@ -369,37 +322,10 @@ const SortableCard: React.FC<SortableCardProps> = ({
   const style = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     transition,
-    opacity: isDragging ? 0.3 : 1,
+    opacity: isDragging ? 0.25 : 1,
   };
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '';
-    try {
-      const date = new Date(dateStr);
-      const day = date.getDate();
-      const month = date.getMonth() + 1;
-      return `${day} Th${month}`;
-    } catch (e) {
-      return '';
-    }
-  };
-
-  const isOverdue = (dateStr?: string) => {
-    if (!dateStr) return false;
-    try {
-      const end = new Date(dateStr).getTime();
-      const now = new Date().getTime();
-      return end < now;
-    } catch (e) {
-      return false;
-    }
-  };
-
-  const completedSubtasks = todo.subtasks?.filter((s) => s.is_completed).length || 0;
-  const totalSubtasks = todo.subtasks?.length || 0;
 
   if (isDragging) {
-    // Render a ghost placeholder card in the list to preserve layout width/height
     return (
       <div
         ref={setNodeRef}
@@ -411,123 +337,49 @@ const SortableCard: React.FC<SortableCardProps> = ({
 
   return (
     <div
-      id={todo.id}
+      id={`todo-card-${todo.id}`}
       ref={setNodeRef}
       style={style}
       onClick={() => onEdit(todo)}
       {...attributes}
       {...listeners}
-      className="group relative flex flex-col gap-2 p-2.5 rounded-[18px] bg-white border border-slate-100 cursor-grab active:cursor-grabbing select-none hover:border-slate-300 transition-all shadow-sm"
+      className="group relative cursor-grab active:cursor-grabbing"
     >
-      {/* Content */}
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[12px] font-bold text-slate-800 leading-snug break-words flex-1">
-          {todo.content}
-        </p>
-      </div>
-
-      {/* Description Snippet if exists */}
-      {todo.description && (
-        <p className="text-[10px] text-slate-400 font-medium line-clamp-2 leading-normal">
-          {todo.description}
-        </p>
-      )}
-
-      {/* Footer Info */}
-      {(totalSubtasks > 0 || todo.deadline) && (
-        <div className="flex items-center gap-2 mt-1 flex-wrap select-none">
-          {totalSubtasks > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md border text-slate-500 border-slate-100 bg-slate-50 font-bold flex items-center gap-1">
-              <CheckSquare size={9} />
-              {completedSubtasks}/{totalSubtasks}
-            </span>
-          )}
-          {todo.deadline && (
-            <span className={`text-[9px] px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-1 ${
-              isOverdue(todo.deadline)
-                ? 'bg-rose-50 border-rose-100 text-rose-600'
-                : 'bg-indigo-50 border-indigo-100 text-indigo-600'
-            }`}>
-              <Calendar size={9} />
-              {formatDate(todo.deadline)}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Card hover delete action */}
-      <div 
-        className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm px-1 py-0.5 rounded-lg border border-slate-100 z-20" 
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(todo.id);
-          }}
-          className="p-1 hover:bg-slate-100 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
-          title="Xóa"
-        >
-          <Trash2 size={11} />
-        </button>
-      </div>
+      <TaskCardShell todo={todo} onDelete={onDelete} />
     </div>
   );
 };
 
-// --- Drag Overlay Visual Card ---
-interface DragOverlayCardProps {
+interface TaskCardShellProps {
   todo: Todo;
   width?: number;
+  isOverlay?: boolean;
+  onDelete?: (id: string) => void;
 }
 
-const DragOverlayCard: React.FC<DragOverlayCardProps> = ({ todo, width }) => {
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '';
-    try {
-      const date = new Date(dateStr);
-      const day = date.getDate();
-      const month = date.getMonth() + 1;
-      return `${day} Th${month}`;
-    } catch (e) {
-      return '';
-    }
-  };
-
-  const isOverdue = (dateStr?: string) => {
-    if (!dateStr) return false;
-    try {
-      const end = new Date(dateStr).getTime();
-      const now = new Date().getTime();
-      return end < now;
-    } catch (e) {
-      return false;
-    }
-  };
-
-  const completedSubtasks = todo.subtasks?.filter((s) => s.is_completed).length || 0;
+const TaskCardShell: React.FC<TaskCardShellProps> = ({ todo, width, isOverlay = false, onDelete }) => {
+  const completedSubtasks = todo.subtasks?.filter((subtask) => subtask.is_completed).length || 0;
   const totalSubtasks = todo.subtasks?.length || 0;
 
   return (
     <div
       style={width ? { width: `${width}px` } : undefined}
-      className="flex flex-col gap-2 p-2.5 rounded-[18px] bg-white border border-slate-300 shadow-2xl cursor-grabbing select-none z-50 pointer-events-none opacity-95"
+      className={`relative flex min-h-[82px] flex-col gap-2 rounded-[18px] bg-white p-2.5 select-none ${
+        isOverlay
+          ? 'border border-slate-300 shadow-2xl cursor-grabbing pointer-events-none opacity-95'
+          : 'border border-slate-100 shadow-sm hover:border-slate-300 transition-all'
+      }`}
     >
-      {/* Content */}
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[12px] font-bold text-slate-800 leading-snug break-words flex-1">
-          {todo.content}
-        </p>
-      </div>
+      <p className="text-[12px] font-bold text-slate-800 leading-snug break-words pr-6">
+        {todo.content}
+      </p>
 
-      {/* Description Snippet if exists */}
       {todo.description && (
         <p className="text-[10px] text-slate-400 font-medium line-clamp-2 leading-normal">
           {todo.description}
         </p>
       )}
 
-      {/* Footer Info */}
       {(totalSubtasks > 0 || todo.deadline) && (
         <div className="flex items-center gap-2 mt-1 flex-wrap select-none">
           {totalSubtasks > 0 && (
@@ -548,6 +400,37 @@ const DragOverlayCard: React.FC<DragOverlayCardProps> = ({ todo, width }) => {
           )}
         </div>
       )}
+
+      {!isOverlay && onDelete && (
+        <div
+          className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm px-1 py-0.5 rounded-lg border border-slate-100 z-20"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(todo.id);
+            }}
+            className="p-1 hover:bg-slate-100 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+            title="Xoa"
+          >
+            <Trash2 size={11} />
+          </button>
+        </div>
+      )}
     </div>
   );
+};
+
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getDate()} Th${date.getMonth() + 1}`;
+};
+
+const isOverdue = (dateStr?: string) => {
+  if (!dateStr) return false;
+  const end = new Date(dateStr).getTime();
+  return Number.isFinite(end) && end < Date.now();
 };
