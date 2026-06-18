@@ -86,8 +86,8 @@ const moveTodoInBoard = (items: Todo[], activeId: string, overId: string): Todo[
     ...activeTodo,
     status: targetStatus,
     is_completed: targetStatus === 'done',
-    completed_at: targetStatus === 'done' 
-      ? (activeTodo.completed_at || new Date().toISOString()) 
+    completed_at: targetStatus === 'done'
+      ? (activeTodo.completed_at || new Date().toISOString())
       : null,
   };
   const withoutActive = items.filter(todo => todo.id !== activeId);
@@ -297,11 +297,10 @@ const ColumnContainer: React.FC<ColumnContainerProps> = ({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col flex-1 min-w-[185px] md:min-w-[160px] lg:min-w-[170px] xl:min-w-[190px] rounded-[20px] bg-[#f8f9fa] p-2.5 transition-all duration-150 border ${
-        isOver
-          ? 'ring-2 ring-indigo-500/20 bg-indigo-50/10 border-indigo-200/50 shadow-sm'
-          : 'border-slate-100/40'
-      }`}
+      className={`flex flex-col flex-1 min-w-[185px] md:min-w-[160px] lg:min-w-[170px] xl:min-w-[190px] rounded-[20px] bg-[#f8f9fa] px-2 py-2 transition-all duration-150 border ${isOver
+        ? 'ring-2 ring-indigo-500/20 bg-indigo-50/10 border-indigo-200/50 shadow-sm'
+        : 'border-slate-100/40'
+        }`}
     >
       <div className="flex items-center justify-between mb-4 select-none w-full">
         <div className="flex items-center gap-2">
@@ -390,13 +389,12 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
   return (
     <div
       style={width ? { width: `${width}px` } : undefined}
-      className={`relative flex min-h-[38px] flex-col gap-1 rounded-xl bg-white px-2.5 py-1.5 select-none ${
-        isOverlay
-          ? 'border border-slate-300 shadow-2xl cursor-grabbing pointer-events-none opacity-95'
-          : 'border border-slate-100 shadow-sm hover:border-slate-300 transition-all'
-      }`}
+      className={`relative flex min-h-[38px] flex-col gap-1 rounded-xl bg-white p-2.5 select-none ${isOverlay
+        ? 'border border-slate-300 shadow-2xl cursor-grabbing pointer-events-none opacity-95'
+        : 'border border-slate-100 shadow-sm hover:border-slate-300 transition-all'
+        }`}
     >
-      <p className="text-[11px] font-semibold text-slate-800 leading-tight break-words pr-6">
+      <p className="text-[11px] font-semibold text-slate-800 leading-tight break-words pr-0">
         {todo.content}
       </p>
 
@@ -415,11 +413,10 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
             </span>
           )}
           {todo.deadline && (
-            <span className={`text-[9px] px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-1 ${
-              isOverdue(todo.deadline)
-                ? 'bg-rose-50 border-rose-100 text-rose-600'
-                : 'bg-indigo-50 border-indigo-100 text-indigo-600'
-            }`}>
+            <span className={`text-[9px] px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-1 ${isOverdue(todo.deadline)
+              ? 'bg-rose-50 border-rose-100 text-rose-600'
+              : 'bg-indigo-50 border-indigo-100 text-indigo-600'
+              }`}>
               <Calendar size={9} />
               {formatDate(todo.deadline)}
             </span>
