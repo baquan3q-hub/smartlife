@@ -248,7 +248,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   items={colTodos.map((todo) => todo.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <div className="space-y-3 min-h-[120px] max-h-[260px] overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="space-y-2 min-h-[120px] max-h-[260px] overflow-y-auto pr-1 custom-scrollbar">
                     {colTodos.map((todo) => (
                       <SortableCard
                         key={todo.id}
@@ -389,7 +389,7 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
   return (
     <div
       style={width ? { width: `${width}px` } : undefined}
-      className={`relative flex min-h-[38px] flex-col gap-1 rounded-xl bg-white p-2.5 select-none ${isOverlay
+      className={`relative flex min-h-[38px] flex-col gap-1 rounded-xl bg-white pl-2 pr-2 py-2 select-none ${isOverlay
         ? 'border border-slate-300 shadow-2xl cursor-grabbing pointer-events-none opacity-95'
         : 'border border-slate-100 shadow-sm hover:border-slate-300 transition-all'
         }`}
