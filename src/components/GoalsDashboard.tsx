@@ -586,7 +586,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="w-full px-3 md:px-8 pt-4 md:pt-8 space-y-6 animate-in fade-in duration-500">
 
       {/* Tab Switcher */}
       <div className="flex justify-between items-center flex-wrap gap-4 border-b border-gray-200 pb-3">

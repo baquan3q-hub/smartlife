@@ -59,6 +59,7 @@ export const walletService = {
           name: wallet.name,
           type: wallet.type,
           balance: wallet.balance,
+          initial_balance: wallet.initial_balance,
           color: wallet.color,
           icon: wallet.icon,
           include_in_total: wallet.include_in_total,

@@ -481,7 +481,7 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="w-full px-3 md:px-8 pt-4 md:pt-8 space-y-6 animate-fade-in">
       {/* ─── Header ─── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

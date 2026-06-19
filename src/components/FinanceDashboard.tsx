@@ -531,6 +531,9 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     const [walletName, setWalletName] = useState('');
     const [walletType, setWalletType] = useState<Wallet['type']>('cash');
     const [walletBalance, setWalletBalance] = useState('');
+    const [walletCurrentBalance, setWalletCurrentBalance] = useState('');
+    const [selectedWalletForHistory, setSelectedWalletForHistory] = useState<Wallet | null>(null);
+    const [isWalletHistoryModalOpen, setIsWalletHistoryModalOpen] = useState(false);
     const [walletColor, setWalletColor] = useState('#6366F1');
     const [walletIcon, setWalletIcon] = useState('Wallet');
     const [walletIncludeInTotal, setWalletIncludeInTotal] = useState(true);
@@ -1453,10 +1456,21 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                     <div className="flex items-center gap-1">
                                                         <button
                                                             onClick={() => {
+                                                                setSelectedWalletForHistory(w);
+                                                                setIsWalletHistoryModalOpen(true);
+                                                            }}
+                                                            className="text-gray-400 hover:text-sky-600 p-1.5 rounded-lg hover:bg-gray-50 transition"
+                                                            title="Lịch sử giao dịch"
+                                                        >
+                                                            <FileText size={13} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
                                                                 setEditingWallet(w);
                                                                 setWalletName(w.name);
                                                                 setWalletType(w.type);
-                                                                setWalletBalance(w.balance.toString());
+                                                                setWalletBalance(w.initial_balance.toString());
+                                                                setWalletCurrentBalance(w.balance.toString());
                                                                 setWalletColor(w.color);
                                                                 setWalletIcon(w.icon);
                                                                 setWalletIncludeInTotal(w.include_in_total);
@@ -1536,10 +1550,21 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                         <div className="flex items-center gap-1">
                                                             <button
                                                                 onClick={() => {
+                                                                    setSelectedWalletForHistory(w);
+                                                                    setIsWalletHistoryModalOpen(true);
+                                                                }}
+                                                                className="text-gray-400 hover:text-sky-600 p-1.5 rounded-lg hover:bg-gray-50 transition"
+                                                                title="Lịch sử giao dịch"
+                                                            >
+                                                                <FileText size={13} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
                                                                     setEditingWallet(w);
                                                                     setWalletName(w.name);
                                                                     setWalletType(w.type);
                                                                     setWalletBalance(w.initial_balance.toString());
+                                                                    setWalletCurrentBalance(w.balance.toString());
                                                                     setWalletColor(w.color);
                                                                     setWalletIcon(w.icon);
                                                                     setWalletIncludeInTotal(w.include_in_total);
@@ -3199,14 +3224,23 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
                                 const amountNum = Number(walletBalance);
                                 if (isNaN(amountNum) || amountNum < 0) {
-                                    alert('Số tiền ban đầu không hợp lệ!');
+                                    alert(walletType === 'fund' ? 'Hạn mức ngân sách không hợp lệ!' : 'Số tiền ban đầu không hợp lệ!');
+                                    return;
+                                }
+
+                                const currentBalanceNum = editingWallet 
+                                    ? Number(walletCurrentBalance) 
+                                    : amountNum;
+
+                                if (isNaN(currentBalanceNum)) {
+                                    alert('Số dư hiện tại không hợp lệ!');
                                     return;
                                 }
 
                                 const walletPayload = {
                                     name: walletName.trim(),
                                     type: walletType,
-                                    balance: editingWallet ? editingWallet.balance : amountNum,
+                                    balance: currentBalanceNum,
                                     initial_balance: amountNum,
                                     color: walletColor,
                                     icon: walletIcon,
@@ -3269,6 +3303,25 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     {walletBalance && !isNaN(Number(walletBalance)) && formatCurrency(Number(walletBalance), lang)}
                                 </div>
                             </div>
+
+                            {editingWallet && (
+                                <div className="animate-fade-in">
+                                    <label className="text-xs font-bold text-gray-500 uppercase ml-1">
+                                        {walletType === 'fund' ? 'Số dư quỹ hiện có' : 'Số dư hiện tại'}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        required
+                                        value={walletCurrentBalance}
+                                        onChange={(e) => setWalletCurrentBalance(e.target.value)}
+                                        placeholder="0"
+                                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-black mt-1 outline-none text-base text-gray-800"
+                                    />
+                                    <div className="text-right text-xs text-sky-600 font-bold mt-1">
+                                        {walletCurrentBalance && !isNaN(Number(walletCurrentBalance)) && formatCurrency(Number(walletCurrentBalance), lang)}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Color Selector */}
                             <div>
@@ -3761,6 +3814,98 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Lịch sử giao dịch của Ví/Quỹ */}
+            {isWalletHistoryModalOpen && selectedWalletForHistory && (
+                <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col transform transition-all scale-100 animate-scale-up border border-gray-100">
+                        {/* Header */}
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
+                            <div>
+                                <h3 className="text-lg font-black text-gray-800 flex items-center gap-2">
+                                    <FileText className="text-sky-600" size={20} />
+                                    Lịch sử dòng tiền: {selectedWalletForHistory.name}
+                                </h3>
+                                <p className="text-[11px] text-gray-500 font-medium">
+                                    {selectedWalletForHistory.type === 'fund' 
+                                        ? `Quỹ mục đích • Hạn mức: ${formatCurrency(selectedWalletForHistory.initial_balance, lang)}` 
+                                        : `Tài khoản / Ví • Loại: ${
+                                            selectedWalletForHistory.type === 'bank' ? 'Ngân hàng' :
+                                            selectedWalletForHistory.type === 'credit' ? 'Thẻ tín dụng' :
+                                            selectedWalletForHistory.type === 'savings' ? 'Tiết kiệm' :
+                                            selectedWalletForHistory.type === 'e-wallet' ? 'Ví điện tử' : 'Tiền mặt'
+                                          }`
+                                    }
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setIsWalletHistoryModalOpen(false);
+                                    setSelectedWalletForHistory(null);
+                                }}
+                                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Summary Widget */}
+                        <div className="bg-sky-50/50 p-4 border-b border-gray-100 flex justify-between items-center px-6 flex-shrink-0">
+                            <span className="text-xs font-bold text-gray-500 uppercase font-sans">Số dư hiện tại</span>
+                            <span className="text-lg font-black text-sky-700 font-sans">
+                                {hideBalance ? '••••••' : formatCurrency(selectedWalletForHistory.balance, lang)}
+                            </span>
+                        </div>
+
+                        {/* List of transactions */}
+                        <div className="overflow-y-auto p-6 flex-1 custom-scrollbar space-y-3">
+                            {(() => {
+                                const walletTransactions = transactions
+                                    .filter(t => t.wallet_id === selectedWalletForHistory.id)
+                                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                                if (walletTransactions.length === 0) {
+                                    return (
+                                        <div className="py-16 text-center text-gray-400">
+                                            <FileText size={40} className="mx-auto mb-3 opacity-30" />
+                                            <p className="font-semibold text-sm">Chưa có giao dịch nào liên kết với ví/quỹ này</p>
+                                        </div>
+                                    );
+                                }
+
+                                return walletTransactions.map(t => {
+                                    const isIncome = t.type === TransactionType.INCOME;
+                                    const catStyles = getCategoryStyles(t.category);
+                                    const IconComponent = catStyles.icon;
+
+                                    return (
+                                        <div key={t.id} className="flex justify-between items-center p-3.5 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white transition duration-200">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${catStyles.bgClass}`}>
+                                                    {catStyles.emoji ? (
+                                                        <span className="text-sm">{catStyles.emoji}</span>
+                                                    ) : (
+                                                        <IconComponent size={15} />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs font-bold text-gray-700">{t.description || t.category}</div>
+                                                    <div className="text-[10px] text-gray-400 font-semibold mt-0.5">
+                                                        {t.date.split('-').reverse().join('/')} • {t.category}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <span className={`font-black text-sm ${isIncome ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                {isIncome ? '+' : '-'}{formatCurrency(t.amount, lang)}
+                                            </span>
+                                        </div>
+                                    );
+                                });
+                            })()}
                         </div>
                     </div>
                 </div>
