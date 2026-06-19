@@ -449,7 +449,7 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" /></div>;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="w-full px-3 md:px-8 pt-4 md:pt-8 space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col gap-3">
         <div>

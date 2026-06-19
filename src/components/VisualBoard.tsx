@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AppState, Goal, Todo, TimetableEvent, Habit, CountdownItem, CountUpItem, HabitLog, JournalEntry, MoodLevel } from '../types';
-import { calculateCumulativeGPA } from '../services/gpaCalculator';
-import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap, Crown, X, ShieldCheck, Flame, Timer, TrendingUp, Download, Share2, Edit2, BookOpen, Loader2, FileText } from 'lucide-react';
+import { calculateCumulativeGPA, calculateSemesterGPA, getAcademicStanding } from '../services/gpaCalculator';
+import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap, Crown, X, ShieldCheck, Flame, Timer, TrendingUp, Download, Share2, Edit2, BookOpen, Loader2, FileText, Eye, EyeOff } from 'lucide-react';
 import MyStorage from './MyStorage';
 import { useProAccess } from '../hooks/useProAccess';
 import { supabase } from '../services/supabase';
@@ -25,6 +25,71 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const [showAllHolidays, setShowAllHolidays] = useState(false);
     const [showStorage, setShowStorage] = useState(false);
     const [showStorageGate, setShowStorageGate] = useState(false);
+    const [activeTodoStatusTab, setActiveTodoStatusTab] = useState<'backlog' | 'todo' | 'doing'>('todo');
+    const [showFinanceBalance, setShowFinanceBalance] = useState(true);
+
+    // Draggable Storage Button State
+    const [storagePos, setStoragePos] = useState({ x: 0, y: 0 });
+    const [isDraggingStorage, setIsDraggingStorage] = useState(false);
+    const dragStartPos = useRef({ x: 0, y: 0 });
+    const buttonStartPos = useRef({ x: 0, y: 0 });
+    const hasDragged = useRef(false);
+
+    const handleStorageTouchStart = (e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        dragStartPos.current = { x: touch.clientX, y: touch.clientY };
+        buttonStartPos.current = { x: storagePos.x, y: storagePos.y };
+        hasDragged.current = false;
+        setIsDraggingStorage(true);
+    };
+
+    const handleStorageTouchMove = (e: React.TouchEvent) => {
+        if (!isDraggingStorage) return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - dragStartPos.current.x;
+        const dy = touch.clientY - dragStartPos.current.y;
+
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+            hasDragged.current = true;
+        }
+
+        const targetX = buttonStartPos.current.x + dx;
+        const targetY = buttonStartPos.current.y + dy;
+
+        // Dynamic boundaries based on viewport size to prevent dragging off-screen
+        const btnWidth = 48;
+        const btnHeight = 48;
+        const defaultRight = 24;
+        const defaultBottom = 96;
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        // Left boundary: screenWidth - defaultRight - btnWidth
+        const minX = -(screenWidth - defaultRight - btnWidth - 12);
+        // Right boundary: defaultRight
+        const maxX = defaultRight - 12;
+
+        // Top boundary: screenHeight - defaultBottom - btnHeight
+        const minY = -(screenHeight - defaultBottom - btnHeight - 12);
+        // Bottom boundary: defaultBottom
+        const maxY = defaultBottom - 12;
+
+        // Clamp positions
+        const clampedX = Math.max(minX, Math.min(maxX, targetX));
+        const clampedY = Math.max(minY, Math.min(maxY, targetY));
+
+        setStoragePos({
+            x: clampedX,
+            y: clampedY
+        });
+    };
+
+    const handleStorageTouchEnd = (e: React.TouchEvent) => {
+        setIsDraggingStorage(false);
+        if (hasDragged.current) {
+            e.preventDefault();
+        }
+    };
 
     // Pull to Refresh state
     const [pullDistance, setPullDistance] = useState(0);
@@ -187,7 +252,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const handleShare = async () => {
         if (!shareRef.current) return;
         try {
-            const canvas = await html2canvas(shareRef.current, { background: '#111827', scale: 2 } as any);
+            const canvas = await html2canvas(shareRef.current, { background: '#ffffff', scale: 2 } as any);
             const image = canvas.toDataURL('image/png');
             const link = document.createElement('a');
             link.href = image;
@@ -284,6 +349,22 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
         return { income, expense, balance: income - expense };
     }, [appState.transactions]);
 
+    // 1b. Finance: Monthly stats (income & expense of current month)
+    const monthlyFinanceStats = useMemo(() => {
+        const now = new Date();
+        const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+        let income = 0;
+        let expense = 0;
+        appState.transactions.forEach(t => {
+            if (t.date && t.date.startsWith(currentYearMonth)) {
+                if (t.type === 'income') income += t.amount;
+                else expense += t.amount;
+            }
+        });
+        return { income, expense };
+    }, [appState.transactions]);
+
     // 2. Goals Separation
     const financeGoals = useMemo(() =>
         appState.goals.filter(g => g.type === 'FINANCIAL' || (g.target_amount && g.target_amount > 0)),
@@ -296,6 +377,16 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     // NEW: Cumulative GPA
     const cumulativeGPA = useMemo(() => calculateCumulativeGPA(appState.gpaSemesters), [appState.gpaSemesters]);
 
+    const previousSemesters = useMemo(() => {
+        const semOrder = { HK1: 1, HK2: 2, HocHe: 3 };
+        return [...appState.gpaSemesters].sort((a, b) => {
+            if (a.year_of_study !== b.year_of_study) {
+                return a.year_of_study - b.year_of_study;
+            }
+            return (semOrder[a.semester_type as keyof typeof semOrder] || 99) - (semOrder[b.semester_type as keyof typeof semOrder] || 99);
+        });
+    }, [appState.gpaSemesters]);
+
     // Top 3 Priority Todos
     const priorityTodos = useMemo(() => {
         const priorityOrder = { urgent: 1, focus: 2, high: 3, medium: 4, low: 5, chill: 6, temp: 7 };
@@ -304,6 +395,15 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             .sort((a, b) => (priorityOrder[a.priority as keyof typeof priorityOrder] || 99) - (priorityOrder[b.priority as keyof typeof priorityOrder] || 99))
             .slice(0, 3);
     }, [appState.todos]);
+
+    // Filtered Todos by active status tab
+    const filteredTodos = useMemo(() => {
+        return appState.todos.filter(t => {
+            if (t.is_completed || t.status === 'done') return false;
+            const status = t.status || 'todo';
+            return status === activeTodoStatusTab;
+        });
+    }, [appState.todos, activeTodoStatusTab]);
 
     // Next 2 Upcoming Events Logic REPLACED with Today & Tomorrow Logic
     const scheduleData = useMemo(() => {
@@ -447,8 +547,12 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            className="w-full overflow-x-hidden px-3 md:px-8 pt-4 md:pt-8 relative"
+            className="w-full overflow-x-hidden px-3 md:px-8 pt-4 md:pt-8 relative min-h-screen"
         >
+            {/* Background decorative glassmorphism blobs */}
+            <div className="absolute top-10 left-10 w-96 h-96 bg-indigo-200/20 rounded-full blur-3xl pointer-events-none -z-10 animate-[pulse_6s_infinite]" />
+            <div className="absolute top-1/3 right-10 w-[450px] h-[450px] bg-purple-200/20 rounded-full blur-3xl pointer-events-none -z-10 animate-[pulse_8s_infinite_1s]" />
+            <div className="absolute bottom-20 left-1/4 w-[400px] h-[400px] bg-cyan-200/15 rounded-full blur-3xl pointer-events-none -z-10 animate-[pulse_7s_infinite_2s]" />
             {/* Pull to Refresh Spinner */}
             <div
                 className="absolute left-0 right-0 flex justify-center pointer-events-none transition-all duration-200 z-[100]"
@@ -465,47 +569,50 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                     />
                 </div>
             </div>
+
             {/* 1. Welcome Header */}
-            <header className="mb-6">
-                <div className="text-sm text-gray-500 font-medium uppercase tracking-wider mb-1">
-                    {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}
+            <header className="mb-6 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                    <div className="text-sm text-gray-500 font-medium uppercase tracking-wider mb-1">
+                        {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </div>
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 truncate">
+                        Hello {userName || 'ban'}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-600">Have a nice day</span>
+                    </h1>
                 </div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 truncate">
-                    Hello {userName || 'ban'}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-600">Have a nice day</span>
-                </h1>
+
+                {/* AI Advisor Icon Button Shortcut */}
+                <button
+                    onClick={() => onNavigate?.('ai-advisor')}
+                    className="shrink-0 w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-900 border border-indigo-500/30 text-cyan-400 hover:text-cyan-300 hover:border-cyan-400/40 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center relative overflow-hidden group"
+                    title="Trợ lý sự nghiệp AI"
+                >
+                    <div className="absolute top-0 right-0 w-8 h-8 bg-cyan-500/10 rounded-full blur-md group-hover:scale-125 transition-transform" />
+                    <Bot size={22} className="relative z-10 animate-[pulse_3s_infinite]" />
+                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                    </span>
+                </button>
             </header>
 
-            {/* HABIT STREAK SHARE WIDGET */}
-            {!loadingEvents && habits.length > 0 && (
-                <div ref={shareRef} className="mb-6 bg-white rounded-2xl p-3 shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3 overflow-x-auto flex-1 min-w-0 mr-4 pb-1 custom-scrollbar">
-                        {habits.slice(0, 5).map(habit => {
-                            const stats = getHabitStats(habit);
-                            return (
-                                <button key={habit.id} onClick={() => onNavigate?.('habit')} className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-xl border border-gray-100 transition-colors shrink-0">
-                                    <span className="text-xl">{habit.icon}</span>
-                                    <span className="font-bold text-gray-700 text-sm max-w-[100px] truncate">{habit.title}</span>
-                                    <span className="flex items-center gap-1 text-orange-500 font-black text-sm bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-100">
-                                        <Flame size={14} /> {stats.currentStreak}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                    <button onClick={handleShare} className="shrink-0 p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors border border-transparent hover:border-indigo-100" title="Tải ảnh khoe Streak">
-                        <Download size={18} />
-                    </button>
-                </div>
-            )}
 
-            {/* My Storage Toggle - Discreet */}
+            {/* My Storage Toggle - Discreet & Draggable on Mobile */}
             <button
                 onClick={handleStorageClick}
-                className="fixed bottom-24 right-6 z-50 w-12 h-12 bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 transition-all hover:scale-110 group"
+                onTouchStart={handleStorageTouchStart}
+                onTouchMove={handleStorageTouchMove}
+                onTouchEnd={handleStorageTouchEnd}
+                style={{
+                    transform: `translate3d(${storagePos.x}px, ${storagePos.y}px, 0)`,
+                    transition: isDraggingStorage ? 'none' : 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                    touchAction: 'none'
+                }}
+                className="fixed bottom-24 right-6 z-50 w-12 h-12 bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 hover:scale-110 active:scale-95 group select-none"
                 title="My Storage"
             >
                 <Archive size={20} />
-                {!canUseStorage && <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center"><Crown size={10} className="text-white" /></span>}
+                {!canUseStorage && <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-50 rounded-full flex items-center justify-center pointer-events-none"><Crown size={10} className="text-white" /></span>}
                 <span className="absolute right-full mr-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">My Storage {!canUseStorage ? '(Pro)' : ''}</span>
             </button>
 
@@ -573,254 +680,594 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                 </div>
             )}
 
-            {/* 2. MAIN SCHEDULE SECTION (TOP) */}
-            <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                        <CalendarIcon className="text-indigo-600" />
-                        Lịch trình nay - mai
-                    </h2>
-                    <button onClick={() => onNavigate?.('schedule')} className="text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1">
-                        Chi tiết <ArrowUpRight size={14} />
-                    </button>
-                </div>
+            {/* TWO-COLUMN LAYOUT FOR DESKTOP */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
 
-                {/* DESKTOP LAYOUT (md and up): 2 Columns */}
-                <div className="hidden md:grid md:grid-cols-2 gap-4">
-                    {/* TODAY CARD */}
-                    <div className="bg-white rounded-3xl p-3 md:p-5 shadow-sm border border-indigo-100 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110 pointer-events-none"></div>
-                        <div className="relative z-10">
-                            <h3 className="text-indigo-900 font-bold mb-4 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                                Hôm nay ({scheduleData.todayLabel})
-                            </h3>
+                {/* ─── MAIN COLUMN (lg:col-span-3) ─── */}
+                <div className="lg:col-span-3 space-y-6">
 
-                            <div className="space-y-3">
-                                {scheduleData.today.length > 0 ? scheduleData.today.map((ev, idx) => (
-                                    <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100/50 hover:bg-indigo-50 transition-colors">
-                                        <div className="flex flex-col items-center justify-center min-w-[60px] border-r border-indigo-100 pr-3">
-                                            <span className="text-lg font-black text-indigo-600 leading-none">{ev.start_time}</span>
-                                            <span className="text-[10px] text-gray-400 font-medium uppercase">{ev.end_time || '...'}</span>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-bold text-gray-800 text-base truncate">{ev.title}</div>
-                                            {ev.location && (
-                                                <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-300"></div>
-                                                    {ev.location}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <div className="text-center py-8 text-indigo-300 italic">
-                                        Không có lịch trình hôm nay. Enjoy! 🎉
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* TOMORROW CARD */}
-                    <div className="bg-white rounded-3xl p-3 md:p-5 shadow-sm border border-gray-100 relative overflow-hidden group">
-                        <div className="relative z-10">
-                            <h3 className="text-gray-600 font-bold mb-4 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-gray-300"></span>
-                                Ngày mai ({scheduleData.tomorrowLabel})
-                            </h3>
-
-                            <div className="space-y-3">
-                                {scheduleData.tomorrow.length > 0 ? scheduleData.tomorrow.map((ev, idx) => (
-                                    <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-gray-50 border border-transparent hover:border-gray-200 transition-colors opacity-80 hover:opacity-100">
-                                        <div className="flex flex-col items-center justify-center min-w-[60px] border-r border-gray-200/50 pr-3">
-                                            <span className="text-lg font-black text-gray-500 leading-none">{ev.start_time}</span>
-                                            <span className="text-[10px] text-gray-400 font-medium uppercase">{ev.end_time || '...'}</span>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-bold text-gray-700 text-base truncate">{ev.title}</div>
-                                            {ev.location && (
-                                                <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-1">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
-                                                    {ev.location}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <div className="text-center py-8 text-gray-300 italic">
-                                        Ngày mai rảnh rỗi.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* MOBILE LAYOUT (md:hidden): Swipeable / Autoplay Carousel Slider */}
-                <div className="md:hidden relative w-full">
-                    <div
-                        ref={scheduleScrollRef}
-                        onTouchStart={() => { lastActiveSlideInteraction.current = Date.now(); }}
-                        className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-3 pb-2 scroll-smooth"
-                    >
-                        {/* Slide 1: TODAY */}
-                        <div className="w-[90%] shrink-0 snap-center px-1">
-                            <div className="bg-white rounded-3xl p-4 shadow-sm border border-indigo-100 relative overflow-hidden min-h-[180px]">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 pointer-events-none"></div>
-                                <div className="relative z-10">
-                                    <h3 className="text-indigo-900 font-bold mb-4 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                                        Hôm nay ({scheduleData.todayLabel})
-                                    </h3>
-
-                                    <div className="space-y-3">
-                                        {scheduleData.today.length > 0 ? scheduleData.today.map((ev, idx) => (
-                                            <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100/50">
-                                                <div className="flex flex-col items-center justify-center min-w-[55px] border-r border-indigo-100 pr-3">
-                                                    <span className="text-base font-black text-indigo-600 leading-none">{ev.start_time}</span>
-                                                    <span className="text-[9px] text-gray-400 font-medium uppercase">{ev.end_time || '...'}</span>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="font-bold text-gray-800 text-sm truncate">{ev.title}</div>
-                                                    {ev.location && (
-                                                        <div className="flex items-center gap-1 text-[10px] text-gray-500 mt-1">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-300"></div>
-                                                            {ev.location}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )) : (
-                                            <div className="text-center py-8 text-indigo-300 italic text-sm">
-                                                Không có lịch trình hôm nay. Enjoy! 🎉
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Slide 2: TOMORROW */}
-                        <div className="w-[90%] shrink-0 snap-center px-1">
-                            <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100 relative overflow-hidden min-h-[180px]">
-                                <div className="relative z-10">
-                                    <h3 className="text-gray-600 font-bold mb-4 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-gray-300"></span>
-                                        Ngày mai ({scheduleData.tomorrowLabel})
-                                    </h3>
-
-                                    <div className="space-y-3">
-                                        {scheduleData.tomorrow.length > 0 ? scheduleData.tomorrow.map((ev, idx) => (
-                                            <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-gray-50 border border-transparent">
-                                                <div className="flex flex-col items-center justify-center min-w-[55px] border-r border-gray-200/50 pr-3">
-                                                    <span className="text-base font-black text-gray-500 leading-none">{ev.start_time}</span>
-                                                    <span className="text-[9px] text-gray-400 font-medium uppercase">{ev.end_time || '...'}</span>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="font-bold text-gray-700 text-sm truncate">{ev.title}</div>
-                                                    {ev.location && (
-                                                        <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-1">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
-                                                            {ev.location}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )) : (
-                                            <div className="text-center py-8 text-gray-300 italic text-sm">
-                                                Ngày mai rảnh rỗi.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* NEW: AI Advisor Banner */}
-            <div
-                onClick={() => onNavigate?.('ai-advisor')}
-                className="mb-8 relative bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 md:p-8 shadow-xl text-white cursor-pointer group overflow-hidden hover:shadow-2xl hover:-translate-y-1 border border-indigo-500/20 hover:border-indigo-400/40 transition-all duration-300"
-            >
-                {/* Glowing decorative elements */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-cyan-500/20 transition-all duration-500" />
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -ml-16 -mb-16 group-hover:bg-purple-500/20 transition-all duration-500" />
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-25 group-hover:opacity-45 transition-opacity duration-500" />
-
-                <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6">
-                    <div className="flex-1 text-center sm:text-left">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-cyan-300 rounded-full text-xs font-black uppercase tracking-widest mb-4 shadow-sm backdrop-blur-md">
-                            <Sparkles size={14} className="animate-pulse text-yellow-300" /> AI Advisor
-                        </div>
-                        <h3 className="text-xl sm:text-3xl font-black mb-2 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-indigo-200 to-purple-300">
-                            TRỢ LÝ SỰ NGHIỆP AI
-                        </h3>
-                        <p className="text-slate-300 max-w-xl text-xs sm:text-sm leading-relaxed mx-auto sm:mx-0">
-                            Hỏi đáp thông minh về lộ trình học tập, tài chính và lập kế hoạch sự nghiệp.
-                        </p>
-                    </div>
-                    <div className="relative shrink-0 hidden sm:flex items-center justify-center w-20 h-20 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border border-cyan-400/30 rounded-2xl shadow-[0_0_20px_rgba(34,211,238,0.15)] group-hover:shadow-[0_0_30px_rgba(34,211,238,0.3)] group-hover:scale-105 group-hover:rotate-2 transition-all duration-300 backdrop-blur-md">
-                        <Bot size={36} className="text-cyan-400" />
-                        <Sparkles className="absolute -top-1.5 -right-1.5 text-yellow-300 animate-pulse" size={14} />
-                    </div>
-                </div>
-            </div>
-
-            {/* 3. Masonry / Grid Layout (Remaining Items) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-8">
-
-                {/* COL 1: TASKS & HOLIDAYS (Was Col 3) */}
-                <div className="space-y-4 md:space-y-8 min-w-0">
-                    <div
-                        onClick={() => onNavigate?.('schedule')}
-                        className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-4 md:p-6 shadow-xl text-white relative overflow-hidden min-h-[250px] md:min-h-[300px] flex flex-col cursor-pointer hover:shadow-2xl transition-all group"
-                    >
-                        {/* Decorative Background */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none group-hover:bg-white/10 transition-colors"></div>
-
-                        <div className="relative z-10 flex-1 flex flex-col">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="flex items-center gap-2 font-bold text-lg text-white/90">
-                                    <Zap className="text-yellow-400 fill-yellow-400" size={20} />
-                                    Nhiệm vụ hôm nay
-                                </h3>
-                                <ArrowUpRight size={18} className="text-white/30 group-hover:text-white transition-colors" />
-                            </div>
-
-                            <div 
-                                onClick={(e) => e.stopPropagation()} 
-                                className="space-y-3 flex-1 max-h-[160px] md:max-h-[200px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/20"
+                    {/* BLOCK 1: TODAY'S ACTION HUB */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white/40 backdrop-blur-lg p-4 md:p-6 rounded-[32px] border border-white/60 shadow-[4px_4px_24px_rgba(0,0,0,0.04)]">
+                        {/* Col 1: Tasks & Focus */}
+                        <div className="md:col-span-1 space-y-4">
+                            {/* Today's Tasks - Now named Todo and styled in light mode */}
+                            <div
+                                onClick={() => onNavigate?.('schedule')}
+                                className="bg-indigo-50/50 backdrop-blur-md border border-indigo-100/60 rounded-3xl p-4 md:p-5 shadow-[4px_4px_20px_rgba(99,102,241,0.08)] hover:shadow-[4px_4px_25px_rgba(99,102,241,0.12)] text-gray-800 relative overflow-hidden min-h-[220px] flex flex-col justify-between cursor-pointer hover:bg-indigo-50/60 transition-all group"
                             >
-                                {priorityTodos.length > 0 ? priorityTodos.map((todo, idx) => (
-                                    <div key={todo.id} className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 flex items-start gap-3 hover:bg-white/20 transition-colors cursor-pointer group/item">
-                                        <div className={`mt-1 w-5 h-5 rounded-full border-2 border-white/30 flex items-center justify-center transition-colors ${idx === 0 ? 'group-hover/item:border-yellow-400' : ''}`}>
-                                            {/* Check icon placeholder */}
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none group-hover:bg-indigo-500/10 transition-colors"></div>
+
+                                <div className="relative z-10 flex-1 flex flex-col justify-between">
+                                    <div className="flex justify-between items-start mb-2 gap-2">
+                                        <div className="flex-1">
+                                            <h3 className="flex items-center gap-1.5 font-bold text-base text-gray-805">
+                                                <Zap className="text-indigo-500 fill-indigo-100 animate-pulse shrink-0" size={18} />
+                                                Todo
+                                            </h3>
+
+                                            {/* Status Tabs for Backlog, Todo, Doing */}
+                                            <div className="flex bg-slate-100/90 p-0.5 rounded-lg text-[10px] font-bold mt-2" onClick={(e) => e.stopPropagation()}>
+                                                {(['backlog', 'todo', 'doing'] as const).map(tab => (
+                                                    <button
+                                                        key={tab}
+                                                        onClick={() => setActiveTodoStatusTab(tab)}
+                                                        className={`flex-1 py-1 px-1.5 rounded-md transition-all capitalize text-[9px] font-bold ${activeTodoStatusTab === tab
+                                                            ? 'bg-white text-indigo-700 shadow-xs'
+                                                            : 'text-gray-500 hover:text-gray-805'
+                                                            }`}
+                                                    >
+                                                        {tab}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div className="text-sm font-medium leading-snug">{todo.content}</div>
-                                            <span className={`text-[10px] uppercase font-bold tracking-wider opacity-60 mt-1 inline-block px-1.5 py-0.5 rounded
-                                                ${todo.priority === 'urgent' ? 'bg-red-500/20 text-red-200' :
-                                                    todo.priority === 'focus' ? 'bg-indigo-400/20 text-indigo-200' : 'bg-gray-500/20'}
-                                            `}>
-                                                {todo.priority}
-                                            </span>
+                                        <ArrowUpRight size={16} className="text-gray-400 group-hover:text-indigo-600 transition-colors mt-1 shrink-0" />
+                                    </div>
+
+                                    <div
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="space-y-2 flex-1 max-h-[140px] overflow-y-auto pr-1 mt-2 scrollbar-thin scrollbar-thumb-gray-200"
+                                    >
+                                        {filteredTodos.length > 0 ? filteredTodos.map((todo) => (
+                                            <div key={todo.id} className="bg-white/80 backdrop-blur-md rounded-xl p-2.5 border border-gray-100 flex items-start gap-2 hover:bg-white transition-colors cursor-pointer group/item">
+                                                <div className="mt-1 w-3.5 h-3.5 rounded-full border border-gray-300 flex items-center justify-center transition-colors hover:border-indigo-500 shrink-0">
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-xs font-semibold leading-snug text-gray-800 break-words">{todo.content}</div>
+                                                    <div className="flex flex-col gap-1 mt-1.5">
+                                                        {todo.priority && todo.priority !== 'medium' && (
+                                                            <div>
+                                                                <span className={`text-[8px] uppercase font-black tracking-wider px-1 py-0.5 rounded-md leading-none inline-block
+                                                                    ${todo.priority === 'urgent' ? 'bg-red-50 text-red-600 border border-red-100' :
+                                                                        todo.priority === 'focus' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
+                                                                            todo.priority === 'high' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                                                                'bg-slate-50 text-slate-600 border border-slate-200/50'}
+                                                                `}>
+                                                                    {todo.priority}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {todo.description && (
+                                                            <span className="text-[10px] text-gray-400 font-medium leading-relaxed italic block mt-0.5 break-words">
+                                                                {todo.description}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )) : (
+                                            <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-1.5 py-6">
+                                                <div className="p-1.5 bg-gray-50 rounded-full"><Zap size={16} className="text-gray-405" /></div>
+                                                <p className="text-[11px] font-medium">Trống lịch phần này! ☕</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Finance Card - Swapped here from BLOCK 3 */}
+                            <div
+                                onClick={() => onNavigate?.('finance')}
+                                className="bg-white/70 backdrop-blur-md rounded-3xl p-4 md:p-5 border border-slate-100 shadow-[4px_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[4px_4px_25px_rgba(0,0,0,0.1)] relative overflow-hidden group cursor-pointer hover:bg-slate-50/20 transition-all flex flex-col justify-between min-h-[160px]"
+                            >
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110 pointer-events-none"></div>
+
+                                <div className="relative z-10 flex-1 flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2 text-gray-500" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-650">
+                                                    <Wallet size={14} />
+                                                </div>
+                                                <span className="font-bold text-xs uppercase tracking-wide text-gray-700">Tài chính</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setShowFinanceBalance(!showFinanceBalance)}
+                                                className="p-1 hover:bg-gray-150 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+                                                title={showFinanceBalance ? "Ẩn số dư" : "Hiển thị số dư"}
+                                            >
+                                                {showFinanceBalance ? <EyeOff size={14} /> : <Eye size={14} />}
+                                            </button>
+                                        </div>
+
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Số dư hiện tại</div>
+                                        <div className="text-xl md:text-2xl font-black text-gray-800 tracking-tight truncate">
+                                            {showFinanceBalance ? formatCurrency(financeStats.balance) : '••••••'}
                                         </div>
                                     </div>
-                                )) : (
-                                    <div className="flex flex-col items-center justify-center h-full text-white/50 gap-2">
-                                        <div className="p-3 bg-white/10 rounded-full"><Zap size={24} /></div>
-                                        <p className="text-sm">Hết việc rồi! Chill thôi! ☕</p>
+
+                                    <div className="flex gap-4 pt-2.5 border-t border-gray-100 mt-2.5">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-[9px] text-gray-400 font-bold uppercase mb-0.5 truncate">Thu tháng này</div>
+                                            <div className="flex items-center text-emerald-600 font-bold text-xs">
+                                                <ArrowUpRight size={12} className="mr-0.5 shrink-0" />
+                                                <span className="truncate">
+                                                    {showFinanceBalance ? formatCurrency(monthlyFinanceStats.income) : '••••••'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="w-px bg-gray-100"></div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-[9px] text-gray-400 font-bold uppercase mb-0.5 truncate">Chi tháng này</div>
+                                            <div className="flex items-center text-red-500 font-bold text-xs">
+                                                <ArrowDownRight size={12} className="mr-0.5 shrink-0" />
+                                                <span className="truncate">
+                                                    {showFinanceBalance ? formatCurrency(monthlyFinanceStats.expense) : '••••••'}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Col 2 & 3: Lịch trình nay - mai */}
+                        <div className="md:col-span-2">
+                            <div className="bg-slate-50/50 backdrop-blur-md rounded-3xl p-4 md:p-5 border border-slate-100 shadow-[4px_4px_20px_rgba(0,0,0,0.04)] h-full flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h2 className="text-base md:text-lg font-bold text-gray-800 flex items-center gap-2">
+                                            <CalendarIcon className="text-indigo-600" size={18} />
+                                            Lịch trình nay - mai
+                                        </h2>
+                                        <button onClick={() => onNavigate?.('schedule')} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-2.5 py-1 rounded-full transition-colors flex items-center gap-0.5">
+                                            Chi tiết <ArrowUpRight size={12} />
+                                        </button>
+                                    </div>
+
+                                    {/* DESKTOP LAYOUT (md and up): 2 Columns */}
+                                    <div className="hidden md:grid md:grid-cols-2 gap-4">
+                                        {/* TODAY CARD */}
+                                        <div className="bg-white/75 backdrop-blur-md rounded-2xl p-4 border border-indigo-100/40 shadow-[4px_4px_16px_rgba(99,102,241,0.06)] hover:shadow-[4px_4px_22px_rgba(99,102,241,0.1)] hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50/30 rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
+                                            <h3 className="text-indigo-900 font-bold text-sm mb-3 flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                                                Hôm nay ({scheduleData.todayLabel})
+                                            </h3>
+
+                                            <div className="space-y-2.5 max-h-[180px] overflow-y-auto pr-1">
+                                                {scheduleData.today.length > 0 ? scheduleData.today.map((ev, idx) => (
+                                                    <div key={idx} className="flex gap-2.5 p-2 rounded-xl bg-white border border-indigo-100/20 hover:border-indigo-100 transition-colors">
+                                                        <div className="flex flex-col items-center justify-center min-w-[50px] border-r border-indigo-100/30 pr-2">
+                                                            <span className="text-xs font-black text-indigo-600 leading-none">{ev.start_time}</span>
+                                                            <span className="text-[8px] text-gray-400 font-medium uppercase mt-0.5">{ev.end_time || '...'}</span>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-bold text-gray-700 text-xs truncate">{ev.title}</div>
+                                                            {ev.location && (
+                                                                <div className="flex items-center gap-1 text-[9px] text-gray-400 mt-0.5 truncate">
+                                                                    <div className="w-1 h-1 rounded-full bg-indigo-300"></div>
+                                                                    {ev.location}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )) : (
+                                                    <div className="text-center py-6 text-indigo-300 italic text-xs">
+                                                        Enjoy! 🎉
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* TOMORROW CARD */}
+                                        <div className="bg-white/75 backdrop-blur-md rounded-2xl p-4 border border-gray-100/80 shadow-[4px_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[4px_4px_22px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                                            <h3 className="text-gray-655 font-bold text-sm mb-3 flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                                                Ngày mai ({scheduleData.tomorrowLabel})
+                                            </h3>
+
+                                            <div className="space-y-2.5 max-h-[180px] overflow-y-auto pr-1">
+                                                {scheduleData.tomorrow.length > 0 ? scheduleData.tomorrow.map((ev, idx) => (
+                                                    <div key={idx} className="flex gap-2.5 p-2 rounded-xl bg-white border border-gray-100/80 hover:border-gray-200 transition-colors">
+                                                        <div className="flex flex-col items-center justify-center min-w-[50px] border-r border-gray-200 pr-2">
+                                                            <span className="text-xs font-black text-gray-500 leading-none">{ev.start_time}</span>
+                                                            <span className="text-[8px] text-gray-400 font-medium uppercase mt-0.5">{ev.end_time || '...'}</span>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-bold text-gray-700 text-xs truncate">{ev.title}</div>
+                                                            {ev.location && (
+                                                                <div className="flex items-center gap-1 text-[9px] text-gray-400 mt-0.5 truncate">
+                                                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                                                    {ev.location}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )) : (
+                                                    <div className="text-center py-6 text-gray-300 italic text-xs">
+                                                        Trống lịch.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* MOBILE LAYOUT (md:hidden): Swipeable / Autoplay Carousel Slider */}
+                                    <div className="md:hidden relative w-full">
+                                        <div
+                                            ref={scheduleScrollRef}
+                                            onTouchStart={() => { lastActiveSlideInteraction.current = Date.now(); }}
+                                            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-3 pb-2 scroll-smooth"
+                                        >
+                                            {/* Slide 1: TODAY */}
+                                            <div className="w-[90%] shrink-0 snap-center px-1">
+                                                <div className="bg-white/75 backdrop-blur-md rounded-2xl p-4 border border-indigo-100/40 shadow-[4px_4px_16px_rgba(99,102,241,0.06)] relative overflow-hidden min-h-[140px]">
+                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50/30 rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
+                                                    <h3 className="text-indigo-900 font-bold text-xs mb-3 flex items-center gap-1.5">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                                                        Hôm nay ({scheduleData.todayLabel})
+                                                    </h3>
+
+                                                    <div className="space-y-2">
+                                                        {scheduleData.today.length > 0 ? scheduleData.today.map((ev, idx) => (
+                                                            <div key={idx} className="flex gap-3 p-2.5 rounded-xl bg-white border border-indigo-100/20">
+                                                                <div className="flex flex-col items-center justify-center min-w-[50px] border-r border-indigo-100 pr-2">
+                                                                    <span className="text-xs font-black text-indigo-600 leading-none">{ev.start_time}</span>
+                                                                    <span className="text-[8px] text-gray-400 font-medium uppercase mt-0.5">{ev.end_time || '...'}</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="font-bold text-gray-700 text-xs truncate">{ev.title}</div>
+                                                                    {ev.location && (
+                                                                        <div className="flex items-center gap-1 text-[9px] text-gray-555 mt-0.5">
+                                                                            <div className="w-1 h-1 rounded-full bg-indigo-300"></div>
+                                                                            {ev.location}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )) : (
+                                                            <div className="text-center py-6 text-indigo-300 italic text-xs">
+                                                                Không có lịch. 🎉
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Slide 2: TOMORROW */}
+                                            <div className="w-[90%] shrink-0 snap-center px-1">
+                                                <div className="bg-white/75 backdrop-blur-md rounded-2xl p-4 border border-gray-100/85 shadow-[4px_4px_16px_rgba(0,0,0,0.05)] relative overflow-hidden min-h-[140px]">
+                                                    <h3 className="text-gray-655 font-bold text-xs mb-3 flex items-center gap-1.5">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                                                        Ngày mai ({scheduleData.tomorrowLabel})
+                                                    </h3>
+
+                                                    <div className="space-y-2">
+                                                        {scheduleData.tomorrow.length > 0 ? scheduleData.tomorrow.map((ev, idx) => (
+                                                            <div key={idx} className="flex gap-3 p-2.5 rounded-xl bg-white border border-transparent shadow-xs">
+                                                                <div className="flex flex-col items-center justify-center min-w-[50px] border-r border-gray-200/50 pr-2">
+                                                                    <span className="text-xs font-black text-gray-500 leading-none">{ev.start_time}</span>
+                                                                    <span className="text-[8px] text-gray-400 font-medium uppercase mt-0.5">{ev.end_time || '...'}</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="font-bold text-gray-700 text-xs truncate">{ev.title}</div>
+                                                                    {ev.location && (
+                                                                        <div className="flex items-center gap-1 text-[9px] text-gray-400 mt-0.5">
+                                                                            <div className="w-1 h-1 rounded-full bg-gray-350"></div>
+                                                                            {ev.location}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )) : (
+                                                            <div className="text-center py-6 text-gray-300 italic text-xs">
+                                                                Ngày mai rảnh rỗi.
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    {/* BLOCK 2: CAREER & ACADEMIC GROWTH */}
+                    <div className="space-y-6">
+                        {/* GPA Snapshot & Career Goals */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">                        {/* GPA Snapshot Card */}
+                            <div className="bg-white/70 backdrop-blur-md rounded-3xl p-5 md:p-6 shadow-[4px_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[4px_4px_25px_rgba(0,0,0,0.1)] border border-gray-100 transition-all overflow-hidden group relative flex flex-col justify-between min-h-[220px]">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 pointer-events-none"></div>
+
+                                <div className="relative z-10">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-bold text-gray-800 flex items-center gap-2.5 text-sm md:text-base">
+                                            <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shrink-0 shadow-sm border border-blue-100/30">
+                                                <GraduationCap size={16} />
+                                            </div>
+                                            <span>Điểm Tích Lũy</span>
+                                        </h3>
+                                        <button onClick={() => onNavigate?.('gpa')} className="text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors">
+                                            Chi tiết
+                                        </button>
+                                    </div>
+
+                                    <div className="flex items-center gap-5 my-2">
+                                        <div className="flex-1">
+                                            <div className="text-3xl md:text-4xl font-black text-gray-800 mb-1">
+                                                {cumulativeGPA != null ? cumulativeGPA.toFixed(2) : '0.00'}
+                                            </div>
+                                            <div className="text-xs text-gray-400 font-medium">Trung bình Tích lũy (Hệ số 4)</div>
+                                        </div>
+                                        <div
+                                            onClick={() => onNavigate?.('gpa')}
+                                            className="shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-650 text-white shadow-lg shadow-blue-500/30 group-hover:-translate-y-0.5 cursor-pointer transition-all hover:scale-105"
+                                        >
+                                            <ArrowUpRight size={20} />
+                                        </div>
+                                    </div>
+
+                                    {/* Quá trình học kỳ trước */}
+                                    <div className="mt-4 pt-3 border-t border-gray-50">
+                                        <div className="text-[10px] text-gray-450 font-bold uppercase tracking-wider mb-2">Quá trình kỳ trước</div>
+                                        {previousSemesters.length > 0 ? (
+                                            <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-gray-150">
+                                                {previousSemesters.map((sem) => {
+                                                    const semGPA = calculateSemesterGPA(sem.courses);
+                                                    const standing = getAcademicStanding(semGPA);
+                                                    return (
+                                                        <div
+                                                            key={sem.id}
+                                                            className="bg-slate-50/60 hover:bg-blue-50/30 border border-slate-100 hover:border-blue-200/50 rounded-2xl p-2.5 min-w-[105px] shrink-0 transition-all duration-200 cursor-pointer"
+                                                            onClick={() => onNavigate?.('gpa')}
+                                                        >
+                                                            <div className="text-[9px] text-gray-455 font-bold uppercase tracking-tight truncate">{sem.name}</div>
+                                                            <div className="flex items-baseline gap-1 mt-1">
+                                                                <span className="text-sm font-black text-blue-600">{semGPA != null ? semGPA.toFixed(2) : '—'}</span>
+                                                                {standing && (
+                                                                    <span className="text-[8px] font-semibold text-gray-455">/4.0</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center justify-between mt-1 text-[8px] text-gray-400">
+                                                                <span className="font-medium">{sem.academic_year}</span>
+                                                                {standing && (
+                                                                    <span className={`px-1 rounded-sm font-bold scale-90 origin-right
+                                                                        ${standing === 'Xuất sắc' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' :
+                                                                            standing === 'Giỏi' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                                                                standing === 'Khá' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' :
+                                                                                    'bg-slate-100 text-slate-600'}`}
+                                                                    >
+                                                                        {standing}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="text-[10px] text-gray-400 italic">Chưa có thông tin học kỳ trước.</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-50 z-10">
+                                    <button
+                                        onClick={() => onNavigate?.('gpa')}
+                                        className="w-full py-2.5 bg-blue-50/50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        Theo dõi quá trình học tập
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* CAREER & VISION WIDGET */}
+                            <div className="bg-white/70 backdrop-blur-md rounded-3xl p-5 md:p-6 shadow-[4px_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[4px_4px_25px_rgba(0,0,0,0.1)] border border-gray-100 transition-all relative overflow-hidden group flex flex-col justify-between min-h-[220px]">
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-bold text-gray-800 flex items-center gap-2.5 text-sm md:text-base">
+                                            <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-650 shrink-0 shadow-sm border border-indigo-100/30">
+                                                <Target size={16} />
+                                            </div>
+                                            <span>Định hướng & Tầm nhìn</span>
+                                        </h3>
+                                        <button onClick={() => onNavigate?.('goals')} className="text-xs font-bold text-gray-400 hover:text-indigo-650 transition-colors">
+                                            Chi tiết
+                                        </button>
+                                    </div>
+
+                                    {/* Career Goals Progress */}
+                                    <div className="space-y-2 mb-4">
+                                        {positions.length > 0 ? (
+                                            positions.slice(0, 1).map(pos => {
+                                                const posGoals = careerGoals.filter(g => g.position_id === pos.id);
+                                                const completed = posGoals.filter(g => g.status === 'completed' || g.progress === 100).length;
+                                                const total = posGoals.length;
+                                                const progress = total > 0 ? Math.round((posGoals.reduce((acc, curr) => acc + curr.progress, 0)) / total) : 0;
+
+                                                return (
+                                                    <div key={pos.id} className="bg-slate-50/70 border border-slate-100 hover:border-indigo-100 rounded-2xl p-3 transition-colors">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="font-extrabold text-gray-700 text-xs truncate max-w-[120px]">{pos.title}</span>
+                                                            <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100/30 px-2 py-0.5 rounded-full shrink-0">{completed}/{total} kỹ năng</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center text-[10px] text-gray-500 mb-1.5">
+                                                            <span>Tiến độ tổng:</span>
+                                                            <span className="font-bold text-indigo-650">{progress}%</span>
+                                                        </div>
+                                                        <div className="w-full bg-gray-150 h-1.5 rounded-full overflow-hidden">
+                                                            <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full rounded-full" style={{ width: `${progress}%` }}></div>
+                                                        </div>
+
+                                                        {/* Show up to 3 individual skills/goals */}
+                                                        {posGoals.length > 0 && (
+                                                            <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-2.5">
+                                                                <div className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Kỹ năng đang phát triển:</div>
+                                                                <div className="flex flex-wrap gap-1.5">
+                                                                    {posGoals.slice(0, 3).map(g => (
+                                                                        <span
+                                                                            key={g.id}
+                                                                            className={`px-2 py-0.5 rounded-md text-[9px] font-semibold flex items-center gap-1 border transition-colors
+                                                                                ${g.status === 'completed'
+                                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100/50'
+                                                                                    : g.progress > 0
+                                                                                        ? 'bg-amber-50 text-amber-700 border-amber-100/50'
+                                                                                        : 'bg-slate-55 text-gray-650 border-slate-100'
+                                                                                }`}
+                                                                        >
+                                                                            <span className={`w-1 h-1 rounded-full ${g.status === 'completed' ? 'bg-emerald-500' : g.progress > 0 ? 'bg-amber-500' : 'bg-gray-400'}`}></span>
+                                                                            {g.title} {g.progress > 0 && g.status !== 'completed' ? `(${g.progress}%)` : ''}
+                                                                        </span>
+                                                                    ))}
+                                                                    {posGoals.length > 3 && (
+                                                                        <span className="px-1.5 py-0.5 text-gray-400 text-[8px] font-bold">+{posGoals.length - 3}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <p className="text-gray-400 text-xs italic">Chưa thiết lập vị trí mục tiêu.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* 5-Year Life Goals Snapshot */}
+                                <div className="border-t border-gray-50 pt-3">
+                                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">Mục tiêu dài hạn 5 năm</div>
+                                    {lifeGoals.length > 0 ? (
+                                        <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-gray-150">
+                                            {lifeGoals.slice(0, 3).map(goal => (
+                                                <div key={goal.id} className="flex items-center gap-1.5 text-[10px] py-1.5 px-2.5 bg-indigo-50/50 border border-indigo-100/20 hover:bg-indigo-50 rounded-2xl transition-all duration-200 shrink-0 cursor-pointer" onClick={() => onNavigate?.('goals')}>
+                                                    <span className="text-xs">{goal.icon}</span>
+                                                    <span className={`font-bold text-gray-750 truncate max-w-[70px] ${goal.is_achieved ? 'line-through text-gray-400' : ''}`}>{goal.title}</span>
+                                                    <span className="text-[8px] bg-white text-indigo-600 border border-indigo-100/30 px-1 rounded-sm shrink-0 font-extrabold">{goal.target_year}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-455 text-[10px] italic">Chưa thiết lập mục tiêu 5 năm.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Finance Goals (Shrunk and scrollable horizontally) */}
+                        <div className="bg-white/70 backdrop-blur-md rounded-3xl p-5 shadow-[4px_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[4px_4px_25px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 border border-gray-100 transition-all duration-300 flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center justify-between mb-3.5">
+                                    <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                                        <Target size={18} className="text-pink-550 animate-pulse" /> Mục tiêu Tài chính
+                                    </h3>
+                                    <button onClick={() => onNavigate?.('finance')} className="text-xs font-bold text-indigo-650 hover:text-indigo-850 transition-colors">Xem tất cả</button>
+                                </div>
+                                {financeGoals.length > 0 ? (
+                                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-200">
+                                        {financeGoals.map(goal => {
+                                            const percent = goal.target_amount ? Math.min(100, Math.round(((goal.current_amount || 0) / goal.target_amount) * 100)) : 0;
+                                            return (
+                                                <div key={goal.id} className="min-w-[190px] bg-slate-50/50 hover:bg-pink-50/20 border border-slate-100 hover:border-pink-100/30 p-3.5 rounded-2xl transition-all duration-300 shrink-0 group flex flex-col justify-between" onClick={() => onNavigate?.('finance')}>
+                                                    <div className="flex justify-between items-start gap-2 mb-1.5 cursor-pointer">
+                                                        <span className="font-bold text-xs text-gray-700 truncate max-w-[110px] group-hover:text-pink-700 transition-colors">{goal.title}</span>
+                                                        <span className="text-[9px] text-pink-650 font-bold bg-pink-50 border border-pink-100/30 px-1.5 py-0.5 rounded-md shrink-0">{percent}%</span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full bg-gray-150/70 rounded-full overflow-hidden mb-1.5">
+                                                        <div
+                                                            className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full"
+                                                            style={{ width: `${percent}%` }}
+                                                        />
+                                                    </div>
+                                                    <div className="text-[9px] text-gray-455 font-semibold">{formatCurrency(goal.current_amount || 0)} / {formatCurrency(goal.target_amount || 0)}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="text-center text-gray-400 text-xs py-2">Chưa có mục tiêu tài chính.</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Shortcuts for Learning, CV & Advisor (Compact Row) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+                            {/* Học bài ngay! */}
+                            <div
+                                onClick={() => onNavigate?.('music')}
+                                className="bg-gradient-to-br from-violet-50/60 via-purple-50/40 to-indigo-50/60 backdrop-blur-md rounded-2xl p-4 shadow-[4px_4px_16px_rgba(139,92,246,0.06)] hover:shadow-[4px_4px_22px_rgba(139,92,246,0.12)] hover:-translate-y-0.5 cursor-pointer transition-all border border-violet-100/50 hover:border-violet-200 group relative overflow-hidden flex items-center justify-between min-h-[72px]"
+                            >
+                                <div className="absolute -top-6 -right-6 w-16 h-16 bg-gradient-to-br from-violet-200/20 to-transparent rounded-full blur-sm group-hover:scale-125 transition-transform"></div>
+                                <div className="flex items-center gap-3 relative z-10 min-w-0">
+                                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center shrink-0 shadow-sm">
+                                        <BookOpen size={16} className="text-white" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="font-extrabold text-gray-800 text-xs sm:text-sm truncate">Học bài ngay!</h3>
+                                        <p className="text-violet-650 text-[9px] font-semibold mt-0.5 truncate">Phòng tự học tập trung</p>
+                                    </div>
+                                </div>
+                                <ArrowUpRight size={16} className="text-gray-400 group-hover:text-violet-650 shrink-0 ml-2" />
+                            </div>
+
+                            {/* Cố vấn AI */}
+                            <div
+                                onClick={() => onNavigate?.('gpa-career')}
+                                className="bg-gradient-to-br from-indigo-50/60 via-cyan-50/40 to-purple-50/60 backdrop-blur-md rounded-2xl p-4 shadow-[4px_4px_16px_rgba(99,102,241,0.08)] hover:shadow-[4px_4px_22px_rgba(99,102,241,0.12)] hover:-translate-y-0.5 cursor-pointer transition-all border border-indigo-100/50 hover:border-indigo-200 group relative overflow-hidden flex items-center justify-between min-h-[72px]"
+                            >
+                                <div className="absolute -top-6 -right-6 w-16 h-16 bg-gradient-to-br from-indigo-200/20 to-transparent rounded-full blur-sm group-hover:scale-125 transition-transform"></div>
+                                <div className="flex items-center gap-3 relative z-10 min-w-0">
+                                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shrink-0 shadow-sm">
+                                        <Bot size={16} className="text-white animate-pulse" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="font-extrabold text-gray-800 text-xs sm:text-sm truncate">Cố vấn sự nghiệp AI</h3>
+                                        <p className="text-indigo-650 text-[9px] font-semibold mt-0.5 truncate">Định hình tương lai</p>
+                                    </div>
+                                </div>
+                                <ArrowUpRight size={16} className="text-gray-400 group-hover:text-indigo-650 shrink-0 ml-2" />
+                            </div>
+
+                            {/* Xây dựng CV */}
+                            <div
+                                onClick={() => onNavigate?.('goals-cv')}
+                                className="bg-gradient-to-br from-teal-50/60 via-emerald-55/40 to-cyan-50/60 backdrop-blur-md rounded-2xl p-4 shadow-[4px_4px_16px_rgba(20,184,166,0.08)] hover:shadow-[4px_4px_22px_rgba(20,184,166,0.12)] hover:-translate-y-0.5 cursor-pointer transition-all border border-teal-100/50 hover:border-teal-200 group relative overflow-hidden flex items-center justify-between min-h-[72px]"
+                            >
+                                <div className="absolute -top-6 -right-6 w-16 h-16 bg-gradient-to-br from-teal-200/20 to-transparent rounded-full blur-sm group-hover:scale-125 transition-transform"></div>
+                                <div className="flex items-center gap-3 relative z-10 min-w-0">
+                                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shrink-0 shadow-sm">
+                                        <FileText size={16} className="text-white" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="font-extrabold text-gray-800 text-xs sm:text-sm truncate">Xây dựng CV tự động</h3>
+                                        <p className="text-teal-650 text-[9px] font-semibold mt-0.5 truncate">Ứng tuyển chuyên nghiệp</p>
+                                    </div>
+                                </div>
+                                <ArrowUpRight size={16} className="text-gray-400 group-hover:text-teal-650 shrink-0 ml-2" />
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                {/* ─── SIDEBAR COLUMN (lg:col-span-1) ─── */}
+                <div className="lg:col-span-1 space-y-6">
 
                     {/* Quick Mood & Journal Streak Widget */}
-                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 space-y-4">
+                    <div className="bg-white/70 backdrop-blur-md rounded-3xl p-5 md:p-6 shadow-[4px_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[4px_4px_25px_rgba(0,0,0,0.1)] border border-gray-100 space-y-4">
                         <div className="flex items-center justify-between">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm md:text-base">
                                 <Heart className="text-emerald-500 fill-emerald-100" size={18} />
@@ -842,7 +1289,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                         {todayJournal?.mood ? (
                             <div className="space-y-3">
                                 <div className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3 border border-gray-100">
-                                    <span className="text-3xl">
+                                    <span className="text-3xl shrink-0">
                                         {todayJournal.mood === 1 ? '😢' :
                                             todayJournal.mood === 2 ? '😟' :
                                                 todayJournal.mood === 3 ? '😐' :
@@ -859,7 +1306,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => onNavigate?.('journal' as any)}
+                                    onClick={() => onNavigate?.('journal')}
                                     className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl transition-all border border-emerald-100 flex items-center justify-center gap-1.5"
                                 >
                                     <Edit2 size={12} /> Viết nhật ký chi tiết
@@ -867,7 +1314,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                <p className="text-xs text-gray-400 font-semibold">Hôm nay bạn cảm thấy thế nào? Ghi nhận nhanh:</p>
+                                <p className="text-xs text-gray-450 font-semibold">Hôm nay bạn cảm thấy thế nào? Ghi nhận nhanh:</p>
                                 <div className="grid grid-cols-5 gap-2">
                                     {([1, 2, 3, 4, 5] as MoodLevel[]).map(val => (
                                         <button
@@ -882,7 +1329,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                     ))}
                                 </div>
                                 <button
-                                    onClick={() => onNavigate?.('journal' as any)}
+                                    onClick={() => onNavigate?.('journal')}
                                     className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl transition-all border border-emerald-100 flex items-center justify-center gap-1.5"
                                 >
                                     <BookOpen size={12} /> Bắt đầu viết nhật ký
@@ -891,485 +1338,182 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                         )}
                     </div>
 
-                    {/* Holidays Countdown */}
-                    <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-4 md:p-6 shadow-sm border border-pink-100 h-auto transition-all duration-500">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                <Gift size={18} className="text-rose-500" /> Lễ hội
+                    {/* HABIT STREAK WIDGET IN SIDEBAR */}
+                    {!loadingEvents && habits.length > 0 && (
+                        <div ref={shareRef} className="bg-white/70 backdrop-blur-md rounded-3xl p-5 md:p-6 shadow-[4px_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[4px_4px_25px_rgba(0,0,0,0.1)] border border-gray-100 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm md:text-base">
+                                    <Flame className="text-orange-500 fill-orange-100 animate-pulse shrink-0" size={18} />
+                                    <span>Thói quen & Streak</span>
+                                </h3>
+                                <button
+                                    onClick={handleShare}
+                                    className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
+                                    title="Tải ảnh khoe Streak"
+                                >
+                                    <Download size={16} />
+                                </button>
+                            </div>
+
+                            <div className="space-y-2 max-h-[170px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200">
+                                {habits.map(habit => {
+                                    const stats = getHabitStats(habit);
+                                    return (
+                                        <div
+                                            key={habit.id}
+                                            onClick={() => onNavigate?.('habit')}
+                                            className="flex items-center justify-between bg-gray-50 hover:bg-indigo-50/40 p-2.5 rounded-2xl border border-gray-100/50 hover:border-indigo-100/30 transition-all cursor-pointer group"
+                                        >
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <span className="text-xl shrink-0">{habit.icon}</span>
+                                                <span className="font-bold text-gray-705 text-xs truncate max-w-[120px] group-hover:text-indigo-900 transition-colors">{habit.title}</span>
+                                            </div>
+                                            <span className="flex items-center gap-1 text-orange-600 font-extrabold text-xs bg-orange-50 border border-orange-100/60 px-2 py-0.5 rounded-lg shrink-0">
+                                                <Flame size={12} fill="currentColor" /> {stats.currentStreak}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TIMELINE CONTAINER (Countdowns + Countups + Holidays) */}
+                    <div className="bg-white/70 backdrop-blur-md border border-gray-100 rounded-3xl p-5 shadow-[4px_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[4px_4px_25px_rgba(0,0,0,0.1)] space-y-6">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm md:text-base">
+                                <Clock className="text-indigo-600 animate-pulse" size={18} />
+                                <span>Cột mốc & Sự kiện</span>
                             </h3>
                             <button
                                 onClick={() => setShowAllHolidays(!showAllHolidays)}
-                                className="text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors"
+                                className="text-xs font-bold text-indigo-650 hover:text-indigo-850 transition-colors"
                             >
-                                {showAllHolidays ? 'Thu gọn' : 'Xem thêm'}
-                            </button>
-                        </div>
-                        <div className="space-y-3">
-                            {visibleHolidays.map((h: any, idx: number) => (
-                                <div key={idx} className="bg-white/80 p-3 rounded-2xl flex items-center justify-between shadow-sm border border-white/50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-white rounded-full shadow-sm">
-                                            {h.icon}
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-sm text-gray-700">{h.name}</div>
-                                            <div className="text-xs text-gray-500 font-medium">{h.day}/{h.month}</div>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="font-bold text-lg text-indigo-600 leading-none">{h.daysLeft}</div>
-                                        <div className="text-[10px] text-gray-400 font-bold uppercase">Ngày</div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* NEW: GPA Snapshot Card */}
-                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all overflow-hidden group relative">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 pointer-events-none"></div>
-
-                        <div className="relative">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                    <GraduationCap size={18} className="text-blue-500" /> Điểm Tích Lũy
-                                </h3>
-                                <button onClick={() => onNavigate?.('gpa')} className="text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors">
-                                    Chi tiết
-                                </button>
-                            </div>
-
-                            <div className="flex items-center gap-5">
-                                <div className="flex-1">
-                                    <div className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-800 mb-1">
-                                        {cumulativeGPA != null ? cumulativeGPA.toFixed(2) : '0.00'}
-                                    </div>
-                                    <div className="text-xs text-gray-400 font-medium">Trung bình Tích lũy (Hệ số 4)</div>
-                                </div>
-                                <div
-                                    onClick={() => onNavigate?.('gpa')}
-                                    className="shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30 group-hover:-translate-y-1 cursor-pointer transition-all hover:scale-105"
-                                >
-                                    <ArrowUpRight size={20} />
-                                </div>
-                            </div>
-
-                            <div className="mt-5 pt-5 border-t border-gray-50">
-                                <button
-                                    onClick={() => onNavigate?.('gpa')}
-                                    className="w-full py-2.5 bg-blue-50/50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                                >
-                                    Theo dõi quá trình học tập
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* COL 2: FOCUS ZONE & SCHEDULE GOALS */}
-                <div className="space-y-4 md:space-y-8 min-w-0">
-                    {/* NEW: Music Focus Card */}
-                    <div
-                        onClick={() => onNavigate?.('music')}
-                        className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-3xl p-4 md:p-6 shadow-xl text-white relative overflow-hidden group cursor-pointer transition-transform duration-300 hover:scale-[1.02]"
-                    >
-                        <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none group-hover:bg-white/20 transition-colors"></div>
-                        <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/30 rounded-full blur-2xl -ml-6 -mb-6 pointer-events-none"></div>
-
-                        <div className="relative z-10 flex items-center justify-between">
-                            <div>
-                                <h3 className="flex items-center gap-2 font-bold text-xl mb-2">
-                                    <span className="bg-white/20 p-2 rounded-lg"><Headphones size={20} className="text-white" /></span>
-                                    Học bài ngay!
-                                </h3>
-                                <p className="text-indigo-100 text-sm mb-4 max-w-[200px]">Bật chế độ tập trung với âm nhạc và timer.</p>
-                                <button className="bg-white text-indigo-600 px-5 py-2 rounded-full text-xs font-bold shadow-lg group-hover:bg-indigo-50 transition-all flex items-center gap-2">
-                                    <Play size={12} fill="currentColor" /> Bắt đầu Focus
-                                </button>
-                            </div>
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-30 group-hover:opacity-50 transition-opacity scale-125">
-                                <Music size={80} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Schedule Goals (New) */}
-                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 max-h-[500px] overflow-y-auto scrollbar-hide">
-                        <div className="flex items-center justify-between mb-6 sticky top-0 bg-white z-10 py-1">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                <Target size={18} className="text-indigo-500" /> Mục tiêu Lịch trình
-                            </h3>
-                            <button onClick={() => onNavigate?.('schedule')} className="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors">Xem thêm</button>
-                        </div>
-                        <div className="space-y-5">
-                            {scheduleGoals.map(goal => {
-                                const { percent } = calculateTimeProgress(goal.created_at, goal.deadline);
-                                const timeLeft = getTimeRemaining(goal.deadline);
-                                return (
-                                    <div key={goal.id} className="group border-b border-gray-50 last:border-0 pb-3 last:pb-0">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <div className="flex items-center gap-1.5">
-                                                {goal.is_priority && <Star size={14} className="text-amber-500 fill-amber-500" />}
-                                                <span className="font-bold text-gray-700 leading-tight">{goal.title}</span>
-                                            </div>
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${timeLeft.color}`}>
-                                                {timeLeft.text}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center gap-2 mb-2">
-                                            {(() => {
-                                                const currentStatus = goal.status || (goal.progress === 100 ? 'COMPLETED' : (goal.progress && goal.progress > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'));
-                                                const handleStatusClick = (e: React.MouseEvent) => {
-                                                    e.stopPropagation();
-                                                    if (!onUpdateGoal) return;
-                                                    let nextStatus: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED' = 'NOT_STARTED';
-                                                    let nextProgress = goal.progress || 0;
-                                                    if (currentStatus === 'NOT_STARTED') { nextStatus = 'IN_PROGRESS'; nextProgress = 50; }
-                                                    else if (currentStatus === 'IN_PROGRESS') { nextStatus = 'COMPLETED'; nextProgress = 100; }
-                                                    else if (currentStatus === 'COMPLETED') { nextStatus = 'NOT_STARTED'; nextProgress = 0; }
-                                                    onUpdateGoal({ ...goal, status: nextStatus, progress: nextProgress });
-                                                };
-
-                                                if (currentStatus === 'COMPLETED') return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium border border-emerald-200 whitespace-nowrap hover:bg-emerald-200 transition-colors cursor-pointer">Đã hoàn thành</button>;
-                                                if (currentStatus === 'IN_PROGRESS') return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium border border-blue-200 whitespace-nowrap hover:bg-blue-200 transition-colors cursor-pointer">Đang hoàn thành</button>;
-                                                return <button onClick={handleStatusClick} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium border border-gray-200 whitespace-nowrap hover:bg-gray-200 transition-colors cursor-pointer">Chưa hoàn thành</button>;
-                                            })()}
-                                            {goal.type && goal.type !== 'PERSONAL' && (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium whitespace-nowrap">
-                                                    {goal.type === 'SHORT_TERM' ? 'Ngắn hạn' : goal.type === 'MEDIUM_TERM' ? 'Trung hạn' : 'Dài hạn'}
-                                                </span>
-                                            )}
-                                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full transition-all duration-500"
-                                                    style={{ width: `${percent}%` }}
-                                                />
-                                            </div>
-                                            <span className="text-[10px] font-bold text-indigo-600">{Math.round(percent)}%</span>
-                                        </div>
-
-                                        <div className="flex justify-between items-center text-[10px] text-gray-400">
-                                            <span>Deadline: {new Date(goal.deadline).toLocaleDateString('vi-VN')}</span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {scheduleGoals.length === 0 && <div className="text-center text-gray-400 text-sm py-4">Chưa có mục tiêu lịch trình.</div>}
-                        </div>
-                    </div>
-
-                    {/* COUNTUPS */}
-                    {!loadingEvents && countups.length > 0 && (
-                        <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
-                                <TrendingUp className="text-emerald-500" /> Đã trôi qua
-                            </h3>
-                            <div className="space-y-3">
-                                {countups.slice(0, 3).map(c => {
-                                    const d = diffDays(c.start_date, true);
-                                    return (
-                                        <div key={c.id} className="flex items-center gap-4 bg-gray-50 rounded-2xl p-3">
-                                            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-2xl">{c.icon}</div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-bold text-gray-800 truncate">{c.title}</div>
-                                                <div className="text-xs text-gray-400">{new Date(c.start_date).toLocaleDateString('vi-VN')}</div>
-                                            </div>
-                                            <div className="text-xl font-black text-emerald-600">{d > 0 ? d : 0} <span className="text-xs font-normal text-gray-500">ngày</span></div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* COUNTDOWNS */}
-                    {!loadingEvents && countdowns.length > 0 && (
-                        <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
-                                <Timer className="text-indigo-500" /> Sắp diễn ra
-                            </h3>
-                            <div className="space-y-3">
-                                {countdowns.slice(0, 3).map(c => {
-                                    const d = diffDays(c.target_date);
-                                    return (
-                                        <div key={c.id} className="flex items-center gap-4 bg-gray-50 rounded-2xl p-3">
-                                            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-2xl">{c.icon}</div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-bold text-gray-800 truncate">{c.title}</div>
-                                                <div className="text-xs text-gray-400">{new Date(c.target_date).toLocaleDateString('vi-VN')}</div>
-                                            </div>
-                                            <div className="text-xl font-black text-indigo-600">{d > 0 ? d : 0} <span className="text-xs font-normal text-gray-500">ngày</span></div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* COL 3: FINANCE SNAPSHOT & GOALS (Was Col 1) */}
-                <div className="space-y-4 md:space-y-8 min-w-0">
-                    {/* Net Worth Card */}
-                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
-
-                        <div className="relative">
-                            <div className="flex items-center gap-3 mb-4 text-gray-500">
-                                <div className="p-2 bg-indigo-100/50 rounded-xl text-indigo-600">
-                                    <Wallet size={20} />
-                                </div>
-                                <span className="font-bold text-sm uppercase tracking-wide">Tài chính tổng quan</span>
-                            </div>
-                            <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-2 truncate">
-                                {formatCurrency(financeStats.balance)}
-                            </div>
-                            <div className="flex gap-4 mt-6">
-                                <div>
-                                    <div className="text-xs text-gray-400 font-bold uppercase mb-1">Tổng thu</div>
-                                    <div className="flex items-center text-emerald-500 font-bold text-sm">
-                                        <ArrowUpRight size={16} className="mr-1" />
-                                        {formatCurrency(financeStats.income)}
-                                    </div>
-                                </div>
-                                <div className="w-px bg-gray-100"></div>
-                                <div>
-                                    <div className="text-xs text-gray-400 font-bold uppercase mb-1">Tổng chi</div>
-                                    <div className="flex items-center text-red-500 font-bold text-sm">
-                                        <ArrowDownRight size={16} className="mr-1" />
-                                        {formatCurrency(financeStats.expense)}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Finance Goals */}
-                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                <Target size={18} className="text-pink-500" /> Mục tiêu Tài chính
-                            </h3>
-                            <button onClick={() => onNavigate?.('finance')} className="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors">Xem thêm</button>
-                        </div>
-                        <div className="space-y-4">
-                            {financeGoals.slice(0, 3).map(goal => {
-                                const percent = goal.target_amount ? Math.min(100, Math.round(((goal.current_amount || 0) / goal.target_amount) * 100)) : 0;
-                                return (
-                                    <div key={goal.id} className="group">
-                                        <div className="flex justify-between text-sm mb-1">
-                                            <span className="font-bold text-gray-700">{goal.title}</span>
-                                            <span className="text-gray-400 font-medium text-xs">{percent}%</span>
-                                        </div>
-                                        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-500 group-hover:shadow-[0_0_10px_rgba(236,72,153,0.4)]"
-                                                style={{ width: `${percent}%` }}
-                                            />
-                                        </div>
-                                        <div className="text-[10px] text-gray-400 mt-1 text-right">{formatCurrency(goal.current_amount || 0)} / {formatCurrency(goal.target_amount || 0)}</div>
-                                    </div>
-                                );
-                            })}
-                            {financeGoals.length === 0 && <div className="text-center text-gray-400 text-sm py-4">Chưa có mục tiêu tài chính.</div>}
-                        </div>
-                    </div>
-
-                    {/* NEW: CAREER & VISION WIDGET */}
-                    <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden group">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                <Target size={18} className="text-indigo-600" /> Định hướng & Tầm nhìn
-                            </h3>
-                            <button onClick={() => onNavigate?.('goals')} className="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors">
-                                Chi tiết
+                                {showAllHolidays ? 'Thu gọn' : 'Xem tất cả'}
                             </button>
                         </div>
 
-                        {/* Section 1: Career Goals Progress */}
-                        <div className="space-y-3 mb-5 pb-5 border-b border-gray-100">
-                            <div className="text-xs text-gray-400 font-bold uppercase tracking-wider">Lộ trình nghề nghiệp</div>
-                            {positions.length > 0 ? (
-                                positions.slice(0, 1).map(pos => {
-                                    const posGoals = careerGoals.filter(g => g.position_id === pos.id);
-                                    const completed = posGoals.filter(g => g.status === 'completed' || g.progress === 100).length;
-                                    const total = posGoals.length;
-                                    const progress = total > 0 ? Math.round((posGoals.reduce((acc, curr) => acc + curr.progress, 0)) / total) : 0;
-
-                                    return (
-                                        <div key={pos.id} className="bg-indigo-50/30 border border-indigo-100/40 rounded-2xl p-3">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="font-bold text-gray-800 text-sm">{pos.title}</span>
-                                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{completed}/{total} kỹ năng</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
-                                                <span>Tiến độ tổng:</span>
-                                                <span className="font-bold">{progress}%</span>
-                                            </div>
-                                            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                                                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-full rounded-full" style={{ width: `${progress}%` }}></div>
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <p className="text-gray-400 text-xs italic">Chưa thiết lập vị trí mục tiêu.</p>
-                            )}
-                        </div>
-
-                        {/* Section 2: 5-Year Life Goals Snapshot */}
-                        <div className="space-y-3">
-                            <div className="text-xs text-gray-400 font-bold uppercase tracking-wider">Mục tiêu dài hạn 5 năm</div>
-                            {lifeGoals.length > 0 ? (
+                        {/* Countdowns (Sắp diễn ra) */}
+                        {!loadingEvents && countdowns.length > 0 && (
+                            <div className="space-y-2.5">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                    <Timer size={12} className="text-indigo-500" /> Sắp diễn ra
+                                </div>
                                 <div className="space-y-2">
-                                    {lifeGoals.slice(0, 3).map(goal => (
-                                        <div key={goal.id} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded-xl">
-                                            <div className="flex items-center gap-2 truncate">
-                                                <span className="text-base">{goal.icon}</span>
-                                                <span className={`font-bold text-gray-700 truncate ${goal.is_achieved ? 'line-through text-gray-400' : ''}`}>{goal.title}</span>
+                                    {countdowns.slice(0, 3).map(c => {
+                                        const d = diffDays(c.target_date);
+                                        return (
+                                            <div key={c.id} className="flex items-center gap-3 bg-gray-50 rounded-2xl p-2.5 hover:bg-indigo-50/50 transition-colors">
+                                                <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center text-xl shrink-0">{c.icon}</div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-bold text-gray-700 text-xs truncate">{c.title}</div>
+                                                    <div className="text-[9px] text-gray-450 font-medium">{new Date(c.target_date).toLocaleDateString('vi-VN')}</div>
+                                                </div>
+                                                <div className="text-sm font-black text-indigo-600 shrink-0">{d > 0 ? d : 0} <span className="text-[9px] font-normal text-gray-400">ngày</span></div>
                                             </div>
-                                            <div className="flex items-center gap-1.5 shrink-0">
-                                                <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-full">{goal.target_year}</span>
-                                                {goal.is_achieved && <span className="text-emerald-500 font-bold">✓</span>}
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Countups (Đã trôi qua) */}
+                        {!loadingEvents && countups.length > 0 && (
+                            <div className="space-y-2.5">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                    <TrendingUp size={12} className="text-emerald-500" /> Đã trôi qua
+                                </div>
+                                <div className="space-y-2">
+                                    {countups.slice(0, 3).map(c => {
+                                        const d = diffDays(c.start_date, true);
+                                        return (
+                                            <div key={c.id} className="flex items-center gap-3 bg-gray-50 rounded-2xl p-2.5 hover:bg-emerald-50/50 transition-colors">
+                                                <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center text-xl shrink-0">{c.icon}</div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-bold text-gray-700 text-xs truncate">{c.title}</div>
+                                                    <div className="text-[9px] text-gray-455 font-medium">{new Date(c.start_date).toLocaleDateString('vi-VN')}</div>
+                                                </div>
+                                                <div className="text-sm font-black text-emerald-600 shrink-0">{d > 0 ? d : 0} <span className="text-[9px] font-normal text-gray-400">ngày</span></div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Holidays Countdown (Lễ hội) */}
+                        <div className="space-y-2.5">
+                            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                <Gift size={12} className="text-rose-500" /> Lễ hội
+                            </div>
+                            <div className="space-y-2">
+                                {visibleHolidays.map((h: any, idx: number) => (
+                                    <div key={idx} className="bg-rose-50/40 p-2.5 rounded-2xl flex items-center justify-between border border-rose-100/10 hover:bg-rose-50 transition-colors">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <div className="p-1 bg-white rounded-lg shadow-sm shrink-0">
+                                                {h.icon}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="font-bold text-xs text-gray-700 truncate">{h.name}</div>
+                                                <div className="text-[9px] text-gray-500 font-medium">{h.day}/{h.month}</div>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-gray-400 text-xs italic">Chưa thiết lập mục tiêu 5 năm.</p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* NEW: MY SPOTIFY WIDGET */}
-                    <div
-                        onClick={() => onOpenSpotify?.()}
-                        className="bg-[#121212] rounded-3xl p-6 shadow-md hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group border border-[#282828]"
-                    >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#1DB954]/20 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
-                        <div className="relative flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-full bg-[#1DB954] flex items-center justify-center shadow-lg shadow-[#1DB954]/20 group-hover:scale-110 transition-transform">
-                                    <Play size={20} className="text-black fill-black ml-1" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-white text-lg">My Spotify</h3>
-                                    <p className="text-[#1DB954] text-xs font-bold uppercase tracking-wider mt-0.5">Trình phát nhạc</p>
-                                </div>
-                            </div>
-                            <div className="text-gray-500 group-hover:text-white transition-colors">
-                                <ArrowUpRight size={20} />
+                                        <div className="text-right shrink-0 ml-2">
+                                            <span className="font-bold text-sm text-indigo-600">{h.daysLeft}</span>
+                                            <span className="text-[8px] text-gray-400 font-bold uppercase block -mt-1">Ngày</span>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
 
-                    {/* NEW: CAREER ORIENTATION AI WIDGET */}
-                    <div
-                        onClick={() => onNavigate?.('gpa-career')}
-                        className="bg-gradient-to-br from-indigo-50/45 via-cyan-50/35 to-purple-50/45 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer border border-indigo-100/50 hover:border-indigo-200 group relative overflow-hidden"
-                    >
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-200/20 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
-                        <div className="relative flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform">
-                                    <Bot size={22} className="text-white animate-pulse" />
+                    {/* MY SPOTIFY & STORAGE COMBINED ROW */}
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* MY SPOTIFY MINI WIDGET */}
+                        <div
+                            onClick={() => onOpenSpotify?.()}
+                            className="bg-[#121212]/80 backdrop-blur-md rounded-2xl p-3.5 shadow-[4px_4px_16px_rgba(0,0,0,0.2)] hover:shadow-[4px_4px_22px_rgba(29,185,84,0.15)] hover:-translate-y-0.5 transition-all cursor-pointer relative overflow-hidden group border border-[#282828] flex flex-col justify-between h-28"
+                        >
+                            <div className="absolute -top-6 -right-6 w-16 h-16 bg-[#1DB954]/15 rounded-full blur-md group-hover:scale-125 transition-transform duration-500"></div>
+                            <div className="flex justify-between items-start">
+                                <div className="w-8 h-8 rounded-full bg-[#1DB954] flex items-center justify-center shadow-lg shadow-[#1DB954]/20 group-hover:scale-110 transition-transform shrink-0">
+                                    <Play size={14} className="text-black fill-black ml-0.5" />
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-gray-800 text-lg">Cố vấn sự nghiệp AI</h3>
-                                    <p className="text-indigo-600 text-xs font-bold uppercase tracking-wider mt-0.5">Định hình tương lai</p>
-                                </div>
+                                <ArrowUpRight size={14} className="text-gray-555 group-hover:text-white transition-colors" />
                             </div>
-                            <div className="text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all">
-                                <ArrowUpRight size={20} />
+                            <div>
+                                <h3 className="font-bold text-white text-xs">My Spotify</h3>
+                                <p className="text-[#1DB954] text-[9px] font-bold uppercase tracking-wider mt-0.5">Phát nhạc</p>
                             </div>
                         </div>
-                    </div>
 
-                    {/* NEW: AUTO CV BUILDER WIDGET */}
-                    <div
-                        onClick={() => onNavigate?.('goals-cv')}
-                        className="bg-gradient-to-br from-teal-50/45 via-emerald-50/35 to-cyan-50/45 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer border border-teal-100/50 hover:border-teal-200 group relative overflow-hidden"
-                    >
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-teal-200/20 to-transparent rounded-bl-full -mr-4 -mt-4 opacity-50 group-hover:scale-110 transition-transform"></div>
-                        <div className="relative flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20 group-hover:scale-110 transition-transform">
-                                    <FileText size={22} className="text-white" />
+                        {/* MY STORAGE MINI WIDGET */}
+                        <div
+                            onClick={handleStorageClick}
+                            className="bg-gradient-to-br from-slate-900/80 to-gray-900/80 backdrop-blur-md rounded-2xl p-3.5 shadow-[4px_4px_16px_rgba(0,0,0,0.2)] hover:shadow-[4px_4px_22px_rgba(99,102,241,0.15)] hover:-translate-y-0.5 transition-all cursor-pointer relative overflow-hidden group border border-slate-800 flex flex-col justify-between h-28"
+                        >
+                            <div className="absolute -top-6 -right-6 w-16 h-16 bg-indigo-500/15 rounded-full blur-md group-hover:scale-125 transition-transform duration-500"></div>
+                            <div className="flex justify-between items-start">
+                                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform shrink-0">
+                                    <LockKeyhole size={14} className="text-white" />
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-gray-800 text-lg">Xây dựng CV tự động</h3>
-                                    <p className="text-teal-600 text-xs font-bold uppercase tracking-wider mt-0.5">Ứng tuyển chuyên nghiệp</p>
-                                </div>
+                                {!canUseStorage ? (
+                                    <Crown size={12} className="text-yellow-400 fill-yellow-400/20" />
+                                ) : (
+                                    <ArrowUpRight size={14} className="text-gray-555 group-hover:text-white transition-colors" />
+                                )}
                             </div>
-                            <div className="text-gray-400 group-hover:text-teal-600 group-hover:translate-x-0.5 transition-all">
-                                <ArrowUpRight size={20} />
+                            <div>
+                                <h3 className="font-bold text-white text-xs">My Storage</h3>
+                                <p className="text-gray-400 text-[9px] font-bold uppercase tracking-wider mt-0.5">Kho lưu trữ</p>
                             </div>
                         </div>
                     </div>
 
                 </div>
-
             </div>
 
-            {/* MY STORAGE PROMO SECTION */}
-            <div className="mt-8 mb-4">
-                <div
-                    onClick={handleStorageClick}
-                    className="relative bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 rounded-2xl md:rounded-3xl p-5 md:p-10 shadow-2xl cursor-pointer group overflow-hidden hover:shadow-[0_20px_60px_rgba(0,0,0,0.3)] transition-all duration-500"
-                >
-                    {/* Decorative elements */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-indigo-500/20 transition-colors duration-500" />
-                    <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl -ml-12 -mb-12 group-hover:bg-purple-500/20 transition-colors duration-500" />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-700" />
-
-                    {/* Grid pattern overlay */}
-                    <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} />
-
-                    {/* Pro badge */}
-                    {!canUseStorage && (
-                        <div className="absolute top-5 right-5 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 border border-yellow-500/30 rounded-full backdrop-blur-sm">
-                            <Crown size={14} className="text-yellow-400" />
-                            <span className="text-yellow-300 text-xs font-bold">PRO</span>
-                        </div>
-                    )}
-
-                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 md:gap-10">
-                        {/* Icon */}
-                        <div className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shrink-0">
-                            <LockKeyhole size={36} className="text-white" />
-                        </div>
-
-                        {/* Text */}
-                        <div className="text-center md:text-left flex-1">
-                            <h3 className="text-2xl md:text-3xl font-bold text-white mb-2 group-hover:text-indigo-200 transition-colors">
-                                My Storage
-                            </h3>
-                            <p className="text-gray-400 text-sm md:text-base max-w-lg leading-relaxed">
-                                Kho lưu trữ riêng tư — Ghi chú, liên kết, tệp tin, hình ảnh, âm thanh & video.
-                                Mọi thứ quan trọng, tất cả ở một nơi an toàn.
-                            </p>
-                            <div className="flex flex-wrap gap-2 mt-4 justify-center md:justify-start">
-                                <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-xs font-semibold">Ghi chú</span>
-                                <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs font-semibold">Liên kết</span>
-                                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs font-semibold">Tệp tin</span>
-                                <span className="px-3 py-1 bg-pink-500/20 text-pink-300 rounded-full text-xs font-semibold">Hình ảnh</span>
-                                <span className="px-3 py-1 bg-violet-500/20 text-violet-300 rounded-full text-xs font-semibold">Âm thanh</span>
-                                <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded-full text-xs font-semibold">Video</span>
-                            </div>
-                        </div>
-
-                        {/* CTA */}
-                        <div className="shrink-0">
-                            <div className={`px-6 py-3 rounded-2xl font-bold text-sm shadow-lg group-hover:scale-105 transition-all duration-300 flex items-center gap-2 ${canUseStorage
-                                ? 'bg-white text-gray-900 group-hover:bg-indigo-100'
-                                : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white group-hover:from-indigo-600 group-hover:to-purple-700'
-                                }`}>
-                                {canUseStorage ? <><LockKeyhole size={16} /> Mở kho</> : <><Crown size={16} className="text-yellow-300" /> Nâng cấp Pro</>}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
             {/* Safe space at the bottom for mobile to prevent navbar cover */}
             <div className="md:hidden" style={{ height: 'calc(100px + env(safe-area-inset-bottom))' }} />
         </div>
