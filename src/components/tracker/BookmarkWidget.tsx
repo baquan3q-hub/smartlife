@@ -31,9 +31,146 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [editingGroupName, setEditingGroupName] = useState('');
 
-  // Load groups from localStorage
-  useEffect(() => {
-    if (userId) {
+  // Edit bookmark states
+  const [editingBookmark, setEditingBookmark] = useState<StorageItem | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editUrl, setEditUrl] = useState('');
+  const [editGroup, setEditGroup] = useState('');
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const getGroupColor = (group?: string) => {
+    if (!group) return { bg: '#f1f5f9', text: '#475569', border: '#e2e8f0' };
+    let hash = 0;
+    for (let i = 0; i < group.length; i++) {
+      hash = group.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash % 360);
+    return {
+      bg: `hsl(${hue}, 80%, 96%)`,
+      text: `hsl(${hue}, 85%, 26%)`,
+      border: `hsl(${hue}, 70%, 88%)`,
+    };
+  };
+
+  const handleOpenEdit = (b: StorageItem) => {
+    setEditingBookmark(b);
+    setEditTitle(b.title || '');
+    setEditUrl(b.content || '');
+    setEditGroup(b.metadata?.group || '');
+    setIsEditOpen(true);
+  };
+
+  const handleUpdateBookmark = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBookmark || !editTitle.trim() || !editUrl.trim()) return;
+
+    setIsSaving(true);
+    let formattedUrl = editUrl.trim();
+    if (!/^https?:\/\//i.test(formattedUrl)) {
+      formattedUrl = `https://${formattedUrl}`;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('my_storage')
+        .update({
+          title: editTitle.trim(),
+          content: formattedUrl,
+          metadata: { ...editingBookmark.metadata, group: editGroup || null },
+        })
+        .eq('id', editingBookmark.id);
+
+      if (error) throw error;
+
+      setIsEditOpen(false);
+      setEditingBookmark(null);
+      fetchBookmarks();
+    } catch (err: any) {
+      alert('Lỗi cập nhật liên kết: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Save categories list to database
+  const saveCategoriesToDb = async (updatedGroups: string[]) => {
+    if (!userId) return;
+    localStorage.setItem(`bookmark_groups_${userId}`, JSON.stringify(updatedGroups));
+    
+    try {
+      const { data, error } = await supabase
+        .from('my_storage')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('type', 'bookmark_categories')
+        .limit(1);
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        await supabase
+          .from('my_storage')
+          .update({ content: JSON.stringify(updatedGroups) })
+          .eq('id', data[0].id);
+      } else {
+        await supabase.from('my_storage').insert([
+          {
+            user_id: userId,
+            type: 'bookmark_categories',
+            title: 'Bookmark Categories',
+            content: JSON.stringify(updatedGroups),
+          }
+        ]);
+      }
+    } catch (err) {
+      console.error('Lỗi lưu danh mục bookmark:', err);
+    }
+  };
+
+  // Load groups from Supabase, fallback to localStorage
+  const loadCategories = async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('my_storage')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('type', 'bookmark_categories')
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        try {
+          const parsed = JSON.parse(data[0].content || '[]');
+          setGroups(parsed);
+          localStorage.setItem(`bookmark_groups_${userId}`, data[0].content || '[]');
+        } catch (e) {
+          // fallback
+        }
+      } else {
+        // Not in DB yet, try local storage
+        const saved = localStorage.getItem(`bookmark_groups_${userId}`);
+        let initial = ['dự án', 'Sách'];
+        if (saved) {
+          try {
+            initial = JSON.parse(saved);
+          } catch (e) {}
+        }
+        setGroups(initial);
+        // Save to DB so it exists
+        await supabase.from('my_storage').insert([
+          {
+            user_id: userId,
+            type: 'bookmark_categories',
+            title: 'Bookmark Categories',
+            content: JSON.stringify(initial),
+          }
+        ]);
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh mục bookmark:', err);
+      // Fallback to localStorage
       const saved = localStorage.getItem(`bookmark_groups_${userId}`);
       if (saved) {
         try {
@@ -42,11 +179,13 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
           setGroups(['dự án', 'Sách']);
         }
       } else {
-        const initial = ['dự án', 'Sách'];
-        setGroups(initial);
-        localStorage.setItem(`bookmark_groups_${userId}`, JSON.stringify(initial));
+        setGroups(['dự án', 'Sách']);
       }
     }
+  };
+
+  useEffect(() => {
+    loadCategories();
   }, [userId]);
 
   const fetchBookmarks = async () => {
@@ -126,7 +265,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
     }
   };
 
-  const handleAddGroup = (e: React.FormEvent) => {
+  const handleAddGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = newGroupName.trim();
     if (!cleanName) return;
@@ -136,10 +275,8 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
     }
     const updated = [...groups, cleanName];
     setGroups(updated);
-    if (userId) {
-      localStorage.setItem(`bookmark_groups_${userId}`, JSON.stringify(updated));
-    }
     setNewGroupName('');
+    await saveCategoriesToDb(updated);
   };
 
   const handleRemoveGroup = async (groupToRemove: string) => {
@@ -147,13 +284,12 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
 
     const updated = groups.filter(g => g !== groupToRemove);
     setGroups(updated);
-    if (userId) {
-      localStorage.setItem(`bookmark_groups_${userId}`, JSON.stringify(updated));
-    }
 
     if (selectedGroupTab === groupToRemove) {
       setSelectedGroupTab('Tất cả');
     }
+
+    await saveCategoriesToDb(updated);
 
     // Update in Supabase
     try {
@@ -189,15 +325,13 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
     // Update groups list local state
     const updated = groups.map(g => g === oldName ? cleanNewName : g);
     setGroups(updated);
-    if (userId) {
-      localStorage.setItem(`bookmark_groups_${userId}`, JSON.stringify(updated));
-    }
 
     if (selectedGroupTab === oldName) {
       setSelectedGroupTab(cleanNewName);
     }
 
     setEditingGroup(null);
+    await saveCategoriesToDb(updated);
 
     // Update in Supabase
     try {
@@ -371,6 +505,8 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
             filteredBookmarks.map((b) => {
               const domain = getDomain(b.content);
               const faviconUrl = domain ? `https://www.google.com/s2/favicons?sz=64&domain=${domain}` : '';
+              const groupColors = b.metadata?.group ? getGroupColor(b.metadata.group) : null;
+              
               return (
                 <div
                   key={b.id}
@@ -380,7 +516,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
                     href={b.content}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 flex-1 min-w-0"
+                    className="flex items-center gap-3 flex-1 min-w-0 mr-1.5"
                   >
                     <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
                       {faviconUrl ? (
@@ -396,7 +532,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
                         <Bookmark size={13} className="text-slate-400" />
                       )}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-[11px] font-bold text-slate-800 truncate group-hover:text-blue-600 transition-colors leading-tight">
                         {b.title}
                       </p>
@@ -404,14 +540,39 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
                         {domain || 'docs.google.com'}
                       </span>
                     </div>
+                    {b.metadata?.group && groupColors && (
+                      <span
+                        className="px-1.5 py-0.5 rounded-md text-[8.5px] font-extrabold uppercase tracking-wider border transition-all shrink-0 ml-auto mr-1.5"
+                        style={{ backgroundColor: groupColors.bg, color: groupColors.text, borderColor: groupColors.border }}
+                      >
+                        {b.metadata.group}
+                      </span>
+                    )}
                   </a>
-                  <button
-                    onClick={() => handleDeleteBookmark(b.id)}
-                    className="p-1 hover:bg-slate-100 text-slate-300 hover:text-slate-600 rounded-lg transition-colors shrink-0 ml-2 cursor-pointer"
-                    title="Xóa liên kết"
-                  >
-                    <X size={13} className="stroke-[2.5]" />
-                  </button>
+                  <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex items-center gap-1 shrink-0 ml-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleOpenEdit(b);
+                      }}
+                      className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
+                      title="Sửa liên kết"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleDeleteBookmark(b.id);
+                      }}
+                      className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                      title="Xóa liên kết"
+                    >
+                      <X size={13} className="stroke-[2.5]" />
+                    </button>
+                  </div>
                 </div>
               );
             })
@@ -559,6 +720,96 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
         }}
         userId={userId}
       />
+
+      {/* Edit Bookmark Modal */}
+      {isEditOpen && editingBookmark && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => {
+              setIsEditOpen(false);
+              setEditingBookmark(null);
+            }}
+          />
+          {/* Modal Content */}
+          <div className="relative w-[90%] max-w-sm bg-white rounded-3xl shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200 text-slate-800">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-base font-bold text-gray-800">Chỉnh sửa Bookmark</h3>
+              <button
+                onClick={() => {
+                  setIsEditOpen(false);
+                  setEditingBookmark(null);
+                }}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateBookmark} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5 block mb-1">Tên liên kết</label>
+                <input
+                  type="text"
+                  placeholder="Tên liên kết (ví dụ: Google Classroom)"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-350 focus:border-slate-350 bg-white"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5 block mb-1">Đường dẫn URL</label>
+                <input
+                  type="text"
+                  placeholder="Đường dẫn URL (ví dụ: classroom.google.com)"
+                  value={editUrl}
+                  onChange={(e) => setEditUrl(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-350 focus:border-slate-350 bg-white"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase ml-0.5 block mb-1">Nhóm / Category</label>
+                <select
+                  value={editGroup}
+                  onChange={(e) => setEditGroup(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-350 focus:border-slate-350 bg-white text-gray-750 font-medium"
+                >
+                  <option value="">Không phân loại</option>
+                  {groups.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex justify-end gap-1.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditOpen(false);
+                    setEditingBookmark(null);
+                  }}
+                  className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving || !editTitle.trim() || !editUrl.trim()}
+                  className="px-4 py-2 text-xs font-bold text-white bg-black disabled:opacity-50 hover:bg-slate-900 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-slate-200/50"
+                >
+                  {isSaving && <Loader2 size={12} className="animate-spin" />}
+                  Lưu thay đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

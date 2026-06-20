@@ -13,6 +13,24 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
   const [isLoading, setIsLoading] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
+  // Refs for tracking latest values to avoid stale closures in event listeners/cleanup
+  const contentRef = useRef(content);
+  const noteIdRef = useRef(noteId);
+  const userIdRef = useRef(userId);
+  const hasUnsavedChangesRef = useRef(false);
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
+
+  useEffect(() => {
+    noteIdRef.current = noteId;
+  }, [noteId]);
+
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
+
   // Fetch or initialize quick note
   const loadQuickNote = async () => {
     if (!userId) return;
@@ -30,9 +48,12 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
       if (error) throw error;
 
       if (data && data.length > 0) {
-        setContent(data[0].content || '');
+        const dbContent = data[0].content || '';
+        setContent(dbContent);
         setNoteId(data[0].id);
         setSyncStatus('saved');
+        // Keep local storage in sync
+        localStorage.setItem(`smartlife_quicknote_${userId}`, dbContent);
       } else {
         // Create a default quick note if not found
         const { data: newNote, error: createError } = await supabase
@@ -50,9 +71,11 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
 
         if (createError) throw createError;
         if (newNote) {
-          setContent(newNote.content || '');
+          const dbContent = newNote.content || '';
+          setContent(dbContent);
           setNoteId(newNote.id);
           setSyncStatus('saved');
+          localStorage.setItem(`smartlife_quicknote_${userId}`, dbContent);
         }
       }
     } catch (err) {
@@ -73,11 +96,13 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
   }, [userId]);
 
   const saveNoteToDb = async (text: string, id: string | null) => {
-    if (!userId) return;
+    const currentUserId = userIdRef.current;
+    if (!currentUserId) return;
     setSyncStatus('saving');
-    
+    hasUnsavedChangesRef.current = true;
+
     // Save locally first
-    localStorage.setItem(`smartlife_quicknote_${userId}`, text);
+    localStorage.setItem(`smartlife_quicknote_${currentUserId}`, text);
 
     try {
       if (id) {
@@ -85,16 +110,17 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
           .from('my_storage')
           .update({ content: text })
           .eq('id', id);
-        
+
         if (error) throw error;
         setSyncStatus('saved');
+        hasUnsavedChangesRef.current = false;
       } else {
         // Fallback: Create if noteId is not yet loaded
         const { data, error } = await supabase
           .from('my_storage')
           .insert([
             {
-              user_id: userId,
+              user_id: currentUserId,
               type: 'note',
               title: 'Quick Note',
               content: text,
@@ -102,12 +128,14 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
           ])
           .select()
           .single();
-        
+
         if (error) throw error;
         if (data) {
           setNoteId(data.id);
+          noteIdRef.current = data.id;
         }
         setSyncStatus('saved');
+        hasUnsavedChangesRef.current = false;
       }
     } catch (err) {
       console.error('Lỗi lưu ghi chú:', err);
@@ -119,6 +147,12 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
     const text = e.target.value;
     setContent(text);
     setSyncStatus('saving');
+    hasUnsavedChangesRef.current = true;
+
+    // Save to localStorage immediately on keystroke as a backup
+    if (userId) {
+      localStorage.setItem(`smartlife_quicknote_${userId}`, text);
+    }
 
     // Debounce database save (1.2 seconds of inactivity)
     if (debounceTimer.current) {
@@ -126,15 +160,42 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
     }
 
     debounceTimer.current = setTimeout(() => {
-      saveNoteToDb(text, noteId);
+      saveNoteToDb(text, noteIdRef.current);
     }, 1200);
   };
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
+  const handleBlur = () => {
+    // If there are unsaved changes, save immediately when focus is lost
+    if (hasUnsavedChangesRef.current) {
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
+        debounceTimer.current = null;
+      }
+      saveNoteToDb(contentRef.current, noteIdRef.current);
+    }
+  };
+
+  // Save on unmount & page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (hasUnsavedChangesRef.current) {
+        saveNoteToDb(contentRef.current, noteIdRef.current);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+
+      // Cleanup timer
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+
+      // Save any pending changes
+      if (hasUnsavedChangesRef.current) {
+        saveNoteToDb(contentRef.current, noteIdRef.current);
       }
     };
   }, []);
@@ -153,7 +214,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
           <StickyNote size={16} className="text-slate-700" />
           Ghi chú
         </h3>
-        
+
         <div className="flex items-center gap-3">
           {/* Word count */}
           <span className="text-[10px] font-bold text-slate-400">
@@ -174,7 +235,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
               </span>
             ) : syncStatus === 'saved' ? (
               <span className="text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100/50">
-                ✓ Đã lưu đám mây
+                Đã lưu
               </span>
             ) : syncStatus === 'error' ? (
               <span className="text-rose-605 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100/50">
@@ -190,6 +251,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
         <textarea
           value={content}
           onChange={handleChange}
+          onBlur={handleBlur}
           disabled={isLoading}
           placeholder={isLoading ? "Đang tải dữ liệu..." : "Ý tưởng đột xuất, ghi chú nhanh bài học... Gõ vào đây sẽ tự động lưu."}
           className="w-full h-full text-xs bg-transparent text-slate-750 placeholder-slate-400 focus:outline-none resize-none font-medium leading-relaxed"
