@@ -319,7 +319,7 @@ const ColumnContainer: React.FC<ColumnContainerProps> = ({
         className="w-full mt-3 py-2 text-slate-400 hover:text-slate-600 text-xs font-bold flex items-center gap-1.5 hover:bg-slate-200/40 rounded-xl transition-all justify-start px-2.5"
       >
         <Plus size={14} className="stroke-[3]" />
-        Them task
+        Task
       </button>
     </div>
   );
