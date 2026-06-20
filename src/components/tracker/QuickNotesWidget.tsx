@@ -47,13 +47,30 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
 
       if (error) throw error;
 
+      // Check if we have unsaved local changes
+      const isUnsaved = localStorage.getItem(`smartlife_quicknote_unsaved_${userId}`) === 'true';
+      const localContent = localStorage.getItem(`smartlife_quicknote_${userId}`);
+
       if (data && data.length > 0) {
         const dbContent = data[0].content || '';
-        setContent(dbContent);
-        setNoteId(data[0].id);
-        setSyncStatus('saved');
-        // Keep local storage in sync
-        localStorage.setItem(`smartlife_quicknote_${userId}`, dbContent);
+        const dbId = data[0].id;
+        setNoteId(dbId);
+        noteIdRef.current = dbId;
+
+        if (isUnsaved && localContent !== null && localContent !== dbContent) {
+          // If we have newer unsaved local content, use it and push it to Supabase
+          setContent(localContent);
+          setSyncStatus('saving');
+          hasUnsavedChangesRef.current = true;
+          // Trigger immediate save to Supabase
+          saveNoteToDb(localContent, dbId);
+        } else {
+          // Otherwise, sync DB content to local state and local storage
+          setContent(dbContent);
+          setSyncStatus('saved');
+          localStorage.setItem(`smartlife_quicknote_${userId}`, dbContent);
+          localStorage.setItem(`smartlife_quicknote_unsaved_${userId}`, 'false');
+        }
       } else {
         // Create a default quick note if not found
         const { data: newNote, error: createError } = await supabase
@@ -63,7 +80,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
               user_id: userId,
               type: 'note',
               title: 'Quick Note',
-              content: '',
+              content: isUnsaved && localContent !== null ? localContent : '',
             },
           ])
           .select()
@@ -74,8 +91,10 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
           const dbContent = newNote.content || '';
           setContent(dbContent);
           setNoteId(newNote.id);
+          noteIdRef.current = newNote.id;
           setSyncStatus('saved');
           localStorage.setItem(`smartlife_quicknote_${userId}`, dbContent);
+          localStorage.setItem(`smartlife_quicknote_unsaved_${userId}`, 'false');
         }
       }
     } catch (err) {
@@ -100,7 +119,8 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
     if (!currentUserId) return;
     setSyncStatus('saving');
     hasUnsavedChangesRef.current = true;
-
+    localStorage.setItem(`smartlife_quicknote_unsaved_${currentUserId}`, 'true');
+    
     // Save locally first
     localStorage.setItem(`smartlife_quicknote_${currentUserId}`, text);
 
@@ -114,6 +134,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
         if (error) throw error;
         setSyncStatus('saved');
         hasUnsavedChangesRef.current = false;
+        localStorage.setItem(`smartlife_quicknote_unsaved_${currentUserId}`, 'false');
       } else {
         // Fallback: Create if noteId is not yet loaded
         const { data, error } = await supabase
@@ -136,6 +157,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
         }
         setSyncStatus('saved');
         hasUnsavedChangesRef.current = false;
+        localStorage.setItem(`smartlife_quicknote_unsaved_${currentUserId}`, 'false');
       }
     } catch (err) {
       console.error('Lỗi lưu ghi chú:', err);
@@ -152,6 +174,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
     // Save to localStorage immediately on keystroke as a backup
     if (userId) {
       localStorage.setItem(`smartlife_quicknote_${userId}`, text);
+      localStorage.setItem(`smartlife_quicknote_unsaved_${userId}`, 'true');
     }
 
     // Debounce database save (1.2 seconds of inactivity)
