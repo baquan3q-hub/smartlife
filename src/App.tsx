@@ -1932,6 +1932,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 };
 
 import LandingPage from './components/LandingPage';
+import FeaturesPage from './components/FeaturesPage';
+import PricingPage from './components/PricingPage';
+import ContactPage from './components/ContactPage';
 
 const AppWrapper: React.FC = () => {
     useTheme();
@@ -2001,7 +2004,25 @@ const AppWrapper: React.FC = () => {
 
     if (showLogin) return <Login onBack={() => setShowLogin(false)} />;
 
-    return <LandingPage onLogin={() => setShowLogin(true)} lang={lang} setLang={setLang} />;
+    const handleNavigate = (page: string) => {
+        if (page === 'home') {
+            window.location.hash = '';
+        } else {
+            window.location.hash = `#/${page}`;
+        }
+    };
+
+    if (hash === '#/features') {
+        return <FeaturesPage onLogin={() => setShowLogin(true)} onNavigate={handleNavigate} lang={lang} setLang={setLang} />;
+    }
+    if (hash === '#/pricing') {
+        return <PricingPage onLogin={() => setShowLogin(true)} onNavigate={handleNavigate} lang={lang} setLang={setLang} />;
+    }
+    if (hash === '#/contact') {
+        return <ContactPage onLogin={() => setShowLogin(true)} onNavigate={handleNavigate} lang={lang} setLang={setLang} />;
+    }
+
+    return <LandingPage onLogin={() => setShowLogin(true)} onNavigate={handleNavigate} lang={lang} setLang={setLang} />;
 };
 
 const App: React.FC = () => (

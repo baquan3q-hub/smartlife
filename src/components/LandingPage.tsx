@@ -5,6 +5,7 @@ import { Lang } from '../i18n/i18n';
 
 interface LandingPageProps {
     onLogin: () => void;
+    onNavigate: (page: string) => void;
     lang: Lang;
     setLang: (lang: Lang) => void;
 }
@@ -344,57 +345,57 @@ const translations = {
     }
 };
 
-const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, setLang }) => {
     const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
     const [isDescExpanded, setIsDescExpanded] = useState(false);
 
     const t = translations[lang];
 
     const marqueeFeatures = lang === 'vi' ? [
-        { name: 'AI Your Own 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
-        { name: 'Cố vấn sự nghiệp AI 💼', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
-        { name: 'Xây dựng CV tự động 📄', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
-        { name: 'Nhật ký chữa lành 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
-        { name: 'GPA Tracker VNU 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
-        { name: 'Nghe nhạc Spotify 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
-        { name: 'Kỷ luật Thói quen 🔥', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
-        { name: 'Bảng Kanban 📋', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
-        { name: 'Lưu trữ Bookmark 🔖', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
-        { name: 'Tập trung Pomodoro ⏳', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
-        { name: 'Quản lý Tài chính 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-250', targetId: 'finance' },
-        { name: 'Thời khóa biểu 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
-        { name: 'Lưu trữ Bảo mật 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
-        { name: 'Đếm ngược Sự kiện 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
+        { name: 'AI Your Own', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'Cố vấn sự nghiệp AI', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
+        { name: 'Xây dựng CV tự động', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
+        { name: 'Nhật ký chữa lành', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
+        { name: 'GPA Tracker VNU', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
+        { name: 'Nghe nhạc Spotify', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
+        { name: 'Kỷ luật Thói quen', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
+        { name: 'Bảng Kanban', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
+        { name: 'Lưu trữ Bookmark', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
+        { name: 'Tập trung Pomodoro', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
+        { name: 'Quản lý Tài chính', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-250', targetId: 'finance' },
+        { name: 'Thời khóa biểu', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
+        { name: 'Lưu trữ Bảo mật', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
+        { name: 'Đếm ngược Sự kiện', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
     ] : lang === 'ko' ? [
-        { name: 'AI Your Own 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
-        { name: 'AI 커리어 상담사 💼', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
-        { name: '자동 이력서 빌더 📄', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
-        { name: '힐링 다이어리 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
-        { name: 'GPA 트래커 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
-        { name: '스포티파이 음악 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
-        { name: '습관 관리 🔥', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
-        { name: 'Kanban 보드 📋', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
-        { name: '북마크 관리자 🔖', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
-        { name: '뽀모도로 타이머 ⏳', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
-        { name: '자산 관리 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
-        { name: '시각적 일정표 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
-        { name: '안전한 보관소 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
-        { name: '이벤트 카운트다운 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
+        { name: 'AI Your Own', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'AI 커리어 상담사', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
+        { name: '자동 이력서 빌더', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
+        { name: '힐링 다이어리', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
+        { name: 'GPA 트래커', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
+        { name: '스포티파이 음악', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
+        { name: '습관 관리', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
+        { name: 'Kanban 보드', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
+        { name: '북마크 관리자', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
+        { name: '뽀모도로 타이머', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
+        { name: '자산 관리', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
+        { name: '시각적 일정표', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
+        { name: '안전한 보관소', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
+        { name: '이벤트 카운트다운', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
     ] : [
-        { name: 'AI Your Own 🧠', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
-        { name: 'AI Career Guidance 💼', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
-        { name: 'Auto CV Builder 📄', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
-        { name: 'Healing Journal 📖', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
-        { name: 'GPA Tracker 🎯', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
-        { name: 'Spotify Music Player 🎧', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
-        { name: 'Habit & Streaks 🔥', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
-        { name: 'Kanban Board 📋', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
-        { name: 'Bookmark Manager 🔖', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
-        { name: 'Pomodoro Focus ⏳', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
-        { name: 'Finance Manager 📈', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
-        { name: 'Visual Schedule 📆', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
-        { name: 'Secure Storage 🛡️', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
-        { name: 'Event Countdown 🔔', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
+        { name: 'AI Your Own', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'AI Career Guidance', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
+        { name: 'Auto CV Builder', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
+        { name: 'Healing Journal', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
+        { name: 'GPA Tracker', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
+        { name: 'Spotify Music Player', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
+        { name: 'Habit & Streaks', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
+        { name: 'Kanban Board', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
+        { name: 'Bookmark Manager', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
+        { name: 'Pomodoro Focus', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
+        { name: 'Finance Manager', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
+        { name: 'Visual Schedule', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
+        { name: 'Secure Storage', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
+        { name: 'Event Countdown', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
     ];
 
     const scrollToSection = (id: string) => {
@@ -421,13 +422,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, lang, setLang }) => 
 
             {/* Header */}
             <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100/80 transition-all duration-300">
-                <div className="w-full px-4 xs:px-6 sm:px-8 lg:px-12 h-16 sm:h-[72px] flex items-center justify-between">
+                <div className="w-full px-4 xs:px-6 sm:px-8 lg:px-12 h-16 sm:h-[72px] flex items-center justify-between relative">
                     <div className="flex items-center gap-2.5 sm:gap-3 hover:opacity-90 transition-opacity cursor-pointer animate-fade-in" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
                         <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden shadow-md shadow-indigo-100 border border-gray-100 shrink-0">
                             <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
                         </div>
                         <span className="font-extrabold text-base xs:text-lg sm:text-xl tracking-tight bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">SmartLife</span>
                     </div>
+                    {/* Centered navigation links */}
+                    <nav className="hidden md:flex items-center gap-6 sm:gap-8 absolute left-1/2 transform -translate-x-1/2">
+                        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="px-3 py-2 text-sm font-bold text-gray-900 bg-gray-100 rounded-lg transition-all">{lang === 'vi' ? 'Trang chủ' : lang === 'ko' ? '홈' : 'Home'}</button>
+                        <button onClick={() => onNavigate('features')} className="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">{lang === 'vi' ? 'Tính năng' : lang === 'ko' ? '기능' : 'Features'}</button>
+                        <button onClick={() => onNavigate('pricing')} className="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">{lang === 'vi' ? 'Bảng giá' : lang === 'ko' ? '요금제' : 'Pricing'}</button>
+                        <button onClick={() => onNavigate('contact')} className="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">{lang === 'vi' ? 'Liên hệ' : lang === 'ko' ? '문의' : 'Contact'}</button>
+                    </nav>
                     <div className="flex items-center gap-2 xs:gap-3 sm:gap-4">
                         {/* Language Toggle */}
                         <button
