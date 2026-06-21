@@ -92,7 +92,7 @@ interface AuthenticatedAppProps {
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) => {
     const { user, signOut } = useAuth();
-    
+
     // Notifications State
     const [unreadNotifications, setUnreadNotifications] = useState<UserNotification[]>([]);
 
@@ -121,13 +121,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 (payload) => {
                     const newNotif = payload.new as UserNotification;
                     console.log('Realtime notification received:', newNotif);
-                    
+
                     // Thêm thông báo mới vào modal popup trong thời gian thực
                     setUnreadNotifications(prev => {
                         if (prev.some(n => n.id === newNotif.id)) return prev;
                         return [newNotif, ...prev];
                     });
-                    
+
                     // Gửi push notification nếu được cấp quyền
                     if ('Notification' in window && Notification.permission === 'granted') {
                         new Notification(newNotif.title, {
@@ -135,7 +135,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             icon: '/pwa-192x192.png'
                         });
                     }
-                    
+
                     // Refresh data if subscription changes
                     if (newNotif.type === 'gift_pro' || newNotif.type === 'extend_pro') {
                         fetchData(true);
@@ -352,7 +352,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     useEffect(() => {
         if (!user) return;
-        
+
         const tourLastShownKey = `smartlife_tour_last_shown_${user.id}`;
         const lastActiveKey = `smartlife_last_active_time_${user.id}`;
         const logoutFlagKey = `smartlife_logged_out_flag`;
@@ -430,7 +430,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     const handleOpenPricing = React.useCallback(async () => {
         if (!user) return;
-        
+
         // Kiểm tra hóa đơn hiện tại trong state
         if (currentOrder) {
             const expireTime = new Date(currentOrder.invoice_expires_at).getTime();
@@ -441,7 +441,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 setCurrentOrder(null);
             }
         }
-        
+
         // Gọi DB kiểm tra xem có hóa đơn pending nào không
         const pendingOrder = await getLatestPendingOrder(user.id);
         if (pendingOrder) {
@@ -486,7 +486,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             function withTimeout<T>(promise: Promise<T>, timeoutMs = 8000): Promise<T> {
                 return Promise.race([
                     promise,
-                    new Promise<never>((_, reject) => 
+                    new Promise<never>((_, reject) =>
                         setTimeout(() => reject(new Error('Yêu cầu dữ liệu quá thời gian (Timeout)')), timeoutMs)
                     )
                 ]);
@@ -604,7 +604,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         is_completed: todo.is_completed || false,
                         deadline: todo.deadline || null
                     }));
-                    
+
                     supabase.from('todos').insert(todosToInsert).then(({ error }) => {
                         if (error) {
                             console.error('[SmartLife] Error syncing guest todos:', error);
@@ -740,12 +740,12 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (wallet) {
                 const balanceChange = newTx.type === 'income' ? newTx.amount : -newTx.amount;
                 const updatedWallet = { ...wallet, balance: Number(wallet.balance) + balanceChange };
-                
+
                 setAppState(prev => ({
                     ...prev,
                     wallets: prev.wallets.map(w => w.id === wallet.id ? updatedWallet : w)
                 }));
-                
+
                 supabase.from('wallets').update({ balance: updatedWallet.balance }).eq('id', wallet.id).then();
             }
         }
@@ -759,8 +759,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (data) {
                 setAppState((prev: AppState) => ({
                     ...prev,
-                    transactions: prev.transactions.map(t => t.id === tempId ? { 
-                        ...data, 
+                    transactions: prev.transactions.map(t => t.id === tempId ? {
+                        ...data,
                         amount: Number(data.amount),
                         wallet_id: data.wallet_id || null,
                         debt_id: data.debt_id || null
@@ -818,7 +818,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
             if (isChanged) {
                 setAppState(prev => ({ ...prev, wallets: walletsToUpdate }));
-                
+
                 const updatePromises = [];
                 if (oldTx.wallet_id) {
                     const oldW = walletsToUpdate.find(w => w.id === oldTx.wallet_id);
@@ -834,10 +834,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
         try {
             const { error } = await supabase.from('transactions').update({
-                amount: updatedTx.amount, 
-                category: updatedTx.category, 
-                date: updatedTx.date, 
-                type: updatedTx.type, 
+                amount: updatedTx.amount,
+                category: updatedTx.category,
+                date: updatedTx.date,
+                type: updatedTx.type,
                 description: updatedTx.description,
                 wallet_id: updatedTx.wallet_id || null,
                 debt_id: updatedTx.debt_id || null
@@ -864,12 +864,12 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (wallet) {
                 const balanceChange = txToDelete.type === 'income' ? -txToDelete.amount : txToDelete.amount;
                 const updatedWallet = { ...wallet, balance: Number(wallet.balance) + balanceChange };
-                
+
                 setAppState(prev => ({
                     ...prev,
                     wallets: prev.wallets.map(w => w.id === wallet.id ? updatedWallet : w)
                 }));
-                
+
                 supabase.from('wallets').update({ balance: updatedWallet.balance }).eq('id', wallet.id).then();
             }
         }
@@ -928,14 +928,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         const result = await debtService.createDebt(user.id, newDebt);
         if (result) {
             setAppState(prev => ({ ...prev, debts: [result, ...prev.debts] }));
-            
+
             // Nếu có liên kết với ví, tạo giao dịch chi tiêu/thu nhập tương ứng để khấu trừ ví
             if (newDebt.wallet_id) {
                 const isLend = newDebt.type === 'lend';
                 const txCategory = isLend ? 'Cho vay 💸' : 'Đi vay 💰';
                 const txType = isLend ? TransactionType.EXPENSE : TransactionType.INCOME;
-                const txDesc = isLend 
-                    ? `Cho vay: ${newDebt.partner_name} (${newDebt.description || 'Giải ngân'})` 
+                const txDesc = isLend
+                    ? `Cho vay: ${newDebt.partner_name} (${newDebt.description || 'Giải ngân'})`
                     : `Đi vay từ: ${newDebt.partner_name} (${newDebt.description || 'Giải ngân'})`;
 
                 await handleAddTransaction({
@@ -1200,7 +1200,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     const handleUpdateTodo = React.useCallback(async (item: any) => {
         const prevTodos = [...appState.todos];
-        
+
         let updatedItem = { ...item };
         const existingTodo = appState.todos.find(t => t.id === item.id);
         const wasAlreadyDone = existingTodo && (existingTodo.status === 'done' || existingTodo.is_completed);
@@ -1282,7 +1282,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     const handleReorderTodos = React.useCallback(async (reorderedTodos: Todo[]) => {
         lastReorderTimeRef.current = Date.now();
         const prevTodos = [...appState.todos];
-        
+
         // Assign fresh sort_order based on array position
         const withOrder = reorderedTodos.map((t, idx) => {
             const nextTodo = { ...t, sort_order: idx };
@@ -1321,7 +1321,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         try {
             // Batch update sort_order, status, is_completed, and completed_at for each changed item
             const updates = changedTodos.map(t => {
-                const updateFields: any = { 
+                const updateFields: any = {
                     sort_order: t.sort_order,
                     status: t.status || (t.is_completed ? 'done' : 'todo'),
                     is_completed: t.status === 'done',
@@ -1338,7 +1338,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     console.warn("[SmartLife] Column error during reorder. Retrying without completed_at.");
                     isCompletedAtSupportedRef.current = false;
                     const retryUpdates = changedTodos.map(t =>
-                        supabase.from('todos').update({ 
+                        supabase.from('todos').update({
                             sort_order: t.sort_order,
                             status: t.status || (t.is_completed ? 'done' : 'todo'),
                             is_completed: t.status === 'done',
@@ -1512,7 +1512,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     return (
         <div className="h-[100dvh] w-screen overflow-hidden bg-[#F8F9FC] font-sans text-gray-900 flex flex-col md:flex-row">
             {/* Sidebar Desktop */}
-            <aside 
+            <aside
                 onMouseEnter={() => setIsSidebarCollapsed(false)}
                 onMouseLeave={() => setIsSidebarCollapsed(true)}
                 className={`hidden md:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 fixed h-full z-20 ${isSidebarCollapsed ? 'shadow-sm' : 'shadow-lg'} transition-all duration-300 ease-in-out`}
@@ -1524,9 +1524,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         </div>
                         {!isSidebarCollapsed && <h1 className="text-xl font-bold text-gray-800 tracking-tight whitespace-nowrap">SmartLife</h1>}
                     </div>
-                    
+
                     {/* Toggle Button */}
-                    <button 
+                    <button
                         onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
                         className={`absolute -right-3 top-8 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all z-30`}
                     >
@@ -1593,18 +1593,16 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 {/* Pro Status Badge */}
                 {!isSidebarCollapsed && (
                     <div className="px-4 py-2">
-                        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold ${
-                            proAccess.badgeColor === 'green' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                            proAccess.badgeColor === 'yellow' ? 'bg-yellow-50 text-yellow-700 border border-yellow-100' :
-                            proAccess.badgeColor === 'red' ? 'bg-red-50 text-red-600 border border-red-100' :
-                            'bg-gray-50 text-gray-500 border border-gray-100'
-                        }`}>
-                            <span className={`w-2 h-2 rounded-full ${
-                                proAccess.badgeColor === 'green' ? 'bg-emerald-500' :
-                                proAccess.badgeColor === 'yellow' ? 'bg-yellow-500 animate-pulse' :
-                                proAccess.badgeColor === 'red' ? 'bg-red-500 animate-pulse' :
-                                'bg-gray-400'
-                            }`} />
+                        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold ${proAccess.badgeColor === 'green' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                proAccess.badgeColor === 'yellow' ? 'bg-yellow-50 text-yellow-700 border border-yellow-100' :
+                                    proAccess.badgeColor === 'red' ? 'bg-red-50 text-red-600 border border-red-100' :
+                                        'bg-gray-50 text-gray-500 border border-gray-100'
+                            }`}>
+                            <span className={`w-2 h-2 rounded-full ${proAccess.badgeColor === 'green' ? 'bg-emerald-500' :
+                                    proAccess.badgeColor === 'yellow' ? 'bg-yellow-500 animate-pulse' :
+                                        proAccess.badgeColor === 'red' ? 'bg-red-500 animate-pulse' :
+                                            'bg-gray-400'
+                                }`} />
                             <span>{proAccess.badgeText}</span>
                             <span className="ml-auto text-[10px] font-normal opacity-70">{proAccess.planLabel}</span>
                         </div>
@@ -1666,22 +1664,22 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 </header>}
 
                 <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative'}`}> {/* AI Advisor gets full screen, others get dynamic fluid layout */}
-                        {deferredTab === 'visual' && (
-                            <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
-                                if (tab === 'music') {
-                                    setStartInFocusMode(true);
-                                    setActiveTab('schedule');
-                                } else if (tab === 'gpa-career') {
-                                    setGpaInitialView('career');
-                                    setActiveTab('gpa');
-                                } else if (tab === 'goals-cv') {
-                                    setGoalsInitialView('cv');
-                                    setActiveTab('goals');
-                                } else {
-                                    setActiveTab(tab as any);
-                                }
-                            }} onRefresh={async () => { await fetchData(true); }} />
-                        )}
+                    {deferredTab === 'visual' && (
+                        <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
+                            if (tab === 'music') {
+                                setStartInFocusMode(true);
+                                setActiveTab('schedule');
+                            } else if (tab === 'gpa-career') {
+                                setGpaInitialView('career');
+                                setActiveTab('gpa');
+                            } else if (tab === 'goals-cv') {
+                                setGoalsInitialView('cv');
+                                setActiveTab('goals');
+                            } else {
+                                setActiveTab(tab as any);
+                            }
+                        }} onRefresh={async () => { await fetchData(true); }} />
+                    )}
                     {deferredTab === 'finance' && (
                         <FinanceDashboard
                             state={appState}
@@ -1804,8 +1802,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         />
                     )}
                     {deferredTab === 'habit' && (
-                        <HabitDashboard 
-                            userId={user?.id || ''} 
+                        <HabitDashboard
+                            userId={user?.id || ''}
                             onNavigateToSchedule={() => setActiveTab('schedule')}
                             isPro={proAccess.hasAccess}
                             onUpgrade={handleOpenPricing}
@@ -1854,17 +1852,15 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                 <button
                                     key={tab.id}
                                     onClick={() => { setActiveTab(tab.id as any); }}
-                                    className={`flex items-center justify-center rounded-full h-12 shrink-0 transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) active:scale-95 ${
-                                        isActive
+                                    className={`flex items-center justify-center rounded-full h-12 shrink-0 transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) active:scale-95 ${isActive
                                             ? `px-5 py-2.5 ${activeBgClass} ${activeColorClass} shadow-sm shadow-indigo-100/10`
                                             : 'px-3 py-2 text-gray-400 active:text-gray-600 active:bg-gray-50/20'
-                                    }`}
+                                        }`}
                                 >
                                     <IconComponent size={22} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 transition-transform duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) ${isActive && tab.id === 'expand' ? 'rotate-90' : ''}`} />
                                     <span
-                                        className={`text-[12px] font-bold tracking-tight transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) overflow-hidden whitespace-nowrap ${
-                                            isActive ? 'max-w-[100px] opacity-100 ml-2.5' : 'max-w-0 opacity-0 ml-0'
-                                        }`}
+                                        className={`text-[12px] font-bold tracking-tight transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) overflow-hidden whitespace-nowrap ${isActive ? 'max-w-[100px] opacity-100 ml-2.5' : 'max-w-0 opacity-0 ml-0'
+                                            }`}
                                     >
                                         {label}
                                     </span>
@@ -1874,11 +1870,11 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     </nav>
                 </div>
             )}
-            <SettingsModal 
-                isOpen={isSettingsOpen} 
-                onClose={() => setIsSettingsOpen(false)} 
-                userId={user?.id || ''} 
-                onSignOut={signOut} 
+            <SettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                userId={user?.id || ''}
+                onSignOut={signOut}
                 notificationsEnabled={notificationsEnabled}
                 toggleNotifications={toggleNotifications}
                 lang={lang}
@@ -1899,9 +1895,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 order={currentOrder}
                 onCreateNewOrder={handleCreateNewOrder}
             />
-            <WelcomeTourModal 
-                isOpen={isWelcomeTourOpen} 
-                onClose={() => setIsWelcomeTourOpen(false)} 
+            <WelcomeTourModal
+                isOpen={isWelcomeTourOpen}
+                onClose={() => setIsWelcomeTourOpen(false)}
             />
             <MySpotify isOpen={isSpotifyOpen} onClose={() => setIsSpotifyOpen(false)} userId={user?.id || ''} />
             <PWAInstallPrompt />
@@ -1936,6 +1932,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 };
 
 import LandingPage from './components/LandingPage';
+import FeaturesPage from './components/FeaturesPage';
+import PricingPage from './components/PricingPage';
+import ContactPage from './components/ContactPage';
 
 const AppWrapper: React.FC = () => {
     useTheme();
@@ -2005,7 +2004,25 @@ const AppWrapper: React.FC = () => {
 
     if (showLogin) return <Login onBack={() => setShowLogin(false)} />;
 
-    return <LandingPage onLogin={() => setShowLogin(true)} lang={lang} setLang={setLang} />;
+    const handleNavigate = (page: string) => {
+        if (page === 'home') {
+            window.location.hash = '';
+        } else {
+            window.location.hash = `#/${page}`;
+        }
+    };
+
+    if (hash === '#/features') {
+        return <FeaturesPage onLogin={() => setShowLogin(true)} onNavigate={handleNavigate} lang={lang} setLang={setLang} />;
+    }
+    if (hash === '#/pricing') {
+        return <PricingPage onLogin={() => setShowLogin(true)} onNavigate={handleNavigate} lang={lang} setLang={setLang} />;
+    }
+    if (hash === '#/contact') {
+        return <ContactPage onLogin={() => setShowLogin(true)} onNavigate={handleNavigate} lang={lang} setLang={setLang} />;
+    }
+
+    return <LandingPage onLogin={() => setShowLogin(true)} onNavigate={handleNavigate} lang={lang} setLang={setLang} />;
 };
 
 const App: React.FC = () => (
