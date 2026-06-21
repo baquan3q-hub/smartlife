@@ -12,6 +12,17 @@ interface PricingModalProps {
   isTrialExpired?: boolean;
 }
 
+const getPlanDurationLabel = (planId: string) => {
+  switch (planId) {
+    case '1_month': return '1 tháng';
+    case '3_months': return '3 tháng';
+    case '6_months': return '6 tháng';
+    case '12_months': return '12 tháng';
+    case '4_years': return '48 tháng';
+    default: return '';
+  }
+};
+
 const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPlan, daysRemaining, isTrialExpired }) => {
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanDuration>('4_years');
 
@@ -117,10 +128,13 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
                   </div>
                 )}
 
-                {/* Plan Emoji + Name */}
-                <div className="text-sm font-bold text-gray-800 mb-1 flex items-center gap-1.5">
+                {/* Plan Emoji + Name & Duration Badge */}
+                <div className="text-sm font-bold text-gray-800 mb-1 flex items-center flex-wrap gap-1.5">
                   <span>{plan.emoji}</span>
                   <span>{plan.label}</span>
+                  <span className="text-[10px] font-bold bg-indigo-50 text-indigo-750 px-2 py-0.5 rounded-full border border-indigo-100 shrink-0">
+                    {getPlanDurationLabel(plan.id)}
+                  </span>
                 </div>
 
                 {/* Price */}
@@ -180,7 +194,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
                   {/* Name */}
                   <div className="text-base font-black text-gray-900 flex items-center gap-2">
                     {bestValuePlan.label}
-                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">4 NĂM</span>
+                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">48 THÁNG (4 NĂM)</span>
                   </div>
 
                   {/* Price */}

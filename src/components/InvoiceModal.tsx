@@ -11,6 +11,17 @@ interface InvoiceModalProps {
   onCreateNewOrder?: () => void;
 }
 
+const getPlanDurationLabel = (planId: string) => {
+  switch (planId) {
+    case '1_month': return '1 tháng';
+    case '3_months': return '3 tháng';
+    case '6_months': return '6 tháng';
+    case '12_months': return '12 tháng';
+    case '4_years': return '48 tháng';
+    default: return '';
+  }
+};
+
 const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, order, onCreateNewOrder }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
@@ -58,7 +69,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, order, onC
     };
     if (boostLabels[planType]) return boostLabels[planType];
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === planType);
-    return plan?.label || planType;
+    if (plan) {
+      const duration = getPlanDurationLabel(plan.id);
+      return duration ? `${plan.label} (${duration})` : plan.label;
+    }
+    return planType;
   };
 
   const minutes = Math.floor(timeLeft / 60);
