@@ -1553,7 +1553,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
                     <button onClick={() => setActiveTab('visual')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'visual' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.overview', lang) : ''}>
                         <LayoutDashboard size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.overview', lang)}</span>}
-                        {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>
                     <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'finance' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.finance', lang) : ''}>
                         <WalletIcon size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.finance', lang)}</span>}
@@ -1566,13 +1565,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     </button>
                     <button onClick={() => setActiveTab('journal')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'journal' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.journal', lang) : ''}>
                         <BookOpen size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.journal', lang)}</span>}
+                        {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>
                     <button onClick={() => setActiveTab('gpa')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'gpa' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'GPA' : ''}>
                         <GraduationCap size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">GPA</span>}
                     </button>
                     <button onClick={() => setActiveTab('goals')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'goals' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Mục tiêu' : ''}>
                         <Target size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Mục tiêu</span>}
-                        {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>
 
                     {/* Admin Panel Toggle */}
@@ -1668,7 +1667,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
                 <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative'}`}> {/* AI Advisor gets full screen, others get dynamic fluid layout */}
                         {deferredTab === 'visual' && (
-                        proAccess.hasAccess ? (
                             <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
                                 if (tab === 'music') {
                                     setStartInFocusMode(true);
@@ -1683,10 +1681,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                     setActiveTab(tab as any);
                                 }
                             }} onRefresh={async () => { await fetchData(true); }} />
-                        ) : (
-                            <ProGateOverlay featureName="Visual Board" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
-                        )
-                    )}
+                        )}
                     {deferredTab === 'finance' && (
                         <FinanceDashboard
                             state={appState}
@@ -1735,22 +1730,18 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         />
                     )}
                     {deferredTab === 'ai-advisor' && (
-                        proAccess.hasAccess ? (
-                            <AIAdvisorPage
-                                appState={appState}
-                                lang={lang}
-                                onBack={() => setActiveTab('finance')}
-                                onAddTimetable={handleAddTimetable}
-                                onAddTodo={handleAddTodo}
-                                onAddTransaction={handleAddTransaction}
-                                onImportGPAData={handleImportGPAData}
-                                onSelectBoostPack={handleSelectPlan}
-                            />
-                        ) : (
-                            <div className="w-full max-w-none min-h-screen p-4 md:p-8 pt-20 md:pt-8">
-                                <ProGateOverlay featureName="AI Advisor" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
-                            </div>
-                        )
+                        <AIAdvisorPage
+                            appState={appState}
+                            lang={lang}
+                            onBack={() => setActiveTab('finance')}
+                            onAddTimetable={handleAddTimetable}
+                            onAddTodo={handleAddTodo}
+                            onAddTransaction={handleAddTransaction}
+                            onImportGPAData={handleImportGPAData}
+                            onSelectBoostPack={handleSelectPlan}
+                            onUpdateTodo={handleUpdateTodo}
+                            onDeleteTodo={handleDeleteTodo}
+                        />
                     )}
                     {deferredTab === 'admin' && user?.email === 'baquan3q@gmail.com' && (
                         <AdminDashboard adminEmail={user.email} adminId={user.id} />
@@ -1813,10 +1804,19 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         />
                     )}
                     {deferredTab === 'habit' && (
-                        <HabitDashboard userId={user?.id || ''} onNavigateToSchedule={() => setActiveTab('schedule')} />
+                        <HabitDashboard 
+                            userId={user?.id || ''} 
+                            onNavigateToSchedule={() => setActiveTab('schedule')}
+                            isPro={proAccess.hasAccess}
+                            onUpgrade={handleOpenPricing}
+                        />
                     )}
                     {deferredTab === 'journal' && (
-                        <JournalDashboard userId={user?.id || ''} />
+                        proAccess.hasAccess ? (
+                            <JournalDashboard userId={user?.id || ''} />
+                        ) : (
+                            <ProGateOverlay featureName="Nhật ký cá nhân" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
+                        )
                     )}
                     {deferredTab === 'expand' && (
                         <ExpandSection

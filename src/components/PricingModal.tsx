@@ -1,6 +1,6 @@
 // File: src/components/PricingModal.tsx
 import React, { useState } from 'react';
-import { X, Sparkles, CheckCircle, Zap, Brain, CalendarDays, LayoutDashboard, Crown, Star, Flame, Trophy, BarChart3, TrendingUp, BookOpen, Target, Briefcase, FileText } from 'lucide-react';
+import { X, Sparkles, CheckCircle, Zap, Brain, CalendarDays, LayoutDashboard, Crown, Star, Flame, Trophy, BarChart3, TrendingUp, BookOpen, Target, Briefcase, FileText, GraduationCap, Award } from 'lucide-react';
 import { SUBSCRIPTION_PLANS, PAYMENT_INFO } from '../services/subscriptionService';
 import { SubscriptionPlanDuration } from '../types';
 
@@ -13,7 +13,7 @@ interface PricingModalProps {
 }
 
 const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPlan, daysRemaining, isTrialExpired }) => {
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanDuration>('3_months');
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanDuration>('4_years');
 
   if (!isOpen) return null;
 
@@ -21,18 +21,20 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
     return new Intl.NumberFormat('vi-VN').format(price) + 'đ';
   };
 
+  const regularPlans = SUBSCRIPTION_PLANS.filter(p => !p.is_best_value);
+  const bestValuePlan = SUBSCRIPTION_PLANS.find(p => p.is_best_value);
+
   const features = [
-    { icon: <LayoutDashboard size={18} />, color: 'text-indigo-600', bgColor: 'bg-indigo-50', text: 'Visual Board — toàn cảnh cuộc sống đại học trong 1 giao diện' },
-    { icon: <Flame size={18} />, color: 'text-orange-600', bgColor: 'bg-orange-50', text: 'Habit Tracker — theo dõi thói quen với streak, countdown & count-up' },
-    { icon: <Star size={18} />, color: 'text-amber-500', bgColor: 'bg-amber-50', text: 'StarBrain ⭐ — hệ thống sao thưởng & cửa hàng đổi quà khi hoàn thành thói quen' },
-    { icon: <BookOpen size={18} />, color: 'text-teal-600', bgColor: 'bg-teal-50', text: 'Nhật ký cá nhân — không gian chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
     { icon: <Brain size={18} />, color: 'text-violet-600', bgColor: 'bg-violet-50', text: 'AI Cố vấn riêng — 600.000 token/tháng included' },
-    { icon: <Target size={18} />, color: 'text-purple-600', bgColor: 'bg-purple-50', text: 'Lộ trình Sự nghiệp & Mục tiêu 5 năm — AI cố vấn kỹ năng dựa trên GPA' },
-    { icon: <Zap size={18} />, color: 'text-pink-600', bgColor: 'bg-pink-50', text: 'Focus Timer & Lofi Music — chế độ tập trung tối đa' },
-    { icon: <TrendingUp size={18} />, color: 'text-emerald-600', bgColor: 'bg-emerald-50', text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },
-    { icon: <Trophy size={18} />, color: 'text-cyan-600', bgColor: 'bg-cyan-50', text: 'GPA Tracker — tính điểm, lộ trình học tập & mục tiêu tín chỉ' },
     { icon: <Briefcase size={18} />, color: 'text-rose-600', bgColor: 'bg-rose-50', text: 'AI Career Analyzer — Phân tích ngành học & tính cách đề xuất nghề nghiệp' },
     { icon: <FileText size={18} />, color: 'text-sky-600', bgColor: 'bg-sky-50', text: 'CV Builder — Tự động điền học vấn & kỹ năng, export PDF chuyên nghiệp' },
+    { icon: <Target size={18} />, color: 'text-purple-600', bgColor: 'bg-purple-50', text: 'Lộ trình Sự nghiệp & Mục tiêu 5 năm — AI cố vấn kỹ năng dựa trên GPA' },
+    { icon: <Trophy size={18} />, color: 'text-cyan-600', bgColor: 'bg-cyan-50', text: 'GPA Tracker nâng cao — dự đoán GPA tốt nghiệp & lộ trình học tập' },
+    { icon: <LayoutDashboard size={18} />, color: 'text-indigo-600', bgColor: 'bg-indigo-50', text: 'Visual Board — toàn cảnh cuộc sống đại học trong 1 giao diện' },
+    { icon: <TrendingUp size={18} />, color: 'text-emerald-600', bgColor: 'bg-emerald-50', text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },
+    { icon: <BookOpen size={18} />, color: 'text-teal-600', bgColor: 'bg-teal-50', text: 'Nhật ký cá nhân — không gian chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
+    { icon: <Flame size={18} />, color: 'text-orange-600', bgColor: 'bg-orange-50', text: 'Habit Tracker không giới hạn — theo dõi thói quen với streak & count-up' },
+    { icon: <Star size={18} />, color: 'text-amber-500', bgColor: 'bg-amber-50', text: 'StarBrain 🌟 — hệ thống sao thưởng & cửa hàng đổi quà' },
   ];
 
   return (
@@ -60,7 +62,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
                 ? 'Thời gian dùng thử đã hết. Nâng cấp để tiếp tục sử dụng đầy đủ tính năng!'
                 : daysRemaining && daysRemaining > 0
                   ? `Bạn còn ${daysRemaining} ngày dùng thử. Nâng cấp ngay để không bị gián đoạn!`
-                  : 'Đầu tư cho bản thân — chi phí chỉ bằng 1 ly trà sữa/tháng 🧋'}
+                  : 'Đầu tư cho bản thân — chi phí chỉ bằng 1 ly trà đá/tháng 🧋'}
             </p>
 
             {/* Decorative circles */}
@@ -71,24 +73,34 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
 
         {/* Features */}
         <div className="px-8 py-5 border-b border-gray-100">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Tính năng Pro bao gồm</p>
-          <div className="space-y-2.5">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Các tính năng bao gồm</p>
+          <div className="space-y-3.5 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
             {features.map((f, i) => (
-              <div key={i} className="flex items-center gap-3 text-sm text-gray-700">
-                <div className={`w-8 h-8 rounded-lg ${f.bgColor} flex items-center justify-center ${f.color} shrink-0`}>
+              <div key={i} className="flex items-start gap-3 text-sm text-gray-700">
+                <div className={`w-8 h-8 rounded-lg ${f.bgColor} flex items-center justify-center ${f.color} shrink-0 mt-0.5`}>
                   {f.icon}
                 </div>
-                <span>{f.text}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-gray-800 text-xs md:text-sm">{f.text.split(' — ')[0]}</span>
+                  </div>
+                  {f.text.includes(' — ') && (
+                    <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">{f.text.split(' — ')[1]}</p>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         </div>
 
+
         {/* Plans Grid */}
         <div className="px-8 py-6">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Chọn gói phù hợp</p>
+          
+          {/* 4 Regular Plans in 2x2 Grid */}
           <div className="grid grid-cols-2 gap-3">
-            {SUBSCRIPTION_PLANS.map(plan => (
+            {regularPlans.map(plan => (
               <button
                 key={plan.id}
                 onClick={() => setSelectedPlan(plan.id)}
@@ -105,28 +117,31 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
                   </div>
                 )}
 
-                {/* Plan Name */}
-                <div className="text-sm font-bold text-gray-800 mb-1">{plan.label}</div>
+                {/* Plan Emoji + Name */}
+                <div className="text-sm font-bold text-gray-800 mb-1 flex items-center gap-1.5">
+                  <span>{plan.emoji}</span>
+                  <span>{plan.label}</span>
+                </div>
 
                 {/* Price */}
-                <div className="text-xl font-black text-gray-900">
-                  {formatPrice(plan.price)}
+                <div className="flex items-baseline gap-1.5 mt-1">
+                  <span className="text-xl font-black text-gray-900">{formatPrice(plan.price)}</span>
+                  {plan.original_price && plan.original_price > plan.price && (
+                    <span className="text-xs text-gray-400 line-through">{formatPrice(plan.original_price)}</span>
+                  )}
                 </div>
 
                 {/* Monthly Price / Save */}
-                {plan.id !== 'lifetime' && plan.id !== '1_month' && (
-                  <div className="text-[11px] text-gray-500 mt-1">
-                    ~{formatPrice(plan.monthly_price)}/tháng
-                  </div>
-                )}
-                {plan.save_percent > 0 && plan.id !== 'lifetime' && (
+                <div className="text-[11px] text-gray-500 mt-1">
+                  ~{formatPrice(plan.monthly_price)}/tháng
+                </div>
+                {plan.save_percent > 0 ? (
                   <div className="mt-1.5 inline-block text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
                     Tiết kiệm {plan.save_percent}%
                   </div>
-                )}
-                {plan.id === 'lifetime' && (
-                  <div className="mt-1.5 inline-block text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
-                    Trả 1 lần duy nhất
+                ) : (
+                  <div className="mt-1.5 inline-block text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+                    Gói cơ bản
                   </div>
                 )}
 
@@ -139,6 +154,66 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
               </button>
             ))}
           </div>
+
+          {/* Best Value Plan — Full Width, Special Design */}
+          {bestValuePlan && (
+            <button
+              onClick={() => setSelectedPlan(bestValuePlan.id)}
+              className={`relative w-full mt-4 p-5 rounded-2xl border-2 transition-all duration-200 text-left overflow-hidden ${
+                selectedPlan === bestValuePlan.id
+                  ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 shadow-lg shadow-emerald-100'
+                  : 'border-emerald-200 bg-gradient-to-br from-emerald-50/30 to-teal-50/30 hover:border-emerald-400 hover:shadow-md'
+              }`}
+            >
+              {/* Best Value Badge */}
+              <div className="absolute -top-0 right-0 bg-gradient-to-l from-emerald-500 to-teal-500 text-white text-[10px] font-bold px-4 py-1 rounded-bl-xl flex items-center gap-1">
+                <Award size={12} fill="currentColor" /> BEST VALUE
+              </div>
+
+              <div className="flex items-start gap-4">
+                {/* Icon */}
+                <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-emerald-200 shrink-0">
+                  🎓
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  {/* Name */}
+                  <div className="text-base font-black text-gray-900 flex items-center gap-2">
+                    {bestValuePlan.label}
+                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">4 NĂM</span>
+                  </div>
+
+                  {/* Price */}
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-black text-emerald-700">{formatPrice(bestValuePlan.price)}</span>
+                    <span className="text-sm text-gray-400 line-through">{formatPrice(bestValuePlan.original_price || 0)}</span>
+                  </div>
+
+                  {/* Details */}
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <span className="text-[11px] font-bold text-emerald-600 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                      ~{formatPrice(bestValuePlan.monthly_price)}/tháng
+                    </span>
+                    <span className="text-[11px] font-bold text-orange-600 bg-orange-100 px-2.5 py-0.5 rounded-full">
+                      🔥 Tiết kiệm {bestValuePlan.save_percent}%
+                    </span>
+                  </div>
+
+                  {/* FOMO text */}
+                  <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                    💡 Rẻ hơn 1 ly trà đá/tháng! Chỉ hơn gói 1 năm có 100k — đủ dùng cả 4 năm đại học.
+                  </p>
+                </div>
+              </div>
+
+              {/* Selected Indicator */}
+              {selectedPlan === bestValuePlan.id && (
+                <div className="absolute top-5 right-14">
+                  <CheckCircle size={20} className="text-emerald-600" fill="currentColor" />
+                </div>
+              )}
+            </button>
+          )}
         </div>
 
         {/* CTA */}

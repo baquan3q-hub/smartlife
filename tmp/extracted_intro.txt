@@ -1,0 +1,83 @@
+=== PARAGRAPHS ===
+[0]: TÀI LIỆU GIỚI THIỆU SẢN PHẨM SMARTLIFE
+[1]: Hệ Sinh Thái Quản Trị Bản Thân Toàn Diện Dành Cho Sinh Viên & Người Học
+[2]: ❖ ❖ ❖
+[3]: Người thực hiện: Chuyên gia Giáo dục & Công nghệ (10 năm kinh nghiệm)
+"Trong thời đại số, trở ngại lớn nhất của sinh viên không phải là thiếu thốn thông tin, mà là sự quá tải và mất phương hướng. SmartLife ra đời như một hệ sinh thái đồng nhất, kết hợp giữa khoa học hành vi, quản trị tài chính cá nhân, quản lý lộ trình học tập và trí tuệ nhân tạo (AI) để kiến tạo một lối sống tự chủ, khoa học và bền vững cho thế hệ tương lai."
+[4]: MỤC LỤC CHƯƠNG TRÌNH (AGENDA)
+[5]: 1. Lời mở đầu từ Chuyên gia Giáo dục & Công nghệ
+[6]: 2. Tầm nhìn & Sứ mệnh sản phẩm SmartLife
+[7]: 3. Đối tượng sử dụng & Mục đích thực tế
+[8]: 4. Bản đồ Tính năng & Giá trị thực tiễn mang lại
+[9]: 5. Phân tích Trước & Sau khi ứng dụng SmartLife vào cuộc sống
+[10]: 6. Trí tuệ Nhân tạo SmartLife AI Advisor — Trọng tâm đột phá
+[11]: 7. Hệ thống Gói đăng ký & Chính sách giá (Pricing)
+[12]: 8. Giá trị cốt lõi & Tuyên ngôn sản phẩm
+[13]: 1. LỜI MỞ ĐẦU TỪ CHUYÊN GIA GIÁO DỤC & CÔNG NGHỆ
+[14]: Kính chào các bạn sinh viên, các nhà giáo dục và đối tác phát triển,
+[15]: Trải qua hơn 10 năm nghiên cứu và làm việc tại giao lộ giữa giáo dục và công nghệ, tôi đã chứng kiến hàng ngàn sinh viên bước vào giảng đường đại học với tràn đầy hoài bão, nhưng nhanh chóng bị choáng ngợp bởi áp lực tự chủ. Không còn sự kèm cặp sát sao của cha mẹ hay lịch học đóng khung của trường phổ thông, các bạn phải tự mình quản lý: tài chính cá nhân eo hẹp, thời khóa biểu phức tạp, áp lực điểm số GPA, việc rèn luyện thói quen lành mạnh, và cả những xáo trộn tâm sinh lý tuổi trưởng thành.
+[16]: Hầu hết các giải pháp hiện tại đều rời rạc: một ứng dụng ghi chép chi tiêu, một ứng dụng to-do list, một cuốn sổ nhật ký, và một file excel tính điểm thi. Việc chuyển đổi qua lại giữa các công cụ này gây mất tập trung và phá vỡ tính liên tục của dữ liệu. Đó chính là lý do vì sao chúng tôi thiết kế SmartLife — một Super App (Siêu ứng dụng) quản trị bản thân tích hợp sâu sắc, mang tính cá nhân hóa cao, giúp đơn giản hóa việc quản lý cuộc sống để người học có thể tập trung vào thứ quan trọng nhất: phát triển bản thân và tận hưởng tri thức.
+[17]: 2. TẦM NHÌN & SỨ MỆNH SẢN PHẨM SMARTLIFE
+[18]: SmartLife không đơn thuần là một phần mềm tiện ích, mà là một triết lý sống chủ động được số hóa. Tầm nhìn và sứ mệnh của chúng tôi tập trung vào:
+[19]: • Tầm nhìn dài hạn: Trở thành người bạn đồng hành số không thể thiếu của mọi học sinh, sinh viên tại Việt Nam và khu vực trên con đường tự lập, chuyển đổi từ tư duy bị động sang chủ động kiểm soát cuộc đời.
+[20]: • Sứ mệnh cốt lõi: Tích hợp toàn diện các khía cạnh thiết yếu của cuộc sống (Học tập - Tài chính - Thời gian - Sức khỏe tinh thần) vào một giao diện trực quan, mượt mà và tối giản. Ứng dụng trí tuệ nhân tạo (AI) để cung cấp những chỉ dẫn hành động thực tế, khoa học và kịp thời nhất.
+[21]: 3. ĐỐI TƯỢNG SỬ DỤNG & MỤC ĐÍCH THỰC TẾ
+[22]: SmartLife được may đo đặc thù để giải quyết các bài toán thực tế của:
+[23]: ✔ Sinh viên các trường Đại học (đặc biệt là ĐHQGHN - VNU): Cần theo dõi điểm số theo quy chế đào tạo tín chỉ khắt khe, lập kế hoạch cải thiện GPA, tính toán điều kiện cảnh báo học vụ để không rơi vào tình trạng bị thôi học.
+[24]: ✔ Sinh viên sống xa nhà, tự lập tài chính: Cần kiểm soát dòng tiền chi tiêu hàng ngày, lập ngân sách chi tiêu tối giản để tránh tình trạng 'rỗng túi' cuối tháng.
+[25]: ✔ Người học muốn nâng cao hiệu suất làm việc (Self-learners): Muốn rèn luyện thói quen tốt (đọc sách, tập thể dục, học ngoại ngữ) thông qua cơ chế theo dõi chuỗi ngày hoàn thành (streak) và phương pháp tập trung Pomodoro.
+[26]: ✔ Thế hệ trẻ ưu tiên sức khỏe tinh thần: Muốn có một không gian viết nhật ký an toàn, bảo mật bằng mã PIN để giải tỏa áp lực, ghi lại cảm xúc và theo dõi diễn biến tâm lý qua từng giai đoạn học tập.
+[27]: 4. BẢN ĐỒ TÍNH NĂNG & GIÁ TRỊ THỰC TIỄN
+[28]: SmartLife sở hữu một hệ sinh thái tính năng đồ sộ, được thiết kế đồng nhất và tối giản hóa tối đa để mang lại trải nghiệm mượt mà:
+[29]: 4.1 Quản lý Tài chính Thông minh (Finance Dashboard)
+[30]: Giúp người dùng ghi chép thu nhập và chi tiêu theo các danh mục thực tế (Ăn uống, Nhà cửa, Giáo dục, Giải trí, Đầu tư...). Ứng dụng tự động trực quan hóa dòng tiền (Cash Flow) theo biểu đồ trực quan, hỗ trợ thiết lập hạn mức ngân sách tháng và cảnh báo khi chi tiêu vượt ngưỡng. Giúp người học hình thành tư duy tài chính thông minh ngay từ ghế nhà trường.
+[31]: 4.2 Hệ thống Theo dõi học vụ & GPA Tracker (GPA Dashboard)
+[32]: Tính năng độc quyền tích hợp sâu Quy chế đào tạo của Đại học Quốc gia Hà Nội (ĐHQGHN - VNU) cập nhật 2022. Quy đổi tự động thang điểm 10 sang thang điểm chữ (A+, A, B+...) và thang điểm 4. Tính toán GPA học kỳ, GPA tích lũy, tự động cảnh báo học vụ dựa trên năm học và ngưỡng quy chế, phân loại tốt nghiệp (Xuất sắc, Giỏi, Khá...). Cho phép người học lên kịch bản điểm số mục tiêu để biết chính xác học kỳ tới cần đạt bao nhiêu điểm môn học.
+[33]: 4.3 Quản lý Lịch trình & Thiết lập Mục tiêu (Schedule & Goals)
+[34]: Tích hợp thời khóa biểu cố định và linh hoạt. Người dùng có thể xuất thời khóa biểu thành hình ảnh chất lượng cao để làm hình nền điện thoại. Tính năng mục tiêu (Goals) cho phép phân loại mục tiêu ngắn hạn, trung hạn, dài hạn (như IELTS 7.0, tiết kiệm quỹ khởi nghiệp) với tiến độ tự động cập nhật và đếm ngược/đếm xuôi (countdown/up) ngày quan trọng.
+[35]: 4.4 Không gian Học tập tập trung & Âm nhạc (Focus & Sound Space)
+[36]: Công cụ bấm giờ Pomodoro khoa học kết hợp với phát âm thanh môi trường (tiếng mưa, quán cà phê, tiếng sóng biển) giúp kích thích sóng não tập trung. Đặc biệt tích hợp tiện ích Spotify riêng (My Spotify) để người học tự thêm và nghe nhạc/podcast yêu thích trực tiếp trong ứng dụng mà không cần chuyển app.
+[37]: 4.5 Nhật ký Chữa lành & Bảo mật (Healing Journal with PIN Guard)
+[38]: Một góc bình yên để viết nhật ký, ghi lại tâm trạng (Mood Tracker) hàng ngày. Ứng dụng cung cấp các câu hỏi gợi ý (Journal Prompts) để viết khi bí ý tưởng. Toàn bộ nhật ký được bảo vệ tuyệt đối bởi lớp khóa mã PIN bảo mật (Journal Pin Guard), mang lại không gian riêng tư trọn vẹn. (Đây là tính năng độc quyền dành cho các gói Pro hoặc dùng thử, bảo đảm không gian riêng tư bảo mật và chữa lành chuyên sâu).
+[39]: 4.6 Rèn luyện Thói quen (Habit Tracker)
+[40]: Thiết lập các thói quen hàng ngày và tích điểm hoàn thành. Hệ thống tính toán chuỗi ngày thực hiện liên tục (streak) để tạo động lực tâm lý tích cực, giúp việc xây dựng thói quen tốt trở nên dễ dàng và thú vị hơn. (Đối với phiên bản miễn phí, người dùng được giới hạn tối đa 3 thói quen hoạt động; nâng cấp gói Pro để không giới hạn).
+[41]: 4.7 Kho Lưu trữ Trực quan & Tệp tin cá nhân (My Storage & Visual Board)
+[42]: Cho phép người dùng Pro lưu trữ hình ảnh, liên kết tài liệu, tệp tin, audio và video trên bảng trực quan. Tất cả tài nguyên phục vụ học tập, tiểu luận, nghiên cứu khoa học được tập hợp tại một nơi duy nhất.
+[43]: 4.8 Cố vấn Sự nghiệp AI & Định hướng Nghề nghiệp (AI Career Coach)
+[44]: Tích hợp khảo sát tính cách MBTI, DISC và sở thích cá nhân, kết hợp cùng phân tích kết quả học vụ (GPA) hiện tại của người học. Từ đó, AI tự động gợi ý những ngành nghề triển vọng nhất, đề xuất các kỹ năng cứng/mềm cần rèn luyện và vạch ra lộ trình thăng tiến sự nghiệp chi tiết từng bước.
+[45]: 4.9 Xây dựng CV Tự động & Chuyên nghiệp (Auto CV Builder)
+[46]: Hỗ trợ sinh viên thiết kế và xuất bản CV chuyên nghiệp chuẩn ATS chỉ trong vài giây. Tính năng tự động đồng bộ hóa thông tin cá nhân, GPA, các môn học thế mạnh và các dự án thực tế từ hệ thống GPA Dashboard của người dùng, giúp tạo ra một CV chất lượng cao để sẵn sàng ứng tuyển.
+[48]: 5. PHÂN TÍCH TRƯỚC & SAU KHI SỬ DỤNG SMARTLIFE
+[49]: Để thấy rõ giá trị thực tiễn mà SmartLife mang lại, hãy cùng so sánh hiện trạng của người học trước và sau khi ứng dụng sản phẩm này:
+[51]: 6. TRÍ TUỆ NHÂN TẠO SMARTLIFE AI ADVISOR — TRỌNG TÂM ĐỘT PHÁ
+[52]: Điểm khác biệt lớn nhất tạo nên vị thế vượt trội của SmartLife so với các ứng dụng quản lý khác trên thị trường chính là trợ lý ảo SmartLife AI Advisor. Đây không phải là một chatbot hỏi đáp thông thường mà là một 'bộ não' thông minh được tích hợp sâu sắc:
+[53]: 💡 Truy cập dữ liệu thời gian thực: AI Advisor có quyền đọc dữ liệu tài chính, nhiệm vụ, thói quen, nhật ký và điểm số GPA hiện tại của người dùng (trong phạm vi bảo mật cho phép) để đưa ra tư vấn thiết thực.
+[54]: 💡 Tư vấn tài chính cá nhân hóa: Nhận diện những khoản chi tiêu bất hợp lý, đưa ra gợi ý phân bổ dòng tiền theo quy tắc 50/30/20 hoặc tối giản hóa chi tiêu cho sinh viên.
+[55]: 💡 Cố vấn học tập & Định hướng sự nghiệp (VNU Academic & Career Coach): Thấu hiểu sâu sắc quy chế đào tạo ĐHQGHN, kết hợp phân tích kết quả GPA và khảo sát tính cách MBTI/DISC để đưa ra lộ trình thăng tiến sự nghiệp chi tiết, gợi ý ngành nghề phù hợp và kỹ năng bổ trợ cần học.
+[56]: 💡 Hỗ trợ sức khỏe tinh thần (Journal Co-writer): Khi người dùng gặp khó khăn trong việc diễn đạt cảm xúc, AI gợi ý các hướng viết nhật ký, phản hồi động viên chân thành và gợi ý các bài tập thở hoặc thiền ngắn để giải tỏa áp lực.
+[57]: 7. HỆ THỐNG GÓI ĐĂNG KÝ & CHÍNH SÁCH GIÁ (PRICING)
+[59]: Để đảm bảo khả năng cập nhật và nâng cấp tính năng liên tục, SmartLife triển khai hệ thống 5 gói đăng ký linh hoạt, tối ưu chi phí dành cho sinh viên Việt Nam:
+[60]: • Gói Khám Phá (1 tháng): 59.000đ
+[61]: • Gói Nghiêm Túc (3 tháng): 139.000đ (tiết kiệm 21%)
+[62]: • Gói Quyết Tâm (6 tháng): 239.000đ (tiết kiệm 33%)
+[63]: • Gói Đỉnh Cao (12 tháng): 399.000đ (tiết kiệm 44% - Phổ biến nhất)
+[64]: • Gói Sinh Viên Chăm Chỉ (4 năm): 499.000đ (tiết kiệm 82% - Best Value, chỉ ~10.000đ/tháng)
+[65]: Hệ thống áp dụng chính sách giới hạn tính năng (Feature Gating) đối với tài khoản Free bao gồm: giới hạn tối đa 3 thói quen hoạt động ở Habit Tracker, yêu cầu nâng cấp Pro/Trial đối với Nhật ký cá nhân (Healing Journal) và các tính năng nâng cao như Cố vấn AI Advisor, Phân tích hướng nghiệp AI Career Coach, và Tự động xuất CV ATS.
+[67]: 8. GIÁ TRỊ CỐT LÕI & TUYÊN NGÔN SẢN PHẨM
+[68]: Triết lý phát triển của SmartLife được xây dựng vững chắc trên 4 trụ cột giá trị cốt lõi:
+[69]: ✦ 1. Tính Đồng Nhất (Unified Ecosystem): 9 tính năng nằm gọn trong 1 ứng dụng duy nhất. Không quảng cáo rác, không giao diện phức tạp. Dữ liệu liên thông và bổ trợ cho nhau để vẽ nên bức tranh toàn cảnh về cuộc sống của bạn.
+[70]: ✦ 2. Sự Tối Giản & Tốc Độ (Minimalism & Performance): Mọi thao tác đều được thiết kế để hoàn thành trong 1-2 lần chạm. Ứng dụng chạy mượt mà, phản hồi ngay lập tức, tập trung vào những thông tin quan trọng nhất.
+[71]: ✦ 3. Trí Tuệ Định Hướng Hành Động (Actionable AI): Công nghệ AI không làm thay bạn, nhưng đóng vai trò là một người cố vấn thông thái, giúp bạn biến dữ liệu khô khan thành hành động thực tế mỗi ngày.
+[72]: ✦ 4. Quyền Riêng Tư Tuyệt Đối (Privacy-First): Dữ liệu nhật ký được bảo mật mã PIN riêng. Dữ liệu tài chính và cá nhân được tôn trọng và lưu trữ an toàn, đảm bảo không gian cá nhân của người học không bị xâm phạm.
+[73]: SmartLife không chỉ là một công cụ công nghệ — đó là cam kết cho một lối sống kỷ luật, tự chủ và thành công. Với SmartLife, mỗi ngày trôi qua đều là một bước tiến vững chắc hướng tới tương lai mà bạn mong ước.
+
+=== TABLES ===
+
+[TABLE 0]:
+Row 0: Khía cạnh quản lý | Trước khi dùng SmartLife | Sau khi dùng SmartLife (Đã chuyển hóa)
+Row 1: Quản lý Tài chính | Chi tiêu vô tội vạ, không biết tiền đi đâu. Thường xuyên rơi vào khủng hoảng tài chính cuối tháng. | Ghi chép nhanh chóng, chủ động đặt hạn mức chi dùng. Có AI phân tích cơ cấu chi tiêu hằng tháng và gợi ý tối ưu.
+Row 2: Quản lý Học tập & GPA | Mơ hồ về điểm tích lũy, bất ngờ nhận cảnh báo học vụ do tính nhầm điểm hệ 4. Khó lên kế hoạch cải thiện GPA. | Điểm số được quy đổi chuẩn xác theo quy chế ĐHQGHN. Biết rõ điểm đích cần đạt ở từng môn học học kỳ kế tiếp.
+Row 3: Quản lý Thời gian | Trễ deadline, quên lịch thi, thời khóa biểu rời rạc khó theo dõi. Đầu óc luôn căng thẳng vì quá tải lịch. | Lịch trình khoa học, hiển thị dạng widget nổi bật, xuất ảnh thời khóa biểu làm hình nền điện thoại tiện lợi.
+Row 4: Sức khỏe tinh thần | Stress không có nơi giãi bày, sợ người khác đọc trộm nhật ký. Tâm trạng bất ổn không được theo dõi. | Viết nhật ký an toàn với khóa PIN bảo mật. AI hỗ trợ gợi ý viết lách và theo dõi xu hướng tâm trạng qua biểu đồ.
+Row 5: Rèn luyện bản thân | Hào hứng vài ngày rồi bỏ cuộc do thiếu động lực và thiếu công cụ ghi nhận tiến trình thói quen. | Duy trì thói quen theo chuỗi streak trực quan, Pomodoro tập trung kết hợp nhạc nền Spotify mang lại niềm vui học tập.
+Row 6: Định hướng sự nghiệp & CV | Mơ hồ về lộ trình phát triển sự nghiệp sau ra trường. Tự viết CV thủ công khó khăn, thiếu chuyên nghiệp và không nêu bật được thành tích học tập, dự án. | AI tự động phân tích GPA, MBTI/DISC để gợi ý nghề nghiệp thích hợp và vạch lộ trình thăng tiến chi tiết. Hỗ trợ tạo và xuất CV PDF chuyên nghiệp, chuẩn chỉnh từ hồ sơ học tập chỉ trong vài giây.

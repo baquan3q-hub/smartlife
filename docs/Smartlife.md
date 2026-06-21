@@ -149,7 +149,11 @@ Toàn bộ `AppState` làm context nền, đặc biệt là `transactions`, `goa
 Về phía người dùng cuối, đây không phải bài toán trực tiếp. Tuy nhiên ở góc độ triển khai nghiên cứu, người phát triển cần theo dõi người dùng, trạng thái gói, hoạt động gần đây và mức sử dụng AI.
 
 **SmartLife giải quyết thế nào**  
-`AdminDashboard.tsx` cho admin theo dõi danh sách user, plan, trial/pro, đơn hàng subscription và token AI trong ngày. `subscriptionService.ts` hỗ trợ tạo order, xác nhận order, trial và hoàn tác trạng thái gói.
+`AdminDashboard.tsx` cho admin theo dõi danh sách user, plan (gồm 5 gói: Khám phá 1 tháng, Nghiêm túc 3 tháng, Quyết tâm 6 tháng, Đỉnh cao 12 tháng, Sinh viên chăm chỉ 4 năm), đơn hàng subscription và token AI trong ngày. `subscriptionService.ts` hỗ trợ tạo order, xác nhận order, trial và hoàn tác trạng thái gói. Giao diện `PricingModal` hiển thị thông tin chuyển khoản và cấu hình giá tương ứng cho từng gói.
+
+Hệ thống áp dụng các quy tắc giới hạn tính năng (Feature Gating) cho tài khoản Free bao gồm:
+- **Nhật ký cá nhân (Journal)**: Bị chặn (gated) hoàn toàn và yêu cầu nâng cấp Pro/Trial, hiển thị màn hình giới thiệu nâng cấp `ProGateOverlay` cho người dùng Free.
+- **Theo dõi thói quen (Habits)**: Giới hạn tối đa **3 thói quen hoạt động** cho tài khoản Free. Khi thêm thói quen thứ 4, hệ thống sẽ chặn và chuyển nút thêm thành "Nâng cấp Pro".
 
 **Dữ liệu nào được dùng**  
 `profiles`, `subscription_orders`, `api_logs`, RPC `get_admin_users`.

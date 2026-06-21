@@ -1,6 +1,6 @@
 // File: src/components/ProGateOverlay.tsx
 import React from 'react';
-import { Lock, Crown, Sparkles, CalendarDays, Brain, LayoutDashboard, Flame, Star, Zap, TrendingUp, Trophy, BookOpen, Briefcase, FileText } from 'lucide-react';
+import { Lock, Crown, Sparkles, CalendarDays, Brain, LayoutDashboard, Flame, Star, Zap, TrendingUp, Trophy, BookOpen, Briefcase, FileText, Target } from 'lucide-react';
 
 interface ProGateOverlayProps {
   featureName: string;
@@ -46,60 +46,59 @@ const ProGateOverlay: React.FC<ProGateOverlayProps> = ({ featureName, featureIco
           </p>
 
           <p className="text-gray-400 text-xs mb-6">
-            Chỉ từ 33.000đ/tháng — rẻ hơn 1 ly trà sữa 🧋
+            Chỉ từ ~10.000đ/tháng — rẻ hơn 1 ly trà đá 🧋
           </p>
 
           {/* Locked features list (Scrollable) */}
           <div className="flex flex-col gap-2 mb-6 max-h-48 overflow-y-auto pr-1 custom-scrollbar text-left">
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <LayoutDashboard size={16} className="text-pink-500 shrink-0" />
-              <span>Visual Board tổng quan</span>
+            <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <Brain size={14} className="text-violet-500 shrink-0" />
+              <span className="font-bold flex-1 min-w-0 truncate">AI Cố vấn riêng (600k tokens/tháng)</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
-
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <Flame size={16} className="text-orange-500 shrink-0" />
-              <span>Habit Tracker (Streak & Đếm ngược)</span>
+            <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <Briefcase size={14} className="text-rose-500 shrink-0" />
+              <span className="font-bold flex-1 min-w-0 truncate">AI Career Analyzer (MBTI/DISC)</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <Star size={16} className="text-amber-500 shrink-0" />
-              <span>StarBrain ⭐ (Hệ thống phần thưởng)</span>
+            <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <FileText size={14} className="text-sky-500 shrink-0" />
+              <span className="font-bold flex-1 min-w-0 truncate">CV Builder chuẩn Harvard (Export PDF)</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <BookOpen size={16} className="text-emerald-500 shrink-0" />
-              <span>Nhật ký cá nhân & Chữa lành</span>
+            <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <Target size={14} className="text-purple-500 shrink-0" />
+              <span className="font-bold flex-1 min-w-0 truncate">Lộ trình Sự nghiệp & 5 năm</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <Brain size={16} className="text-purple-500 shrink-0" />
-              <span>AI Cố vấn cá nhân</span>
+            <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <Trophy size={14} className="text-cyan-500 shrink-0" />
+              <span className="font-bold flex-1 min-w-0 truncate">GPA Tracker & Giả lập điểm số</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <Zap size={16} className="text-yellow-500 shrink-0" />
-              <span>Focus Timer & Lofi Music</span>
+            <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <LayoutDashboard size={14} className="text-indigo-500 shrink-0" />
+              <span className="font-bold flex-1 min-w-0 truncate">Visual Board tổng quan</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <TrendingUp size={16} className="text-emerald-500 shrink-0" />
-              <span>Quản lý tài chính & Cashflow</span>
+            <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <TrendingUp size={14} className="text-emerald-500 shrink-0" />
+              <span className="font-bold flex-1 min-w-0 truncate">Quản lý tài chính & Cashflow</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <Trophy size={16} className="text-blue-500 shrink-0" />
-              <span>GPA Tracker nâng cao</span>
+            <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <BookOpen size={14} className="text-teal-500 shrink-0" />
+              <span className="font-bold flex-1 min-w-0 truncate">Nhật ký cá nhân Pro (Mood & AI)</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <Briefcase size={16} className="text-cyan-500 shrink-0" />
-              <span>AI Career Analyzer (Phân tích ngành học & tính cách)</span>
+            <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <Flame size={14} className="text-orange-500 shrink-0" />
+              <span className="font-bold flex-1 min-w-0 truncate">Habit Tracker không giới hạn</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
-              <FileText size={16} className="text-teal-500 shrink-0" />
-              <span>CV Builder — Tạo & lưu trữ CV thông minh</span>
+            <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-2.5">
+              <Star size={14} className="text-amber-500 shrink-0" />
+              <span className="font-bold flex-1 min-w-0 truncate">StarBrain ⭐ Hệ thống sao thưởng</span>
               <Lock size={12} className="ml-auto text-gray-300 shrink-0" />
             </div>
           </div>
@@ -116,7 +115,7 @@ const ProGateOverlay: React.FC<ProGateOverlayProps> = ({ featureName, featureIco
           {/* Free features reminder */}
           <div className="text-[11px] text-gray-400 mt-4 flex flex-col items-center gap-1">
             <p>Tương lai nằm trong tay bạn. Đầu tư sớm, sinh lời cao!</p>
-            <p>💡 Đăng ký 3 tháng tặng thêm 1 tháng.</p>
+            <p>💡 Gói Sinh viên chăm chỉ 4 năm chỉ 499k — rẻ hơn trà đá!</p>
           </div>
         </div>
       </div>

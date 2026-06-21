@@ -34,10 +34,12 @@ interface AIAdvisorPageProps {
     onBack: () => void;
     // Action handlers from App.tsx
     onAddTimetable?: (item: any) => Promise<void>;
-    onAddTodo?: (content: string, priority: string, deadline?: string) => Promise<void>;
+    onAddTodo?: (content: string, priority: string, deadline?: string, status?: any, description?: string) => Promise<void>;
     onAddTransaction?: (tx: any) => Promise<void>;
     onImportGPAData?: (semesters: any[]) => Promise<void>;
     onSelectBoostPack?: (packType: 'boost_s' | 'boost_m' | 'boost_l') => void;
+    onUpdateTodo?: (item: any) => Promise<void>;
+    onDeleteTodo?: (id: string) => Promise<void>;
 }
 
 interface UIMessage {
@@ -188,7 +190,7 @@ const getMimeTypeFromExtension = (ext: string): string => {
 const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     appState, lang, onBack,
     onAddTimetable, onAddTodo, onAddTransaction, onImportGPAData,
-    onSelectBoostPack
+    onSelectBoostPack, onUpdateTodo, onDeleteTodo
 }) => {
     const [messages, setMessages] = useState<UIMessage[]>([
         {
@@ -361,6 +363,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         onAddTodo,
         onAddTransaction,
         onImportGPAData,
+        onUpdateTodo,
+        onDeleteTodo,
     };
 
     // Auto scroll

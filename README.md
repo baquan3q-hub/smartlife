@@ -126,6 +126,27 @@ src/
 
 ---
 
+## 💎 Hệ Thống Gói Dịch Vụ & Giới Hạn Tính Năng (Pricing & Gating)
+
+SmartLife triển khai mô hình Freemium phối hợp các gói đăng ký trả phí tối ưu chi phí dành cho sinh viên Việt Nam:
+
+### 1. Các Gói Dịch Vụ
+- 🔥 **Khám phá (1 tháng)**: 59.000đ
+- ⭐ **Nghiêm túc (3 tháng)**: 139.000đ (tiết kiệm 21%)
+- 💎 **Quyết tâm (6 tháng)**: 239.000đ (tiết kiệm 33%)
+- 👑 **Đỉnh cao (12 tháng)**: 399.000đ (tiết kiệm 44% - *Phổ biến*)
+- 🎓 **Sinh viên chăm chỉ (4 năm)**: 499.000đ (tiết kiệm 82% - **BEST VALUE** - Chỉ ~10.000đ/tháng)
+
+### 2. Chính Sách Giới Hạn Tính Năng (Feature Gating)
+- **Nhật ký cá nhân (Healing Journal)**: Tính năng PRO. Người dùng Free cần nâng cấp để truy cập (hiển thị giao diện chặn `ProGateOverlay`).
+- **Theo dõi thói quen (Habit Tracker)**: Tài khoản Free giới hạn tối đa **3 thói quen hoạt động**. Khi thêm thói quen thứ 4 cần nâng cấp Pro.
+- **Tính năng mở khóa Pro**: Cố vấn AI cá nhân hóa (AI Advisor), Cố vấn nghề nghiệp AI (AI Career Coach), Tạo CV ATS xuất PDF, Kế hoạch GPA 5 năm (GPA Projections).
+- **Các tính năng Free hoàn toàn**: Visual Board (Dashboard tổng quan), Thời khóa biểu (Timetable), Quản lý tài chính (Finance - Ví/Quỹ, Sổ nợ, Chuyển khoản), Focus Timer Pomodoro & Music Space.
+
+Chi tiết về kỹ thuật giới hạn quota, AI Boost Packs và sơ đồ cơ sở dữ liệu có sẵn tại [Tài liệu chính sách giá Pricing](file:///c:/Users/84923/OneDrive/Máy tính/online-learning-web ( final e learn )/SmartLifeApp/docs/PRICING.md).
+
+---
+
 ## 🚀 Hướng Dẫn Cài Đặt & Chạy Dưới Local
 
 ### Yêu cầu hệ thống:

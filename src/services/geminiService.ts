@@ -218,7 +218,7 @@ export function buildScheduleContext(state: AppState): string {
                 ctx += `    (trống)\n`;
             } else {
                 colTodos.forEach(t => {
-                    ctx += `    - ${t.content}`;
+                    ctx += `    - [ID: ${t.id}] ${t.content}`;
                     if (t.deadline) {
                         ctx += ` [Hạn: ${new Date(t.deadline).toLocaleDateString('vi-VN')}]`;
                     }
