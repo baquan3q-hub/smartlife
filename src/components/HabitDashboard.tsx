@@ -3,7 +3,7 @@ import { CountdownItem, CountUpItem, Habit, HabitLog, DayOfWeek, CheckinReward }
 import { supabase } from '../services/supabase';
 import { processCheckin, reverseCheckinStars, fetchStarStats, getLevelFromStars, getNextLevel, LEVELS } from '../services/starBrainService';
 import StarBrainDashboard from './StarBrainDashboard';
-import { Plus, X, Flame, Timer, TrendingUp, Trash2, Edit3, ChevronDown, RotateCcw, Award, CheckCircle2, Circle, Calendar, BarChart3, ChevronLeft, ChevronRight, Star, Sparkles, Zap, Gift, ListChecks } from 'lucide-react';
+import { Plus, X, Flame, Timer, TrendingUp, Trash2, Edit3, ChevronDown, RotateCcw, Award, CheckCircle2, Circle, Calendar, BarChart3, ChevronLeft, ChevronRight, Star, Sparkles, Zap, Gift, ListChecks, Crown } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 
 const DAY_LABELS: Record<DayOfWeek, string> = { mon:'T2', tue:'T3', wed:'T4', thu:'T5', fri:'T6', sat:'T7', sun:'CN' };
@@ -41,10 +41,12 @@ const today = () => {
 const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const diffDays = (target: string) => Math.ceil((new Date(target).getTime() - new Date(today()).getTime()) / 86400000);
 
-interface Props { userId: string; onNavigateToSchedule?: () => void; }
+const FREE_HABIT_LIMIT = 3;
+
+interface Props { userId: string; onNavigateToSchedule?: () => void; isPro?: boolean; onUpgrade?: () => void; }
 
 // ── Main Component ──
-const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
+const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule, isPro = false, onUpgrade }) => {
   const [subTab, setSubTab] = useState<'habits' | 'countdown' | 'countup' | 'stars'>('habits');
   const [countdowns, setCountdowns] = useState<CountdownItem[]>([]);
   const [countups, setCountups] = useState<CountUpItem[]>([]);
@@ -132,6 +134,12 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
 
   // ── Habit CRUD ──
   const addHabit = async (item: Omit<Habit, 'id' | 'user_id' | 'created_at'>) => {
+    // Free user limit check
+    if (!isPro && habits.length >= FREE_HABIT_LIMIT) {
+      onUpgrade?.();
+      setShowForm(null);
+      return;
+    }
     const { data } = await supabase.from('habits').insert([{ ...item, user_id: userId }]).select().single();
     if (data) setHabits(prev => [...prev, { ...data, active_days: data.active_days || ALL_DAYS }]);
     setShowForm(null);
@@ -511,11 +519,32 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule }) => {
       {subTab === 'habits' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-gray-900">Today's Habits</h2>
-            <button onClick={() => { setEditItem(null); setShowForm('habit'); }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-orange-200 hover:-translate-y-0.5 transition-all">
-              <Plus size={18} /> Thêm thói quen
-            </button>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold text-gray-900">Today's Habits</h2>
+              {!isPro && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  habits.length >= FREE_HABIT_LIMIT 
+                    ? 'bg-red-50 text-red-600 border-red-200' 
+                    : 'bg-gray-100 text-gray-500 border-gray-200'
+                }`}>
+                  {habits.length}/{FREE_HABIT_LIMIT} Free
+                </span>
+              )}
+              {isPro && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">∞ Pro</span>
+              )}
+            </div>
+            {!isPro && habits.length >= FREE_HABIT_LIMIT ? (
+              <button onClick={() => onUpgrade?.()}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold text-sm shadow-lg shadow-indigo-200 hover:-translate-y-0.5 transition-all">
+                <Crown size={16} className="text-yellow-300" /> Nâng cấp Pro
+              </button>
+            ) : (
+              <button onClick={() => { setEditItem(null); setShowForm('habit'); }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-orange-200 hover:-translate-y-0.5 transition-all">
+                <Plus size={18} /> Thêm thói quen
+              </button>
+            )}
           </div>
 
           {/* Today Panel */}

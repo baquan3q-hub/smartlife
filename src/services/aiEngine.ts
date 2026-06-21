@@ -46,9 +46,11 @@ export interface AIResponse {
 // Action handlers passed from App.tsx
 export interface ActionHandlers {
     onAddTimetable?: (item: any) => Promise<void>;
-    onAddTodo?: (content: string, priority: string, deadline?: string) => Promise<void>;
+    onAddTodo?: (content: string, priority: string, deadline?: string, status?: any, description?: string) => Promise<void>;
     onAddTransaction?: (tx: any) => Promise<void>;
     onImportGPAData?: (semesters: any[]) => Promise<void>;
+    onUpdateTodo?: (item: any) => Promise<void>;
+    onDeleteTodo?: (id: string) => Promise<void>;
 }
 
 // ────────────────────────────────────────
@@ -64,7 +66,7 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
                 table: {
                     type: 'string',
                     description: 'Tên bảng cần truy vấn',
-                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events', 'gpa_semesters', 'gpa_courses', 'habits', 'habit_logs', 'countdown_items', 'countup_items', 'journal_entries', 'journal_tags', 'wallets', 'debts', 'debt_repayments']
+                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events', 'gpa_semesters', 'gpa_courses', 'habits', 'habit_logs', 'countdown_items', 'countup_items', 'journal_entries', 'journal_tags', 'wallets', 'debts', 'debt_repayments', 'my_storage']
                 },
                 select: {
                     type: 'string',
@@ -121,7 +123,9 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
             properties: {
                 content: { type: 'string', description: 'Nội dung việc cần làm' },
                 priority: { type: 'string', description: 'Mức ưu tiên', enum: ['high', 'medium', 'low'] },
-                deadline: { type: 'string', description: 'Hạn hoàn thành, format YYYY-MM-DD' }
+                deadline: { type: 'string', description: 'Hạn hoàn thành, format YYYY-MM-DD' },
+                status: { type: 'string', description: 'Trạng thái cột của task', enum: ['backlog', 'todo', 'doing', 'done'] },
+                description: { type: 'string', description: 'Mô tả chi tiết việc cần làm' }
             },
             required: ['content']
         }
@@ -308,6 +312,76 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
             },
             required: ['semesters']
         }
+    },
+    {
+        name: 'update_todo',
+        description: 'Cập nhật thông tin hoặc trạng thái phân loại cột (backlog, todo, doing, done) của một việc cần làm (todo) hiện tại theo ID. Xác nhận với người dùng trước khi thay đổi.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: { type: 'string', description: 'ID của việc cần làm cần cập nhật (ví dụ: uuid)' },
+                content: { type: 'string', description: 'Nội dung mới của việc cần làm (tuỳ chọn)' },
+                priority: { type: 'string', description: 'Mức ưu tiên mới (tuỳ chọn)', enum: ['high', 'medium', 'low'] },
+                deadline: { type: 'string', description: 'Hạn hoàn thành mới (tuỳ chọn), format YYYY-MM-DD' },
+                status: { type: 'string', description: 'Trạng thái cột phân loại mới (tuỳ chọn)', enum: ['backlog', 'todo', 'doing', 'done'] },
+                description: { type: 'string', description: 'Mô tả chi tiết mới (tuỳ chọn)' }
+            },
+            required: ['id']
+        }
+    },
+    {
+        name: 'delete_todo',
+        description: 'Xóa một việc cần làm (todo) theo ID. Hỏi xác nhận người dùng trước khi xóa.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: { type: 'string', description: 'ID của việc cần làm cần xóa' }
+            },
+            required: ['id']
+        }
+    },
+    {
+        name: 'get_bookmarks',
+        description: 'Lấy danh sách tất cả các liên kết (bookmarks/links) đã lưu của người dùng.',
+        parameters: { type: 'object', properties: {} }
+    },
+    {
+        name: 'add_bookmark',
+        description: 'Thêm một liên kết (bookmark) mới. Xác nhận với người dùng trước khi thêm.',
+        parameters: {
+            type: 'object',
+            properties: {
+                title: { type: 'string', description: 'Tiêu đề hoặc mô tả ngắn của liên kết. VD: "Tài liệu học React"' },
+                url: { type: 'string', description: 'Đường dẫn URL của liên kết. VD: "https://react.dev"' },
+                group: { type: 'string', description: 'Tên nhóm phân loại bookmark (tuỳ chọn). VD: "dự án", "Sách", "học tập"' }
+            },
+            required: ['title', 'url']
+        }
+    },
+    {
+        name: 'update_bookmark',
+        description: 'Cập nhật thông tin hoặc nhóm phân loại của một bookmark hiện có. Xác nhận với người dùng trước khi cập nhật.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: { type: 'string', description: 'ID của bookmark cần cập nhật' },
+                title: { type: 'string', description: 'Tiêu đề mới (tuỳ chọn)' },
+                url: { type: 'string', description: 'URL mới (tuỳ chọn)' },
+                group: { type: 'string', description: 'Nhóm phân loại mới (tuỳ chọn)' }
+            },
+            required: ['id']
+        }
+    },
+    {
+        name: 'delete_bookmark',
+        description: 'Xóa một liên kết (bookmark) theo ID. Hỏi xác nhận trước khi xóa.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: { type: 'string', description: 'ID của bookmark cần xóa' }
+            },
+            required: ['id']
+        }
     }
 ];
 
@@ -335,6 +409,7 @@ const DATE_COLUMNS: Record<string, string> = {
     wallets: 'created_at',
     debts: 'date_lent',
     debt_repayments: 'payment_date',
+    my_storage: 'created_at',
 };
 
 async function executeQueryDatabase(args: any): Promise<any> {
@@ -406,19 +481,189 @@ async function executeAddTodo(
     args: any,
     handlers: ActionHandlers
 ): Promise<ActionResult> {
-    const { content, priority = 'medium', deadline } = args;
+    const { content, priority = 'medium', deadline, status, description } = args;
     try {
         if (handlers.onAddTodo) {
-            await handlers.onAddTodo(content, priority, deadline);
+            await handlers.onAddTodo(content, priority, deadline, status, description);
         }
         return {
             type: 'todo',
             success: true,
-            message: `✅ Đã thêm việc: "${content}" [${priority}]${deadline ? ` (Hạn: ${deadline})` : ''}`,
+            message: `✅ Đã thêm việc: "${content}" [${priority}]${status ? ` [Cột: ${status}]` : ''}${deadline ? ` (Hạn: ${deadline})` : ''}`,
             data: args
         };
     } catch (error: any) {
         return { type: 'todo', success: false, message: `❌ Lỗi thêm việc: ${error.message}` };
+    }
+}
+
+async function executeUpdateTodo(
+    args: any,
+    handlers: ActionHandlers
+): Promise<ActionResult> {
+    const { id, content, priority, deadline, status, description } = args;
+    try {
+        if (handlers.onUpdateTodo) {
+            const updateFields: any = { id };
+            if (content !== undefined) updateFields.content = content;
+            if (priority !== undefined) updateFields.priority = priority;
+            if (deadline !== undefined) updateFields.deadline = deadline;
+            if (status !== undefined) updateFields.status = status;
+            if (description !== undefined) updateFields.description = description;
+
+            await handlers.onUpdateTodo(updateFields);
+            return {
+                type: 'todo',
+                success: true,
+                message: `✅ Đã cập nhật công việc ID: ${id}`,
+                data: args
+            };
+        } else {
+            throw new Error('Update handler is not registered');
+        }
+    } catch (error: any) {
+        return { type: 'todo', success: false, message: `❌ Lỗi cập nhật công việc: ${error.message}` };
+    }
+}
+
+async function executeDeleteTodo(
+    args: any,
+    handlers: ActionHandlers
+): Promise<ActionResult> {
+    const { id } = args;
+    try {
+        if (handlers.onDeleteTodo) {
+            await handlers.onDeleteTodo(id);
+            return {
+                type: 'todo',
+                success: true,
+                message: `✅ Đã xóa công việc ID: ${id}`,
+                data: args
+            };
+        } else {
+            throw new Error('Delete handler is not registered');
+        }
+    } catch (error: any) {
+        return { type: 'todo', success: false, message: `❌ Lỗi xóa công việc: ${error.message}` };
+    }
+}
+
+async function executeGetBookmarks(appState: AppState): Promise<any> {
+    const userId = appState.profile?.id;
+    if (!userId) return { error: 'User is not logged in.' };
+    const { data, error } = await supabase
+        .from('my_storage')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('type', 'link')
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false });
+
+    if (error) return { error: error.message };
+    return { bookmarks: data || [] };
+}
+
+async function executeAddBookmark(args: any, appState: AppState): Promise<ActionResult> {
+    const { title, url, group } = args;
+    const userId = appState.profile?.id;
+    if (!userId) {
+        return { type: 'my_storage' as any, success: false, message: '❌ Lỗi thêm liên kết: Người dùng chưa đăng nhập.' };
+    }
+
+    let formattedUrl = url.trim();
+    if (!/^https?:\/\//i.test(formattedUrl)) {
+        formattedUrl = `https://${formattedUrl}`;
+    }
+
+    try {
+        const { data, error } = await supabase.from('my_storage').insert([
+            {
+                user_id: userId,
+                type: 'link',
+                title: title.trim(),
+                content: formattedUrl,
+                is_pinned: false,
+                metadata: { group: group || null },
+            },
+        ]).select().single();
+
+        if (error) throw error;
+
+        return {
+            type: 'my_storage' as any,
+            success: true,
+            message: `✅ Đã thêm liên kết: "${title}" vào nhóm [${group || 'Mặc định'}]`,
+            data: data
+        };
+    } catch (error: any) {
+        return { type: 'my_storage' as any, success: false, message: `❌ Lỗi thêm liên kết: ${error.message}` };
+    }
+}
+
+async function executeUpdateBookmark(args: any, appState: AppState): Promise<ActionResult> {
+    const { id, title, url, group } = args;
+    const userId = appState.profile?.id;
+    if (!userId) {
+        return { type: 'my_storage' as any, success: false, message: '❌ Lỗi cập nhật liên kết: Người dùng chưa đăng nhập.' };
+    }
+
+    try {
+        const updateFields: any = {};
+        if (title !== undefined) updateFields.title = title.trim();
+        if (url !== undefined) {
+            let formattedUrl = url.trim();
+            if (!/^https?:\/\//i.test(formattedUrl)) {
+                formattedUrl = `https://${formattedUrl}`;
+            }
+            updateFields.content = formattedUrl;
+        }
+        if (group !== undefined) {
+            updateFields.metadata = { group: group || null };
+        }
+
+        const { data, error } = await supabase
+            .from('my_storage')
+            .update(updateFields)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            type: 'my_storage' as any,
+            success: true,
+            message: `✅ Đã cập nhật liên kết ID: ${id}`,
+            data: data
+        };
+    } catch (error: any) {
+        return { type: 'my_storage' as any, success: false, message: `❌ Lỗi cập nhật liên kết: ${error.message}` };
+    }
+}
+
+async function executeDeleteBookmark(args: any, appState: AppState): Promise<ActionResult> {
+    const { id } = args;
+    const userId = appState.profile?.id;
+    if (!userId) {
+        return { type: 'my_storage' as any, success: false, message: '❌ Lỗi xóa liên kết: Người dùng chưa đăng nhập.' };
+    }
+
+    try {
+        const { error } = await supabase
+            .from('my_storage')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        return {
+            type: 'my_storage' as any,
+            success: true,
+            message: `✅ Đã xóa liên kết ID: ${id}`,
+            data: args
+        };
+    } catch (error: any) {
+        return { type: 'my_storage' as any, success: false, message: `❌ Lỗi xóa liên kết: ${error.message}` };
     }
 }
 
@@ -452,13 +697,7 @@ export interface AIAttachment {
     data: string; // Base64 representation of the file
 }
 
-// Action handlers passed from App.tsx
-export interface ActionHandlers {
-    onAddTimetable?: (item: any) => Promise<void>;
-    onAddTodo?: (content: string, priority: string, deadline?: string) => Promise<void>;
-    onAddTransaction?: (tx: any) => Promise<void>;
-    onImportGPAData?: (semesters: any[]) => Promise<void>;
-}
+
 
 async function executeBatchAddTransactions(
     args: any,
@@ -710,6 +949,40 @@ export async function chatWithAI(
                     }
                     case 'add_todo': {
                         const actionResult = await executeAddTodo(args, handlers);
+                        actions.push(actionResult);
+                        result = { success: actionResult.success, message: actionResult.message };
+                        break;
+                    }
+                    case 'update_todo': {
+                        const actionResult = await executeUpdateTodo(args, handlers);
+                        actions.push(actionResult);
+                        result = { success: actionResult.success, message: actionResult.message };
+                        break;
+                    }
+                    case 'delete_todo': {
+                        const actionResult = await executeDeleteTodo(args, handlers);
+                        actions.push(actionResult);
+                        result = { success: actionResult.success, message: actionResult.message };
+                        break;
+                    }
+                    case 'get_bookmarks': {
+                        result = await executeGetBookmarks(appState);
+                        break;
+                    }
+                    case 'add_bookmark': {
+                        const actionResult = await executeAddBookmark(args, appState);
+                        actions.push(actionResult);
+                        result = { success: actionResult.success, message: actionResult.message };
+                        break;
+                    }
+                    case 'update_bookmark': {
+                        const actionResult = await executeUpdateBookmark(args, appState);
+                        actions.push(actionResult);
+                        result = { success: actionResult.success, message: actionResult.message };
+                        break;
+                    }
+                    case 'delete_bookmark': {
+                        const actionResult = await executeDeleteBookmark(args, appState);
                         actions.push(actionResult);
                         result = { success: actionResult.success, message: actionResult.message };
                         break;

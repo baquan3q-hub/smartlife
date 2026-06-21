@@ -284,7 +284,7 @@ export interface SmartInsight {
 }
 
 // 6. Subscription & Pro Plan
-export type SubscriptionPlanDuration = '1_month' | '3_months' | '12_months' | 'lifetime' | 'boost_s' | 'boost_m' | 'boost_l';
+export type SubscriptionPlanDuration = '1_month' | '3_months' | '6_months' | '12_months' | '4_years' | 'lifetime' | 'boost_s' | 'boost_m' | 'boost_l';
 
 export interface SubscriptionPlan {
   id: SubscriptionPlanDuration;
@@ -294,6 +294,9 @@ export interface SubscriptionPlan {
   monthly_price: number;
   save_percent: number;
   is_popular?: boolean;
+  is_best_value?: boolean;
+  emoji?: string;
+  original_price?: number; // Giá gạch (nếu mua từng tháng)
 }
 
 export interface SubscriptionOrder {

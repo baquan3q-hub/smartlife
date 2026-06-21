@@ -6,36 +6,55 @@ import { SubscriptionOrder, SubscriptionPlan, SubscriptionPlanDuration, AdminGif
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: '1_month',
-    label: '1 Tháng',
+    label: 'Khám phá',
+    emoji: '🔥',
     price: 59000,
     duration_days: 30,
     monthly_price: 59000,
     save_percent: 0,
+    original_price: 59000,
   },
   {
     id: '3_months',
-    label: '3 Tháng',
+    label: 'Nghiêm túc',
+    emoji: '⭐',
     price: 139000,
     duration_days: 90,
     monthly_price: Math.round(139000 / 3),
     save_percent: Math.round(100 - ((139000 / 3) / 59000) * 100), // ~21%
-    is_popular: true,
+    original_price: 59000 * 3, // 177k
+  },
+  {
+    id: '6_months',
+    label: 'Quyết tâm',
+    emoji: '💎',
+    price: 239000,
+    duration_days: 180,
+    monthly_price: Math.round(239000 / 6),
+    save_percent: Math.round(100 - ((239000 / 6) / 59000) * 100), // ~33%
+    original_price: 59000 * 6, // 354k
   },
   {
     id: '12_months',
-    label: '12 Tháng',
+    label: 'Đỉnh cao',
+    emoji: '👑',
     price: 399000,
     duration_days: 365,
     monthly_price: Math.round(399000 / 12),
     save_percent: Math.round(100 - ((399000 / 12) / 59000) * 100), // ~44%
+    is_popular: true,
+    original_price: 59000 * 12, // 708k
   },
   {
-    id: 'lifetime',
-    label: 'Vĩnh viễn',
-    price: 899000,
-    duration_days: null,
-    monthly_price: 0,
-    save_percent: 100,
+    id: '4_years',
+    label: 'Sinh viên chăm chỉ',
+    emoji: '🎓',
+    price: 499000,
+    duration_days: 1460,
+    monthly_price: Math.round(499000 / 48),
+    save_percent: Math.round(100 - ((499000 / 48) / 59000) * 100), // ~82%
+    is_best_value: true,
+    original_price: 59000 * 48, // 2.832k
   },
 ];
 
