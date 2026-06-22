@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   closestCenter,
   closestCorners,
@@ -61,7 +61,12 @@ const hasSameBoardState = (a: Todo[], b: Todo[]) => {
   if (a.length !== b.length) return false;
   return a.every((todo, index) => {
     const other = b[index];
-    return other && todo.id === other.id && getEffectiveStatus(todo) === getEffectiveStatus(other);
+    return (
+      other &&
+      todo.id === other.id &&
+      getEffectiveStatus(todo) === getEffectiveStatus(other) &&
+      todo.sort_order === other.sort_order
+    );
   });
 };
 
@@ -128,6 +133,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const activeTodoRef = useRef<Todo | null>(null);
   const localTodosRef = useRef<Todo[]>(sortedTodos);
   const isDraggingRef = useRef(false);
+  const sortedTodosRef = useRef<Todo[]>(sortedTodos);
+  const onReorderTodosRef = useRef(onReorderTodos);
+  const dragOverThrottleRef = useRef<number>(0);
+
+  // Keep refs in sync without triggering re-renders
+  sortedTodosRef.current = sortedTodos;
+  onReorderTodosRef.current = onReorderTodos;
 
   useEffect(() => {
     if (!isDraggingRef.current) {
@@ -136,13 +148,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
   }, [sortedTodos]);
 
-  const updateLocalTodos = (next: Todo[] | ((prev: Todo[]) => Todo[])) => {
+  const updateLocalTodos = useCallback((next: Todo[] | ((prev: Todo[]) => Todo[])) => {
     setLocalTodos((prev) => {
       const resolved = typeof next === 'function' ? (next as (prev: Todo[]) => Todo[])(prev) : next;
       localTodosRef.current = resolved;
       return resolved;
     });
-  };
+  }, []);
 
   const mouseSensorOptions = useMemo(() => ({
     activationConstraint: { distance: 8 },
@@ -156,7 +168,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     useSensor(TouchSensor, touchSensorOptions),
   );
 
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
     isDraggingRef.current = true;
     activeTodoRef.current = localTodosRef.current.find(todo => todo.id === id) || null;
@@ -166,11 +178,18 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (element) {
       setActiveWidth(element.getBoundingClientRect().width);
     }
-  };
+  }, []);
 
-  const handleDragOver = (event: DragOverEvent) => {
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    if (!isDraggingRef.current) return;
+
     const { active, over } = event;
     if (!over) return;
+
+    // Throttle: skip if called within 50ms of last update
+    const now = Date.now();
+    if (now - dragOverThrottleRef.current < 50) return;
+    dragOverThrottleRef.current = now;
 
     const nextActiveId = active.id as string;
     const overId = over.id as string;
@@ -179,9 +198,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       const next = moveTodoInBoard(prev, nextActiveId, overId);
       return hasSameBoardState(prev, next) ? prev : next;
     });
-  };
+  }, [updateLocalTodos]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
 
     isDraggingRef.current = false;
@@ -190,7 +209,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     activeTodoRef.current = null;
 
     if (!over) {
-      updateLocalTodos(sortedTodos);
+      updateLocalTodos(sortedTodosRef.current);
       return;
     }
 
@@ -198,24 +217,24 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     const overId = over.id as string;
     const finalTodos = moveTodoInBoard(localTodosRef.current, nextActiveId, overId);
 
-    if (hasSameBoardState(sortedTodos, finalTodos)) {
-      updateLocalTodos(sortedTodos);
+    if (hasSameBoardState(sortedTodosRef.current, finalTodos)) {
+      updateLocalTodos(sortedTodosRef.current);
       return;
     }
 
     updateLocalTodos(finalTodos);
-    onReorderTodos(finalTodos);
-  };
+    onReorderTodosRef.current(finalTodos);
+  }, [updateLocalTodos]);
 
-  const handleDragCancel = () => {
+  const handleDragCancel = useCallback(() => {
     isDraggingRef.current = false;
     setActiveId(null);
     setActiveWidth(null);
     activeTodoRef.current = null;
-    updateLocalTodos(sortedTodos);
-  };
+    updateLocalTodos(sortedTodosRef.current);
+  }, [updateLocalTodos]);
 
-  const collisionDetectionStrategy = React.useCallback((args: any) => {
+  const collisionDetectionStrategy = useCallback((args: any) => {
     const intersections = rectIntersection(args);
     if (intersections.length > 0) {
       return intersections;
@@ -258,7 +277,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       />
                     ))}
                     {colTodos.length === 0 && (
-                      <div className="flex min-h-[112px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-xs font-semibold text-slate-400">
+                      <div className="flex min-h-[112px] flex-col items-center justify-center rounded-2xl border border-dashed border-border px-4 py-10 text-xs font-semibold text-muted-foreground">
                         Trống
                       </div>
                     )}
@@ -297,17 +316,17 @@ const ColumnContainer: React.FC<ColumnContainerProps> = ({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col flex-1 min-w-[185px] md:min-w-[160px] lg:min-w-[170px] xl:min-w-[190px] rounded-[20px] bg-[#f8f9fa] px-2 py-2 transition-all duration-150 border ${isOver
+      className={`flex flex-col flex-1 min-w-[185px] md:min-w-[160px] lg:min-w-[170px] xl:min-w-[190px] rounded-[20px] kanban-column px-2 py-2 transition-all duration-150 border ${isOver
         ? 'ring-2 ring-indigo-500/20 bg-indigo-50/10 border-indigo-200/50 shadow-sm'
-        : 'border-slate-100/40'
+        : 'border-border/40'
         }`}
     >
       <div className="flex items-center justify-between mb-4 select-none w-full">
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${col.dot}`} />
-          <h4 className="font-bold text-slate-800 text-xs">{col.label}</h4>
+          <h4 className="font-bold text-foreground text-xs">{col.label}</h4>
         </div>
-        <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200/50 text-slate-500 rounded-full">
+        <span className="text-[10px] font-bold px-2 py-0.5 bg-secondary text-muted-foreground rounded-full">
           {count}
         </span>
       </div>
@@ -316,7 +335,7 @@ const ColumnContainer: React.FC<ColumnContainerProps> = ({
 
       <button
         onClick={onQuickAdd}
-        className="w-full mt-3 py-2 text-slate-400 hover:text-slate-600 text-xs font-bold flex items-center gap-1.5 hover:bg-slate-200/40 rounded-xl transition-all justify-start px-2.5"
+        className="w-full mt-3 py-2 text-muted-foreground hover:text-foreground text-xs font-bold flex items-center gap-1.5 hover:bg-secondary/50 rounded-xl transition-all justify-start px-2.5"
       >
         <Plus size={14} className="stroke-[3]" />
         Task
@@ -389,17 +408,17 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
   return (
     <div
       style={width ? { width: `${width}px` } : undefined}
-      className={`relative flex min-h-[38px] flex-col gap-1 rounded-xl bg-white pl-2 pr-2 py-2 select-none ${isOverlay
-        ? 'border border-slate-300 shadow-2xl cursor-grabbing pointer-events-none opacity-95'
-        : 'border border-slate-100 shadow-sm hover:border-slate-300 transition-all'
+      className={`relative flex min-h-[38px] flex-col gap-1 rounded-xl bg-card pl-2 pr-2 py-2 select-none ${isOverlay
+        ? 'border border-border/80 shadow-2xl cursor-grabbing pointer-events-none opacity-95'
+        : 'border border-border shadow-sm hover:border-primary/40 transition-all'
         }`}
     >
-      <p className="text-[11px] font-semibold text-slate-800 leading-tight break-words pr-0">
+      <p className="text-[11px] font-semibold text-foreground leading-tight break-words pr-0">
         {todo.content}
       </p>
 
       {todo.description && (
-        <p className="text-[10px] text-slate-400 font-medium line-clamp-2 leading-normal">
+        <p className="text-[10px] text-muted-foreground font-medium line-clamp-2 leading-normal">
           {todo.description}
         </p>
       )}
@@ -407,7 +426,7 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
       {(totalSubtasks > 0 || todo.deadline) && (
         <div className="flex items-center gap-2 mt-1 flex-wrap select-none">
           {totalSubtasks > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md border text-slate-500 border-slate-100 bg-slate-50 font-bold flex items-center gap-1">
+            <span className="text-[9px] px-1.5 py-0.5 rounded-md border text-muted-foreground border-border bg-secondary font-bold flex items-center gap-1">
               <CheckSquare size={9} />
               {completedSubtasks}/{totalSubtasks}
             </span>
@@ -426,7 +445,7 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
 
       {!isOverlay && onDelete && (
         <div
-          className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm px-1 py-0.5 rounded-lg border border-slate-100 z-20"
+          className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 backdrop-blur-sm px-1 py-0.5 rounded-lg border border-border z-20"
           onClick={(event) => event.stopPropagation()}
         >
           <button
@@ -434,7 +453,7 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
               event.stopPropagation();
               onDelete(todo.id);
             }}
-            className="p-1 hover:bg-slate-100 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+            className="p-1 hover:bg-secondary text-muted-foreground hover:text-rose-600 rounded transition-colors cursor-pointer"
             title="Xoa"
           >
             <Trash2 size={11} />

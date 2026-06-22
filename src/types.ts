@@ -154,6 +154,8 @@ export interface TimetableEvent {
   end_time?: string;
   location?: string;
   created_at?: string;
+  email_notify?: boolean;
+  email_notify_before_minutes?: number;
 }
 
 export interface Task {
@@ -183,6 +185,8 @@ export interface Todo {
   subtasks?: { id: string; title: string; is_completed: boolean }[];
   completed_at?: string | null;
   created_at?: string;
+  email_notify?: boolean;
+  email_notify_before_minutes?: number;
 }
 
 export interface QuickNote {
@@ -250,6 +254,13 @@ export interface Profile {
   qr_code_url?: string;
   student_card_url?: string;
   citizen_card_url?: string;
+  email_notifications?: {
+    enabled: boolean;
+    todo_deadline: boolean;
+    timetable_deadline: boolean;
+    calendar_deadline: boolean;
+    hours_before: number;
+  };
 }
 
 // Interface cho Smart Backend

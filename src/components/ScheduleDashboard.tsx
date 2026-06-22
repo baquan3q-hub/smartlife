@@ -21,7 +21,7 @@ interface ScheduleDashboardProps {
   onAddTimetable: (t: any) => void;
   onUpdateTimetable: (t: any) => void;
   onDeleteTimetable: (id: string) => void;
-  onAddTodo: (content: string, priority: any, deadline?: string, status?: TodoStatus, description?: string, subtasks?: any[]) => void;
+  onAddTodo: (content: string, priority: any, deadline?: string, status?: TodoStatus, description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number) => void;
   onUpdateTodo: (t: any) => void;
   onDeleteTodo: (id: string) => void;
   onReorderTodos: (reordered: Todo[]) => void;
@@ -95,6 +95,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const [modalDescription, setModalDescription] = useState('');
   const [modalSubtasks, setModalSubtasks] = useState<{ id: string; title: string; is_completed: boolean }[]>([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [modalEmailNotify, setModalEmailNotify] = useState(false);
+  const [modalEmailNotifyBefore, setModalEmailNotifyBefore] = useState(60);
 
   // Calendar states
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -240,7 +242,9 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
       day_of_week: Number(fd.get('day_of_week')),
       start_time: start,
       end_time: end,
-      location: fd.get('location')
+      location: fd.get('location'),
+      email_notify: fd.get('email_notify') === 'on',
+      email_notify_before_minutes: fd.get('email_notify_before_minutes') ? Number(fd.get('email_notify_before_minutes')) : 60
     };
     if (editingEvent) onUpdateTimetable({ ...editingEvent, ...data });
     else onAddTimetable(data);
@@ -256,6 +260,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     setModalDescription('');
     setModalSubtasks([]);
     setNewSubtaskTitle('');
+    setModalEmailNotify(false);
+    setModalEmailNotifyBefore(60);
 
     if (defaultDate) {
       const year = defaultDate.getFullYear();
@@ -278,6 +284,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     setModalDescription(todo.description || '');
     setModalSubtasks(todo.subtasks || []);
     setNewSubtaskTitle('');
+    setModalEmailNotify(todo.email_notify || false);
+    setModalEmailNotifyBefore(todo.email_notify_before_minutes ?? 60);
 
     if (todo.deadline) {
       const d = new Date(todo.deadline);
@@ -328,7 +336,9 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         formattedDeadline,
         modalStatus,
         modalDescription.trim() || undefined,
-        modalSubtasks
+        modalSubtasks,
+        modalEmailNotify,
+        modalEmailNotifyBefore
       );
     } else if (modalMode === 'edit' && selectedTodo) {
       onUpdateTodo({
@@ -338,6 +348,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         deadline: formattedDeadline || null,
         description: modalDescription.trim() || null,
         subtasks: modalSubtasks,
+        email_notify: modalEmailNotify,
+        email_notify_before_minutes: modalEmailNotifyBefore,
       });
     }
     setIsModalOpen(false);
@@ -594,7 +606,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 {/* + Thêm task button */}
                 <button
                   onClick={() => handleOpenCreateModal('todo')}
-                  className="bg-black hover:bg-slate-900 text-white font-extrabold text-[10px] px-3.5 py-1.5 rounded-full flex items-center gap-1 transition-all duration-200 active:scale-95 shrink-0"
+                  className="bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground font-extrabold text-[10px] px-3.5 py-1.5 rounded-full flex items-center gap-1 transition-all duration-200 active:scale-95 shrink-0"
                 >
                   <Plus size={12} className="stroke-[3]" />
                   Thêm task
@@ -1018,6 +1030,35 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 />
               </div>
 
+              <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-200/60 space-y-2.5">
+                <div className="flex items-center">
+                  <label className="text-[11px] font-bold text-slate-650 cursor-pointer flex items-center gap-2 select-none">
+                    <input
+                      type="checkbox"
+                      name="email_notify"
+                      defaultChecked={editingEvent?.email_notify}
+                      className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                    />
+                    Gửi email nhắc nhở
+                  </label>
+                </div>
+                
+                <div>
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase ml-0.5 block mb-1">Thời gian nhắc trước</label>
+                  <select
+                    name="email_notify_before_minutes"
+                    defaultValue={editingEvent?.email_notify_before_minutes ?? 60}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl outline-none font-semibold text-xs text-slate-700 focus:ring-1 focus:ring-indigo-400 cursor-pointer"
+                  >
+                    <option value={15}>Trước 15 phút</option>
+                    <option value={30}>Trước 30 phút</option>
+                    <option value={60}>Trước 1 giờ</option>
+                    <option value={120}>Trước 2 giờ</option>
+                    <option value={1440}>Trước 1 ngày</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setIsTimeModalOpen(false)} className="flex-1 py-3 border border-slate-200 rounded-2xl text-slate-500 hover:bg-slate-50 font-bold text-xs">Hủy</button>
                 <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 font-bold text-xs shadow-sm hover:shadow active:scale-95 transition-all">Lưu lịch trình</button>
@@ -1128,6 +1169,39 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 />
               </div>
 
+              {/* Email Notifications */}
+              <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-200/60 space-y-2.5">
+                <div className="flex items-center">
+                  <label className="text-[11px] font-bold text-slate-655 cursor-pointer flex items-center gap-2 select-none">
+                    <input
+                      type="checkbox"
+                      checked={modalEmailNotify}
+                      onChange={(e) => setModalEmailNotify(e.target.checked)}
+                      className="w-4 h-4 accent-black rounded cursor-pointer"
+                    />
+                    Gửi email nhắc nhở
+                  </label>
+                </div>
+                {modalEmailNotify && (
+                  <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                    <label className="block text-[9px] font-extrabold text-slate-400 uppercase ml-0.5 mb-1.5 tracking-wider">
+                      Thời gian nhắc trước
+                    </label>
+                    <select
+                      value={modalEmailNotifyBefore}
+                      onChange={(e) => setModalEmailNotifyBefore(Number(e.target.value))}
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none font-semibold text-xs text-slate-700 focus:border-slate-400 cursor-pointer"
+                    >
+                      <option value={15}>Trước 15 phút</option>
+                      <option value={30}>Trước 30 phút</option>
+                      <option value={60}>Trước 1 giờ</option>
+                      <option value={120}>Trước 2 giờ</option>
+                      <option value={1440}>Trước 1 ngày</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
               {/* Subtasks (Checklist) Input & List */}
               <div>
                 <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">
@@ -1181,7 +1255,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                   <button
                     type="button"
                     onClick={handleCreateSubtask}
-                    className="w-8 h-8 rounded-full bg-black hover:bg-slate-900 text-white flex items-center justify-center transition-all duration-200 active:scale-90 shrink-0"
+                    className="w-8 h-8 rounded-full bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground flex items-center justify-center transition-all duration-200 active:scale-90 shrink-0"
                   >
                     <Plus size={14} className="stroke-[3]" />
                   </button>
@@ -1201,7 +1275,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                   type="button"
                   onClick={handleModalSave}
                   disabled={!modalContent.trim()}
-                  className="flex-1 py-3 bg-black hover:bg-slate-900 text-white font-bold text-xs rounded-2xl transition-all shadow-md active:scale-95 disabled:opacity-50"
+                  className="flex-1 py-3 bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground font-bold text-xs rounded-2xl transition-all shadow-md active:scale-95 disabled:opacity-50"
                 >
                   {modalMode === 'create' ? 'Thêm task' : 'Lưu thay đổi'}
                 </button>
