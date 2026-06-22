@@ -222,6 +222,7 @@ export interface AppState {
   gpaTargetSemesters: number;        // Số kỳ còn lại dự kiến
   wallets: Wallet[];                 // Thêm Ví
   debts: Debt[];                     // Thêm Khoản nợ
+  calendarEvents?: any[];            // Calendar Events
 }
 
 

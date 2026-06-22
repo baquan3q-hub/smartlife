@@ -1161,6 +1161,22 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             setAppState((prev: AppState) => ({ ...prev, timetable: prevTimetable }));
         }
     };
+
+    const handleAddCalendarEvent = async (event: any) => {
+        setCalendarEvents((prev) => {
+            if (prev.some(e => e.id === event.id)) return prev;
+            return [...prev, event];
+        });
+    };
+
+    const handleUpdateCalendarEvent = async (event: any) => {
+        setCalendarEvents((prev) => prev.map(e => e.id === event.id ? event : e));
+    };
+
+    const handleDeleteCalendarEvent = async (id: string) => {
+        setCalendarEvents((prev) => prev.filter(e => e.id !== id));
+    };
+
     const handleAddTodo = async (content: string, priority: any, deadline?: string, status: TodoStatus = 'todo', description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number) => {
         if (!user) return;
         const tempId = crypto.randomUUID();
@@ -1699,7 +1715,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
                 <div className={`${activeTab === 'ai-advisor' ? 'h-full' : 'w-full max-w-none min-h-screen px-1 md:px-2.5 py-3 md:py-5 pt-16 md:pt-4 relative'}`}> {/* AI Advisor gets full screen, others get dynamic fluid layout */}
                     {deferredTab === 'visual' && (
-                        <VisualBoard appState={appState} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
+                        <VisualBoard appState={{ ...appState, calendarEvents }} userName={user?.user_metadata?.full_name || appState.profile?.full_name} userId={user?.id} userEmail={user?.email || undefined} onUpdateGoal={handleUpdateGoal} onUpgrade={handleOpenPricing} onOpenSpotify={() => setIsSpotifyOpen(true)} onNavigate={(tab) => {
                             if (tab === 'music') {
                                 setStartInFocusMode(true);
                                 setActiveTab('schedule');
@@ -1763,7 +1779,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     )}
                     {deferredTab === 'ai-advisor' && (
                         <AIAdvisorPage
-                            appState={appState}
+                            appState={{ ...appState, calendarEvents }}
                             lang={lang}
                             onBack={() => setActiveTab('finance')}
                             onAddTimetable={handleAddTimetable}
@@ -1773,6 +1789,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             onSelectBoostPack={handleSelectPlan}
                             onUpdateTodo={handleUpdateTodo}
                             onDeleteTodo={handleDeleteTodo}
+                            onAddCalendarEvent={handleAddCalendarEvent}
+                            onUpdateCalendarEvent={handleUpdateCalendarEvent}
+                            onDeleteCalendarEvent={handleDeleteCalendarEvent}
                         />
                     )}
                     {deferredTab === 'admin' && user?.email === 'baquan3q@gmail.com' && (
@@ -1780,7 +1799,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     )}
                     {deferredTab === 'schedule' && (
                         <ScheduleDashboard
-                            state={{ ...appState, todos: filteredTodos, timer, onOpenMusic: () => setActiveTab('music') } as any}
+                            state={{ ...appState, todos: filteredTodos, calendarEvents, timer, onOpenMusic: () => setActiveTab('music') } as any}
                             onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
                             onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
                             onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onReorderTodos={handleReorderTodos}

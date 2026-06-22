@@ -51,6 +51,9 @@ export interface ActionHandlers {
     onImportGPAData?: (semesters: any[]) => Promise<void>;
     onUpdateTodo?: (item: any) => Promise<void>;
     onDeleteTodo?: (id: string) => Promise<void>;
+    onAddCalendarEvent?: (event: any) => Promise<void>;
+    onUpdateCalendarEvent?: (event: any) => Promise<void>;
+    onDeleteCalendarEvent?: (id: string) => Promise<void>;
 }
 
 // ────────────────────────────────────────
@@ -400,6 +403,52 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
             },
             required: ['id']
         }
+    },
+    {
+        name: 'add_calendar_event',
+        description: 'Thêm lịch hẹn hoặc cuộc họp cụ thể theo ngày vào lịch (Calendar). Thích hợp cho các cuộc hẹn diễn ra một lần hoặc vào một ngày cụ thể (không cố định hàng tuần). Mặc định nếu không chỉ định gì sẽ bật thông báo báo trước 30 phút qua Gmail.',
+        parameters: {
+            type: 'object',
+            properties: {
+                title: { type: 'string', description: 'Tiêu đề lịch hẹn. VD: "Đi ăn chè"' },
+                date: { type: 'string', description: 'Ngày diễn ra lịch hẹn, format YYYY-MM-DD. VD: "2026-06-24"' },
+                time: { type: 'string', description: 'Giờ diễn ra, format HH:mm. VD: "01:00" hoặc "18:30" (tuỳ chọn)' },
+                location: { type: 'string', description: 'Địa điểm (tuỳ chọn)' },
+                description: { type: 'string', description: 'Mô tả chi tiết hoặc ghi chú lịch hẹn (tuỳ chọn)' },
+                email_notify: { type: 'boolean', description: 'Có gửi email thông báo nhắc nhở qua Gmail không. Mặc định là true.' },
+                email_notify_before_minutes: { type: 'integer', description: 'Thời gian gửi thông báo trước khi diễn ra sự kiện (phút). Mặc định là 30. Nếu báo trước 1 ngày thì truyền 1440 (24 * 60).' }
+            },
+            required: ['title', 'date']
+        }
+    },
+    {
+        name: 'update_calendar_event',
+        description: 'Cập nhật thông tin chi tiết của một lịch hẹn/sự kiện lịch hiện có theo ID. Hỏi xác nhận trước khi cập nhật.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: { type: 'string', description: 'ID của lịch hẹn cần cập nhật' },
+                title: { type: 'string', description: 'Tiêu đề mới (tuỳ chọn)' },
+                date: { type: 'string', description: 'Ngày mới format YYYY-MM-DD (tuỳ chọn)' },
+                time: { type: 'string', description: 'Giờ mới format HH:mm (tuỳ chọn)' },
+                location: { type: 'string', description: 'Địa điểm mới (tuỳ chọn)' },
+                description: { type: 'string', description: 'Mô tả/ghi chú mới (tuỳ chọn)' },
+                email_notify: { type: 'boolean', description: 'Bật/tắt gửi email thông báo (tuỳ chọn)' },
+                email_notify_before_minutes: { type: 'integer', description: 'Thời gian gửi thông báo trước (phút) (tuỳ chọn)' }
+            },
+            required: ['id']
+        }
+    },
+    {
+        name: 'delete_calendar_event',
+        description: 'Xóa một lịch hẹn/sự kiện lịch theo ID. Hỏi xác nhận trước khi xóa.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: { type: 'string', description: 'ID của lịch hẹn cần xóa' }
+            },
+            required: ['id']
+        }
     }
 ];
 
@@ -682,6 +731,145 @@ async function executeDeleteBookmark(args: any, appState: AppState): Promise<Act
         };
     } catch (error: any) {
         return { type: 'my_storage' as any, success: false, message: `❌ Lỗi xóa liên kết: ${error.message}` };
+    }
+}
+
+async function executeAddCalendarEvent(
+    args: any,
+    appState: AppState,
+    handlers: ActionHandlers
+): Promise<ActionResult> {
+    const userId = appState.profile?.id;
+    if (!userId) {
+        return { type: 'calendar_event' as any, success: false, message: '❌ Lỗi thêm lịch hẹn: Người dùng chưa đăng nhập.' };
+    }
+    const { title, date, time, location, description, email_notify = true, email_notify_before_minutes = 30 } = args;
+    try {
+        let formattedTime = time || null;
+        if (formattedTime) {
+            const parts = formattedTime.split(':');
+            if (parts.length === 2) {
+                formattedTime = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+            } else if (parts.length === 3) {
+                formattedTime = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
+            }
+        }
+
+        const newEvent = {
+            user_id: userId,
+            title,
+            date,
+            time: formattedTime,
+            location: location || null,
+            description: description || null,
+            type: 'PERSONAL',
+            email_notify,
+            email_notify_before_minutes
+        };
+
+        const { data, error } = await supabase.from('calendar_events').insert([newEvent]).select().single();
+        if (error) throw error;
+
+        if (handlers.onAddCalendarEvent) {
+            await handlers.onAddCalendarEvent(data);
+        }
+
+        return {
+            type: 'calendar_event' as any,
+            success: true,
+            message: `✅ Đã thêm lịch hẹn: "${title}" vào ngày ${date}${time ? ` lúc ${time}` : ''}${email_notify ? ` (Báo trước ${email_notify_before_minutes} phút qua Gmail)` : ''}`,
+            data
+        };
+    } catch (error: any) {
+        return { type: 'calendar_event' as any, success: false, message: `❌ Lỗi thêm lịch hẹn: ${error.message}` };
+    }
+}
+
+async function executeUpdateCalendarEvent(
+    args: any,
+    appState: AppState,
+    handlers: ActionHandlers
+): Promise<ActionResult> {
+    const userId = appState.profile?.id;
+    if (!userId) {
+        return { type: 'calendar_event' as any, success: false, message: '❌ Lỗi cập nhật lịch hẹn: Người dùng chưa đăng nhập.' };
+    }
+    const { id, title, date, time, location, description, email_notify, email_notify_before_minutes } = args;
+    try {
+        const updateFields: any = {};
+        if (title !== undefined) updateFields.title = title;
+        if (date !== undefined) updateFields.date = date;
+        if (time !== undefined) {
+            let formattedTime = time || null;
+            if (formattedTime) {
+                const parts = formattedTime.split(':');
+                if (parts.length === 2) {
+                    formattedTime = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+                } else if (parts.length === 3) {
+                    formattedTime = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
+                }
+            }
+            updateFields.time = formattedTime;
+        }
+        if (location !== undefined) updateFields.location = location || null;
+        if (description !== undefined) updateFields.description = description || null;
+        if (email_notify !== undefined) updateFields.email_notify = email_notify;
+        if (email_notify_before_minutes !== undefined) updateFields.email_notify_before_minutes = email_notify_before_minutes;
+
+        const { data, error } = await supabase
+            .from('calendar_events')
+            .update(updateFields)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        if (handlers.onUpdateCalendarEvent) {
+            await handlers.onUpdateCalendarEvent(data);
+        }
+
+        return {
+            type: 'calendar_event' as any,
+            success: true,
+            message: `✅ Đã cập nhật lịch hẹn: "${data.title}" ngày ${data.date}`,
+            data
+        };
+    } catch (error: any) {
+        return { type: 'calendar_event' as any, success: false, message: `❌ Lỗi cập nhật lịch hẹn: ${error.message}` };
+    }
+}
+
+async function executeDeleteCalendarEvent(
+    args: any,
+    appState: AppState,
+    handlers: ActionHandlers
+): Promise<ActionResult> {
+    const userId = appState.profile?.id;
+    if (!userId) {
+        return { type: 'calendar_event' as any, success: false, message: '❌ Lỗi xóa lịch hẹn: Người dùng chưa đăng nhập.' };
+    }
+    const { id } = args;
+    try {
+        const { error } = await supabase
+            .from('calendar_events')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        if (handlers.onDeleteCalendarEvent) {
+            await handlers.onDeleteCalendarEvent(id);
+        }
+
+        return {
+            type: 'calendar_event' as any,
+            success: true,
+            message: `✅ Đã xóa lịch hẹn ID: ${id}`,
+            data: args
+        };
+    } catch (error: any) {
+        return { type: 'calendar_event' as any, success: false, message: `❌ Lỗi xóa lịch hẹn: ${error.message}` };
     }
 }
 
@@ -1001,6 +1189,24 @@ export async function chatWithAI(
                     }
                     case 'delete_bookmark': {
                         const actionResult = await executeDeleteBookmark(args, appState);
+                        actions.push(actionResult);
+                        result = { success: actionResult.success, message: actionResult.message };
+                        break;
+                    }
+                    case 'add_calendar_event': {
+                        const actionResult = await executeAddCalendarEvent(args, appState, handlers);
+                        actions.push(actionResult);
+                        result = { success: actionResult.success, message: actionResult.message };
+                        break;
+                    }
+                    case 'update_calendar_event': {
+                        const actionResult = await executeUpdateCalendarEvent(args, appState, handlers);
+                        actions.push(actionResult);
+                        result = { success: actionResult.success, message: actionResult.message };
+                        break;
+                    }
+                    case 'delete_calendar_event': {
+                        const actionResult = await executeDeleteCalendarEvent(args, appState, handlers);
                         actions.push(actionResult);
                         result = { success: actionResult.success, message: actionResult.message };
                         break;

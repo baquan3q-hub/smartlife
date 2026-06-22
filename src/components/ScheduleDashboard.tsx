@@ -61,7 +61,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   onRefresh,
 }) => {
   const { timetable, goals, todos } = state;
-  const { timer, onOpenMusic } = state as any;
+  const { timer, onOpenMusic, calendarEvents = [] } = state as any;
 
   // View state: 'board' (Kanban) or 'list' (Calendar Grid view for todos)
   const [todoView, setTodoView] = useState<'board' | 'list'>(() => {
@@ -450,12 +450,12 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                   <div className={`text-center py-3 border-b border-slate-100 ${isToday ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-50/80 text-slate-600'}`}>
                     <span className="text-xs tracking-wide">{day.label}</span>
                   </div>
-                  <div className="p-2.5 space-y-2.5 flex-1">
+                  <div className="p-2.5 space-y-2.5 flex-1 max-h-[380px] overflow-y-auto scrollbar-thin scroll-smooth pb-4">
                     {dayEvents.map(e => (
                       <div
                         key={e.id}
                         onClick={() => { setEditingEvent(e); setIsTimeModalOpen(true); }}
-                        className={`relative group p-2.5 rounded-xl border border-slate-150 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 bg-white hover:border-indigo-400`}
+                        className={`relative group p-2.5 rounded-xl border border-transparent shadow-[0_2px_8px_rgba(99,102,241,0.04)] shadow-sm hover:shadow-[0_6px_16px_rgba(99,102,241,0.08)] cursor-pointer transition-all duration-300 hover:-translate-y-0.5 bg-white hover:border-indigo-100`}
                       >
                         <div className="font-bold text-slate-800 text-xs leading-snug mb-1">{e.title}</div>
                         <div className="flex items-center gap-1 text-[10px] text-slate-400">
@@ -490,10 +490,43 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
   // Render roadmap timeline today
   const renderRoadmapTimeline = () => {
+    const getLocalDateString = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const todayStr = getLocalDateString(new Date());
     const todayIndex = new Date().getDay();
-    const todayEvents = timetable
-      .filter(t => t.day_of_week === todayIndex)
-      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const todayTimetableEvents = timetable.filter(t => t.day_of_week === todayIndex);
+    const todayCalendarEvents = (calendarEvents || []).filter((e: any) => e.date === todayStr);
+
+    const mappedTimetable = todayTimetableEvents.map(e => ({
+      id: e.id,
+      title: e.title,
+      start_time: e.start_time ? e.start_time.slice(0, 5) : '00:00',
+      end_time: e.end_time ? e.end_time.slice(0, 5) : undefined,
+      location: e.location,
+      description: null,
+      isCalendarEvent: false,
+      email_notify: false,
+      email_notify_before_minutes: 0
+    }));
+
+    const mappedCalendar = todayCalendarEvents.map(e => ({
+      id: e.id,
+      title: e.title,
+      start_time: e.time ? e.time.slice(0, 5) : '00:00',
+      end_time: undefined,
+      location: e.location,
+      description: e.description,
+      isCalendarEvent: true,
+      email_notify: e.email_notify,
+      email_notify_before_minutes: e.email_notify_before_minutes
+    }));
+
+    const combinedEvents = [...mappedTimetable, ...mappedCalendar].sort((a, b) => a.start_time.localeCompare(b.start_time));
     const now = new Date();
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
@@ -504,36 +537,94 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
           Tiến trình hoạt động hôm nay
         </h4>
 
-        {todayEvents.length === 0 ? (
+        {combinedEvents.length === 0 ? (
           <div className="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            Không có lịch trình cố định cho ngày hôm nay.
+            Không có lịch trình cố định hoặc lịch hẹn nào cho ngày hôm nay.
           </div>
         ) : (
           <div className="relative pl-3 space-y-6 before:absolute before:inset-0 before:left-3 before:-translate-x-px before:h-full before:w-0.5 before:bg-indigo-100">
-            {todayEvents.map((event) => {
-              const isPast = event.end_time ? event.end_time < currentTime : event.start_time < currentTime;
-              const isHappening = event.start_time <= currentTime && (!event.end_time || event.end_time >= currentTime);
+            {combinedEvents.map((event) => {
+              const isPast = event.end_time 
+                ? event.end_time < currentTime 
+                : (() => {
+                    const [sh, sm] = event.start_time.split(':').map(Number);
+                    const [ch, cm] = currentTime.split(':').map(Number);
+                    return (ch * 60 + cm) >= (sh * 60 + sm + 60);
+                  })();
+
+              const isHappening = event.end_time 
+                ? (event.start_time <= currentTime && event.end_time >= currentTime)
+                : (() => {
+                    const [sh, sm] = event.start_time.split(':').map(Number);
+                    const [ch, cm] = currentTime.split(':').map(Number);
+                    const startMin = sh * 60 + sm;
+                    const currentMin = ch * 60 + cm;
+                    return currentMin >= startMin && currentMin < startMin + 60;
+                  })();
 
               return (
                 <div key={event.id} className="relative flex items-start gap-4">
                   {/* Bullet Node */}
                   <div className={`absolute left-0 flex items-center justify-center w-6 h-6 -translate-x-1/2 rounded-full border-2 shadow-sm z-10 ${
-                    isHappening ? 'bg-indigo-600 border-white ring-4 ring-indigo-100' : isPast ? 'bg-slate-200 border-white' : 'bg-white border-indigo-300'
+                    event.isCalendarEvent
+                      ? (isHappening ? 'bg-violet-600 border-white ring-4 ring-violet-100' : isPast ? 'bg-slate-200 border-white' : 'bg-white border-violet-300')
+                      : (isHappening ? 'bg-indigo-600 border-white ring-4 ring-indigo-100' : isPast ? 'bg-slate-200 border-white' : 'bg-white border-indigo-300')
                   }`}>
-                    {isHappening ? <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" /> : <div className={`w-1.5 h-1.5 rounded-full ${isPast ? 'bg-slate-400' : 'bg-indigo-400'}`} />}
+                    {isHappening ? (
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    ) : (
+                      <div className={`w-1.5 h-1.5 rounded-full ${
+                        isPast 
+                          ? 'bg-slate-400' 
+                          : (event.isCalendarEvent ? 'bg-violet-400' : 'bg-indigo-400')
+                      }`} />
+                    )}
                   </div>
 
                   {/* Activity Card */}
-                  <div className="flex-1 ml-6 p-3 rounded-2xl border border-slate-100 bg-white">
+                  <div className={`flex-1 ml-6 p-3 rounded-2xl border ${
+                    event.isCalendarEvent
+                      ? 'border-violet-100 bg-gradient-to-r from-violet-50/40 to-indigo-50/20 hover:from-violet-100/40 hover:to-indigo-100/30 transition-all'
+                      : 'border-slate-100 bg-white hover:border-slate-200 transition-all'
+                  }`}>
                     <div className="flex justify-between items-center mb-0.5">
-                      <h5 className="text-xs font-bold text-slate-800">{event.title}</h5>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500">
-                        {event.start_time.slice(0, 5)}
+                      <div className="flex items-center gap-2">
+                        <h5 className={`text-xs font-bold ${event.isCalendarEvent ? 'text-violet-950' : 'text-slate-800'}`}>{event.title}</h5>
+                        {event.isCalendarEvent && (
+                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-700 uppercase tracking-wider scale-90 shrink-0">
+                            Lịch hẹn
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                        event.isCalendarEvent 
+                          ? 'bg-violet-100 text-violet-700' 
+                          : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {event.start_time}
                       </span>
                     </div>
-                    <div className="text-[10px] text-slate-500">
-                      {event.start_time.slice(0, 5)} - {event.end_time?.slice(0, 5)} {event.location && `· ${event.location}`}
+                    <div className={`text-[10px] ${event.isCalendarEvent ? 'text-violet-700/80' : 'text-slate-500'}`}>
+                      {event.isCalendarEvent ? (
+                        <>
+                          {event.start_time}{event.location && ` · ${event.location}`}
+                          {event.email_notify && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] text-violet-600 font-bold ml-2">
+                              🔔 Gmail (-{event.email_notify_before_minutes}p)
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {event.start_time} - {event.end_time} {event.location && `· ${event.location}`}
+                        </>
+                      )}
                     </div>
+                    {event.description && (
+                      <div className="text-[9.5px] text-violet-750/70 italic mt-1 border-t border-violet-100/30 pt-1 leading-normal">
+                        Ghi chú: {event.description}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
