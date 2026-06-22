@@ -726,7 +726,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
 
                                     <div
                                         onClick={(e) => e.stopPropagation()}
-                                        className="space-y-2 flex-1 max-h-[140px] overflow-y-auto pr-1 mt-2 scrollbar-thin scrollbar-thumb-gray-200"
+                                        className="space-y-2 flex-1 max-h-[140px] overflow-y-auto px-1.5 py-1.5 pb-6 mt-2 scrollbar-thin scrollbar-thumb-gray-200 scroll-fade-bottom"
                                     >
                                         {filteredTodos.length > 0 ? filteredTodos.map((todo) => (
                                             <div key={todo.id} className="bg-white/80 backdrop-blur-md rounded-xl p-2.5 border border-gray-100 flex items-start gap-2 hover:bg-white transition-colors cursor-pointer group/item">
