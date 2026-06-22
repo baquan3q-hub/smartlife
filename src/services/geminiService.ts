@@ -246,6 +246,18 @@ export function buildScheduleContext(state: AppState): string {
             ctx += `  - ${days[e.day_of_week]}: ${e.title} (${e.start_time}${e.end_time ? `-${e.end_time}` : ''})${e.location ? ` @ ${e.location}` : ''}\n`;
         });
     }
+
+    const customEvents = state.calendarEvents || [];
+    if (customEvents.length > 0) {
+        ctx += `\n📅 SỰ KIỆN LỊCH HẸN CHI TIẾT (Calendar):\n`;
+        customEvents.forEach(e => {
+            ctx += `  - [ID: ${e.id}] Ngày ${e.date}${e.time ? ` lúc ${e.time.slice(0, 5)}` : ''}: ${e.title}`;
+            if (e.location) ctx += ` (Địa điểm: ${e.location})`;
+            if (e.description) ctx += ` — Ghi chú: "${e.description}"`;
+            if (e.email_notify) ctx += ` [Báo qua Gmail trước ${e.email_notify_before_minutes} phút]`;
+            ctx += '\n';
+        });
+    }
     return ctx || '\n📋 LỊCH TRÌNH: Chưa có dữ liệu';
 }
 
@@ -506,6 +518,7 @@ QUY TẮC BẢO MẬT & TIẾT KIỆM TOKEN:
   • Gọi \`get_journal_entries\` khi hỏi về nội dung nhật ký gần đây hoặc phân tích cảm xúc dạo gần đây.
   • Gọi \`simulate_financial_impact\` khi người dùng hỏi về kịch bản chi tiêu phát sinh đột xuất, chi tiêu giả định (ví dụ: bị CSGT phạt, đám cưới bạn thân, hỏng xe, đầu tư công nghệ...).
   • Gọi \`query_database\` khi cần lấy dữ liệu chi tiết, danh sách đầy đủ hoặc lọc theo mốc thời gian cụ thể (ví dụ: truy vấn tất cả giao dịch trong quá khứ của tháng trước, lọc danh sách việc đã xong, tìm kiếm nội dung...). BẮT BUỘC dùng tool này thay vì \`get_financial_report\` khi người dùng hỏi các thông tin lịch sử tài chính chi tiết ngoài 30 giao dịch gần nhất hoặc ngoài tháng hiện tại.
+  • Gọi các công cụ quản lý lịch hẹn cuộc họp (\`add_calendar_event\`, \`update_calendar_event\`, \`delete_calendar_event\`) khi người dùng muốn lên lịch, cập nhật hoặc xóa các cuộc hẹn/sự kiện cụ thể theo ngày (lịch không cố định).
 - Bạn phải LUÔN gọi các công cụ này trước khi trả lời, KHÔNG tự bịa số liệu hay đoán bừa nếu chưa gọi tool tương ứng.
 
 ĐỊNH DẠNG BÁO CÁO CHI TIẾT (ARTIFACTS):
@@ -530,7 +543,11 @@ NGUYÊN TẮC PHÂN TÍCH & TRÌNH BÀY (QUAN TRỌNG):
 5. Khi vẽ biểu đồ, bạn PHẢI gọi công cụ (tool call) \`render_chart\`. Tuyệt đối KHÔNG viết mã JSON của biểu đồ hoặc văn bản thô của biểu đồ vào bên trong thẻ <artifact>. Thẻ <artifact> chỉ chứa văn bản báo cáo định dạng Markdown (như tiêu đề, bảng biểu Markdown, văn bản phân tích), còn biểu đồ sẽ được hệ thống vẽ tự động từ tool call.
 6. ƯU TIÊN dùng bảng (Table Markdown) để trình bày các dữ liệu liên quan đến tiền bạc (như thu nhập, chi tiêu, số dư, ngân sách, xu hướng tài chính) và các việc cần làm (như Todo list, nhiệm vụ, lịch trình, thời hạn, mức độ ưu tiên) cũng như thống kê điểm số GPA để người dùng quan sát trực quan và gọn gàng nhất.
 7. Khi người dùng yêu cầu dự đoán chi tiêu: phân tích mức chi tiêu trung bình các tháng trước, tính độ lệch và đưa ra dự đoán số tiền cho các tháng tới bằng một bảng (table) rõ ràng.
-8. Khi người dùng yêu cầu thêm lịch/việc/giao dịch, dùng tool tương ứng. Nếu người dùng liệt kê NHIỀU khoản thu chi trong 1 tin nhắn, LUÔN dùng tool \`batch_add_transactions\` thay vì gọi \`add_transaction\` nhiều lần.
+8. Khi người dùng yêu cầu thêm lịch/việc/giao dịch, dùng tool tương ứng:
+   - Với việc cần làm có thời hạn hoặc danh sách việc, dùng \`add_todo\`.
+   - Với thời khóa biểu cố định lặp lại hàng tuần, dùng \`add_timetable\`.
+   - Với lịch hẹn, cuộc họp, sự kiện cụ thể vào ngày giờ cụ thể (lịch không cố định), dùng \`add_calendar_event\`. Mặc định khi thêm lịch hẹn qua AI, nếu người dùng không chỉ định thời gian nhắc nhở, hãy tự động cài đặt \`email_notify: true\` và \`email_notify_before_minutes: 30\` (báo trước 30 phút qua Gmail). Nếu người dùng nói thời gian cụ thể (ví dụ: báo trước 1 ngày), hãy đổi ra số phút tương ứng (ví dụ: 1 ngày = 1440 phút).
+   - Nếu người dùng liệt kê NHIỀU khoản thu chi trong 1 tin nhắn, LUÔN dùng tool \`batch_add_transactions\` thay vì gọi \`add_transaction\` nhiều lần.
 9. Giọng điệu chuyên nghiệp, ngắn gọn. Đầu ra phải dễ đọc trên giao diện mobile (tránh viết văn quá dài).
 10. Khi người dùng hỏi hoặc yêu cầu mô phỏng về một khoản chi phí phát sinh, hãy LUÔN gọi \`simulate_financial_impact\` để chạy thuật toán mô phỏng. Sau đó, hiển thị chi tiết kết quả mô phỏng bằng một báo cáo Markdown hoặc bảng đẹp mắt bên trong thẻ \`<artifact title="Mô phỏng Tác động Tài chính">\`, chỉ rõ: mức độ ảnh hưởng (🟢 Thấp, 🟡 Trung bình, hoặc 🔴 Cao), tóm tắt tác động, số dư ví sau phát sinh, % ngân sách bị tiêu hao, số ngày trì hoãn mục tiêu tiết kiệm và đề xuất hành động cụ thể để khắc phục.
 

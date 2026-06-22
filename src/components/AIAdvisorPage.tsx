@@ -365,6 +365,9 @@ interface AIAdvisorPageProps {
     onSelectBoostPack?: (packType: 'boost_s' | 'boost_m' | 'boost_l') => void;
     onUpdateTodo?: (item: any) => Promise<void>;
     onDeleteTodo?: (id: string) => Promise<void>;
+    onAddCalendarEvent?: (event: any) => Promise<void>;
+    onUpdateCalendarEvent?: (event: any) => Promise<void>;
+    onDeleteCalendarEvent?: (id: string) => Promise<void>;
 }
 
 interface UIMessage {
@@ -521,7 +524,8 @@ const getMimeTypeFromExtension = (ext: string): string => {
 const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     appState, lang, onBack,
     onAddTimetable, onAddTodo, onAddTransaction, onImportGPAData,
-    onSelectBoostPack, onUpdateTodo, onDeleteTodo
+    onSelectBoostPack, onUpdateTodo, onDeleteTodo,
+    onAddCalendarEvent, onUpdateCalendarEvent, onDeleteCalendarEvent
 }) => {
     const [messages, setMessages] = useState<UIMessage[]>([
         {
@@ -700,6 +704,9 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         onImportGPAData,
         onUpdateTodo,
         onDeleteTodo,
+        onAddCalendarEvent,
+        onUpdateCalendarEvent,
+        onDeleteCalendarEvent,
     };
 
     // Auto scroll

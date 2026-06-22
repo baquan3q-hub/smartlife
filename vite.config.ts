@@ -466,6 +466,11 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       // Proxy không cần nữa — geminiProxyPlugin xử lý /api/gemini trực tiếp
     },
+    css: {
+      postcss: {
+        plugins: [],
+      },
+    },
     build: {
       emptyOutDir: true,
       rollupOptions: {
