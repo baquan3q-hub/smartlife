@@ -27,6 +27,56 @@
       }
     })();
   </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          screens: {
+            'xs': '475px',
+          },
+          colors: {
+            primary: '#0ea5e9', // Sky 500
+            secondary: '#10B981', // Emerald 500
+            accent: '#F59E0B', // Amber 500
+            danger: '#EF4444', // Red 500
+            background: '#F3F4F6', // Gray 100
+            surface: '#FFFFFF',
+            indigo: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              300: '#7dd3fc',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+              950: '#082f49',
+            },
+            purple: {
+              50: '#ecfeff',
+              100: '#cffafe',
+              200: '#a5f3fc',
+              300: '#67e8f9',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+              700: '#0e7490',
+              800: '#155e75',
+              900: '#164e63',
+              950: '#083344',
+            }
+          },
+          fontFamily: {
+            sans: ['Roboto', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" href="/favicon.ico" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
