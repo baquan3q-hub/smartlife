@@ -266,11 +266,11 @@ export const HabitsWidget: React.FC<HabitsWidgetProps> = ({ userId, onNavigateTo
                       className="p-0.5 rounded-full hover:bg-slate-100 transition-colors shrink-0 text-slate-300 hover:text-slate-550 cursor-pointer"
                     >
                       {done ? (
-                        <div className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center text-white">
+                        <div className="w-5 h-5 rounded-full bg-slate-700 dark:bg-primary flex items-center justify-center text-white dark:text-primary-foreground">
                           <CheckCircle size={12} className="stroke-[3.5]" />
                         </div>
                       ) : (
-                        <div className="w-5 h-5 rounded-full border-[1.5px] border-slate-300 bg-white" />
+                        <div className="w-5 h-5 rounded-full border-[1.5px] border-slate-300 dark:border-border bg-white" />
                       )}
                     </button>
 
@@ -289,7 +289,7 @@ export const HabitsWidget: React.FC<HabitsWidgetProps> = ({ userId, onNavigateTo
                           <span
                             key={dateStr}
                             className={`w-1.5 h-1.5 rounded-full transition-all ${
-                              isLogged ? 'bg-slate-700' : 'bg-slate-200'
+                              isLogged ? 'bg-slate-700 dark:bg-primary' : 'bg-slate-200 dark:bg-border/60'
                             }`}
                             title={DAY_LABELS[ALL_DAYS[idx]]}
                           />
@@ -309,7 +309,7 @@ export const HabitsWidget: React.FC<HabitsWidgetProps> = ({ userId, onNavigateTo
               );
             })
           ) : (
-            <div className="flex flex-col items-center justify-center py-8 px-4 border border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs">
+            <div className="flex flex-col items-center justify-center py-8 px-4 border border-dashed border-border rounded-2xl text-muted-foreground text-xs">
               Chưa thiết lập thói quen nào
             </div>
           )}
@@ -329,9 +329,9 @@ export const HabitsWidget: React.FC<HabitsWidgetProps> = ({ userId, onNavigateTo
         <button
           type="submit"
           disabled={isSaving || !newTitle.trim()}
-          className="w-7 h-7 rounded-full bg-black hover:bg-slate-900 text-white flex items-center justify-center transition-all duration-200 active:scale-90 shrink-0 cursor-pointer"
+          className="w-7 h-7 rounded-full bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground flex items-center justify-center transition-all duration-200 active:scale-90 shrink-0 cursor-pointer"
         >
-          {isSaving ? <Loader2 size={12} className="animate-spin text-white" /> : <Plus size={14} className="stroke-[3]" />}
+          {isSaving ? <Loader2 size={12} className="animate-spin text-current" /> : <Plus size={14} className="stroke-[3]" />}
         </button>
       </form>
     </div>

@@ -6,6 +6,8 @@ import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
 import { Lang } from '../i18n/i18n';
 
+
+
 interface FinanceDashboardProps {
     state: AppState;
     onAddTransaction: (t: Omit<Transaction, 'id'>) => void;
@@ -651,6 +653,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     // AI State
     const [aiInsight, setAiInsight] = useState<{ insight: string; actions: string[] } | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+
 
 
     const stats = useMemo(() => {
@@ -2106,7 +2110,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     </div>
 
                     {/* Buttons Group */}
-                    <div className="flex flex-1 w-full md:w-auto gap-3">
+                    <div className="flex flex-1 w-full md:w-auto gap-3 flex-wrap sm:flex-nowrap">
                         {/* AI Analysis Button */}
                         <button
                             onClick={handleAnalyzeFinance}
@@ -2115,6 +2119,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                             <Sparkles size={16} className="text-yellow-300 animate-pulse" />
                             <span className="text-xs md:text-sm">AI Own</span>
                         </button>
+
+
 
                         {/* Add Transaction Button */}
                         <button
@@ -2167,6 +2173,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         <h3 className="text-2xl font-bold tracking-tight text-gray-900 relative z-10">
                             {hideBalance ? '••••••' : formatCurrency(stats.totalBalance, lang)}
                         </h3>
+
                     </div>
 
                     {/* Income Card - 2-Step Interaction */}
@@ -3910,6 +3917,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     </div>
                 </div>
             )}
+
+
         </div>
     );
 };

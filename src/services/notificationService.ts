@@ -3,15 +3,8 @@ import { TimetableEvent, Goal, Todo } from "../types";
 import { Solar, Lunar } from "lunar-javascript";
 import { supabase } from "./supabase";
 
-// Simple "Ding" sound (Base64 MP3 to avoid external deps)
-const NOTIFICATION_SOUND = "data:audio/mp3;base64,SUQzBAAAAAABAFRYVFgAAAASAAADbWFqb3JfYnJhbmQAbXA0MgBUWFRYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFRYAAAAEAAAA2NvbXBhdGlibGVfYnJhbmQAbXA0Mmlzb21tcDQxAFRTU0UAAAAOAAADTGF2ZjU3LjU2LjEwMAAAAAAAAAAAAAAA//uQZAAAAAAAABAAAAAAAAAAAAQD//7kmRAAAAAAAAIAAAAA///+5JkAAABUAW4AAAAAAACAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/8zEAAAAAABhAAABAAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA//MxAAAAAAAYAAAAQAAAAAAAAAAAAAAAAAAAAAABAAAAP/zMQAAAAAAGAAAAEAAAAAAAAAAAAAAAAAAAAAAAQAAAD/8zEAAAAAABgAAABAAAAAAAAAAAAAAAAAAAAAAAEAAAA="; // Placeholder, too long. I will use a shorter one or a link if base64 is too massive for inline.
-// Actually, let's use a reliable simple beep URL as backup, or a very short base64.
-// Let's stick to a reliable URL from a CDN like unpkg or similar if possible, OR just use the Google one but handle errors better.
-// BETTER: Create a helper that tries to play.
-
 const playNotificationSound = () => {
     try {
-        // Use a short, pleasant notification sound
         const audio = new Audio('/tiengthongbaobamgio.mp3');
         audio.volume = 0.7;
         audio.play().catch(e => console.warn("Audio play failed (user interaction needed first):", e));
@@ -69,33 +62,49 @@ const getSettings = () => {
     }
 };
 
+const notifiedTags: Record<string, number> = {};
+const hasNotifiedRecently = (tag: string) => {
+    const last = notifiedTags[tag];
+    if (!last) return false;
+    return (Date.now() - last) < 12 * 60 * 60 * 1000;
+};
+const markNotified = (tag: string) => {
+    notifiedTags[tag] = Date.now();
+};
+
+const sendNotification = (title: string, options?: NotificationOptions) => {
+    playNotificationSound();
+    new Notification(title, {
+        icon: '/pwa-192x192.png',
+        silent: false,
+        ...options
+    });
+};
+
 export const checkAndNotify = (timetable: TimetableEvent[]) => {
     if (Notification.permission !== "granted") return;
     const settings = getSettings();
     if (!settings.timetable && !settings.timetable_pre) return;
 
     const now = new Date();
-    const currentDay = now.getDay(); // 0 (Sun) - 6 (Sat)
+    const currentDay = now.getDay();
 
     timetable.forEach(event => {
         if (event.day_of_week !== currentDay) return;
 
-        // Calculate time difference
         const [h, m] = event.start_time.split(':').map(Number);
         const eventTime = new Date();
         eventTime.setHours(h, m, 0, 0);
 
         const diffMinutes = Math.floor((eventTime.getTime() - now.getTime()) / 60000);
 
-        // Notify 15 minutes before
         if (settings.timetable_pre && diffMinutes === 15) {
             sendNotification(`⏳ Sắp diễn ra =))): ${event.title}`, {
-                body: `Còn 30 phút nữa là đến giờ rồi bạn ơi! (${event.start_time})`,
-                tag: `pre--30{event.id}-${now.toDateString()}`
+                body: `Còn 15 phút nữa là đến giờ rồi bạn ơi! (${event.start_time})`,
+                tag: `pre-15-${event.id}-${now.toDateString()}`
             });
         }
 
-        // Notify at start time
         if (settings.timetable && diffMinutes === 0) {
             sendNotification(`🔔 Đang diễn ra rùi nè: ${event.title}`, {
                 body: `Sự kiện bắt đầu ngay bây giờ tại ${event.location || 'không gian mạng'}!`,
@@ -110,10 +119,8 @@ export const checkCalendarAndNotify = () => {
     const settings = getSettings();
     const now = new Date();
 
-    // Check only around 7:00 AM - 9:00 AM to avoid spam, or run once a day logic
-    // For simplicity in this interval loop, we check if hour is 8 or 9 and we haven't notified today
     const currentHour = now.getHours();
-    if (currentHour < 8 || currentHour > 20) return; // Only verify during day
+    if (currentHour < 8 || currentHour > 20) return;
 
     const solar = Solar.fromDate(now);
     const lunar = Lunar.fromDate(now);
@@ -123,7 +130,6 @@ export const checkCalendarAndNotify = () => {
     const tag = `lunar-${day}-${month}-${now.getFullYear()}`;
     if (hasNotifiedRecently(tag)) return;
 
-    // 1. Rằm & Mùng 1
     if (settings.calendar_lunar) {
         if (day === 1) {
             sendNotification("🌙 Hôm nay là Mùng 1", { body: "Chúc bạn một tháng mới bình an và may mắn! 🙏", tag });
@@ -137,11 +143,10 @@ export const checkCalendarAndNotify = () => {
         }
     }
 
-    // 2. Holidays (Simple list)
     if (settings.calendar_holiday) {
-        // Tet Nguyen Dan (Lunar 1/1) already covered by Mung 1 but can overload
         if (day === 1 && month === 1) {
             sendNotification("🎆 CHÚC MỪNG NĂM MỚI!", { body: "Tết đến xuân về! Chúc mừng năm mới an khang thịnh vượng! 🧧", tag: tag + '-tet' });
+            markNotified(tag);
         }
     }
 };
@@ -151,17 +156,12 @@ export const checkGoalsAndNotify = (goals: Goal[]) => {
     const settings = getSettings();
     if (!settings.goals_remind) return;
 
-    // Notify randomly between 9 AM and 9 PM
     const now = new Date();
     if (now.getHours() < 9 || now.getHours() > 21) return;
 
-    // Logic: 5% chance every check (assuming check interval is 1 min) -> too high
-    // Better: Check if we haven't notified about goals today
     const tag = `goal-remind-${now.toDateString()}`;
     if (hasNotifiedRecently(tag)) return;
 
-    // Pick a random time? Or just notify at 9 AM?
-    // Let's notify at 9 AM or 3 PM if not done
     if (now.getHours() === 9 || now.getHours() === 15) {
         const pendingGoals = goals.filter(g => (g?.progress ?? 0) < 100);
         if (pendingGoals.length > 0) {
@@ -186,36 +186,29 @@ interface CalendarEvent {
     id: string;
     title: string;
     description?: string;
-    date: string; // YYYY-MM-DD
-    time?: string; // HH:MM:00
+    date: string;
+    time?: string;
     location?: string;
+    email_notify?: boolean;
+    email_notify_before_minutes?: number;
 }
 
 export const checkCustomEventsAndNotify = (events: CalendarEvent[]) => {
     if (Notification.permission !== "granted") return;
 
-    // Default settings check (assuming 'calendar_lunar' implies general calendar notifications for now, 
-    // or we can add a specific setting later. For now, let's respect the master toggle concept or just default 'true' for personal events)
-    // Ideally we add 'personal_events: true' to settings, but let's assume if user adds event they want noti.
-
     const now = new Date();
-    // Format YYYY-MM-DD
     const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
 
-    // Filter events for TODAY
     const todayEvents = events.filter(e => e.date === dateStr);
 
     todayEvents.forEach(event => {
-        // 1. If has specific time
         if (event.time) {
             const [h, m] = event.time.split(':').map(Number);
             const eventTime = new Date();
             eventTime.setHours(h, m, 0, 0);
 
-            // Diff in minutes
             const diffMinutes = Math.floor((eventTime.getTime() - now.getTime()) / 60000);
 
-            // Notify AT THE TIME (0 to -1 min to catch it)
             if (diffMinutes === 0) {
                 const tag = `evt-start-${event.id}`;
                 if (hasNotifiedRecently(tag)) return;
@@ -226,9 +219,7 @@ export const checkCustomEventsAndNotify = (events: CalendarEvent[]) => {
                 });
                 markNotified(tag);
             }
-        }
-        // 2. All day event -> Notify at 9:00 AM once
-        else {
+        } else {
             if (now.getHours() === 9 && now.getMinutes() === 0) {
                 const tag = `evt-allday-${event.id}`;
                 if (hasNotifiedRecently(tag)) return;
@@ -249,7 +240,6 @@ export const checkHabitsFromDBAndNotify = async (userId: string) => {
     const now = new Date();
     const h = now.getHours();
 
-    // Chỉ nhắc vào lúc 8h sáng và 20h tối (8 PM)
     if (h !== 8 && h !== 20) return;
 
     const tag = `habit-remind-${now.toDateString()}-${h}`;
@@ -260,7 +250,6 @@ export const checkHabitsFromDBAndNotify = async (userId: string) => {
         const daysOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
         const currentDayStr = daysOfWeek[now.getDay()];
 
-        // 1. Lấy danh sách habit active của user
         const { data: habits, error: habitsError } = await supabase
             .from('habits')
             .select('*')
@@ -276,7 +265,6 @@ export const checkHabitsFromDBAndNotify = async (userId: string) => {
 
         if (todayHabits.length === 0) return;
 
-        // 2. Lấy log hôm nay
         const { data: logs, error: logsError } = await supabase
             .from('habit_logs')
             .select('*')
@@ -302,7 +290,6 @@ export const checkHabitsFromDBAndNotify = async (userId: string) => {
             }
             markNotified(tag);
         } else if (h === 20) {
-            // Đã hoàn thành hết lúc 20h
             sendNotification("🎉 Tuyệt vời!", {
                 body: "Bạn đã hoàn thành TẤT CẢ thói quen hôm nay. Chúc bạn ngủ ngon! 😴",
                 tag
@@ -313,30 +300,6 @@ export const checkHabitsFromDBAndNotify = async (userId: string) => {
     } catch (e) {
         console.error("Habit notification error:", e);
     }
-};
-
-// Helper: Prevent duplicate notifications in same session/day
-const notifiedTags: Record<string, number> = {};
-const hasNotifiedRecently = (tag: string) => {
-    const last = notifiedTags[tag];
-    if (!last) return false;
-    // Debounce for 12 hours
-    return (Date.now() - last) < 12 * 60 * 60 * 1000;
-};
-const markNotified = (tag: string) => {
-    notifiedTags[tag] = Date.now();
-};
-
-
-const sendNotification = (title: string, options?: NotificationOptions) => {
-    // Play sound manually to ensure it's audible
-    playNotificationSound();
-
-    new Notification(title, {
-        icon: '/pwa-192x192.png',
-        silent: false, // We played sound manually, but keeping this doesn't hurt
-        ...options
-    });
 };
 
 export const checkTodosAndNotify = (todos: Todo[]) => {
@@ -366,16 +329,314 @@ export const checkTodosAndNotify = (todos: Todo[]) => {
     const pendingTodos = todos.filter(t => !t.is_completed);
 
     if (pendingTodos.length > 0) {
-        sendNotification("📝 Nhắc nhở Todo List", {
-            body: `Bạn còn ${pendingTodos.length} nhiệm vụ chưa làm xong (ví dụ: "${pendingTodos[0].content}"). Nhấn để hoàn thành ngay nhé! 💪`,
+        const todoMessages = [
+            `📝 Bạn có ${pendingTodos.length} công việc chưa hoàn thành!`,
+            `🎯 Hãy hoàn thành các task của ngày hôm nay nhé!`,
+            `⚡ Đừng quên check-in các việc cần làm trong danh sách!`
+        ];
+        const msg = todoMessages[Math.floor(Math.random() * todoMessages.length)];
+        const bodyContent = pendingTodos.slice(0, 2).map(t => `- ${t.content}`).join('\n') + 
+            (pendingTodos.length > 2 ? `\n... và ${pendingTodos.length - 2} việc khác.` : '');
+
+        sendNotification(msg, {
+            body: bodyContent,
             tag
         });
         markNotified(tag);
-    } else if (todos.length === 0) {
-        sendNotification("📝 Lên kế hoạch học tập", {
-            body: "Bạn chưa tạo danh sách việc cần làm hôm nay. Hãy lên Todo List ngay để học tập hiệu quả nhé! 🚀",
-            tag
+    }
+};
+
+// In-memory dedup cache to prevent rapid-fire duplicate sends within same session
+const emailSentCache: Record<string, number> = {};
+const hasEmailSentRecently = (key: string): boolean => {
+    const lastSent = emailSentCache[key];
+    if (!lastSent) return false;
+    // Block re-send within 30 minutes
+    return (Date.now() - lastSent) < 30 * 60 * 1000;
+};
+const markEmailSent = (key: string) => {
+    emailSentCache[key] = Date.now();
+};
+
+// Helper: Call /api/send-email (Vercel serverless or Vite dev proxy)
+const callSendEmailAPI = async (payload: {
+    logId?: string;
+    to: string;
+    lang: string;
+    sourceType: string;
+    item: any;
+    minutesLeft: number;
+}): Promise<{ success: boolean; error?: string }> => {
+    try {
+        const response = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
         });
-        markNotified(tag);
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error(`[EmailNotification] API Error (${response.status}):`, errData);
+            return { success: false, error: errData.error || `HTTP ${response.status}` };
+        }
+
+        const data = await response.json();
+        console.log('[EmailNotification] ✅ Email sent:', data);
+        return { success: true };
+    } catch (e: any) {
+        console.error('[EmailNotification] Network error:', e.message);
+        return { success: false, error: e.message };
+    }
+};
+
+export const checkAndSendEmailNotifications = async (
+    todos: Todo[],
+    timetable: TimetableEvent[],
+    calendarEvents: any[],
+    profile: any,
+    currentLang: string
+) => {
+    if (!profile || !profile.email) return;
+
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+    // 1. Check Todos
+    const dueTodos = todos.filter(t => {
+        if (t.is_completed || !t.deadline) return false;
+        const emailNotify = t.email_notify || (profile?.email_notifications?.enabled && profile?.email_notifications?.todo_deadline);
+        if (!emailNotify) return false;
+        
+        const diffMinutes = Math.floor((new Date(t.deadline).getTime() - now.getTime()) / 60000);
+        const beforeMinutes = t.email_notify_before_minutes ?? (profile?.email_notifications?.hours_before ? profile.email_notifications.hours_before * 60 : 60);
+        
+        return diffMinutes > 0 && diffMinutes <= beforeMinutes;
+    });
+
+    for (const todo of dueTodos) {
+        try {
+            const diffMinutes = Math.floor((new Date(todo.deadline!).getTime() - now.getTime()) / 60000);
+            const dedupKey = `todo_${todo.id}_${dateStr}`;
+
+            // In-memory dedup: skip if already sent recently in this session
+            if (hasEmailSentRecently(dedupKey)) continue;
+
+            // DB-level dedup: include date in notification_type so the same todo can be notified on different days
+            const notiType = `deadline_${dateStr}`;
+            
+            const { data: inserted, error: insertError } = await supabase
+                .from('email_notification_logs')
+                .insert([{
+                    user_id: profile.id,
+                    source_type: 'todo',
+                    source_id: todo.id,
+                    notification_type: notiType,
+                    email_to: profile.email,
+                    status: 'pending'
+                }])
+                .select()
+                .single();
+
+            if (insertError) {
+                if (insertError.code === '23505') {
+                    // Already sent today for this todo — mark in-memory cache too
+                    markEmailSent(dedupKey);
+                } else {
+                    console.error("[EmailNotification] Error logging todo notification:", insertError);
+                }
+                continue;
+            }
+
+            if (inserted) {
+                const result = await callSendEmailAPI({
+                    logId: inserted.id,
+                    to: profile.email,
+                    lang: currentLang,
+                    sourceType: 'todo',
+                    item: todo,
+                    minutesLeft: diffMinutes
+                });
+
+                if (result.success) {
+                    markEmailSent(dedupKey);
+                    // Update log status to sent
+                    await supabase
+                        .from('email_notification_logs')
+                        .update({ status: 'sent' })
+                        .eq('id', inserted.id);
+                } else {
+                    // Update log status to failed
+                    await supabase
+                        .from('email_notification_logs')
+                        .update({ status: 'failed' })
+                        .eq('id', inserted.id);
+                }
+            }
+        } catch (e) {
+            console.error("[EmailNotification] Error processing todo email:", e);
+        }
+    }
+
+    // 2. Check Calendar Events
+    const dueCalendarEvents = calendarEvents.filter(ce => {
+        if (!ce.date) return false;
+        const emailNotify = ce.email_notify || (profile?.email_notifications?.enabled && profile?.email_notifications?.calendar_deadline);
+        if (!emailNotify) return false;
+        
+        // Parse event time safely: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DDTHH:MM:SS"
+        const timeStr = ce.time ? ce.time.padEnd(8, ':00').slice(0, 8) : '00:00:00';
+        const eventTimeStr = `${ce.date}T${timeStr}`;
+        const eventTime = new Date(eventTimeStr);
+        if (isNaN(eventTime.getTime())) return false;
+
+        const diffMinutes = Math.floor((eventTime.getTime() - now.getTime()) / 60000);
+        const beforeMinutes = ce.email_notify_before_minutes ?? (profile?.email_notifications?.hours_before ? profile.email_notifications.hours_before * 60 : 60);
+        
+        return diffMinutes > 0 && diffMinutes <= beforeMinutes;
+    });
+
+    for (const ce of dueCalendarEvents) {
+        try {
+            const timeStr = ce.time ? ce.time.padEnd(8, ':00').slice(0, 8) : '00:00:00';
+            const eventTimeStr = `${ce.date}T${timeStr}`;
+            const diffMinutes = Math.floor((new Date(eventTimeStr).getTime() - now.getTime()) / 60000);
+            const dedupKey = `calendar_${ce.id}_${dateStr}`;
+
+            if (hasEmailSentRecently(dedupKey)) continue;
+
+            const notiType = `deadline_${dateStr}`;
+
+            const { data: inserted, error: insertError } = await supabase
+                .from('email_notification_logs')
+                .insert([{
+                    user_id: profile.id,
+                    source_type: 'calendar_event',
+                    source_id: ce.id,
+                    notification_type: notiType,
+                    email_to: profile.email,
+                    status: 'pending'
+                }])
+                .select()
+                .single();
+
+            if (insertError) {
+                if (insertError.code === '23505') {
+                    markEmailSent(dedupKey);
+                } else {
+                    console.error("[EmailNotification] Error logging calendar notification:", insertError);
+                }
+                continue;
+            }
+
+            if (inserted) {
+                const result = await callSendEmailAPI({
+                    logId: inserted.id,
+                    to: profile.email,
+                    lang: currentLang,
+                    sourceType: 'calendar_event',
+                    item: ce,
+                    minutesLeft: diffMinutes
+                });
+
+                if (result.success) {
+                    markEmailSent(dedupKey);
+                    await supabase
+                        .from('email_notification_logs')
+                        .update({ status: 'sent' })
+                        .eq('id', inserted.id);
+                } else {
+                    await supabase
+                        .from('email_notification_logs')
+                        .update({ status: 'failed' })
+                        .eq('id', inserted.id);
+                }
+            }
+        } catch (e) {
+            console.error("[EmailNotification] Error processing calendar event email:", e);
+        }
+    }
+
+    // 3. Check Timetable (Weekly recurring class schedule)
+    const todayIndex = now.getDay();
+    const dueTimetable = timetable.filter(tt => {
+        if (tt.day_of_week !== todayIndex) return false;
+        const emailNotify = tt.email_notify || (profile?.email_notifications?.enabled && profile?.email_notifications?.timetable_deadline);
+        if (!emailNotify) return false;
+        
+        // Ensure start_time is properly formatted (HH:MM or HH:MM:SS)
+        const startTimeParts = tt.start_time.split(':');
+        const eventHour = parseInt(startTimeParts[0], 10);
+        const eventMin = parseInt(startTimeParts[1], 10);
+        if (isNaN(eventHour) || isNaN(eventMin)) return false;
+
+        const eventDate = new Date(now);
+        eventDate.setHours(eventHour, eventMin, 0, 0);
+
+        const diffMinutes = Math.floor((eventDate.getTime() - now.getTime()) / 60000);
+        const beforeMinutes = tt.email_notify_before_minutes ?? (profile?.email_notifications?.hours_before ? profile.email_notifications.hours_before * 60 : 60);
+        
+        return diffMinutes > 0 && diffMinutes <= beforeMinutes;
+    });
+
+    for (const tt of dueTimetable) {
+        try {
+            const startTimeParts = tt.start_time.split(':');
+            const eventDate = new Date(now);
+            eventDate.setHours(parseInt(startTimeParts[0], 10), parseInt(startTimeParts[1], 10), 0, 0);
+            const diffMinutes = Math.floor((eventDate.getTime() - now.getTime()) / 60000);
+            
+            const notiType = `timetable_${dateStr}`;
+            const dedupKey = `timetable_${tt.id}_${dateStr}`;
+
+            if (hasEmailSentRecently(dedupKey)) continue;
+            
+            const { data: inserted, error: insertError } = await supabase
+                .from('email_notification_logs')
+                .insert([{
+                    user_id: profile.id,
+                    source_type: 'timetable',
+                    source_id: tt.id,
+                    notification_type: notiType,
+                    email_to: profile.email,
+                    status: 'pending'
+                }])
+                .select()
+                .single();
+
+            if (insertError) {
+                if (insertError.code === '23505') {
+                    markEmailSent(dedupKey);
+                } else {
+                    console.error("[EmailNotification] Error logging timetable notification:", insertError);
+                }
+                continue;
+            }
+
+            if (inserted) {
+                const result = await callSendEmailAPI({
+                    logId: inserted.id,
+                    to: profile.email,
+                    lang: currentLang,
+                    sourceType: 'timetable',
+                    item: tt,
+                    minutesLeft: diffMinutes
+                });
+
+                if (result.success) {
+                    markEmailSent(dedupKey);
+                    await supabase
+                        .from('email_notification_logs')
+                        .update({ status: 'sent' })
+                        .eq('id', inserted.id);
+                } else {
+                    await supabase
+                        .from('email_notification_logs')
+                        .update({ status: 'failed' })
+                        .eq('id', inserted.id);
+                }
+            }
+        } catch (e) {
+            console.error("[EmailNotification] Error processing timetable email:", e);
+        }
     }
 };

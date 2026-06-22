@@ -290,6 +290,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     qr_code_url: profile.qr_code_url || null,
                     student_card_url: profile.student_card_url || null,
                     citizen_card_url: profile.citizen_card_url || null,
+                    email_notifications: profile.email_notifications || null,
                     updated_at: new Date().toISOString(),
                 };
                 const { error } = await supabase.from('profiles').upsert(updates);
@@ -810,6 +811,98 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                     />
                                 </div>
                             </div>
+
+                            {/* Section: Email Notifications */}
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-2">
+                                    <Bell size={14} className="text-emerald-500" />
+                                    {lang === 'vi' ? 'Thông báo qua Email' : lang === 'en' ? 'Email Notifications' : '이메일 알림'}
+                                </h4>
+                                <div className="bg-emerald-50/30 rounded-2xl p-2 border border-emerald-100/50">
+                                    <SwitchItem
+                                        label={lang === 'vi' ? 'Bật thông báo email' : lang === 'en' ? 'Enable email notifications' : '이메일 알림 활성화'}
+                                        desc={lang === 'vi' ? 'Gửi email nhắc nhở khi đến hạn chót' : lang === 'en' ? 'Send reminder emails when approaching deadlines' : '마감일이 다가오면 알림 이메일 전송'}
+                                        checked={profile?.email_notifications?.enabled || false}
+                                        onChange={() => {
+                                            setProfile(prev => {
+                                                if (!prev) return null;
+                                                const current = prev.email_notifications || {
+                                                    enabled: false,
+                                                    todo_deadline: true,
+                                                    timetable_deadline: true,
+                                                    calendar_deadline: true,
+                                                    hours_before: 1
+                                                };
+                                                return {
+                                                    ...prev,
+                                                    email_notifications: {
+                                                        ...current,
+                                                        enabled: !current.enabled
+                                                    }
+                                                };
+                                            });
+                                        }}
+                                    />
+                                    {profile?.email_notifications?.enabled && (
+                                        <>
+                                            <div className="h-px bg-emerald-100/30 my-1 mx-4"></div>
+                                            <SwitchItem
+                                                label={lang === 'vi' ? 'Nhắc nhở công việc (Todo)' : lang === 'en' ? 'Task reminders (Todo)' : '할 일 알림'}
+                                                desc={lang === 'vi' ? 'Gửi email cho các việc cần làm' : lang === 'en' ? 'Send email for todo items' : '할 일에 대한 이메일 보내기'}
+                                                checked={profile.email_notifications.todo_deadline ?? true}
+                                                onChange={() => {
+                                                    setProfile(prev => {
+                                                        if (!prev || !prev.email_notifications) return null;
+                                                        return {
+                                                            ...prev,
+                                                            email_notifications: {
+                                                                ...prev.email_notifications,
+                                                                todo_deadline: !prev.email_notifications.todo_deadline
+                                                            }
+                                                        };
+                                                    });
+                                                }}
+                                            />
+                                            <div className="h-px bg-emerald-100/30 my-1 mx-4"></div>
+                                            <SwitchItem
+                                                label={lang === 'vi' ? 'Nhắc nhở lịch học/làm việc' : lang === 'en' ? 'Timetable reminders' : '시간표 알림'}
+                                                desc={lang === 'vi' ? 'Gửi email nhắc thời khóa biểu cố định' : lang === 'en' ? 'Send email for fixed timetable events' : '고정 시간표 일정에 대한 이메일 보내기'}
+                                                checked={profile.email_notifications.timetable_deadline ?? true}
+                                                onChange={() => {
+                                                    setProfile(prev => {
+                                                        if (!prev || !prev.email_notifications) return null;
+                                                        return {
+                                                            ...prev,
+                                                            email_notifications: {
+                                                                ...prev.email_notifications,
+                                                                timetable_deadline: !prev.email_notifications.timetable_deadline
+                                                            }
+                                                        };
+                                                    });
+                                                }}
+                                            />
+                                            <div className="h-px bg-emerald-100/30 my-1 mx-4"></div>
+                                            <SwitchItem
+                                                label={lang === 'vi' ? 'Nhắc nhở sự kiện lịch' : lang === 'en' ? 'Calendar reminders' : '달력 일정 알림'}
+                                                desc={lang === 'vi' ? 'Gửi email nhắc nhở sự kiện cá nhân' : lang === 'en' ? 'Send email for personal calendar events' : '개인 달력 일정에 대한 이메일 보내기'}
+                                                checked={profile.email_notifications.calendar_deadline ?? true}
+                                                onChange={() => {
+                                                    setProfile(prev => {
+                                                        if (!prev || !prev.email_notifications) return null;
+                                                        return {
+                                                            ...prev,
+                                                            email_notifications: {
+                                                                ...prev.email_notifications,
+                                                                calendar_deadline: !prev.email_notifications.calendar_deadline
+                                                            }
+                                                        };
+                                                    });
+                                                }}
+                                            />
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -1006,7 +1099,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         <button
                             onClick={handleSave}
                             disabled={saving || loading}
-                            className="px-6 py-2.5 rounded-xl bg-gray-900 text-white font-bold hover:bg-black transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-95 text-sm"
+                            className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/95 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-95 text-sm"
                         >
                             {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                             {t('settings.save', lang)}
@@ -1082,7 +1175,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setActiveLightboxField(null)}
-                                className="px-5 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-xs transition-all active:scale-95"
+                                className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/95 text-primary-foreground font-bold text-xs transition-all active:scale-95"
                             >
                                 Đóng
                             </button>

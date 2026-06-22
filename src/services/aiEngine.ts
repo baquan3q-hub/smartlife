@@ -29,7 +29,7 @@ export interface ChartData {
 }
 
 export interface ActionResult {
-    type: 'timetable' | 'todo' | 'transaction';
+    type: 'timetable' | 'todo' | 'transaction' | 'financial_impact';
     success: boolean;
     message: string;
     data?: any;
@@ -234,6 +234,24 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
                 }
             },
             required: ['transactions']
+        }
+    },
+    {
+        name: 'simulate_financial_impact',
+        description: 'Mô phỏng và cố vấn tác động tài chính khi phát sinh chi phí hoặc sự kiện đột xuất giả định (ví dụ: đi đám cưới, bị phạt giao thông, mua điện thoại, hỏng xe, đầu tư công nghệ...). Trả về chi tiết ảnh hưởng tới số dư ví, ngân sách chi tiêu và tiến độ đạt các mục tiêu tiết kiệm.',
+        parameters: {
+            type: 'object',
+            properties: {
+                description: {
+                    type: 'string',
+                    description: 'Mô tả chi tiết hoặc tên sự kiện phát sinh. VD: "bị phạt giao thông", "đi đám cưới bạn thân", "mua laptop mới"'
+                },
+                amount: {
+                    type: 'number',
+                    description: 'Số tiền phát sinh dự kiến (VND). VD: 1000000'
+                }
+            },
+            required: ['description', 'amount']
         }
     },
     {
@@ -1029,6 +1047,25 @@ export async function chatWithAI(
                         }
                         break;
                     }
+                    case 'simulate_financial_impact': {
+                        try {
+                            const simResult = await simulateFinancialImpact(args.description, args.amount, appState, 'vi');
+                            result = { success: true, ...simResult };
+                            actions.push({
+                                type: 'financial_impact' as any,
+                                success: true,
+                                message: `Đã mô phỏng tác động tài chính của kịch bản "${args.description}" với số tiền ${args.amount.toLocaleString('vi-VN')}đ.`,
+                                data: {
+                                    description: args.description,
+                                    amount: args.amount,
+                                    simulation: simResult
+                                }
+                            });
+                        } catch (e: any) {
+                            result = { success: false, error: e.message };
+                        }
+                        break;
+                    }
                     case 'get_user_profile':
                         result = { result: buildProfileContext(appState) };
                         break;
@@ -1174,3 +1211,193 @@ function executeSimulateGPA(args: any, appState: AppState): any {
         scenarios: results,
     };
 }
+
+export interface FinancialSimulationResult {
+    impact_level: 'low' | 'medium' | 'high';
+    impact_level_label: string;
+    summary: string;
+    current_balance_after: number;
+    budget_impact_percent: number;
+    wallet_impacts: Array<{
+        wallet_name: string;
+        balance_before: number;
+        balance_after: number;
+        percentage_decrease: number;
+    }>;
+    savings_delay_days: number;
+    recommendations: Array<{
+        title: string;
+        description: string;
+        action_type: 'adjust_budget' | 'transfer_wallet' | 'reduce_expense' | 'other';
+    }>;
+    historical_trends?: {
+        monthly_trends: Array<{ month: string; income: number; expense: number; surplus: number }>;
+        avg_income: number;
+        avg_expense: number;
+        avg_surplus: number;
+        comparison_percentage: number;
+    };
+}
+
+export async function simulateFinancialImpact(
+    description: string,
+    amount: number,
+    appState: AppState,
+    lang: string = 'vi'
+): Promise<FinancialSimulationResult> {
+    const walletsStr = appState.wallets?.map(w => `- ${w.name}: Số dư hiện tại ${w.balance.toLocaleString('vi-VN')}đ`).join('\n') || '- Không có ví';
+    const budgetsStr = appState.budgets?.map(b => `- ${b.category}: Ngân sách ${b.amount.toLocaleString('vi-VN')}đ tháng ${b.month}`).join('\n') || '- Không có ngân sách';
+    const goalsStr = appState.goals?.filter(g => g.type === 'FINANCIAL').map(g => `- ${g.title}: Mục tiêu ${g?.target_amount?.toLocaleString('vi-VN')}đ, hiện tại ${g?.current_amount?.toLocaleString('vi-VN')}đ, hạn chót ${g.deadline}`).join('\n') || '- Không có mục tiêu tài chính';
+
+    // Calculate historical monthly trends (last 6 months)
+    const txs = appState.transactions || [];
+    const monthlySummary: Record<string, { income: number; expense: number }> = {};
+    
+    txs.forEach(t => {
+        if (!t.date) return;
+        const month = t.date.slice(0, 7); // "YYYY-MM"
+        if (!monthlySummary[month]) {
+            monthlySummary[month] = { income: 0, expense: 0 };
+        }
+        if (t.type === 'income') {
+            monthlySummary[month].income += t.amount;
+        } else if (t.type === 'expense') {
+            monthlySummary[month].expense += t.amount;
+        }
+    });
+
+    const sortedMonths = Object.keys(monthlySummary).sort();
+    const last6Months = sortedMonths.slice(-6);
+    const monthlyTrendsArray = last6Months.map(m => ({
+        month: m,
+        income: monthlySummary[m].income,
+        expense: monthlySummary[m].expense,
+        surplus: monthlySummary[m].income - monthlySummary[m].expense
+    }));
+
+    const last3Months = sortedMonths.slice(-3);
+    let totalIncomeLast3Months = 0;
+    let totalExpenseLast3Months = 0;
+    last3Months.forEach(m => {
+        totalIncomeLast3Months += monthlySummary[m].income;
+        totalExpenseLast3Months += monthlySummary[m].expense;
+    });
+    const activeMonthsCount = last3Months.length || 1;
+    const avgIncomeLast3Months = totalIncomeLast3Months / activeMonthsCount;
+    const avgExpenseLast3Months = totalExpenseLast3Months / activeMonthsCount;
+    const avgSavingsLast3Months = avgIncomeLast3Months - avgExpenseLast3Months;
+
+    const trendsStr = monthlyTrendsArray.map(t => 
+        `- Tháng ${t.month}: Thu nhập ${t.income.toLocaleString('vi-VN')}đ | Chi tiêu ${t.expense.toLocaleString('vi-VN')}đ | Thặng dư ${t.surplus.toLocaleString('vi-VN')}đ`
+    ).join('\n');
+
+    const isEn = lang === 'en';
+    
+    const prompt = `Bạn là chuyên gia cố vấn tài chính cá nhân thông minh.
+Hãy đánh giá tác động tài chính của kịch bản phát sinh bất ngờ:
+- Nội dung phát sinh: "${description}"
+- Số tiền phát sinh: ${amount.toLocaleString('vi-VN')}đ (chi phí chi tiêu)
+
+Tình hình tài chính hiện tại của người dùng:
+- Số dư khả dụng tổng: ${(appState.currentBalance || 0).toLocaleString('vi-VN')}đ
+- Các ví tiền:
+${walletsStr}
+- Ngân sách tháng này:
+${budgetsStr}
+- Mục tiêu tài chính:
+${goalsStr}
+
+LỊCH SỬ THU CHI VÀ XU HƯỚNG CÁC THÁNG TRƯỚC:
+- Xu hướng thu chi theo tháng:
+${trendsStr || '- Chưa có dữ liệu thu chi tháng trước'}
+- Trung bình 3 tháng gần nhất:
+  + Thu nhập trung bình: ${avgIncomeLast3Months.toLocaleString('vi-VN')}đ/tháng
+  + Chi tiêu trung bình: ${avgExpenseLast3Months.toLocaleString('vi-VN')}đ/tháng
+  + Thặng dư tiết kiệm trung bình: ${avgSavingsLast3Months.toLocaleString('vi-VN')}đ/tháng
+
+Yêu cầu phân tích:
+1. Đánh giá xem khoản phát sinh ${amount.toLocaleString('vi-VN')}đ này chiếm bao nhiêu phần trăm so với Thặng dư tiết kiệm trung bình hàng tháng của người dùng (${avgSavingsLast3Months.toLocaleString('vi-VN')}đ).
+2. Dựa vào xu hướng chi tiêu các tháng trước để dự báo xem việc gánh thêm khoản chi này có đẩy người dùng vào tình trạng thâm hụt ngân sách hay không.
+3. Đưa ra các khuyến nghị, đề xuất giải pháp hành động cụ thể để bù đắp khoản chi tiêu này (như cắt giảm ngân sách danh mục nào, rút tiền từ ví nào, hoãn mục tiêu nào).
+
+Yêu cầu trả về kết quả dưới dạng JSON có cấu trúc chính xác như sau (KHÔNG thêm bất kỳ markdown hay văn bản giải thích nào ngoài JSON):
+{
+  "impact_level": "low" | "medium" | "high",
+  "impact_level_label": "Mức độ ảnh hưởng ngắn gọn",
+  "summary": "Tóm tắt đánh giá chi tiết tác động của việc này đối với các ví, ngân sách chi tiêu và các mục tiêu tiết kiệm bằng tiếng ${isEn ? 'Anh' : 'Việt'}",
+  "current_balance_after": "Tổng số dư sau khi trừ đi chi phí này (số)",
+  "budget_impact_percent": "Phần trăm ngân sách tháng này bị tiêu hao bởi khoản này (số, ví dụ: 12.5)",
+  "wallet_impacts": [
+    {
+      "wallet_name": "Tên ví bị ảnh hưởng",
+      "balance_before": "Số dư trước (số)",
+      "balance_after": "Số dư sau (số)",
+      "percentage_decrease": "Phần trăm giảm (số)"
+    }
+  ],
+  "savings_delay_days": "Số ngày trì hoãn mục tiêu tiết kiệm dự kiến (số ngày, ví dụ: 15)",
+  "recommendations": [
+    {
+      "title": "Tên đề xuất bằng tiếng ${isEn ? 'Anh' : 'Việt'}",
+      "description": "Mô tả hành động đề xuất chi tiết bằng tiếng ${isEn ? 'Anh' : 'Việt'}",
+      "action_type": "adjust_budget" | "transfer_wallet" | "reduce_expense" | "other"
+    }
+  ]
+}
+`;
+
+    const body = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { 
+            temperature: 0.2, 
+            topP: 0.95,
+            responseMimeType: "application/json"
+        }
+    };
+
+    const { callGeminiRaw } = await import('./geminiService');
+    const data = await callGeminiRaw(body);
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    try {
+        const parsed = JSON.parse(text.trim()) as FinancialSimulationResult;
+        return {
+            ...parsed,
+            historical_trends: {
+                monthly_trends: monthlyTrendsArray,
+                avg_income: avgIncomeLast3Months,
+                avg_expense: avgExpenseLast3Months,
+                avg_surplus: avgSavingsLast3Months,
+                comparison_percentage: avgSavingsLast3Months > 0 ? Number(((amount / avgSavingsLast3Months) * 100).toFixed(1)) : 100
+            }
+        };
+    } catch (e) {
+        console.error("Error parsing AI Financial Simulation response:", text, e);
+        return {
+            impact_level: 'medium',
+            impact_level_label: isEn ? 'Medium' : 'Trung bình',
+            summary: isEn 
+                ? `An expense of ${amount.toLocaleString('en-US')} USD has arisen. This will decrease your total balance.`
+                : `Có khoản chi tiêu phát sinh ${amount.toLocaleString('vi-VN')}đ cho "${description}". Khoản này sẽ làm giảm tổng số dư khả dụng của bạn.`,
+            current_balance_after: (appState.currentBalance || 0) - amount,
+            budget_impact_percent: 0,
+            wallet_impacts: [],
+            savings_delay_days: 0,
+            recommendations: [
+                {
+                    title: isEn ? 'Review Budgets' : 'Xem lại ngân sách',
+                    description: isEn ? 'Track your expenses to keep balanced.' : 'Theo dõi chi tiêu để giữ cân bằng tài chính.',
+                    action_type: 'other'
+                }
+            ],
+            historical_trends: {
+                monthly_trends: monthlyTrendsArray,
+                avg_income: avgIncomeLast3Months,
+                avg_expense: avgExpenseLast3Months,
+                avg_surplus: avgSavingsLast3Months,
+                comparison_percentage: avgSavingsLast3Months > 0 ? Number(((amount / avgSavingsLast3Months) * 100).toFixed(1)) : 100
+            }
+        };
+    }
+}
+

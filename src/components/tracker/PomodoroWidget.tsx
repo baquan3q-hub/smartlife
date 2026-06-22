@@ -129,16 +129,16 @@ export const PomodoroWidget: React.FC<PomodoroWidgetProps> = ({ timer, onOpenMus
       <div className="flex justify-center items-center gap-2 mb-3.5 relative z-10">
         <button
           onClick={toggleTimer}
-          className="bg-black hover:bg-slate-900 text-white font-extrabold text-xs px-5 py-2.5 rounded-full flex items-center gap-1.5 shadow-sm transition-all duration-200 active:scale-95 shrink-0"
+          className="bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground font-extrabold text-xs px-5 py-2.5 rounded-full flex items-center gap-1.5 shadow-sm transition-all duration-200 active:scale-95 shrink-0"
         >
           {status === 'RUNNING' ? (
             <>
-              <Pause size={12} fill="white" className="stroke-[3]" />
+              <Pause size={12} fill="currentColor" className="stroke-[3]" />
               Tạm dừng
             </>
           ) : (
             <>
-              <Play size={12} fill="white" className="ml-0.5 stroke-[3]" />
+              <Play size={12} fill="currentColor" className="ml-0.5 stroke-[3]" />
               Bắt đầu
             </>
           )}

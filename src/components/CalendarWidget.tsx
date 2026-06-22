@@ -12,6 +12,8 @@ interface CalendarEvent {
     time?: string; // HH:MM:00
     location?: string;
     type: 'HOLIDAY' | 'PERSONAL' | 'WORK';
+    email_notify?: boolean;
+    email_notify_before_minutes?: number;
 }
 
 interface CalendarWidgetProps {
@@ -199,7 +201,9 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ className }) => {
             time: fd.get('time') ? (fd.get('time') as string) + ':00' : null,
             location: fd.get('location') as string,
             type: 'PERSONAL',
-            user_id: user.id
+            user_id: user.id,
+            email_notify: fd.get('email_notify') === 'on',
+            email_notify_before_minutes: fd.get('email_notify_before_minutes') ? Number(fd.get('email_notify_before_minutes')) : 60
         };
 
         if (editingEvent) {
@@ -562,6 +566,35 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ className }) => {
                                         className="w-full pl-7 pr-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold text-xs transition-all focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 text-slate-700 resize-none"
                                         placeholder="Chi tiết sự kiện..."
                                     />
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-200/60 space-y-2.5">
+                                <div className="flex items-center">
+                                    <label className="text-[11px] font-bold text-slate-600 cursor-pointer flex items-center gap-2 select-none">
+                                        <input
+                                            type="checkbox"
+                                            name="email_notify"
+                                            defaultChecked={editingEvent?.email_notify}
+                                            className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                                        />
+                                        Gửi email nhắc nhở
+                                    </label>
+                                </div>
+                                
+                                <div>
+                                    <label className="text-[9px] font-extrabold text-slate-400 uppercase ml-0.5 block mb-1">Thời gian nhắc trước</label>
+                                    <select
+                                        name="email_notify_before_minutes"
+                                        defaultValue={editingEvent?.email_notify_before_minutes ?? 60}
+                                        className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl outline-none font-bold text-xs text-slate-700 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/10 cursor-pointer"
+                                    >
+                                        <option value={15}>Trước 15 phút</option>
+                                        <option value={30}>Trước 30 phút</option>
+                                        <option value={60}>Trước 1 giờ</option>
+                                        <option value={120}>Trước 2 giờ</option>
+                                        <option value={1440}>Trước 1 ngày</option>
+                                    </select>
                                 </div>
                             </div>
 

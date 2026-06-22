@@ -31,7 +31,7 @@ import { careerGoalService } from './services/careerGoalService';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { supabase } from './services/supabase';
-import { requestNotificationPermission, checkAndNotify, checkCalendarAndNotify, checkGoalsAndNotify, checkCustomEventsAndNotify, checkHabitsFromDBAndNotify, checkTodosAndNotify } from './services/notificationService';
+import { requestNotificationPermission, checkAndNotify, checkCalendarAndNotify, checkGoalsAndNotify, checkCustomEventsAndNotify, checkHabitsFromDBAndNotify, checkTodosAndNotify, checkAndSendEmailNotifications } from './services/notificationService';
 import { generateInsights } from './services/smartEngine';
 import InsightCard from './components/InsightCard';
 import { messaging } from './services/firebase';
@@ -710,6 +710,27 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         return () => clearInterval(interval);
     }, [appState.timetable, appState.goals, calendarEvents, appState.todos]);
 
+    // --- EMAIL NOTIFICATION FALLBACK LOOP ---
+    useEffect(() => {
+        if (!user || !appState.profile) return;
+
+        const checkEmails = () => {
+            checkAndSendEmailNotifications(
+                appState.todos,
+                appState.timetable,
+                calendarEvents,
+                appState.profile,
+                lang
+            );
+        };
+
+        // Run once on load
+        checkEmails();
+
+        const interval = setInterval(checkEmails, 60000);
+        return () => clearInterval(interval);
+    }, [appState.todos, appState.timetable, calendarEvents, appState.profile, lang, user]);
+
     // Confirm close app
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -1140,13 +1161,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             setAppState((prev: AppState) => ({ ...prev, timetable: prevTimetable }));
         }
     };
-    const handleAddTodo = async (content: string, priority: any, deadline?: string, status: TodoStatus = 'todo', description?: string, subtasks?: any[]) => {
+    const handleAddTodo = async (content: string, priority: any, deadline?: string, status: TodoStatus = 'todo', description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number) => {
         if (!user) return;
         const tempId = crypto.randomUUID();
         // New todos get sort_order = 0 (top), existing items shift up
         const minOrder = appState.todos.length > 0 ? Math.min(...appState.todos.map(t => t.sort_order ?? 0)) : 0;
         const newSortOrder = minOrder - 1;
-        const newItem = { id: tempId, content, priority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder, description, subtasks };
+        const newItem = { id: tempId, content, priority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder, description, subtasks, email_notify: emailNotify, email_notify_before_minutes: emailNotifyBeforeMinutes };
 
         setAppState((prev: AppState) => ({ ...prev, todos: [newItem, ...prev.todos] }));
 
@@ -1163,7 +1184,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         try {
             const insertPayload: any = {
                 content, priority: dbPriority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder,
-                description, subtasks
+                description, subtasks,
+                email_notify: emailNotify,
+                email_notify_before_minutes: emailNotifyBeforeMinutes
             };
             let data = null;
             let error = null;
@@ -1174,7 +1197,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
             if (error) {
                 if (error.code === '42703') {
-                    console.warn("[SmartLife] description/subtasks columns not found. Retrying insertion without them.");
+                    console.warn("[SmartLife] description/subtasks/email columns not found. Retrying insertion without them.");
                     const fallbackPayload = {
                         content, priority: dbPriority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder
                     };
@@ -1199,35 +1222,40 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     };
 
     const handleUpdateTodo = React.useCallback(async (item: any) => {
-        const prevTodos = [...appState.todos];
+        let prevTodos: Todo[] = [];
 
         let updatedItem = { ...item };
-        const existingTodo = appState.todos.find(t => t.id === item.id);
-        const wasAlreadyDone = existingTodo && (existingTodo.status === 'done' || existingTodo.is_completed);
 
-        if (item.status !== undefined) {
-            updatedItem.is_completed = item.status === 'done';
-            if (item.status === 'done') {
-                const ts = (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
-                updatedItem.completed_at = ts;
-                localStorage.setItem(`todo_completed_at_${item.id}`, ts);
-            } else {
-                updatedItem.completed_at = null;
-                localStorage.removeItem(`todo_completed_at_${item.id}`);
-            }
-        } else if (item.is_completed !== undefined) {
-            updatedItem.status = item.is_completed ? 'done' : 'todo';
-            if (item.is_completed) {
-                const ts = (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
-                updatedItem.completed_at = ts;
-                localStorage.setItem(`todo_completed_at_${item.id}`, ts);
-            } else {
-                updatedItem.completed_at = null;
-                localStorage.removeItem(`todo_completed_at_${item.id}`);
-            }
-        }
+        // Use setAppState to safely read current todos and apply the update atomically
+        setAppState((prev: AppState) => {
+            prevTodos = prev.todos;
+            const existingTodo = prev.todos.find(t => t.id === item.id);
+            const wasAlreadyDone = existingTodo && (existingTodo.status === 'done' || existingTodo.is_completed);
 
-        setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.map(t => t.id === item.id ? { ...t, ...updatedItem } : t) }));
+            if (item.status !== undefined) {
+                updatedItem.is_completed = item.status === 'done';
+                if (item.status === 'done') {
+                    const ts = (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
+                    updatedItem.completed_at = ts;
+                    localStorage.setItem(`todo_completed_at_${item.id}`, ts);
+                } else {
+                    updatedItem.completed_at = null;
+                    localStorage.removeItem(`todo_completed_at_${item.id}`);
+                }
+            } else if (item.is_completed !== undefined) {
+                updatedItem.status = item.is_completed ? 'done' : 'todo';
+                if (item.is_completed) {
+                    const ts = (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
+                    updatedItem.completed_at = ts;
+                    localStorage.setItem(`todo_completed_at_${item.id}`, ts);
+                } else {
+                    updatedItem.completed_at = null;
+                    localStorage.removeItem(`todo_completed_at_${item.id}`);
+                }
+            }
+
+            return { ...prev, todos: prev.todos.map(t => t.id === item.id ? { ...t, ...updatedItem } : t) };
+        });
 
         try {
             // Only send DB-safe fields
@@ -1256,7 +1284,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             alert("Lỗi cập nhật việc: " + error.message);
             setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
         }
-    }, [appState.todos]);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleMoveTodoStatus = React.useCallback(async (id: string, status: TodoStatus) => {
         lastReorderTimeRef.current = Date.now();
@@ -1281,7 +1309,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     // Batch reorder todos after drag-drop (optimistic + persist)
     const handleReorderTodos = React.useCallback(async (reorderedTodos: Todo[]) => {
         lastReorderTimeRef.current = Date.now();
-        const prevTodos = [...appState.todos];
+
+        // Capture prevTodos via ref-safe approach (read current state snapshot)
+        let prevTodos: Todo[] = [];
+        setAppState((prev: AppState) => {
+            prevTodos = prev.todos;
+            return prev; // no-op, just capture
+        });
 
         // Assign fresh sort_order based on array position
         const withOrder = reorderedTodos.map((t, idx) => {
@@ -1356,7 +1390,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             alert("Lỗi sắp xếp việc: " + error.message);
             setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
         }
-    }, [appState.todos]);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // --- GPA HANDLERS ---
     const handleAddGPASemester = async (newSem: Omit<GPASemester, 'id' | 'courses'>) => {
@@ -1510,25 +1544,25 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     };
 
     return (
-        <div className="h-[100dvh] w-screen overflow-hidden bg-[#F8F9FC] font-sans text-gray-900 flex flex-col md:flex-row">
+        <div className="h-[100dvh] w-screen overflow-hidden bg-background font-sans text-foreground flex flex-col md:flex-row">
             {/* Sidebar Desktop */}
             <aside
                 onMouseEnter={() => setIsSidebarCollapsed(false)}
                 onMouseLeave={() => setIsSidebarCollapsed(true)}
-                className={`hidden md:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 fixed h-full z-20 ${isSidebarCollapsed ? 'shadow-sm' : 'shadow-lg'} transition-all duration-300 ease-in-out`}
+                className={`hidden md:flex flex-col ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-card border-r border-border fixed h-full z-20 ${isSidebarCollapsed ? 'shadow-sm' : 'shadow-lg'} transition-all duration-300 ease-in-out`}
             >
                 <div className={`pt-6 pb-4 flex items-center ${isSidebarCollapsed ? 'px-4 justify-center' : 'px-6 justify-between'} gap-3 relative`}>
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-100 border border-gray-100 shrink-0">
+                        <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-100/10 border border-border shrink-0">
                             <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
                         </div>
-                        {!isSidebarCollapsed && <h1 className="text-xl font-bold text-gray-800 tracking-tight whitespace-nowrap">SmartLife</h1>}
+                        {!isSidebarCollapsed && <h1 className="text-xl font-bold text-foreground tracking-tight whitespace-nowrap">SmartLife</h1>}
                     </div>
 
                     {/* Toggle Button */}
                     <button
                         onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                        className={`absolute -right-3 top-8 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all z-30`}
+                        className={`absolute -right-3 top-8 w-6 h-6 bg-card border border-border rounded-full flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/50 shadow-sm transition-all z-30`}
                     >
                         {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
                     </button>
@@ -1620,11 +1654,11 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             </aside>
 
             {/* Main Content */}
-            <main className={`flex-1 md:ml-20 h-full overflow-y-auto scrollbar-hide relative bg-[#F8F9FC] transition-all duration-300 ease-in-out ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-28 md:pb-8'}`}>
-                {activeTab !== 'ai-advisor' && <header className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 z-30 transition-all h-16">
+            <main className={`flex-1 md:ml-20 h-full overflow-y-auto scrollbar-hide relative bg-background transition-all duration-300 ease-in-out ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-28 md:pb-8'}`}>
+                {activeTab !== 'ai-advisor' && <header className="md:hidden fixed top-0 left-0 right-0 bg-card/95 backdrop-blur-md shadow-sm border-b border-border z-30 transition-all h-16">
                     <div className="flex items-center justify-between px-4 h-full">
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-100">
+                            <div className="w-8 h-8 rounded-lg overflow-hidden border border-border">
                                 <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
                             </div>
                             <span className="font-bold text-gray-800 text-lg tracking-tight hidden sm:block">SmartLife</span>
@@ -1840,7 +1874,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             {/* Mobile Bottom Nav — Fixed 4 items */}
             {activeTab !== 'ai-advisor' && (
                 <div className="md:hidden fixed bottom-safe-dock left-6 right-6 z-50 max-w-lg mx-auto transform-gpu">
-                    <nav className="bg-white/90 backdrop-blur-xl border border-gray-100/80 flex justify-between items-center rounded-full h-[68px] shadow-[0_10px_35px_rgba(56,189,248,0.3)] px-3 py-1.5">
+                    <nav className="bg-card/90 backdrop-blur-xl border border-border flex justify-between items-center rounded-full h-[68px] shadow-[0_10px_35px_rgba(56,189,248,0.15)] px-3 py-1.5">
                         {MOBILE_NAV_TABS.map(tab => {
                             const IconComponent = tab.icon;
                             const isActive = activeTab === tab.id;

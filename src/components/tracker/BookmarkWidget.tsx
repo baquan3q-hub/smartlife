@@ -39,13 +39,22 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   const getGroupColor = (group?: string) => {
-    if (!group) return { bg: '#f1f5f9', text: '#475569', border: '#e2e8f0' };
+    const isDark = document.documentElement.classList.contains('dark');
+    if (!group) {
+      return isDark
+        ? { bg: 'rgba(148, 163, 184, 0.12)', text: '#CBD5E1', border: 'rgba(148, 163, 184, 0.22)' }
+        : { bg: '#f1f5f9', text: '#475569', border: '#e2e8f0' };
+    }
     let hash = 0;
     for (let i = 0; i < group.length; i++) {
       hash = group.charCodeAt(i) + ((hash << 5) - hash);
     }
     const hue = Math.abs(hash % 360);
-    return {
+    return isDark ? {
+      bg: `hsl(${hue}, 40%, 16%)`,
+      text: `hsl(${hue}, 90%, 80%)`,
+      border: `hsl(${hue}, 35%, 24%)`,
+    } : {
       bg: `hsl(${hue}, 80%, 96%)`,
       text: `hsl(${hue}, 85%, 26%)`,
       border: `hsl(${hue}, 70%, 88%)`,
@@ -393,7 +402,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className="bg-black hover:bg-slate-900 text-white font-bold text-[10px] px-3.5 py-1.5 rounded-full flex items-center gap-1 transition-all duration-200 active:scale-95 shrink-0 cursor-pointer"
+              className="bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground font-bold text-[10px] px-3.5 py-1.5 rounded-full flex items-center gap-1 transition-all duration-200 active:scale-95 shrink-0 cursor-pointer"
               title="Thêm bookmark"
             >
               <Plus size={11} className="stroke-[3]" />
@@ -415,7 +424,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
             onClick={() => setSelectedGroupTab('Tất cả')}
             className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               selectedGroupTab === 'Tất cả'
-                ? 'bg-[#5f6e7f] text-white shadow-sm'
+                ? 'bg-[#5f6e7f] dark:bg-primary text-white dark:text-primary-foreground shadow-sm'
                 : 'bg-slate-100/70 text-slate-500 hover:bg-slate-100'
             }`}
           >
@@ -427,7 +436,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
               onClick={() => setSelectedGroupTab(group)}
               className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 selectedGroupTab === group
-                  ? 'bg-[#5f6e7f] text-white shadow-sm'
+                  ? 'bg-[#5f6e7f] dark:bg-primary text-white dark:text-primary-foreground shadow-sm'
                   : 'bg-slate-100/70 text-slate-500 hover:bg-slate-100'
               }`}
             >
@@ -485,7 +494,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
               <button
                 type="submit"
                 disabled={isSaving || !title.trim() || !url.trim()}
-                className="px-3.5 py-1.5 text-[10px] font-bold text-white bg-black disabled:opacity-50 hover:bg-slate-900 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                className="px-3.5 py-1.5 text-[10px] font-bold text-white bg-black disabled:opacity-50 hover:bg-slate-900 dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground rounded-lg transition-all flex items-center gap-1 cursor-pointer"
               >
                 {isSaving && <Loader2 size={10} className="animate-spin" />}
                 Lưu liên kết
@@ -701,7 +710,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
               <button
                 type="submit"
                 disabled={!newGroupName.trim()}
-                className="bg-black hover:bg-slate-900 disabled:opacity-50 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1 transition-all active:scale-95 cursor-pointer shrink-0"
+                className="bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground disabled:opacity-50 font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1 transition-all active:scale-95 cursor-pointer shrink-0"
               >
                 <Plus size={14} className="stroke-[3]" />
                 Thêm
@@ -800,7 +809,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
                 <button
                   type="submit"
                   disabled={isSaving || !editTitle.trim() || !editUrl.trim()}
-                  className="px-4 py-2 text-xs font-bold text-white bg-black disabled:opacity-50 hover:bg-slate-900 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-slate-200/50"
+                  className="px-4 py-2 text-xs font-bold text-white bg-black disabled:opacity-50 hover:bg-slate-900 dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-slate-200/50"
                 >
                   {isSaving && <Loader2 size={12} className="animate-spin" />}
                   Lưu thay đổi

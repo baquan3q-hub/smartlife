@@ -1,7 +1,8 @@
 // File: supabase/functions/send-gift-email/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")?.trim();
+const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL")?.trim();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -126,7 +127,7 @@ serve(async (req: Request) => {
           Authorization: `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: "SmartLife <baquan@smartlife.courses>",
+          from: SENDER_EMAIL || "SmartLife <onboarding@resend.dev>",
           to: emailList[0],
           subject: subject || "Thông báo từ SmartLife",
           html: finalHtml,
@@ -139,7 +140,7 @@ serve(async (req: Request) => {
       for (let i = 0; i < emailList.length; i += chunkSize) {
         const chunk = emailList.slice(i, i + chunkSize);
         const batchPayload = chunk.map((recipient: string) => ({
-          from: "SmartLife <baquan@smartlife.courses>",
+          from: SENDER_EMAIL || "SmartLife <onboarding@resend.dev>",
           to: recipient,
           subject: subject || "Thông báo từ SmartLife",
           html: finalHtml,

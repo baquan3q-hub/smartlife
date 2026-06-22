@@ -26,6 +26,331 @@ import { Lang } from '../i18n/i18n';
 import * as XLSX from 'xlsx';
 
 // ────────────────────────────────────────
+// Financial Impact Components
+// ────────────────────────────────────────
+interface FinancialImpactCardProps {
+    action: any;
+    appState: AppState;
+    onAddTransaction?: (tx: any) => Promise<void>;
+    onOpenDetails: (data: any) => void;
+}
+
+const FinancialImpactCard: React.FC<FinancialImpactCardProps> = ({
+    action,
+    appState,
+    onAddTransaction,
+    onOpenDetails
+}) => {
+    const { description, amount, simulation } = action.data || {};
+    if (!simulation) return null;
+
+    const isApplied = appState.transactions.some(t => 
+        t.amount === amount && 
+        (t.description === `[AI Simulated] ${description}` || t.description.includes(description))
+    );
+
+    const getImpactColor = (level: string) => {
+        if (level === 'high') return 'text-rose-600 bg-rose-50 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/30';
+        if (level === 'medium') return 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/30';
+        return 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/30';
+    };
+
+    const handleApply = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!onAddTransaction) return;
+        try {
+            await onAddTransaction({
+                amount: Number(amount),
+                category: 'Khác',
+                type: 'expense',
+                date: new Date().toISOString().slice(0, 10),
+                description: `[AI Simulated] ${description.trim()}`
+            });
+            alert('Đã ghi nhận giao dịch thành công! 💸');
+        } catch (err: any) {
+            console.error(err);
+            alert('Lỗi ghi nhận: ' + err.message);
+        }
+    };
+
+    return (
+        <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-4 space-y-3 hover:shadow-md transition-all duration-200 animate-fade-in text-left">
+            {/* Header */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-base shrink-0 shadow-sm">
+                        💸
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-black text-slate-800 line-clamp-1">{description}</h4>
+                        <p className="text-[10px] text-slate-400 font-bold">{amount.toLocaleString('vi-VN')}đ</p>
+                    </div>
+                </div>
+                <span className={`text-[9.5px] font-extrabold px-2.5 py-1 rounded-full border uppercase tracking-wider ${getImpactColor(simulation.impact_level)}`}>
+                    {simulation.impact_level_label}
+                </span>
+            </div>
+
+            {/* Quick Summary */}
+            <p className="text-[11px] text-slate-500 leading-relaxed font-semibold bg-slate-50 p-2.5 rounded-xl border border-slate-100 line-clamp-2">
+                {simulation.summary}
+            </p>
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="p-2 bg-slate-50/50 rounded-xl border border-slate-100/50">
+                    <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider">Số dư sau phát sinh</span>
+                    <span className="text-xs font-black text-slate-800">{(simulation.current_balance_after || 0).toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="p-2 bg-slate-50/50 rounded-xl border border-slate-100/50">
+                    <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider">Trì hoãn tiết kiệm</span>
+                    <span className="text-xs font-black text-slate-800">{simulation.savings_delay_days > 0 ? `+${simulation.savings_delay_days} ngày` : '0 ngày'}</span>
+                </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-50">
+                <button
+                    onClick={() => onOpenDetails(action.data)}
+                    className="flex-1 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-[10px] font-extrabold transition-all border border-indigo-100 flex items-center justify-center gap-1 active:scale-[0.98]"
+                >
+                    Chi tiết cố vấn 🔍
+                </button>
+                <button
+                    onClick={handleApply}
+                    disabled={isApplied}
+                    className={`flex-1 py-1.5 px-3 rounded-xl text-[10px] font-extrabold transition-all flex items-center justify-center gap-1 active:scale-[0.98] ${
+                        isApplied 
+                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 cursor-default' 
+                            : 'bg-slate-900 hover:bg-slate-855 text-white border border-transparent'
+                    }`}
+                >
+                    {isApplied ? 'Đã ghi nhận 💸' : 'Ghi nhận thực tế ➕'}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+interface FinancialImpactDetailsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    data: any;
+    appState: AppState;
+    onAddTransaction?: (tx: any) => Promise<void>;
+}
+
+const FinancialImpactDetailsModal: React.FC<FinancialImpactDetailsModalProps> = ({
+    isOpen,
+    onClose,
+    data,
+    appState,
+    onAddTransaction
+}) => {
+    if (!isOpen || !data) return null;
+    const { description, amount, simulation } = data;
+    if (!simulation) return null;
+
+    const isApplied = appState.transactions.some(t => 
+        t.amount === amount && 
+        (t.description === `[AI Simulated] ${description}` || t.description.includes(description))
+    );
+
+    const getImpactColor = (level: string) => {
+        if (level === 'high') return 'text-rose-600 bg-rose-50 border-rose-250';
+        if (level === 'medium') return 'text-amber-600 bg-amber-50 border-amber-250';
+        return 'text-emerald-600 bg-emerald-50 border-emerald-250';
+    };
+
+    const handleApply = async () => {
+        if (!onAddTransaction) return;
+        try {
+            await onAddTransaction({
+                amount: Number(amount),
+                category: 'Khác',
+                type: 'expense',
+                date: new Date().toISOString().slice(0, 10),
+                description: `[AI Simulated] ${description.trim()}`
+            });
+            alert('Đã ghi nhận giao dịch thành công! 💸');
+        } catch (err: any) {
+            console.error(err);
+            alert('Lỗi ghi nhận: ' + err.message);
+        }
+    };
+
+    // Prepare chart for surplus trends
+    const trends = simulation.historical_trends?.monthly_trends || [];
+    const hasTrendData = trends.length > 0;
+    const chartData: ChartData | null = hasTrendData ? {
+        chart_type: 'bar',
+        title: 'Thặng dư Thu chi 6 tháng gần nhất',
+        data: trends.map((t: any) => ({
+            label: t.month,
+            value: t.surplus,
+            color: t.surplus >= 0 ? '#3b82f6' : '#f43f5e'
+        }))
+    } : null;
+
+    const trendsAvg = simulation.historical_trends || { avg_income: 0, avg_expense: 0, avg_surplus: 0, comparison_percentage: 0 };
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-250">
+                {/* Header */}
+                <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
+                        <h2 className="text-sm font-black text-slate-800 dark:text-white">
+                            Cố vấn Phân tích Tác động Tài chính
+                        </h2>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 hover:text-slate-650 transition-colors"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-5 overflow-y-auto flex-1 custom-scrollbar space-y-5 text-left">
+                    {/* General Summary & Impact Level */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase tracking-wider flex items-center gap-1.5 ${getImpactColor(simulation.impact_level)}`}>
+                                <AlertCircle size={12} />
+                                Mức ảnh hưởng: {simulation.impact_level_label}
+                            </span>
+                        </div>
+                        <p className="text-xs leading-relaxed text-slate-650 dark:text-slate-400 font-semibold bg-slate-50 dark:bg-slate-800/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-850">
+                            {simulation.summary}
+                        </p>
+                    </div>
+
+                    {/* Quick Metrics Cards */}
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-850">
+                            <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Số dư sau chi</span>
+                            <span className="text-xs font-black text-slate-800 dark:text-white">{(simulation.current_balance_after || 0).toLocaleString('vi-VN')}đ</span>
+                            <p className="text-[8px] font-bold text-rose-500 mt-0.5">-{amount.toLocaleString('vi-VN')}đ</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-850">
+                            <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Ngân sách thâm hụt</span>
+                            <span className="text-xs font-black text-slate-800 dark:text-white">{simulation.budget_impact_percent}%</span>
+                            <p className="text-[8px] font-bold text-amber-500 mt-0.5">tiêu hao ngân sách</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-850">
+                            <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Trì hoãn tiết kiệm</span>
+                            <span className="text-xs font-black text-slate-800 dark:text-white">{simulation.savings_delay_days > 0 ? `+${simulation.savings_delay_days} ngày` : '0 ngày'}</span>
+                            <p className="text-[8px] font-bold text-rose-500 mt-0.5">đạt mục tiêu</p>
+                        </div>
+                    </div>
+
+                    {/* Historical Trends Comparison */}
+                    <div className="p-4.5 bg-gradient-to-br from-indigo-50/40 to-blue-50/20 dark:from-slate-800/20 dark:to-slate-800/5 border border-indigo-100/50 rounded-2xl space-y-3">
+                        <h3 className="text-xs font-black text-indigo-950 dark:text-white flex items-center gap-1.5 uppercase tracking-wider">
+                            📊 So sánh với xu hướng lịch sử
+                        </h3>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span className="text-slate-400 block text-[9px] font-bold uppercase">Thặng dư TB 3 tháng:</span>
+                                <strong className="text-slate-700 dark:text-slate-300 font-extrabold">{trendsAvg.avg_surplus.toLocaleString('vi-VN')}đ/tháng</strong>
+                            </div>
+                            <div>
+                                <span className="text-slate-400 block text-[9px] font-bold uppercase">Tỷ trọng khoản chi:</span>
+                                <strong className={`font-extrabold ${trendsAvg.comparison_percentage > 80 ? 'text-rose-650' : 'text-indigo-650'}`}>
+                                    {trendsAvg.comparison_percentage}% thặng dư
+                                </strong>
+                            </div>
+                        </div>
+
+                        {/* Chart */}
+                        {chartData && (
+                            <div className="pt-1.5 bg-white dark:bg-slate-900 rounded-xl p-2 border border-slate-100 dark:border-slate-800">
+                                <InlineChatChart chart={chartData} />
+                            </div>
+                        )}
+
+                        <div className="text-[10px] text-slate-500 leading-relaxed font-medium">
+                            💡 {trendsAvg.avg_surplus > 0 
+                                ? `Khoản phát sinh này tiêu tốn khoảng ${trendsAvg.comparison_percentage}% số tiền bạn tiết kiệm được trung bình mỗi tháng (${trendsAvg.avg_surplus.toLocaleString('vi-VN')}đ).`
+                                : 'Bạn đang thâm hụt thu chi trung bình các tháng qua. Hãy hết sức cẩn trọng với khoản chi phát sinh này!'
+                            }
+                        </div>
+                    </div>
+
+                    {/* Wallets Impacted list */}
+                    {simulation.wallet_impacts && simulation.wallet_impacts.length > 0 && (
+                        <div className="space-y-2">
+                            <span className="block text-[9.5px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                Ví tiền bị ảnh hưởng
+                            </span>
+                            <div className="space-y-1.5">
+                                {simulation.wallet_impacts.map((wi: any, index: number) => (
+                                    <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800/10 border border-slate-100 dark:border-slate-850">
+                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{wi.wallet_name}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-slate-400 line-through">{(wi.balance_before || 0).toLocaleString('vi-VN')}đ</span>
+                                            <span className="text-xs text-slate-400">→</span>
+                                            <span className="text-xs font-black text-slate-800 dark:text-white">{(wi.balance_after || 0).toLocaleString('vi-VN')}đ</span>
+                                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-650 dark:bg-rose-950/20 ml-1">-{wi.percentage_decrease}%</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Recommendations Section */}
+                    {simulation.recommendations && simulation.recommendations.length > 0 && (
+                        <div className="space-y-2">
+                            <span className="block text-[9.5px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                Khuyến nghị & Giải pháp từ AI
+                            </span>
+                            <div className="grid grid-cols-1 gap-2">
+                                {simulation.recommendations.map((rec: any, index: number) => (
+                                    <div key={index} className="p-3 bg-slate-50 dark:bg-slate-800/20 rounded-xl border border-slate-100 dark:border-slate-850">
+                                        <h4 className="text-xs font-bold text-slate-855 dark:text-white flex items-center gap-1.5 mb-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                            {rec.title}
+                                        </h4>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-450 leading-relaxed font-semibold pl-3">
+                                            {rec.description}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 bg-gray-50 dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 flex items-center justify-end gap-2 shrink-0">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 hover:bg-gray-200 dark:hover:bg-slate-850 text-gray-500 rounded-xl text-xs font-bold transition-colors"
+                    >
+                        Đóng lại
+                    </button>
+                    <button
+                        onClick={handleApply}
+                        disabled={isApplied}
+                        className={`px-4 py-2 font-bold text-xs rounded-xl shadow-md transition-all duration-200 active:scale-[0.99] flex items-center gap-1.5 ${
+                            isApplied 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-250 cursor-default' 
+                                : 'bg-slate-900 hover:bg-slate-855 text-white'
+                        }`}
+                    >
+                        {isApplied ? 'Đã ghi nhận vào thực tế' : 'Ghi nhận khoản này thực tế'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ────────────────────────────────────────
 // Types
 // ────────────────────────────────────────
 interface AIAdvisorPageProps {
@@ -62,6 +387,12 @@ interface Suggestion {
 }
 
 const SUGGESTIONS: Suggestion[] = [
+    {
+        icon: <Zap size={16} />,
+        label: 'Nếu phát sinh tiền bất ngờ ?',
+        prompt: 'Tôi sắp có một khoản chi tiêu phát sinh đột xuất: đi đám cưới bạn thân hết 1 triệu đồng. Việc này có tác động như thế nào đến tổng số dư ví, ngân sách tháng này và tiến độ đạt các mục tiêu tiết kiệm của tôi? Hãy mô phỏng chi tiết và đề xuất giải pháp cho tôi nhé.',
+        gradient: 'from-amber-500 to-rose-500',
+    },
     {
         icon: <Heart size={16} />,
         label: 'Cuộc sống dạo này',
@@ -204,6 +535,10 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const [activeArtifact, setActiveArtifact] = useState<{ title: string; content: string } | null>(null);
     const [copied, setCopied] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const [isSimPopupOpen, setIsSimPopupOpen] = useState(false);
+    const [simDescription, setSimDescription] = useState('');
+    const [simAmount, setSimAmount] = useState('');
+    const [selectedImpactDetails, setSelectedImpactDetails] = useState<any>(null);
 
     const handleStopResponse = () => {
         if (abortControllerRef.current) {
@@ -638,9 +973,9 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 memoryService.extractMemoriesFromConversation(chatText).catch(console.error);
             }
 
-            // Auto-open artifact if generated (Mobile only)
+            // Auto-open artifact if generated
             const parsedRes = parseArtifact(response.text);
-            if (parsedRes && !isDesktop) {
+            if (parsedRes) {
                 setActiveArtifact({
                     title: parsedRes.title,
                     content: parsedRes.artifactContent
@@ -882,7 +1217,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                     <span className="hidden sm:inline">AI Quota:</span>
                                     <span>{Math.min(100, Math.round((quotaStatus.tokensToday / (quotaStatus.tokensTodayLimit || 1)) * 100))}%</span>
                                 </button>
-                                
+
                                 {showQuotaDetail && (
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setShowQuotaDetail(false)} />
@@ -891,7 +1226,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                 <span className="flex items-center gap-1"><Brain size={14} className="text-indigo-600" /> Hạn mức sử dụng AI</span>
                                                 <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full uppercase tracking-wider">{quotaStatus.plan}</span>
                                             </h3>
-                                            
+
                                             <div className="space-y-3 text-[11px]">
                                                 {/* Requests */}
                                                 <div>
@@ -900,9 +1235,9 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                         <span className="font-bold text-gray-800">{quotaStatus.requestsToday}/{quotaStatus.requestsLimit}</span>
                                                     </div>
                                                     <div className="w-full bg-gray-100 rounded-full h-1.5">
-                                                        <div 
-                                                            className="h-1.5 rounded-full bg-indigo-500" 
-                                                            style={{ width: `${Math.min((quotaStatus.requestsToday / (quotaStatus.requestsLimit || 1)) * 100, 100)}%` }} 
+                                                        <div
+                                                            className="h-1.5 rounded-full bg-indigo-500"
+                                                            style={{ width: `${Math.min((quotaStatus.requestsToday / (quotaStatus.requestsLimit || 1)) * 100, 100)}%` }}
                                                         />
                                                     </div>
                                                 </div>
@@ -914,9 +1249,9 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                         <span className="font-bold text-gray-800">{(quotaStatus.tokensToday / 1000).toFixed(1)}k/{(quotaStatus.tokensTodayLimit / 1000).toFixed(0)}k</span>
                                                     </div>
                                                     <div className="w-full bg-gray-100 rounded-full h-1.5">
-                                                        <div 
+                                                        <div
                                                             className={`h-1.5 rounded-full ${quotaStatus.tokensToday >= quotaStatus.tokensTodayLimit * 0.8 ? 'bg-amber-500' : 'bg-indigo-500'}`}
-                                                            style={{ width: `${Math.min((quotaStatus.tokensToday / (quotaStatus.tokensTodayLimit || 1)) * 100, 100)}%` }} 
+                                                            style={{ width: `${Math.min((quotaStatus.tokensToday / (quotaStatus.tokensTodayLimit || 1)) * 100, 100)}%` }}
                                                         />
                                                     </div>
                                                 </div>
@@ -929,9 +1264,9 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                             <span className="font-bold text-gray-800">{(quotaStatus.tokensMonth / 1000).toFixed(0)}k/{(quotaStatus.tokensMonthLimit / 1000).toFixed(0)}k</span>
                                                         </div>
                                                         <div className="w-full bg-gray-100 rounded-full h-1.5">
-                                                            <div 
+                                                            <div
                                                                 className={`h-1.5 rounded-full ${quotaStatus.tokensMonth >= quotaStatus.tokensMonthLimit * 0.8 ? 'bg-red-500' : 'bg-emerald-500'}`}
-                                                                style={{ width: `${Math.min((quotaStatus.tokensMonth / (quotaStatus.tokensMonthLimit || 1)) * 100, 100)}%` }} 
+                                                                style={{ width: `${Math.min((quotaStatus.tokensMonth / (quotaStatus.tokensMonthLimit || 1)) * 100, 100)}%` }}
                                                             />
                                                         </div>
                                                     </div>
@@ -1348,27 +1683,40 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                             </div>
                                         )}
 
-                                        {/* Action Confirmations */}
-                                        {msg.actions && msg.actions.length > 0 && (
-                                            <div className="mt-2 space-y-1.5">
-                                                {msg.actions.map((action, ai) => (
-                                                    <div
-                                                        key={ai}
-                                                        className={`flex items-start gap-2 px-3 py-2 rounded-xl text-xs ${action.success
-                                                            ? 'bg-blue-50 border border-blue-200 text-blue-700'
-                                                            : 'bg-red-50 border border-red-200 text-red-700'
-                                                            }`}
-                                                    >
-                                                        {action.success
-                                                            ? <CheckCircle2 size={14} className="text-blue-500 shrink-0 mt-0.5" />
-                                                            : <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
-                                                        }
-                                                        <span>{action.message}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-
+                                         {/* Action Confirmations */}
+                                         {msg.actions && msg.actions.length > 0 && (
+                                             <div className="mt-2 space-y-2">
+                                                 {msg.actions.map((action, ai) => {
+                                                     if (action.type === 'financial_impact') {
+                                                         return (
+                                                             <FinancialImpactCard
+                                                                 key={ai}
+                                                                 action={action}
+                                                                 appState={appState}
+                                                                 onAddTransaction={onAddTransaction}
+                                                                 onOpenDetails={(data) => setSelectedImpactDetails(data)}
+                                                             />
+                                                         );
+                                                     }
+                                                     return (
+                                                         <div
+                                                             key={ai}
+                                                             className={`flex items-start gap-2 px-3 py-2 rounded-xl text-xs ${action.success
+                                                                 ? 'bg-blue-50 border border-blue-200 text-blue-700'
+                                                                 : 'bg-red-50 border border-red-200 text-red-700'
+                                                                 }`}
+                                                         >
+                                                             {action.success
+                                                                 ? <CheckCircle2 size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                                                                 : <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                                                             }
+                                                             <span>{action.message}</span>
+                                                         </div>
+                                                     );
+                                                 })}
+                                             </div>
+                                         )}
+                                         
                                         {/* Inline Charts */}
                                         {msg.charts && msg.charts.length > 0 && (
                                             <div className="mt-2 space-y-2">
@@ -1377,14 +1725,14 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                 ))}
                                             </div>
                                         )}
-                                         {/* Token Counter */}
-                                         {msg.role === 'assistant' && msg.tokens_used !== undefined && msg.tokens_used !== null && (
-                                             <div className="text-[10px] text-gray-400 mt-1 ml-1 flex items-center gap-1 select-none animate-fade-in">
-                                                 <Zap size={10} className="text-gray-400 shrink-0" />
-                                                 <span>Tiêu tốn: <strong>{msg.tokens_used.toLocaleString()}</strong> tokens</span>
-                                             </div>
-                                         )}
-                                     </div>
+                                        {/* Token Counter */}
+                                        {msg.role === 'assistant' && msg.tokens_used !== undefined && msg.tokens_used !== null && (
+                                            <div className="text-[10px] text-gray-400 mt-1 ml-1 flex items-center gap-1 select-none animate-fade-in">
+                                                <Zap size={10} className="text-gray-400 shrink-0" />
+                                                <span>Tiêu tốn: <strong>{msg.tokens_used.toLocaleString()}</strong> tokens</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}
@@ -1416,7 +1764,13 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                     {SUGGESTIONS.map((s, idx) => (
                                         <button
                                             key={idx}
-                                            onClick={() => handleSend(s.prompt)}
+                                            onClick={() => {
+                                                if (s.label.includes('Nếu phát sinh')) {
+                                                    setIsSimPopupOpen(true);
+                                                } else {
+                                                    handleSend(s.prompt);
+                                                }
+                                            }}
                                             className="group text-left p-3.5 rounded-xl border border-gray-100 bg-white hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex items-start gap-3"
                                         >
                                             <div className={`w-8 h-8 rounded-lg bg-gradient-to-r ${s.gradient} flex items-center justify-center text-white shrink-0 shadow-sm group-hover:scale-110 transition-transform`}>
@@ -1554,11 +1908,10 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                 type="button"
                                 onClick={isLoading ? handleStopResponse : () => handleSend()}
                                 disabled={!isLoading && !input.trim() && attachedFiles.length === 0}
-                                className={`m-1 p-2 rounded-xl transition-all shrink-0 ${
-                                    isLoading 
-                                        ? 'bg-red-500 hover:bg-red-600 text-white hover:shadow-lg hover:shadow-red-200 animate-pulse' 
-                                        : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg hover:shadow-blue-200 disabled:opacity-40 disabled:hover:shadow-none'
-                                }`}
+                                className={`m-1 p-2 rounded-xl transition-all shrink-0 ${isLoading
+                                    ? 'bg-red-500 hover:bg-red-600 text-white hover:shadow-lg hover:shadow-red-200 animate-pulse'
+                                    : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg hover:shadow-blue-200 disabled:opacity-40 disabled:hover:shadow-none'
+                                    }`}
                                 title={isLoading ? 'Dừng phản hồi' : 'Gửi tin nhắn'}
                             >
                                 {isLoading ? <Square size={16} className="fill-white text-white" /> : <Send size={16} />}
@@ -1574,7 +1927,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 {activeArtifact && (
                     <>
                         {/* Desktop Side Column */}
-                        {!isDesktop && (
+                        {isDesktop && (
                             <div className="hidden lg:flex flex-col w-[45%] lg:max-w-2xl shrink-0 bg-white border border-gray-100 rounded-t-2xl shadow-sm overflow-hidden animate-fade-in-left">
                                 <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
                                     <div className="flex items-center gap-2 min-w-0">
@@ -1731,6 +2084,134 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     }
                 }}
             />
+
+            {isSimPopupOpen && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-250">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
+                                <h2 className="text-sm font-black text-slate-800 dark:text-white">
+                                    Mô phỏng tác động phát sinh 💸
+                                </h2>
+                            </div>
+                            <button
+                                onClick={() => setIsSimPopupOpen(false)}
+                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 hover:text-slate-650 transition-colors"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-5 space-y-4">
+                            {/* Preset select */}
+                            <div>
+                                <span className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-2">Kịch bản gợi ý nhanh</span>
+                                <div className="flex gap-1.5 flex-wrap">
+                                    {[
+                                        { label: '👮 CSGT phạt', amount: 2000000, desc: 'Bị CSGT xử phạt hành chính' },
+                                        { label: '💒 Đi đám cưới', amount: 1000000, desc: 'Đi ăn cưới bạn thân' },
+                                        { label: '💻 Mua Laptop', amount: 15000000, desc: 'Đầu tư laptop phục vụ học tập/làm việc' },
+                                        { label: '🍕 Liên hoan nhóm', amount: 500000, desc: 'Chi tiền liên hoan nhóm cuối tuần' },
+                                        { label: '📱 Đổi điện thoại', amount: 8000000, desc: 'Mua điện thoại mới phát sinh' },
+                                    ].map((preset, idx) => (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => {
+                                                setSimDescription(preset.desc);
+                                                setSimAmount(String(preset.amount));
+                                            }}
+                                            className="px-2 py-1.5 rounded-xl border border-gray-200 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-650 hover:border-indigo-200 text-[10.5px] font-semibold text-gray-650 transition-all duration-150"
+                                        >
+                                            {preset.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Custom Form */}
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">
+                                        Tình huống phát sinh
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={simDescription}
+                                        onChange={(e) => setSimDescription(e.target.value)}
+                                        placeholder="Ví dụ: Đi đám cưới bạn thân, Sửa xe máy bị hỏng..."
+                                        className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-slate-50 text-xs font-bold text-gray-855 outline-none focus:border-indigo-450 focus:bg-white transition-all"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">
+                                        Số tiền phát sinh (VND)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        required
+                                        value={simAmount}
+                                        onChange={(e) => setSimAmount(e.target.value)}
+                                        placeholder="Ví dụ: 1000000"
+                                        className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-slate-50 text-xs font-bold text-gray-855 outline-none focus:border-indigo-455 focus:bg-white transition-all"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
+                            <button
+                                onClick={() => setIsSimPopupOpen(false)}
+                                className="px-4 py-2 hover:bg-gray-200 text-gray-500 rounded-xl text-xs font-bold transition-colors"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (!simDescription.trim() || !simAmount) {
+                                        alert('Vui lòng điền đầy đủ thông tin.');
+                                        return;
+                                    }
+                                    const amountVal = Number(simAmount);
+                                    if (isNaN(amountVal) || amountVal <= 0) {
+                                        alert('Số tiền không hợp lệ.');
+                                        return;
+                                    }
+                                    setIsSimPopupOpen(false);
+
+                                    // Send the prompt to AI
+                                    const finalPrompt = `Tôi gặp tình huống phát sinh đột xuất: "${simDescription.trim()}" với số tiền là ${amountVal.toLocaleString('vi-VN')}đ. Hãy mô phỏng tác động tài chính của việc này lên số dư, các ví và mục tiêu tiết kiệm của tôi, đồng thời đề xuất giải pháp hành động tiếp theo nhé.`;
+                                    handleSend(finalPrompt);
+
+                                    // Clear fields
+                                    setSimDescription('');
+                                    setSimAmount('');
+                                }}
+                                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-200/50 transition-all flex items-center gap-1.5"
+                            >
+                                <Sparkles size={12} />
+                                Gửi AI đánh giá
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {selectedImpactDetails && (
+                <FinancialImpactDetailsModal
+                    isOpen={!!selectedImpactDetails}
+                    onClose={() => setSelectedImpactDetails(null)}
+                    data={selectedImpactDetails}
+                    appState={appState}
+                    onAddTransaction={onAddTransaction}
+                />
+            )}
         </div>
     );
 };
