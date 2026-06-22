@@ -70,7 +70,10 @@ export default {
                     900: '#164e63',
                     950: '#083344',
                 }
-            }
+            },
+            fontFamily: {
+                sans: ['Roboto', 'sans-serif'],
+            },
         },
     },
     plugins: [],
