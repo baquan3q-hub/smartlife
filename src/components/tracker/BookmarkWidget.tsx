@@ -504,7 +504,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
         )}
 
         {/* List of bookmarks */}
-        <div className="space-y-4 max-h-[160px] md:max-h-[200px] overflow-y-auto pr-1 scrollbar-thin">
+        <div className="space-y-4 max-h-[160px] md:max-h-[200px] overflow-y-auto px-1 py-1 pb-6 scrollbar-thin scroll-fade-bottom">
           {isLoading && bookmarks.length === 0 ? (
             <div className="flex items-center justify-center py-6 text-slate-400 text-xs gap-1.5">
               <Loader2 size={14} className="animate-spin text-slate-500" />

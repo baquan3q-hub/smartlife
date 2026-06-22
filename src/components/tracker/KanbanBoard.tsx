@@ -267,7 +267,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   items={colTodos.map((todo) => todo.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <div className="space-y-2 min-h-[120px] max-h-[260px] overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="space-y-2 min-h-[120px] max-h-[260px] overflow-y-auto px-1.5 py-1.5 pb-8 custom-scrollbar scroll-fade-bottom">
                     {colTodos.map((todo) => (
                       <SortableCard
                         key={todo.id}

@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* Prevent full page scroll & bounce on mobile browsers */
 html.authenticated-app,
@@ -11,24 +11,23 @@ html.authenticated-app body {
   position: fixed;
 }
 
-@layer utilities {
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .bottom-safe-dock {
-    bottom: calc(1rem + env(safe-area-inset-bottom));
-  }
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-safe-dock {
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
 
 /* WYSIWYG editor placeholder */
 [contentEditable]:empty::before {
@@ -172,12 +171,19 @@ html.authenticated-app body {
   scrollbar-color: rgba(156, 163, 175, 0.2) transparent;
 }
 
+/* Scroll Fade Bottom Effect for scroll containers */
+.scroll-fade-bottom {
+  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+}
+
 /* Expand Drawer — Item Pop Animation */
 @keyframes expand-item-pop {
   0% {
     opacity: 0;
     transform: scale(0.85) translateY(12px);
   }
+
   100% {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -218,31 +224,42 @@ html.authenticated-app body {
 }
 
 .dark {
-  --background: #070B14;      /* App background: #070B14 */
-  --foreground: #F8FAFC;      /* Text primary: #F8FAFC */
+  --background: #070B14;
+  /* App background: #070B14 */
+  --foreground: #F8FAFC;
+  /* Text primary: #F8FAFC */
 
-  --card: #0F172A;            /* Main surface/card: #0F172A */
+  --card: #0F172A;
+  /* Main surface/card: #0F172A */
   --card-foreground: #F8FAFC;
 
-  --popover: #111827;         /* Elevated card: #111827 */
+  --popover: #111827;
+  /* Elevated card: #111827 */
   --popover-foreground: #F8FAFC;
 
-  --primary: #38BDF8;         /* Primary accent: #38BDF8 */
+  --primary: #38BDF8;
+  /* Primary accent: #38BDF8 */
   --primary-foreground: #070B14;
 
-  --secondary: #1E293B;       /* Secondary surface: #1E293B */
-  --secondary-foreground: #CBD5E1; /* Text secondary: #CBD5E1 */
+  --secondary: #1E293B;
+  /* Secondary surface: #1E293B */
+  --secondary-foreground: #CBD5E1;
+  /* Text secondary: #CBD5E1 */
 
-  --accent: #162033;          /* Elevated card: #162033 */
+  --accent: #162033;
+  /* Elevated card: #162033 */
   --accent-foreground: #F8FAFC;
 
   --muted: #1E293B;
-  --muted-foreground: #94A3B8; /* Text muted: #94A3B8 */
+  --muted-foreground: #94A3B8;
+  /* Text muted: #94A3B8 */
 
-  --destructive: #EF4444;     /* Danger: #EF4444 */
+  --destructive: #EF4444;
+  /* Danger: #EF4444 */
   --destructive-foreground: #F8FAFC;
 
-  --border: rgba(148, 163, 184, 0.22); /* Border: rgba(148, 163, 184, 0.22) */
+  --border: rgba(148, 163, 184, 0.22);
+  /* Border: rgba(148, 163, 184, 0.22) */
   --input: rgba(148, 163, 184, 0.22);
   --ring: #38BDF8;
 }
@@ -557,10 +574,13 @@ html.dark .premium-glass-modal {
 }
 
 @keyframes pulse-slow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.5;
     transform: scale(1) translate(0, 0);
   }
+
   50% {
     opacity: 0.85;
     transform: scale(1.15) translate(8px, -8px);
@@ -573,25 +593,34 @@ html.dark .premium-glass-modal {
 
 /* Redesigned Calendar Widget Helper Classes */
 .calendar-weekend-sat {
-  color: #2563eb !important; /* blue-600 */
+  color: #2563eb !important;
+  /* blue-600 */
 }
+
 html.dark .calendar-weekend-sat {
-  color: #60a5fa !important; /* blue-400 */
+  color: #60a5fa !important;
+  /* blue-400 */
 }
 
 .calendar-weekend-sun {
-  color: #f43f5e !important; /* rose-500 */
+  color: #f43f5e !important;
+  /* rose-500 */
 }
+
 html.dark .calendar-weekend-sun {
-  color: #fb7185 !important; /* rose-400 */
+  color: #fb7185 !important;
+  /* rose-400 */
 }
 
 .lunar-special-day {
-  color: #8b5cf6 !important; /* violet-500 */
+  color: #8b5cf6 !important;
+  /* violet-500 */
   font-weight: 800 !important;
 }
+
 html.dark .lunar-special-day {
-  color: #a78bfa !important; /* violet-400 */
+  color: #a78bfa !important;
+  /* violet-400 */
   font-weight: 800 !important;
 }
 
@@ -628,7 +657,8 @@ html.dark .lunar-special-day {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #0ea5e9; /* sky-500 */
+  background: #0ea5e9;
+  /* sky-500 */
   border: 2px solid #fff;
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
   z-index: 10;
@@ -642,7 +672,8 @@ html.dark .timeline-dot {
 
 .timeline-item:hover .timeline-dot {
   transform: scale(1.3);
-  background: #10b981; /* emerald-500 */
+  background: #10b981;
+  /* emerald-500 */
   box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25);
 }
 
@@ -650,8 +681,7 @@ html.dark .timeline-dot {
 .kanban-column {
   background-color: rgba(226, 232, 240, 0.4);
 }
+
 html.dark .kanban-column {
   background-color: rgba(30, 41, 59, 0.45) !important;
 }
-
-
