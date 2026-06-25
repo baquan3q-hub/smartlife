@@ -9,8 +9,18 @@
             "destination": "/api/send-email.js"
         },
         {
+            "source": "/api/cron-check-emails",
+            "destination": "/api/cron-check-emails.js"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
+        }
+    ],
+    "crons": [
+        {
+            "path": "/api/cron-check-emails",
+            "schedule": "*/5 * * * *"
         }
     ]
 }

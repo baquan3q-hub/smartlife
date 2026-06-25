@@ -13,6 +13,17 @@ import { HabitsWidget } from './tracker/HabitsWidget';
 import { QuickNotesWidget } from './tracker/QuickNotesWidget';
 import ConfirmModal from './ConfirmModal';
 
+const formatBeforeMinutes = (minutes: number) => {
+  if (minutes <= 0) return 'Đúng giờ';
+  if (minutes < 60) return `${minutes}p`;
+  if (minutes < 1440) {
+    const hrs = Math.floor(minutes / 60);
+    return `${hrs}h`;
+  }
+  const days = Math.floor(minutes / 1440);
+  return `${days} ngày`;
+};
+
 interface ScheduleDashboardProps {
   state: AppState;
   onAddGoal: (g: any) => void;
@@ -461,6 +472,11 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                         <div className="flex items-center gap-1 text-[10px] text-slate-400">
                           <Clock size={10} />
                           <span>{e.start_time.slice(0, 5)} - {e.end_time?.slice(0, 5)}</span>
+                          {e.email_notify && (
+                            <span className="text-indigo-600 font-bold ml-1" title={`Nhắc nhở email trước ${formatBeforeMinutes(e.email_notify_before_minutes ?? 60)}`}>
+                              🔔
+                            </span>
+                          )}
                         </div>
                         {e.location && (
                           <div className="flex items-center gap-1 text-[9px] text-slate-400 mt-1">
@@ -610,13 +626,18 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                           {event.start_time}{event.location && ` · ${event.location}`}
                           {event.email_notify && (
                             <span className="inline-flex items-center gap-0.5 text-[9px] text-violet-600 font-bold ml-2">
-                              🔔 Gmail (-{event.email_notify_before_minutes}p)
+                              🔔 Gmail (-{formatBeforeMinutes(event.email_notify_before_minutes)})
                             </span>
                           )}
                         </>
                       ) : (
                         <>
                           {event.start_time} - {event.end_time} {event.location && `· ${event.location}`}
+                          {event.email_notify && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] text-indigo-600 font-bold ml-2">
+                              🔔 Gmail (-{formatBeforeMinutes(event.email_notify_before_minutes)})
+                            </span>
+                          )}
                         </>
                       )}
                     </div>
@@ -1141,11 +1162,19 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                     defaultValue={editingEvent?.email_notify_before_minutes ?? 60}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl outline-none font-semibold text-xs text-slate-700 focus:ring-1 focus:ring-indigo-400 cursor-pointer"
                   >
+                    <option value={5}>Trước 5 phút</option>
+                    <option value={10}>Trước 10 phút</option>
                     <option value={15}>Trước 15 phút</option>
                     <option value={30}>Trước 30 phút</option>
                     <option value={60}>Trước 1 giờ</option>
                     <option value={120}>Trước 2 giờ</option>
+                    <option value={180}>Trước 3 giờ</option>
+                    <option value={360}>Trước 6 giờ</option>
+                    <option value={720}>Trước 12 giờ</option>
                     <option value={1440}>Trước 1 ngày</option>
+                    <option value={2880}>Trước 2 ngày</option>
+                    <option value={4320}>Trước 3 ngày</option>
+                    <option value={10080}>Trước 7 ngày</option>
                   </select>
                 </div>
               </div>
