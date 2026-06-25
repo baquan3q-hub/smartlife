@@ -21,6 +21,17 @@ interface VisualBoardProps {
     onRefresh?: () => Promise<void>;
 }
 
+const formatBeforeMinutes = (minutes: number) => {
+    if (minutes <= 0) return 'Đúng giờ';
+    if (minutes < 60) return `${minutes}p`;
+    if (minutes < 1440) {
+        const hrs = Math.floor(minutes / 60);
+        return `${hrs}h`;
+    }
+    const days = Math.floor(minutes / 1440);
+    return `${days} ngày`;
+};
+
 const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, userEmail, onNavigate, onUpgrade, onOpenSpotify, onUpdateGoal, onRefresh }) => {
     const [showAllHolidays, setShowAllHolidays] = useState(false);
     const [showStorage, setShowStorage] = useState(false);
@@ -438,8 +449,8 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             location: e.location,
             description: null,
             isCalendarEvent: false,
-            email_notify: false,
-            email_notify_before_minutes: 0
+            email_notify: e.email_notify || false,
+            email_notify_before_minutes: e.email_notify_before_minutes ?? 0
         });
 
         const mapCalendarEvent = (e: any) => ({
@@ -912,9 +923,9 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                                                     {ev.location}
                                                                 </div>
                                                             )}
-                                                            {ev.isCalendarEvent && ev.email_notify && (
-                                                                <div className="text-[8px] text-violet-650 font-semibold mt-0.5 flex items-center gap-0.5">
-                                                                    🔔 Gmail (-{ev.email_notify_before_minutes}p)
+                                                            {ev.email_notify && (
+                                                                <div className={`text-[8px] font-semibold mt-0.5 flex items-center gap-0.5 ${ev.isCalendarEvent ? 'text-violet-650' : 'text-indigo-600'}`}>
+                                                                    🔔 Gmail (-{formatBeforeMinutes(ev.email_notify_before_minutes)})
                                                                 </div>
                                                             )}
                                                         </div>
@@ -956,9 +967,9 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                                                     {ev.location}
                                                                 </div>
                                                             )}
-                                                            {ev.isCalendarEvent && ev.email_notify && (
-                                                                <div className="text-[8px] text-violet-650 font-semibold mt-0.5 flex items-center gap-0.5">
-                                                                    🔔 Gmail (-{ev.email_notify_before_minutes}p)
+                                                            {ev.email_notify && (
+                                                                <div className={`text-[8px] font-semibold mt-0.5 flex items-center gap-0.5 ${ev.isCalendarEvent ? 'text-violet-650' : 'text-indigo-600'}`}>
+                                                                    🔔 Gmail (-{formatBeforeMinutes(ev.email_notify_before_minutes)})
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1011,9 +1022,9 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                                                         {ev.location}
                                                                     </div>
                                                                 )}
-                                                                {ev.isCalendarEvent && ev.email_notify && (
-                                                                    <div className="text-[8px] text-violet-600 font-semibold mt-0.5 flex items-center gap-0.5">
-                                                                        🔔 Gmail (-{ev.email_notify_before_minutes}p)
+                                                                {ev.email_notify && (
+                                                                    <div className={`text-[8px] font-semibold mt-0.5 flex items-center gap-0.5 ${ev.isCalendarEvent ? 'text-violet-600' : 'text-indigo-600'}`}>
+                                                                        🔔 Gmail (-{formatBeforeMinutes(ev.email_notify_before_minutes)})
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1057,9 +1068,9 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                                                         {ev.location}
                                                                     </div>
                                                                 )}
-                                                                {ev.isCalendarEvent && ev.email_notify && (
-                                                                    <div className="text-[8px] text-violet-650 font-semibold mt-0.5 flex items-center gap-0.5">
-                                                                        🔔 Gmail (-{ev.email_notify_before_minutes}p)
+                                                                {ev.email_notify && (
+                                                                    <div className={`text-[8px] font-semibold mt-0.5 flex items-center gap-0.5 ${ev.isCalendarEvent ? 'text-violet-650' : 'text-indigo-600'}`}>
+                                                                        🔔 Gmail (-{formatBeforeMinutes(ev.email_notify_before_minutes)})
                                                                     </div>
                                                                 )}
                                                             </div>
