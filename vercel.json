@@ -16,11 +16,5 @@
             "source": "/(.*)",
             "destination": "/index.html"
         }
-    ],
-    "crons": [
-        {
-            "path": "/api/cron-check-emails",
-            "schedule": "*/5 * * * *"
-        }
     ]
 }
