@@ -187,6 +187,7 @@ export interface Todo {
   created_at?: string;
   email_notify?: boolean;
   email_notify_before_minutes?: number;
+  attach_link?: string;
 }
 
 export interface QuickNote {

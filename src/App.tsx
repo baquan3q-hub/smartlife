@@ -27,6 +27,7 @@ import ProGateOverlay from './components/ProGateOverlay';
 import { GlobalLoader } from './components/GlobalLoader';
 import ClickRippleEffect from './components/ClickRippleEffect';
 import { careerGoalService } from './services/careerGoalService';
+import { syncTaskLinkToBookmark, deleteTaskLinkBookmark } from './services/taskBookmarkSyncService';
 
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -1177,13 +1178,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         setCalendarEvents((prev) => prev.filter(e => e.id !== id));
     };
 
-    const handleAddTodo = async (content: string, priority: any, deadline?: string, status: TodoStatus = 'todo', description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number) => {
+    const handleAddTodo = async (content: string, priority: any, deadline?: string, status: TodoStatus = 'todo', description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string) => {
         if (!user) return;
         const tempId = crypto.randomUUID();
         // New todos get sort_order = 0 (top), existing items shift up
         const minOrder = appState.todos.length > 0 ? Math.min(...appState.todos.map(t => t.sort_order ?? 0)) : 0;
         const newSortOrder = minOrder - 1;
-        const newItem = { id: tempId, content, priority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder, description, subtasks, email_notify: emailNotify, email_notify_before_minutes: emailNotifyBeforeMinutes };
+        const newItem = { id: tempId, content, priority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder, description, subtasks, email_notify: emailNotify, email_notify_before_minutes: emailNotifyBeforeMinutes, attach_link: attachLink };
 
         setAppState((prev: AppState) => ({ ...prev, todos: [newItem, ...prev.todos] }));
 
@@ -1202,7 +1203,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 content, priority: dbPriority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder,
                 description, subtasks,
                 email_notify: emailNotify,
-                email_notify_before_minutes: emailNotifyBeforeMinutes
+                email_notify_before_minutes: emailNotifyBeforeMinutes,
+                attach_link: attachLink
             };
             let data = null;
             let error = null;
@@ -1213,7 +1215,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
             if (error) {
                 if (error.code === '42703') {
-                    console.warn("[SmartLife] description/subtasks/email columns not found. Retrying insertion without them.");
+                    console.warn("[SmartLife] Column error. Retrying insertion without optional columns.");
                     const fallbackPayload = {
                         content, priority: dbPriority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder
                     };
@@ -1224,11 +1226,16 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 if (error) throw error;
             }
 
+            const finalId = data?.id || tempId;
             if (data) {
                 setAppState((prev: AppState) => ({
                     ...prev,
                     todos: prev.todos.map(t => t.id === tempId ? { ...t, ...data } : t)
                 }));
+            }
+
+            if (attachLink) {
+                syncTaskLinkToBookmark(user.id, finalId, content, attachLink);
             }
         } catch (error: any) {
             console.error(error);
@@ -1273,6 +1280,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             return { ...prev, todos: prev.todos.map(t => t.id === item.id ? { ...t, ...updatedItem } : t) };
         });
 
+        if (user && (item.attach_link !== undefined || item.content !== undefined)) {
+            const existing = prevTodos.find(t => t.id === item.id);
+            const targetLink = item.attach_link !== undefined ? item.attach_link : existing?.attach_link;
+            const targetContent = item.content !== undefined ? item.content : existing?.content;
+            syncTaskLinkToBookmark(user.id, item.id, targetContent || '', targetLink);
+        }
+
         try {
             // Only send DB-safe fields
             const { id, user_id, created_at, ...updateFields } = updatedItem;
@@ -1300,7 +1314,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             alert("Lỗi cập nhật việc: " + error.message);
             setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
         }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleMoveTodoStatus = React.useCallback(async (id: string, status: TodoStatus) => {
         lastReorderTimeRef.current = Date.now();
@@ -1311,6 +1325,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         if (!window.confirm("Bạn có chắc chắn muốn xóa công việc này không?")) return;
         const prevTodos = [...appState.todos];
         setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.filter(t => t.id !== id) }));
+
+        if (user) {
+            deleteTaskLinkBookmark(user.id, id);
+        }
 
         try {
             const { error } = await supabase.from('todos').delete().eq('id', id);
@@ -1671,43 +1689,48 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
             {/* Main Content */}
             <main className={`flex-1 md:ml-20 h-full overflow-y-auto scrollbar-hide relative bg-background transition-all duration-300 ease-in-out ${activeTab === 'ai-advisor' ? 'pb-0' : 'pb-28 md:pb-8'}`}>
-                {activeTab !== 'ai-advisor' && <header className="md:hidden fixed top-0 left-0 right-0 bg-card/95 backdrop-blur-md shadow-sm border-b border-border z-30 transition-all h-16">
-                    <div className="flex items-center justify-between px-4 h-full">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg overflow-hidden border border-border">
+                {activeTab !== 'ai-advisor' && <header className="md:hidden fixed top-0 left-0 right-0 bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800/60 z-30 transition-all pt-safe shadow-sm shadow-slate-900/5">
+                    <div className="flex items-center justify-between px-4 h-16">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-700/80 shadow-xs shrink-0">
                                 <img src="/pwa-192x192.png" alt="SmartLife" className="w-full h-full object-cover" />
                             </div>
-                            <span className="font-bold text-gray-800 text-lg tracking-tight hidden sm:block">SmartLife</span>
+                            <div className="flex flex-col">
+                                <span className="font-black text-slate-850 dark:text-slate-100 text-sm tracking-tight leading-tight">SmartLife</span>
+                                <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 leading-tight">
+                                    {activeTab === 'visual' ? 'Tổng quan' : activeTab === 'schedule' ? 'Lịch trình' : activeTab === 'finance' ? 'Tài chính' : activeTab === 'goals' ? 'Mục tiêu' : activeTab === 'habit' ? 'Thói quen' : activeTab === 'journal' ? 'Nhật ký' : activeTab === 'gpa' ? 'GPA' : activeTab}
+                                </span>
+                            </div>
                         </div>
-                        <div className="flex gap-2 items-center">
+                        <div className="flex gap-1.5 items-center">
                             {/* Habit Shortcut — toggleable in Settings */}
                             {headerShortcuts.habit && (
-                                <button onClick={() => setActiveTab('habit')} className={`p-2 rounded-full transition-all ${activeTab === 'habit' ? 'text-orange-600 bg-orange-100' : 'text-orange-500 bg-orange-50 hover:bg-orange-100'}`} title="Thói quen">
-                                    <Flame size={20} />
+                                <button onClick={() => setActiveTab('habit')} className={`p-2 rounded-xl transition-all ${activeTab === 'habit' ? 'text-orange-600 bg-orange-100 dark:bg-orange-950/50' : 'text-orange-500 bg-orange-50/80 dark:bg-slate-800/80 hover:bg-orange-100'}`} title="Thói quen">
+                                    <Flame size={19} />
                                 </button>
                             )}
                             {/* Spotify Shortcut — toggleable in Settings */}
                             {headerShortcuts.spotify && (
-                                <button onClick={() => setIsSpotifyOpen(true)} className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-full transition-colors" title="My Spotify">
-                                    <Music size={20} />
+                                <button onClick={() => setIsSpotifyOpen(true)} className="p-2 text-emerald-600 bg-emerald-50/80 dark:bg-slate-800/80 dark:text-emerald-400 hover:bg-emerald-100 rounded-xl transition-colors" title="My Spotify">
+                                    <Music size={19} />
                                 </button>
                             )}
                             {/* Admin Panel — always visible for admin */}
                             {user?.email === 'baquan3q@gmail.com' && (
-                                <button onClick={() => setActiveTab('admin')} className={`p-2 rounded-full transition-colors ${activeTab === 'admin' ? 'text-red-600 bg-red-50' : 'text-red-500 hover:bg-red-50'}`} title="Admin Panel">
-                                    <ShieldAlert size={20} />
+                                <button onClick={() => setActiveTab('admin')} className={`p-2 rounded-xl transition-colors ${activeTab === 'admin' ? 'text-red-600 bg-red-100 dark:bg-red-950/50' : 'text-red-500 bg-red-50/80 dark:bg-slate-800/80 hover:bg-red-100'}`} title="Admin Panel">
+                                    <ShieldAlert size={19} />
                                 </button>
                             )}
                             {/* Pro Upgrade */}
                             {!proAccess.isProActive && !proAccess.isLifetime && (
-                                <button onClick={handleOpenPricing} className="relative p-2 rounded-full hover:bg-yellow-50 transition-colors" title="Nâng cấp Pro">
-                                    <Crown size={20} className="text-yellow-500" fill="currentColor" />
-                                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white" />
+                                <button onClick={handleOpenPricing} className="relative p-2 rounded-xl bg-amber-50/80 dark:bg-slate-800/80 hover:bg-amber-100 transition-colors" title="Nâng cấp Pro">
+                                    <Crown size={19} className="text-amber-500" fill="currentColor" />
+                                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse border-2 border-white dark:border-slate-900" />
                                 </button>
                             )}
                             {/* Settings — always visible */}
-                            <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Cài đặt">
-                                <Settings size={20} />
+                            <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 dark:text-slate-400 bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200/80 rounded-xl transition-colors" title="Cài đặt">
+                                <Settings size={19} />
                             </button>
                         </div>
                     </div>

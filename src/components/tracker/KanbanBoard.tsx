@@ -19,7 +19,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Calendar, CheckSquare, Plus, Trash2 } from 'lucide-react';
+import { Calendar, CheckSquare, Plus, Trash2, Link2 } from 'lucide-react';
 import { Todo, TodoStatus } from '../../types';
 
 interface KanbanBoardProps {
@@ -423,7 +423,7 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
         </p>
       )}
 
-      {(totalSubtasks > 0 || todo.deadline) && (
+      {(totalSubtasks > 0 || todo.deadline || todo.attach_link) && (
         <div className="flex items-center gap-2 mt-1 flex-wrap select-none">
           {totalSubtasks > 0 && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-md border text-muted-foreground border-border bg-secondary font-bold flex items-center gap-1">
@@ -439,6 +439,19 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
               <Calendar size={9} />
               {formatDate(todo.deadline)}
             </span>
+          )}
+          {todo.attach_link && (
+            <a
+              href={todo.attach_link.startsWith('http') ? todo.attach_link : `https://${todo.attach_link}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-[9px] px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-1 bg-sky-50 border-sky-100 text-sky-600 hover:text-sky-800 hover:bg-sky-100 transition-colors z-10"
+              title={todo.attach_link}
+            >
+              <Link2 size={9} />
+              Link
+            </a>
           )}
         </div>
       )}

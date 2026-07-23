@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import { StorageItem } from '../../types';
 import { Plus, X, Bookmark, SlidersHorizontal, Loader2, Trash2, Edit2, Check } from 'lucide-react';
@@ -37,6 +37,37 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
   const [editUrl, setEditUrl] = useState('');
   const [editGroup, setEditGroup] = useState('');
   const [isEditOpen, setIsEditOpen] = useState(false);
+
+  // Mouse Drag-to-Scroll & Wheel for Category Tabs Bar
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const isMouseDownRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!tabsRef.current) return;
+    isMouseDownRef.current = true;
+    startXRef.current = e.pageX - tabsRef.current.offsetLeft;
+    scrollLeftRef.current = tabsRef.current.scrollLeft;
+  };
+
+  const handleMouseLeaveOrUp = () => {
+    isMouseDownRef.current = false;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isMouseDownRef.current || !tabsRef.current) return;
+    const x = e.pageX - tabsRef.current.offsetLeft;
+    const walk = (x - startXRef.current) * 1.5;
+    tabsRef.current.scrollLeft = scrollLeftRef.current - walk;
+  };
+
+  const handleWheelScroll = (e: React.WheelEvent) => {
+    if (!tabsRef.current) return;
+    if (e.deltaY !== 0) {
+      tabsRef.current.scrollLeft += e.deltaY * 0.8;
+    }
+  };
 
   const getGroupColor = (group?: string) => {
     const isDark = document.documentElement.classList.contains('dark');
@@ -149,46 +180,42 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
 
       if (error) throw error;
 
+      let categoryList: string[] = ['Tasks', 'dự án', 'Sách'];
       if (data && data.length > 0) {
         try {
           const parsed = JSON.parse(data[0].content || '[]');
-          setGroups(parsed);
-          localStorage.setItem(`bookmark_groups_${userId}`, data[0].content || '[]');
+          if (Array.isArray(parsed)) {
+            categoryList = Array.from(new Set(['Tasks', ...parsed]));
+          }
         } catch (e) {
           // fallback
         }
-      } else {
-        // Not in DB yet, try local storage
-        const saved = localStorage.getItem(`bookmark_groups_${userId}`);
-        let initial = ['dự án', 'Sách'];
-        if (saved) {
-          try {
-            initial = JSON.parse(saved);
-          } catch (e) {}
-        }
-        setGroups(initial);
-        // Save to DB so it exists
+      }
+      setGroups(categoryList);
+      localStorage.setItem(`bookmark_groups_${userId}`, JSON.stringify(categoryList));
+
+      if (!data || data.length === 0) {
         await supabase.from('my_storage').insert([
           {
             user_id: userId,
             type: 'bookmark_categories',
             title: 'Bookmark Categories',
-            content: JSON.stringify(initial),
+            content: JSON.stringify(categoryList),
           }
         ]);
       }
     } catch (err) {
       console.error('Lỗi tải danh mục bookmark:', err);
-      // Fallback to localStorage
       const saved = localStorage.getItem(`bookmark_groups_${userId}`);
       if (saved) {
         try {
-          setGroups(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          setGroups(Array.from(new Set(['Tasks', ...parsed])));
         } catch (e) {
-          setGroups(['dự án', 'Sách']);
+          setGroups(['Tasks', 'dự án', 'Sách']);
         }
       } else {
-        setGroups(['dự án', 'Sách']);
+        setGroups(['Tasks', 'dự án', 'Sách']);
       }
     }
   };
@@ -289,6 +316,10 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
   };
 
   const handleRemoveGroup = async (groupToRemove: string) => {
+    if (groupToRemove === 'Tasks') {
+      alert('Nhóm "Tasks" là nhóm hệ thống cố định dành cho công việc Kanban và không thể xóa!');
+      return;
+    }
     if (!window.confirm(`Bạn có chắc chắn muốn xóa nhóm "${groupToRemove}" không? Tất cả bookmark trong nhóm này sẽ trở về trạng thái không phân loại.`)) return;
 
     const updated = groups.filter(g => g !== groupToRemove);
@@ -321,6 +352,11 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
   };
 
   const handleRenameGroup = async (oldName: string, newName: string) => {
+    if (oldName === 'Tasks') {
+      alert('Nhóm "Tasks" là nhóm hệ thống cố định và không thể đổi tên!');
+      setEditingGroup(null);
+      return;
+    }
     const cleanNewName = newName.trim();
     if (!cleanNewName || cleanNewName === oldName) {
       setEditingGroup(null);
@@ -371,10 +407,10 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
     }
   };
 
-  // Compile unique groups list dynamically (merging saved custom groups with any other groups found in bookmarks)
+  // Compile unique groups list dynamically (merging saved custom groups with any other groups found in bookmarks, ensuring Tasks is always present)
   const allGroups = useMemo(() => {
     const bookmarkGroups = bookmarks.map(b => b.metadata?.group).filter(Boolean) as string[];
-    const combined = Array.from(new Set([...groups, ...bookmarkGroups]));
+    const combined = Array.from(new Set(['Tasks', ...groups, ...bookmarkGroups]));
     return combined;
   }, [groups, bookmarks]);
 
@@ -419,7 +455,15 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
         </div>
 
         {/* Group Tabs / Filters */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5 mb-3.5 scrollbar-hide select-none">
+        <div
+          ref={tabsRef}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeaveOrUp}
+          onMouseUp={handleMouseLeaveOrUp}
+          onMouseMove={handleMouseMove}
+          onWheel={handleWheelScroll}
+          className="flex items-center gap-1.5 overflow-x-auto pb-2.5 mb-3.5 scrollbar-thin select-none cursor-grab active:cursor-grabbing"
+        >
           <button
             onClick={() => setSelectedGroupTab('Tất cả')}
             className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
@@ -670,25 +714,31 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
                       ) : (
                         <>
                           <span className="text-xs font-semibold text-slate-700">{group}</span>
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => {
-                                setEditingGroup(group);
-                                setEditingGroupName(group);
-                              }}
-                              className="p-1 hover:bg-slate-200 text-slate-400 hover:text-sky-600 rounded-lg transition-colors cursor-pointer"
-                              title="Sửa tên"
-                            >
-                              <Edit2 size={13} />
-                            </button>
-                            <button
-                              onClick={() => handleRemoveGroup(group)}
-                              className="p-1 hover:bg-slate-200 text-slate-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
-                              title="Xóa nhóm"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
+                          {group === 'Tasks' ? (
+                            <span className="text-[10px] font-extrabold text-slate-400 bg-slate-200/70 px-2.5 py-0.5 rounded-full select-none">
+                              Hệ thống (Cố định)
+                            </span>
+                          ) : (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => {
+                                  setEditingGroup(group);
+                                  setEditingGroupName(group);
+                                }}
+                                className="p-1 hover:bg-slate-200 text-slate-400 hover:text-sky-600 rounded-lg transition-colors cursor-pointer"
+                                title="Sửa tên"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveGroup(group)}
+                                className="p-1 hover:bg-slate-200 text-slate-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                                title="Xóa nhóm"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
