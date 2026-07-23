@@ -20,6 +20,10 @@ html.authenticated-app body {
   scrollbar-width: none;
 }
 
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -123,7 +127,7 @@ html.authenticated-app body {
   }
 }
 
-/* Custom Thin Scrollbar */
+/* Custom Thin Scrollbar (Hidden by default, overlay on hover) */
 .scrollbar-thin::-webkit-scrollbar {
   width: 3px;
   height: 3px;
@@ -134,20 +138,32 @@ html.authenticated-app body {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.2);
+  background: transparent;
   border-radius: 9999px;
+  transition: background-color 0.2s ease-in-out;
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+.scrollbar-thin:hover::-webkit-scrollbar-thumb {
   background: rgba(156, 163, 175, 0.4);
 }
 
-.scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.2) transparent;
+.scrollbar-thin:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
 }
 
-/* Custom Scrollbar */
+.scrollbar-thin {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overflow-y: auto;
+  overflow-y: overlay;
+}
+
+.scrollbar-thin:hover {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+}
+
+/* Custom Scrollbar (Hidden by default, overlay on hover - keeps cards centered & symmetrical) */
 .custom-scrollbar::-webkit-scrollbar {
   width: 3px;
   height: 3px;
@@ -158,17 +174,29 @@ html.authenticated-app body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.2);
+  background: transparent;
   border-radius: 9999px;
+  transition: background-color 0.2s ease-in-out;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
   background: rgba(156, 163, 175, 0.4);
 }
 
+.custom-scrollbar:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
 .custom-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overflow-y: auto;
+  overflow-y: overlay;
+}
+
+.custom-scrollbar:hover {
   scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.2) transparent;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
 }
 
 /* Scroll Fade Bottom Effect for scroll containers */
@@ -488,19 +516,30 @@ html.dark .bg-white.rounded-3xl {
   background-color: var(--card) !important;
 }
 
-/* Custom scrollbars for dark mode */
+/* Custom scrollbars for dark mode (Hidden by default, shown on hover) */
 html.dark .scrollbar-thin::-webkit-scrollbar-thumb,
 html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3) !important;
+  background: transparent !important;
 }
 
-html.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover,
-html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.5) !important;
+html.dark .scrollbar-thin:hover::-webkit-scrollbar-thumb,
+html.dark .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4) !important;
 }
 
-html.dark .scrollbar-thin {
-  scrollbar-color: rgba(148, 163, 184, 0.3) transparent !important;
+html.dark .scrollbar-thin:hover::-webkit-scrollbar-thumb:hover,
+html.dark .custom-scrollbar:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7) !important;
+}
+
+html.dark .scrollbar-thin,
+html.dark .custom-scrollbar {
+  scrollbar-color: transparent transparent !important;
+}
+
+html.dark .scrollbar-thin:hover,
+html.dark .custom-scrollbar:hover {
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent !important;
 }
 
 /* Custom Date and Time Inputs Styling */

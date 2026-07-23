@@ -32,7 +32,7 @@ interface ScheduleDashboardProps {
   onAddTimetable: (t: any) => void;
   onUpdateTimetable: (t: any) => void;
   onDeleteTimetable: (id: string) => void;
-  onAddTodo: (content: string, priority: any, deadline?: string, status?: TodoStatus, description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number) => void;
+  onAddTodo: (content: string, priority: any, deadline?: string, status?: TodoStatus, description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string) => void;
   onUpdateTodo: (t: any) => void;
   onDeleteTodo: (id: string) => void;
   onReorderTodos: (reordered: Todo[]) => void;
@@ -104,6 +104,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const [modalStatus, setModalStatus] = useState<TodoStatus>('todo');
   const [modalDeadline, setModalDeadline] = useState('');
   const [modalDescription, setModalDescription] = useState('');
+  const [modalAttachLink, setModalAttachLink] = useState('');
   const [modalSubtasks, setModalSubtasks] = useState<{ id: string; title: string; is_completed: boolean }[]>([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [modalEmailNotify, setModalEmailNotify] = useState(false);
@@ -269,6 +270,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     setModalContent('');
     setModalStatus(status || 'todo');
     setModalDescription('');
+    setModalAttachLink('');
     setModalSubtasks([]);
     setNewSubtaskTitle('');
     setModalEmailNotify(false);
@@ -293,6 +295,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     setModalContent(todo.content);
     setModalStatus(todo.status || (todo.is_completed ? 'done' : 'todo'));
     setModalDescription(todo.description || '');
+    setModalAttachLink(todo.attach_link || '');
     setModalSubtasks(todo.subtasks || []);
     setNewSubtaskTitle('');
     setModalEmailNotify(todo.email_notify || false);
@@ -349,7 +352,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         modalDescription.trim() || undefined,
         modalSubtasks,
         modalEmailNotify,
-        modalEmailNotifyBefore
+        modalEmailNotifyBefore,
+        modalAttachLink.trim() || undefined
       );
     } else if (modalMode === 'edit' && selectedTodo) {
       onUpdateTodo({
@@ -358,6 +362,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         status: modalStatus,
         deadline: formattedDeadline || null,
         description: modalDescription.trim() || null,
+        attach_link: modalAttachLink.trim() || null,
         subtasks: modalSubtasks,
         email_notify: modalEmailNotify,
         email_notify_before_minutes: modalEmailNotifyBefore,
@@ -1287,6 +1292,32 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                   placeholder="Thêm chi tiết (không bắt buộc)..."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400 text-xs font-semibold bg-slate-50/50 text-slate-750 resize-none h-20"
                 />
+              </div>
+
+              {/* Attach Link Input */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">
+                  LINK ĐÍNH KÈM (ATTACH LINK)
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={modalAttachLink}
+                    onChange={(e) => setModalAttachLink(e.target.value)}
+                    placeholder="Ví dụ: https://github.com/my-project"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400 text-xs font-semibold bg-white text-slate-800 pr-20"
+                  />
+                  {modalAttachLink.trim() && (
+                    <a
+                      href={modalAttachLink.trim().startsWith('http') ? modalAttachLink.trim() : `https://${modalAttachLink.trim()}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      Mở link ↗
+                    </a>
+                  )}
+                </div>
               </div>
 
               {/* Email Notifications */}

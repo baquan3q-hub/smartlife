@@ -4,7 +4,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-  <meta name="theme-color" content="#0ea5e9" id="theme-meta" />
+  <meta name="theme-color" content="#FFFFFF" id="theme-meta" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>SmartLife Assistant</title>
   <script>
@@ -20,10 +21,10 @@
         root.style.colorScheme = 'light';
       }
       
-      // Dynamic update of mobile theme color
+      // Dynamic update of mobile theme color to seamlessly match top header
       const meta = document.getElementById('theme-meta');
       if (meta) {
-        meta.setAttribute('content', isDark ? '#0B0F19' : '#0ea5e9');
+        meta.setAttribute('content', isDark ? '#0F172A' : '#FFFFFF');
       }
     })();
   </script>
