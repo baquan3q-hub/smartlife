@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { AppState, TransactionType, Transaction, Goal, BudgetConfig, Wallet, Debt, DebtRepayment } from '../types';
+import { AppState, TransactionType, Transaction, Goal, BudgetConfig, Wallet, Debt, DebtRepayment, SavingsLog } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, LineChart, Line } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet as WalletIcon, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart, Loader2, Utensils, Car, ShoppingBag, FileText, Tv, Heart, BookOpen, Coffee, Gift, Briefcase, Coins, PiggyBank, GraduationCap, Home, Droplets, Landmark, Plane, Eye, EyeOff, ArrowRightLeft, CreditCard } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet as WalletIcon, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart, Loader2, Utensils, Car, ShoppingBag, FileText, Tv, Heart, BookOpen, Coffee, Gift, Briefcase, Coins, PiggyBank, GraduationCap, Home, Droplets, Landmark, Plane, Eye, EyeOff, ArrowRightLeft, CreditCard, History, Flame, Target, Sliders, BarChart2 } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
 import { Lang } from '../i18n/i18n';
+import { savingsService } from '../services/savingsService';
 
 
 
@@ -519,13 +520,34 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
 
-    // Goal Form State (Visual only)
+    // Goal Form State
     const [goalTarget, setGoalTarget] = useState('');
     const [goalCurrent, setGoalCurrent] = useState('');
+    const [goalMonthlyTarget, setGoalMonthlyTarget] = useState('');
 
-    // Deposit Modal State
+    // Deposit Modal & Savings Habit State
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
     const [selectedGoalForDeposit, setSelectedGoalForDeposit] = useState<Goal | null>(null);
+    const [depositDate, setDepositDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [depositNote, setDepositNote] = useState<string>('');
+    const [depositWalletId, setDepositWalletId] = useState<string>('');
+
+    // Savings Log & History Modal State (CRUD)
+    const [savingsLogs, setSavingsLogs] = useState<SavingsLog[]>([]);
+    const [isSavingHistoryModalOpen, setIsSavingHistoryModalOpen] = useState<boolean>(false);
+    const [selectedGoalForHistory, setSelectedGoalForHistory] = useState<Goal | null>(null);
+    const [historyGoalFilter, setHistoryGoalFilter] = useState<string>('all');
+    const [editingLog, setEditingLog] = useState<SavingsLog | null>(null);
+    const [editLogAmount, setEditLogAmount] = useState<string>('');
+    const [editLogDate, setEditLogDate] = useState<string>('');
+    const [editLogNote, setEditLogNote] = useState<string>('');
+
+    // Savings Balance Adjustment & Analytics State
+    const [isAdjustBalanceModalOpen, setIsAdjustBalanceModalOpen] = useState<boolean>(false);
+    const [selectedGoalForAdjust, setSelectedGoalForAdjust] = useState<Goal | null>(null);
+    const [adjustNewAmount, setAdjustNewAmount] = useState<string>('');
+    const [adjustReason, setAdjustReason] = useState<string>('');
+    const [savingsModalTab, setSavingsModalTab] = useState<'analytics' | 'history'>('analytics');
 
     // Wallets UI State
     const [isAddWalletModalOpen, setIsAddWalletModalOpen] = useState(false);
@@ -608,6 +630,81 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             setNewCategoryName('');
         }
     }, [isModalOpen, type, editingTransaction, expenseCategories, incomeCategories]);
+
+    useEffect(() => {
+        const userId = state.profile?.id || 'guest';
+        savingsService.fetchSavingsLogs(userId).then(logs => {
+            setSavingsLogs(logs);
+        });
+    }, [state.profile?.id]);
+
+    // Monthly Savings Habit Statistics
+    const monthlySavingsStats = useMemo(() => {
+        const currentMonthStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+        
+        // Filter logs in current month
+        const currentMonthLogs = savingsLogs.filter(l => l.date && l.date.startsWith(currentMonthStr));
+        const totalSavedThisMonth = currentMonthLogs.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+
+        // Sum of all monthly_targets of active financial goals
+        const financialGoals = state.goals.filter(g => g.type === 'FINANCIAL');
+        const totalMonthlyTarget = financialGoals.reduce((sum, g) => sum + (g.monthly_target || 0), 0);
+
+        // Total accumulated balance across all savings goals
+        const totalAccumulated = financialGoals.reduce((sum, g) => sum + (g.current_amount || 0), 0);
+        const totalTarget = financialGoals.reduce((sum, g) => sum + (g.target_amount || 0), 0);
+
+        // Unique days saved this month
+        const daysSet = new Set(currentMonthLogs.map(l => l.date));
+        const savedDaysCount = daysSet.size;
+
+        const habitProgressPercent = totalMonthlyTarget > 0 
+            ? Math.min(Math.round((totalSavedThisMonth / totalMonthlyTarget) * 100), 100)
+            : (totalSavedThisMonth > 0 ? 100 : 0);
+
+        const overallProgressPercent = totalTarget > 0
+            ? Math.min(Math.round((totalAccumulated / totalTarget) * 100), 100)
+            : 0;
+
+        const avgPerLog = currentMonthLogs.length > 0
+            ? Math.round(totalSavedThisMonth / currentMonthLogs.length)
+            : 0;
+
+        return {
+            totalSavedThisMonth,
+            totalMonthlyTarget,
+            totalAccumulated,
+            totalTarget,
+            savedDaysCount,
+            habitProgressPercent,
+            overallProgressPercent,
+            avgPerLog,
+            currentMonthLogs
+        };
+    }, [savingsLogs, state.goals, selectedYear, selectedMonth]);
+
+    const monthlySavingsComparisonChartData = useMemo(() => {
+        const result: { month: string; amount: number }[] = [];
+        const now = new Date();
+        
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const y = d.getFullYear();
+            const m = d.getMonth() + 1;
+            const monthPrefix = `${y}-${String(m).padStart(2, '0')}`;
+            const monthLabel = `Thg ${m}/${y}`;
+
+            const total = savingsLogs
+                .filter(l => l.date && l.date.startsWith(monthPrefix))
+                .reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+
+            result.push({
+                month: monthLabel,
+                amount: total
+            });
+        }
+        return result;
+    }, [savingsLogs]);
 
     // History Filter State
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
@@ -844,11 +941,13 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         const fd = new FormData(e.currentTarget);
         const target = Number(fd.get('target_amount'));
         const current = Number(fd.get('current_amount'));
+        const monthlyTarget = Number(goalMonthlyTarget);
 
         const data = {
             title: fd.get('title'),
             target_amount: target,
             current_amount: current,
+            monthly_target: isNaN(monthlyTarget) ? 0 : monthlyTarget,
             deadline: fd.get('deadline'),
             type: 'FINANCIAL', // Default type for Finance Dashboard
             progress: Math.round((current / (target || 1)) * 100)
@@ -863,9 +962,10 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
         setEditingGoal(null);
         setGoalTarget('');
         setGoalCurrent('');
+        setGoalMonthlyTarget('');
     };
 
-    const handleDepositSubmit = (e: React.FormEvent) => {
+    const handleDepositSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedGoalForDeposit || !depositAmount) return;
 
@@ -875,18 +975,144 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             return;
         }
 
-        const newCurrent = (selectedGoalForDeposit.current_amount || 0) + amount;
-        const newProgress = Math.round((newCurrent / (selectedGoalForDeposit.target_amount || 1)) * 100);
-
-        onUpdateGoal({
-            ...selectedGoalForDeposit,
-            current_amount: newCurrent,
-            progress: newProgress
+        const userId = state.profile?.id || 'guest';
+        const newLog = await savingsService.addSavingsLog(userId, {
+            goal_id: selectedGoalForDeposit.id,
+            amount: amount,
+            date: depositDate || new Date().toISOString().split('T')[0],
+            note: depositNote.trim() || 'Ghi nhận tiết kiệm'
         });
+
+        if (newLog) {
+            const updatedLogs = [newLog, ...savingsLogs.filter(l => l.id !== newLog.id)];
+            setSavingsLogs(updatedLogs);
+
+            // Calculate new total accumulated amount for the goal from savings logs
+            const newCurrent = savingsService.calculateTotalSavings(updatedLogs, selectedGoalForDeposit.id);
+            const newProgress = Math.round((newCurrent / (selectedGoalForDeposit.target_amount || 1)) * 100);
+
+            onUpdateGoal({
+                ...selectedGoalForDeposit,
+                current_amount: newCurrent,
+                progress: newProgress
+            });
+
+            // Optional: If user selected a wallet to deduct from, create an expense transaction
+            if (depositWalletId) {
+                onAddTransaction({
+                    amount: amount,
+                    category: 'Tiết kiệm',
+                    date: depositDate || new Date().toISOString().split('T')[0],
+                    type: TransactionType.EXPENSE,
+                    description: `Trích tiền tiết kiệm mục tiêu: ${selectedGoalForDeposit.title}`,
+                    wallet_id: depositWalletId
+                });
+            }
+        }
 
         setIsDepositModalOpen(false);
         setDepositAmount('');
+        setDepositNote('');
+        setDepositWalletId('');
+        setDepositDate(new Date().toISOString().split('T')[0]);
         setSelectedGoalForDeposit(null);
+    };
+
+    const handleUpdateLogSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingLog) return;
+        const amt = Number(editLogAmount);
+        if (isNaN(amt) || amt <= 0) {
+            alert("Số tiền không hợp lệ!");
+            return;
+        }
+
+        const updates = {
+            amount: amt,
+            date: editLogDate,
+            note: editLogNote.trim()
+        };
+
+        const success = await savingsService.updateSavingsLog(editingLog.id, updates);
+        if (success) {
+            const updatedLogs = savingsLogs.map(l => l.id === editingLog.id ? { ...l, ...updates } : l);
+            setSavingsLogs(updatedLogs);
+
+            // Recalculate target goal
+            const targetGoal = state.goals.find(g => g.id === editingLog.goal_id);
+            if (targetGoal) {
+                const newCurrent = savingsService.calculateTotalSavings(updatedLogs, targetGoal.id);
+                const newProgress = Math.round((newCurrent / (targetGoal.target_amount || 1)) * 100);
+                onUpdateGoal({
+                    ...targetGoal,
+                    current_amount: newCurrent,
+                    progress: newProgress
+                });
+            }
+            setEditingLog(null);
+            setEditLogAmount('');
+            setEditLogDate('');
+            setEditLogNote('');
+        }
+    };
+
+    const handleDeleteLog = async (logId: string, goalId: string) => {
+        if (!window.confirm("Bạn có chắc chắn muốn xóa lượt nạp tiết kiệm này?")) return;
+
+        const success = await savingsService.deleteSavingsLog(logId);
+        if (success) {
+            const updatedLogs = savingsLogs.filter(l => l.id !== logId);
+            setSavingsLogs(updatedLogs);
+
+            const targetGoal = state.goals.find(g => g.id === goalId);
+            if (targetGoal) {
+                const newCurrent = savingsService.calculateTotalSavings(updatedLogs, targetGoal.id);
+                const newProgress = Math.round((newCurrent / (targetGoal.target_amount || 1)) * 100);
+                onUpdateGoal({
+                    ...targetGoal,
+                    current_amount: newCurrent,
+                    progress: newProgress
+                });
+            }
+        }
+    };
+
+    const handleAdjustBalanceSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedGoalForAdjust) return;
+        const newAmt = Number(adjustNewAmount);
+        if (isNaN(newAmt) || newAmt < 0) {
+            alert("Vui lòng nhập số tiền tích lũy hợp lệ!");
+            return;
+        }
+
+        const currentAmt = selectedGoalForAdjust.current_amount || 0;
+        const diff = newAmt - currentAmt;
+        const userId = state.profile?.id || 'guest';
+
+        if (diff !== 0) {
+            const newLog = await savingsService.addSavingsLog(userId, {
+                goal_id: selectedGoalForAdjust.id,
+                amount: diff,
+                date: new Date().toISOString().split('T')[0],
+                note: adjustReason.trim() ? `Điều chỉnh số dư: ${adjustReason.trim()}` : 'Điều chỉnh số dư tích lũy'
+            });
+            if (newLog) {
+                setSavingsLogs(prev => [newLog, ...prev.filter(l => l.id !== newLog.id)]);
+            }
+        }
+
+        const newProgress = Math.round((newAmt / (selectedGoalForAdjust.target_amount || 1)) * 100);
+        onUpdateGoal({
+            ...selectedGoalForAdjust,
+            current_amount: newAmt,
+            progress: newProgress
+        });
+
+        setIsAdjustBalanceModalOpen(false);
+        setSelectedGoalForAdjust(null);
+        setAdjustNewAmount('');
+        setAdjustReason('');
     };
 
     const handleAnalyzeFinance = () => {
@@ -2449,95 +2675,221 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     </div>
                 </div>
 
-                {/* Savings Goals Management Section */}
+                {/* Savings Vault & Goals Section */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 h-full flex flex-col">
-                    <div className="flex justify-between items-center mb-4 md:mb-6">
+                    {/* Section Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-gray-100 pb-3">
                         <div>
-                            <h3 className="text-lg md:text-xl font-bold text-gray-800 flex items-center gap-2">
-                                <WalletIcon className="text-sky-600 w-5 h-5 md:w-6 md:h-6" /> <span className="hidden md:inline">Danh sách Mục tiêu Tiết kiệm</span><span className="md:hidden">Mục tiêu Tiết kiệm</span>
+                            <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                                <PiggyBank className="text-sky-600 w-4 h-4 md:w-5 md:h-5" /> 
+                                <span>Mục tiêu tiết kiệm</span>
                             </h3>
-                            <p className="text-xs md:text-sm text-gray-500">Đặt mục tiêu và theo dõi tiến độ</p>
                         </div>
-                        <button
-                            onClick={() => {
-                                setEditingGoal(null);
-                                setGoalTarget('');
-                                setGoalCurrent('');
-                                setIsGoalModalOpen(true);
-                            }}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-sky-50 text-sky-600 rounded-lg text-sm font-bold hover:bg-sky-100 transition"
-                        >
-                            <Plus size={16} /> Thêm
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                            <button
+                                onClick={() => {
+                                    setSelectedGoalForHistory(null);
+                                    setHistoryGoalFilter('all');
+                                    setSavingsModalTab('analytics');
+                                    setIsSavingHistoryModalOpen(true);
+                                }}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition whitespace-nowrap"
+                            >
+                                <BarChart2 size={15} /> <span>Thống kê</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const financialGoals = state.goals.filter(g => g.type === 'FINANCIAL');
+                                    if (financialGoals.length === 0) {
+                                        alert("Vui lòng tạo mục tiêu tiết kiệm trước!");
+                                        setEditingGoal(null);
+                                        setGoalTarget('');
+                                        setGoalCurrent('');
+                                        setGoalMonthlyTarget('');
+                                        setIsGoalModalOpen(true);
+                                        return;
+                                    }
+                                    setSelectedGoalForDeposit(financialGoals[0]);
+                                    setDepositAmount('');
+                                    setDepositDate(new Date().toISOString().split('T')[0]);
+                                    setDepositNote('');
+                                    setDepositWalletId(state.wallets?.[0]?.id || '');
+                                    setIsDepositModalOpen(true);
+                                }}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition whitespace-nowrap"
+                            >
+                                <Plus size={15} /> <span>Nạp nhanh</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setEditingGoal(null);
+                                    setGoalTarget('');
+                                    setGoalCurrent('');
+                                    setGoalMonthlyTarget('');
+                                    setIsGoalModalOpen(true);
+                                }}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-sky-50 text-sky-600 rounded-xl text-xs font-bold hover:bg-sky-100 transition whitespace-nowrap"
+                            >
+                                <Target size={15} /> <span>Thêm mục tiêu</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin space-y-4 max-h-[350px]">
+                    {/* Savings Vault Summary Bar */}
+                    <div className="mb-4 bg-slate-50 border border-slate-200/80 p-4 rounded-xl">
+                        <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-3 pb-3 border-b border-slate-200/60">
+                            <div>
+                                <div className="text-[11px] text-gray-500 font-medium truncate">Tổng tích lũy</div>
+                                <div className="text-sm sm:text-base md:text-lg font-extrabold text-sky-600 mt-0.5">
+                                    {formatCurrency(monthlySavingsStats.totalAccumulated, lang)}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-[11px] text-gray-500 font-medium truncate">Tháng này ({selectedMonth + 1}/{selectedYear})</div>
+                                <div className="text-sm sm:text-base md:text-lg font-extrabold text-emerald-600 mt-0.5">
+                                    {formatCurrency(monthlySavingsStats.totalSavedThisMonth, lang)}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-[11px] text-gray-500 font-medium truncate">Số ngày nạp</div>
+                                <div className="text-xs sm:text-sm font-bold text-gray-800 flex items-center gap-1 mt-0.5">
+                                    <Flame size={14} className="text-amber-500 shrink-0" />
+                                    <span className="truncate">{monthlySavingsStats.savedDaysCount} ngày</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Habit progress bar */}
+                        <div>
+                            <div className="flex justify-between items-center mb-1 text-xs">
+                                <span className="font-semibold text-gray-700">Mục tiêu tháng:</span>
+                                <span className="font-bold text-sky-600">
+                                    {formatCurrency(monthlySavingsStats.totalSavedThisMonth, lang)} / {formatCurrency(monthlySavingsStats.totalMonthlyTarget, lang)} ({monthlySavingsStats.habitProgressPercent}%)
+                                </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                <div
+                                    className="bg-sky-500 h-full rounded-full transition-all duration-500"
+                                    style={{ width: `${monthlySavingsStats.habitProgressPercent}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Goals List */}
+                    <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin space-y-3 max-h-[360px]">
                         {state.goals.filter(g => g.type === 'FINANCIAL').map(goal => (
-                            <div key={goal.id} className="border border-gray-100 rounded-2xl p-4 hover:shadow-md transition-shadow bg-gray-50 relative group">
-                                <button
-                                    onClick={() => onDeleteGoal(goal.id)}
-                                    className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setEditingGoal(goal);
-                                        setGoalTarget((goal.target_amount || 0).toString());
-                                        setGoalCurrent(goal.current_amount?.toString() || '');
-                                        setIsGoalModalOpen(true);
-                                    }}
-                                    className="absolute top-2 right-9 p-1.5 text-gray-400 hover:text-sky-600 hover:bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                >
-                                    <Edit2 size={16} />
-                                </button>
+                            <div key={goal.id} className="border border-gray-200 rounded-xl p-4 bg-gray-50 relative group">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="font-bold text-gray-800 text-base">{goal.title}</h4>
+                                            {goal.monthly_target && goal.monthly_target > 0 ? (
+                                                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md text-[10px] font-bold">
+                                                    {formatCurrency(goal.monthly_target, lang)}/tháng
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                        <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                            <CalendarDays size={12} /> Hạn: {new Date(goal.deadline).toLocaleDateString('vi-VN')}
+                                        </p>
+                                    </div>
 
-                                <h4 className="font-bold text-gray-800 mb-1">{goal.title}</h4>
-                                <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                                    <CalendarDays size={12} /> Hạn: {new Date(goal.deadline).toLocaleDateString('vi-VN')}
-                                </p>
+                                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => {
+                                                setEditingGoal(goal);
+                                                setGoalTarget((goal.target_amount || 0).toString());
+                                                setGoalCurrent((goal.current_amount || 0).toString());
+                                                setGoalMonthlyTarget((goal.monthly_target || 0).toString());
+                                                setIsGoalModalOpen(true);
+                                            }}
+                                            className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-white rounded-lg transition"
+                                            title="Sửa mục tiêu"
+                                        >
+                                            <Edit2 size={15} />
+                                        </button>
+                                        <button
+                                            onClick={() => onDeleteGoal(goal.id)}
+                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-lg transition"
+                                            title="Xóa mục tiêu"
+                                        >
+                                            <Trash2 size={15} />
+                                        </button>
+                                    </div>
+                                </div>
 
-                                <div className="flex justify-between items-end text-sm mb-1">
-                                    <span className="text-sky-600 font-bold">{formatCurrency(goal.current_amount || 0, lang)}</span>
+                                <div className="flex justify-between items-end text-sm mb-1.5">
+                                    <span className="text-sky-600 font-bold text-base">{formatCurrency(goal.current_amount || 0, lang)}</span>
                                     <span className="text-gray-400 font-medium">/ {formatCurrency(goal.target_amount || 0, lang)}</span>
                                 </div>
 
-                                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden mb-3">
                                     <div
-                                        className="bg-gradient-to-r from-sky-500 to-blue-600 h-full rounded-full transition-all duration-1000"
+                                        className="bg-sky-500 h-full rounded-full transition-all duration-500"
                                         style={{ width: `${Math.min(((goal.current_amount || 0) / (goal.target_amount || 1)) * 100, 100)}%` }}
                                     ></div>
                                 </div>
-                                <div className="flex justify-between mt-2">
-                                    <button
-                                        onClick={() => {
-                                            setSelectedGoalForDeposit(goal);
-                                            setDepositAmount('');
-                                            setIsDepositModalOpen(true);
-                                        }}
-                                        className="text-xs font-bold text-sky-600 hover:underline"
-                                    >
-                                        + Nạp thêm
-                                    </button>
+
+                                {/* Actions Bar on Goal Card */}
+                                <div className="flex items-center justify-between pt-1 border-t border-gray-200/60">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setSelectedGoalForDeposit(goal);
+                                                setDepositAmount('');
+                                                setDepositDate(new Date().toISOString().split('T')[0]);
+                                                setDepositNote('');
+                                                setDepositWalletId(state.wallets?.[0]?.id || '');
+                                                setIsDepositModalOpen(true);
+                                            }}
+                                            className="text-xs font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg transition flex items-center gap-1"
+                                        >
+                                            <Plus size={13} /> Nạp tiền
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedGoalForAdjust(goal);
+                                                setAdjustNewAmount((goal.current_amount || 0).toString());
+                                                setAdjustReason('');
+                                                setIsAdjustBalanceModalOpen(true);
+                                            }}
+                                            className="text-xs font-bold text-gray-700 bg-gray-200/70 hover:bg-gray-200 px-2 py-1 rounded-lg transition flex items-center gap-1"
+                                            title="Điều chỉnh số tiền tích lũy trực tiếp"
+                                        >
+                                            <Sliders size={13} /> Điều chỉnh
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedGoalForHistory(goal);
+                                                setHistoryGoalFilter(goal.id);
+                                                setSavingsModalTab('history');
+                                                setIsSavingHistoryModalOpen(true);
+                                            }}
+                                            className="text-xs font-medium text-gray-500 hover:text-indigo-600 flex items-center gap-1 px-1.5 py-1"
+                                        >
+                                            <History size={13} /> Lịch sử ({savingsLogs.filter(l => l.goal_id === goal.id).length})
+                                        </button>
+                                    </div>
                                     <span className="text-xs font-bold text-gray-500">{Math.round(((goal.current_amount || 0) / (goal.target_amount || 1)) * 100)}%</span>
                                 </div>
                             </div>
                         ))}
 
                         {state.goals.filter(g => g.type === 'FINANCIAL').length === 0 && (
-                            <div className="text-center py-10 text-gray-400 italic">
-                                Bạn chưa có mục tiêu.
+                            <div className="text-center py-10 text-gray-400 italic bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                Bạn chưa tạo quỹ tiết kiệm nào. Hãy bấm <b>+ Thêm Quỹ</b> để bắt đầu.
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Add/Edit Transaction Modal */}
+            {/* Add/Edit Goal Modal */}
             {
                 isGoalModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm z-[60]">
-                        <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
+                    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-lg">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-lg text-gray-800">{editingGoal ? 'Sửa Mục Tiêu' : 'Mục tiêu Tiết kiệm Mới'}</h3>
                                 <button onClick={() => setIsGoalModalOpen(false)}><X size={20} className="text-gray-400" /></button>
@@ -2548,7 +2900,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     <input name="title" required defaultValue={editingGoal?.title} placeholder="Ví dụ: Mua iPhone 16" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium mt-1" />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Số tiền mục tiêu</label>
+                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Số tiền mục tiêu (Tổng)</label>
                                     <input
                                         name="target_amount"
                                         type="number"
@@ -2563,7 +2915,20 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Đã tích lũy</label>
+                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Mục tiêu tiết kiệm hàng tháng (Thói quen)</label>
+                                    <input
+                                        type="number"
+                                        value={goalMonthlyTarget}
+                                        onChange={(e) => setGoalMonthlyTarget(e.target.value)}
+                                        placeholder="Ví dụ: 2,000,000"
+                                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none font-medium mt-1"
+                                    />
+                                    <div className="flex justify-end mt-1 text-xs text-indigo-600 font-bold">
+                                        {goalMonthlyTarget && !isNaN(Number(goalMonthlyTarget)) && formatCurrency(Number(goalMonthlyTarget), lang)}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Đã tích lũy ban đầu</label>
                                     <input
                                         name="current_amount"
                                         type="number"
@@ -2580,7 +2945,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     <label className="text-xs text-gray-500 uppercase font-bold ml-1">Dự định hoàn thành</label>
                                     <input type="date" name="deadline" required defaultValue={editingGoal ? editingGoal.deadline : new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm mt-1" />
                                 </div>
-                                <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 mt-2">{editingGoal ? 'Cập Nhật' : 'Lưu Mục Tiêu'}</button>
+                                <button type="submit" className="w-full py-3 bg-sky-600 text-white rounded-xl font-bold hover:bg-sky-700 transition mt-2">{editingGoal ? 'Cập Nhật' : 'Lưu Mục Tiêu'}</button>
                             </form>
                         </div>
                     </div>
@@ -2590,31 +2955,97 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             {/* Deposit Modal */}
             {
                 isDepositModalOpen && selectedGoalForDeposit && (
-                    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                        <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-                            <div className="flex justify-between items-center mb-6">
+                    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setIsDepositModalOpen(false)}>
+                        <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-4">
                                 <div>
-                                    <h3 className="font-bold text-lg text-gray-800">Nạp thêm tiền</h3>
-                                    <p className="text-xs text-gray-500 line-clamp-1">Cho mục tiêu: {selectedGoalForDeposit.title}</p>
+                                    <h3 className="font-bold text-lg text-gray-800">Nạp tiền Tiết kiệm</h3>
+                                    <p className="text-xs text-gray-500 line-clamp-1">Mục tiêu: {selectedGoalForDeposit.title}</p>
                                 </div>
-                                <button onClick={() => setIsDepositModalOpen(false)}><X size={20} className="text-gray-400" /></button>
+                                <button onClick={() => setIsDepositModalOpen(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
                             </div>
 
                             <form onSubmit={handleDepositSubmit} className="space-y-4">
                                 <div>
-                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Số tiền muốn nạp</label>
+                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Số tiền tiết kiệm (VNĐ)</label>
                                     <input
                                         type="number"
                                         autoFocus
+                                        required
                                         value={depositAmount}
                                         onChange={(e) => setDepositAmount(e.target.value)}
-                                        placeholder="Nhập số tiền..."
-                                        className="w-full p-4 bg-sky-50 rounded-xl border-2 border-sky-100 text-sky-700 text-lg font-bold outline-none focus:border-sky-500 transition-colors mt-2"
+                                        placeholder="Nhập hoặc chọn số tiền..."
+                                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 text-gray-800 text-lg font-bold outline-none focus:border-sky-500 transition-colors mt-1"
                                     />
-                                    <div className="flex justify-end mt-1 text-xs text-gray-400">
+                                    {/* Quick preset buttons */}
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                        {[50000, 100000, 200000, 500000, 1000000].map((preset) => (
+                                            <button
+                                                key={preset}
+                                                type="button"
+                                                onClick={() => {
+                                                    const current = Number(depositAmount) || 0;
+                                                    setDepositAmount((current + preset).toString());
+                                                }}
+                                                className="px-2.5 py-1 bg-gray-100 hover:bg-sky-100 hover:text-sky-700 text-gray-700 text-xs font-bold rounded-lg transition-colors"
+                                            >
+                                                +{preset >= 1000000 ? `${preset / 1000000}M` : `${preset / 1000}k`}
+                                            </button>
+                                        ))}
+                                        {depositAmount && Number(depositAmount) > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setDepositAmount('')}
+                                                className="px-2 py-1 bg-rose-50 text-rose-600 text-xs font-bold rounded-lg hover:bg-rose-100"
+                                            >
+                                                Xóa
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="flex justify-end mt-1 text-xs text-sky-600 font-bold">
                                         {depositAmount && !isNaN(Number(depositAmount)) && formatCurrency(Number(depositAmount), lang)}
                                     </div>
                                 </div>
+
+                                <div>
+                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Ngày nạp</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={depositDate}
+                                        onChange={(e) => setDepositDate(e.target.value)}
+                                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-medium mt-1"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Ghi chú (Tùy chọn)</label>
+                                    <input
+                                        type="text"
+                                        value={depositNote}
+                                        onChange={(e) => setDepositNote(e.target.value)}
+                                        placeholder="Ví dụ: Nạp thói quen hàng ngày..."
+                                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-medium mt-1"
+                                    />
+                                </div>
+
+                                {state.wallets && state.wallets.length > 0 && (
+                                    <div>
+                                        <label className="text-xs text-gray-500 uppercase font-bold ml-1">Trích từ Ví tài chính (Tự động trừ ví)</label>
+                                        <select
+                                            value={depositWalletId}
+                                            onChange={(e) => setDepositWalletId(e.target.value)}
+                                            className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-medium mt-1"
+                                        >
+                                            <option value="">-- Không trích ví (Chỉ lưu số dư mục tiêu) --</option>
+                                            {state.wallets.map(w => (
+                                                <option key={w.id} value={w.id}>
+                                                    {w.name} ({formatCurrency(w.balance, lang)})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
 
                                 <div className="flex gap-3 pt-2">
                                     <button
@@ -2626,12 +3057,351 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 py-3 bg-sky-600 text-white rounded-xl font-bold shadow-lg shadow-sky-200 hover:bg-sky-700 transition"
+                                        className="flex-1 py-3 bg-sky-600 text-white rounded-xl font-bold hover:bg-sky-700 transition"
                                     >
-                                        Xác nhận
+                                        Lưu khoản nạp
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Direct Balance Adjustment Modal */}
+            {
+                isAdjustBalanceModalOpen && selectedGoalForAdjust && (
+                    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setIsAdjustBalanceModalOpen(false)}>
+                        <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-4">
+                                <div>
+                                    <h3 className="font-bold text-lg text-gray-800">Điều chỉnh số dư tích lũy</h3>
+                                    <p className="text-xs text-gray-500 line-clamp-1">Mục tiêu: {selectedGoalForAdjust.title}</p>
+                                </div>
+                                <button onClick={() => setIsAdjustBalanceModalOpen(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+                            </div>
+
+                            <form onSubmit={handleAdjustBalanceSubmit} className="space-y-4">
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 font-medium">
+                                    Số dư hiện tại: <b>{formatCurrency(selectedGoalForAdjust.current_amount || 0, lang)}</b>. Bạn có thể sửa trực tiếp số tiền tích lũy thực tế ở bên dưới.
+                                </div>
+
+                                <div>
+                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Số tiền tích lũy mới (VNĐ)</label>
+                                    <input
+                                        type="number"
+                                        autoFocus
+                                        required
+                                        value={adjustNewAmount}
+                                        onChange={(e) => setAdjustNewAmount(e.target.value)}
+                                        placeholder="Nhập số tiền tích lũy mới..."
+                                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 text-gray-800 text-lg font-bold outline-none focus:border-sky-500 transition-colors mt-1"
+                                    />
+                                    <div className="flex justify-end mt-1 text-xs text-sky-600 font-bold">
+                                        {adjustNewAmount && !isNaN(Number(adjustNewAmount)) && formatCurrency(Number(adjustNewAmount), lang)}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs text-gray-500 uppercase font-bold ml-1">Lý do điều chỉnh (Tùy chọn)</label>
+                                    <input
+                                        type="text"
+                                        value={adjustReason}
+                                        onChange={(e) => setAdjustReason(e.target.value)}
+                                        placeholder="Ví dụ: Kiểm đếm lại heo đất, đính chính..."
+                                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-medium mt-1"
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAdjustBalanceModalOpen(false)}
+                                        className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition"
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-3 bg-sky-600 text-white rounded-xl font-bold hover:bg-sky-700 transition"
+                                    >
+                                        Cập nhật số dư
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Savings Analytics & History Modal */}
+            {
+                isSavingHistoryModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setIsSavingHistoryModalOpen(false)}>
+                        <div className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-lg flex flex-col max-h-[88vh]" onClick={(e) => e.stopPropagation()}>
+                            {/* Modal Header */}
+                            <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+                                <div>
+                                    <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                                        <PiggyBank className="text-sky-600" /> Thống Kê & Lịch Sử Tiết Kiệm
+                                    </h3>
+                                    <p className="text-xs text-gray-500">
+                                        Báo cáo tổng quan tiến độ thói quen và danh sách các khoản nạp
+                                    </p>
+                                </div>
+                                <button onClick={() => setIsSavingHistoryModalOpen(false)}>
+                                    <X size={20} className="text-gray-400 hover:text-gray-600" />
+                                </button>
+                            </div>
+
+                            {/* Tab Switcher */}
+                            <div className="flex border-b border-gray-200 mt-3">
+                                <button
+                                    onClick={() => setSavingsModalTab('analytics')}
+                                    className={`px-4 py-2 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-colors ${
+                                        savingsModalTab === 'analytics'
+                                            ? 'border-sky-600 text-sky-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                    <BarChart2 size={14} /> Thống kê chi tiết
+                                </button>
+                                <button
+                                    onClick={() => setSavingsModalTab('history')}
+                                    className={`px-4 py-2 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-colors ${
+                                        savingsModalTab === 'history'
+                                            ? 'border-sky-600 text-sky-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                    <History size={14} /> Lịch sử nạp ({savingsLogs.length})
+                                </button>
+                            </div>
+
+                            {/* TAB 1: ANALYTICS OVERVIEW */}
+                            {savingsModalTab === 'analytics' && (
+                                <div className="flex-1 overflow-y-auto py-4 space-y-4 scrollbar-thin">
+                                    {/* Top KPIs Grid */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                        <div className="p-3 bg-sky-50 rounded-xl border border-sky-100">
+                                            <div className="text-[11px] text-sky-700 font-semibold">Tổng tích lũy</div>
+                                            <div className="text-sm sm:text-base font-extrabold text-sky-800 mt-0.5">
+                                                {formatCurrency(monthlySavingsStats.totalAccumulated, lang)}
+                                            </div>
+                                        </div>
+                                        <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                                            <div className="text-[11px] text-emerald-700 font-semibold">Nạp tháng này</div>
+                                            <div className="text-sm sm:text-base font-extrabold text-emerald-800 mt-0.5">
+                                                {formatCurrency(monthlySavingsStats.totalSavedThisMonth, lang)}
+                                            </div>
+                                        </div>
+                                        <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                                            <div className="text-[11px] text-indigo-700 font-semibold">Số ngày nạp</div>
+                                            <div className="text-sm sm:text-base font-extrabold text-indigo-800 mt-0.5">
+                                                {monthlySavingsStats.savedDaysCount} ngày
+                                            </div>
+                                        </div>
+                                        <div className="p-3 bg-amber-50 rounded-xl border border-amber-100">
+                                            <div className="text-[11px] text-amber-700 font-semibold">Trung bình/lần</div>
+                                            <div className="text-sm sm:text-base font-extrabold text-amber-800 mt-0.5">
+                                                {formatCurrency(monthlySavingsStats.avgPerLog, lang)}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Monthly Savings Comparison Bar Chart */}
+                                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                                        <h4 className="text-xs font-bold uppercase text-gray-700 mb-2 flex items-center gap-1.5">
+                                            <BarChart2 size={14} className="text-sky-600" />
+                                            <span>So sánh tiết kiệm giữa các tháng</span>
+                                        </h4>
+                                        <div className="h-48 w-full mt-2">
+                                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                                                <BarChart data={monthlySavingsComparisonChartData}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 11 }} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={(value) => value >= 1000000 ? `${value / 1000000}M` : value >= 1000 ? `${value / 1000}k` : `${value}`} />
+                                                    <Tooltip
+                                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                                        formatter={(value: number | undefined) => [formatCurrency(value || 0, lang), 'Tiết kiệm']}
+                                                    />
+                                                    <Bar dataKey="amount" name="Tiền tiết kiệm" fill="#0EA5E9" radius={[6, 6, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+
+                                    {/* Overall Goal Progress Summary */}
+                                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <span className="text-xs font-bold text-gray-700">Tổng tiến độ hoàn thành các mục tiêu:</span>
+                                            <span className="text-xs font-bold text-sky-600">
+                                                {monthlySavingsStats.overallProgressPercent}%
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                                            <div
+                                                className="bg-sky-500 h-full rounded-full transition-all duration-500"
+                                                style={{ width: `${monthlySavingsStats.overallProgressPercent}%` }}
+                                            ></div>
+                                        </div>
+                                        <div className="flex justify-between text-[11px] text-gray-500 mt-1.5">
+                                            <span>Đã có: {formatCurrency(monthlySavingsStats.totalAccumulated, lang)}</span>
+                                            <span>Mục tiêu: {formatCurrency(monthlySavingsStats.totalTarget, lang)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Per Goal Breakdown */}
+                                    <div>
+                                        <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Chi tiết từng quỹ tiết kiệm</h4>
+                                        <div className="space-y-2">
+                                            {state.goals.filter(g => g.type === 'FINANCIAL').map(g => {
+                                                const pct = Math.round(((g.current_amount || 0) / (g.target_amount || 1)) * 100);
+                                                return (
+                                                    <div key={g.id} className="p-3 bg-white border border-gray-200 rounded-xl">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="text-xs font-bold text-gray-800">{g.title}</span>
+                                                            <span className="text-xs font-bold text-sky-600">{pct}%</span>
+                                                        </div>
+                                                        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden mb-1">
+                                                            <div className="bg-sky-500 h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%` }}></div>
+                                                        </div>
+                                                        <div className="flex justify-between text-[11px] text-gray-500">
+                                                            <span>Đã nạp: {formatCurrency(g.current_amount || 0, lang)}</span>
+                                                            <span>Còn thiếu: {formatCurrency(Math.max((g.target_amount || 0) - (g.current_amount || 0), 0), lang)}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TAB 2: HISTORY LOGS */}
+                            {savingsModalTab === 'history' && (
+                                <div className="flex-1 flex flex-col min-h-0 py-3">
+                                    {/* Filter bar */}
+                                    <div className="pb-3 flex gap-2 border-b border-gray-100">
+                                        <select
+                                            value={historyGoalFilter}
+                                            onChange={(e) => setHistoryGoalFilter(e.target.value)}
+                                            className="p-2 bg-gray-50 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 outline-none flex-1"
+                                        >
+                                            <option value="all">-- Tất cả mục tiêu --</option>
+                                            {state.goals.filter(g => g.type === 'FINANCIAL').map(g => (
+                                                <option key={g.id} value={g.id}>{g.title}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Logs list */}
+                                    <div className="flex-1 overflow-y-auto py-3 space-y-3 scrollbar-thin">
+                                        {savingsLogs
+                                            .filter(l => historyGoalFilter === 'all' || l.goal_id === historyGoalFilter)
+                                            .map(log => {
+                                                const parentGoal = state.goals.find(g => g.id === log.goal_id);
+                                                const isEditingThis = editingLog?.id === log.id;
+
+                                                return (
+                                                    <div key={log.id} className="p-3.5 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition-colors">
+                                                        {isEditingThis ? (
+                                                            <form onSubmit={handleUpdateLogSubmit} className="space-y-3 p-1">
+                                                                <div className="font-bold text-xs text-indigo-600">Chỉnh sửa khoản nạp:</div>
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <input
+                                                                        type="number"
+                                                                        required
+                                                                        value={editLogAmount}
+                                                                        onChange={(e) => setEditLogAmount(e.target.value)}
+                                                                        placeholder="Số tiền..."
+                                                                        className="p-2 bg-white rounded-lg border border-gray-200 text-xs font-bold"
+                                                                    />
+                                                                    <input
+                                                                        type="date"
+                                                                        required
+                                                                        value={editLogDate}
+                                                                        onChange={(e) => setEditLogDate(e.target.value)}
+                                                                        className="p-2 bg-white rounded-lg border border-gray-200 text-xs"
+                                                                    />
+                                                                </div>
+                                                                <input
+                                                                    type="text"
+                                                                    value={editLogNote}
+                                                                    onChange={(e) => setEditLogNote(e.target.value)}
+                                                                    placeholder="Ghi chú..."
+                                                                    className="w-full p-2 bg-white rounded-lg border border-gray-200 text-xs"
+                                                                />
+                                                                <div className="flex justify-end gap-2 pt-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setEditingLog(null)}
+                                                                        className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold"
+                                                                    >
+                                                                        Hủy
+                                                                    </button>
+                                                                    <button
+                                                                        type="submit"
+                                                                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold"
+                                                                    >
+                                                                        Lưu lại
+                                                                    </button>
+                                                                </div>
+                                                            </form>
+                                                        ) : (
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`font-bold text-sm ${log.amount < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                                            {log.amount > 0 ? '+' : ''}{formatCurrency(log.amount, lang)}
+                                                                        </span>
+                                                                        <span className="text-[11px] px-2 py-0.5 bg-gray-200/60 text-gray-700 font-medium rounded-md">
+                                                                            {new Date(log.date).toLocaleDateString('vi-VN')}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-600 font-medium mt-0.5">
+                                                                        {log.note || 'Ghi nhận tiết kiệm'}
+                                                                    </div>
+                                                                    {historyGoalFilter === 'all' && parentGoal && (
+                                                                        <div className="text-[10px] text-gray-400 mt-0.5">
+                                                                            Mục tiêu: {parentGoal.title}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex items-center gap-1">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingLog(log);
+                                                                            setEditLogAmount(log.amount.toString());
+                                                                            setEditLogDate(log.date);
+                                                                            setEditLogNote(log.note || '');
+                                                                        }}
+                                                                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition"
+                                                                    >
+                                                                        <Edit2 size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteLog(log.id, log.goal_id)}
+                                                                        className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-white rounded-lg transition"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+
+                                        {savingsLogs.filter(l => historyGoalFilter === 'all' || l.goal_id === historyGoalFilter).length === 0 && (
+                                            <div className="text-center py-10 text-gray-400 italic text-sm">
+                                                Chưa có lịch sử nạp tiền nào.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )

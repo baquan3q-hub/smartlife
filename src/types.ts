@@ -130,11 +130,22 @@ export interface Goal {
   title: string;
   target_amount?: number; // Có thể null nếu chỉ là mục tiêu text
   current_amount?: number;
+  monthly_target?: number; // Mục tiêu tiết kiệm hàng tháng cho thói quen tiết kiệm
   deadline: string;
   type?: 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM' | 'FINANCIAL' | 'PERSONAL';
   is_priority?: boolean;
   progress?: number;
   status?: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED';
+  created_at?: string;
+}
+
+export interface SavingsLog {
+  id: string;
+  user_id?: string;
+  goal_id: string;
+  amount: number;
+  date: string; // YYYY-MM-DD
+  note?: string;
   created_at?: string;
 }
 

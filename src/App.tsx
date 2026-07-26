@@ -528,7 +528,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         wallet_id: t.wallet_id || null,
                         debt_id: t.debt_id || null,
                     })),
-                    goals: goalRes.data || [],
+                    goals: (goalRes.data || []).map((g: any) => ({
+                        ...g,
+                        monthly_target: g.monthly_target ?? (Number(localStorage.getItem(`goal_monthly_target_${g.id}`)) || 0)
+                    })),
                     budgets: budgetRes.data || [],
                     timetable: timeRes.data || [],
                     todos: shouldSkipTodos ? prev.todos : (todoRes.data || []).map((t: any) => ({
@@ -1081,10 +1084,43 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         const tempId = Date.now().toString();
         const optimisticGoal = { ...newGoal, id: tempId, user_id: user.id };
         setAppState((prev: AppState) => ({ ...prev, goals: [...prev.goals, optimisticGoal] }));
+        
+        if (newGoal.monthly_target) {
+            try { localStorage.setItem(`goal_monthly_target_${tempId}`, newGoal.monthly_target.toString()); } catch (e) {}
+        }
+
         try {
             const { data, error } = await supabase.from('goals').insert([{ user_id: user.id, ...newGoal }]).select().single();
-            if (error) throw error;
-            if (data) setAppState((prev: AppState) => ({ ...prev, goals: prev.goals.map(g => g.id === tempId ? data : g) }));
+            if (error) {
+                // If database schema cache is missing 'monthly_target' column, strip it and retry insert
+                if (error.message?.includes('monthly_target') || error.message?.includes('schema cache')) {
+                    const { monthly_target, ...fallbackPayload } = newGoal;
+                    const { data: retryData, error: retryError } = await supabase
+                        .from('goals')
+                        .insert([{ user_id: user.id, ...fallbackPayload }])
+                        .select()
+                        .single();
+                    
+                    if (retryError) throw retryError;
+                    if (retryData) {
+                        const finalGoal = { ...retryData, monthly_target: newGoal.monthly_target };
+                        if (retryData.id) {
+                            try { localStorage.setItem(`goal_monthly_target_${retryData.id}`, (newGoal.monthly_target || 0).toString()); } catch (e) {}
+                        }
+                        setAppState((prev: AppState) => ({ ...prev, goals: prev.goals.map(g => g.id === tempId ? finalGoal : g) }));
+                        return;
+                    }
+                } else {
+                    throw error;
+                }
+            }
+            if (data) {
+                const finalGoal = { ...data, monthly_target: newGoal.monthly_target || data.monthly_target };
+                if (data.id && newGoal.monthly_target) {
+                    try { localStorage.setItem(`goal_monthly_target_${data.id}`, newGoal.monthly_target.toString()); } catch (e) {}
+                }
+                setAppState((prev: AppState) => ({ ...prev, goals: prev.goals.map(g => g.id === tempId ? finalGoal : g) }));
+            }
         } catch (error: any) {
             console.error(error);
             alert(`Lỗi thêm mục tiêu: ${error.message}`);
@@ -1095,12 +1131,32 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     const handleUpdateGoal = async (updatedGoal: any) => {
         const prevGoals = [...appState.goals];
         setAppState((prev: AppState) => ({ ...prev, goals: prev.goals.map(g => g.id === updatedGoal.id ? updatedGoal : g) }));
+        
+        if (updatedGoal.monthly_target !== undefined) {
+            try { localStorage.setItem(`goal_monthly_target_${updatedGoal.id}`, (updatedGoal.monthly_target || 0).toString()); } catch (e) {}
+        }
+
         try {
-            const { error } = await supabase.from('goals').update({
-                title: updatedGoal.title, target_amount: updatedGoal.target_amount, current_amount: updatedGoal.current_amount,
-                deadline: updatedGoal.deadline, type: updatedGoal.type, progress: updatedGoal.progress
-            }).eq('id', updatedGoal.id);
-            if (error) throw error;
+            const updatePayload: any = {
+                title: updatedGoal.title,
+                target_amount: updatedGoal.target_amount,
+                current_amount: updatedGoal.current_amount,
+                monthly_target: updatedGoal.monthly_target,
+                deadline: updatedGoal.deadline,
+                type: updatedGoal.type,
+                progress: updatedGoal.progress
+            };
+
+            const { error } = await supabase.from('goals').update(updatePayload).eq('id', updatedGoal.id);
+            if (error) {
+                if (error.message?.includes('monthly_target') || error.message?.includes('schema cache')) {
+                    delete updatePayload.monthly_target;
+                    const { error: retryError } = await supabase.from('goals').update(updatePayload).eq('id', updatedGoal.id);
+                    if (retryError) throw retryError;
+                } else {
+                    throw error;
+                }
+            }
         } catch (error: any) {
             console.error(error);
             alert(`Lỗi cập nhật mục tiêu: ${error.message}`);
