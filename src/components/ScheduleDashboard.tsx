@@ -42,6 +42,7 @@ interface ScheduleDashboardProps {
   activeTaskId?: string | null;
   onStartTracking?: (todo: Todo) => void;
   onRefresh?: () => Promise<void>;
+  onNavigate?: (tab: string, params?: any) => void;
 }
 
 const DISPLAY_DAYS = [
@@ -70,6 +71,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   activeTaskId = null,
   onStartTracking = () => {},
   onRefresh,
+  onNavigate,
 }) => {
   const { timetable, goals, todos } = state;
   const { timer, onOpenMusic, calendarEvents = [] } = state as any;
@@ -845,7 +847,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         <div className="flex flex-col gap-3 md:gap-4 w-full">
           <PomodoroWidget timer={timer} onOpenMusic={onOpenMusic} />
           <div className="flex-1">
-            <QuickNotesWidget userId={state.profile?.id || ''} />
+            <QuickNotesWidget userId={state.profile?.id || ''} onNavigate={onNavigate} />
           </div>
         </div>
 
