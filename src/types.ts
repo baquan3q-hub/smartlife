@@ -207,6 +207,37 @@ export interface QuickNote {
   created_at: string;
 }
 
+// Interface & Type cho Bộ nhớ Lưu trữ Ghi chú (Note Archive Hub)
+export type NoteLabelType = 'Work' | 'University' | 'Reminder' | 'Learning' | 'ToDo-List' | 'Ideas';
+
+export interface NoteArchive {
+  id: string;
+  user_id?: string;
+  title: string;
+  content: string;
+  labels: NoteLabelType[];
+  note_date: string; // YYYY-MM-DD
+  is_pinned?: boolean;
+  metadata?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface NoteArchiveFilter {
+  label?: NoteLabelType | 'All';
+  startDate?: string;
+  endDate?: string;
+  searchQuery?: string;
+  isPinnedOnly?: boolean;
+}
+
+export interface AISummaryRequest {
+  label: NoteLabelType | 'All';
+  startDate: string;
+  endDate: string;
+  timeframePreset?: 'today' | '3days' | '7days' | '30days' | 'this_month' | 'custom' | 'all';
+}
+
 // Interface cho Ngân sách (Budget)
 export interface BudgetConfig {
   id: string;

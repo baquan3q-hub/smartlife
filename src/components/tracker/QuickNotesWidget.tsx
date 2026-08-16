@@ -1,17 +1,32 @@
-import React, { useState, useEffect, useRef } from 'react';
+// File: src/components/tracker/QuickNotesWidget.tsx
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
-import { StickyNote, CloudLightning, Loader2, Save } from 'lucide-react';
+import {
+  StickyNote, Loader2, Save, Sparkles, BookOpen, Plus,
+  Check, ArrowRight, Layers, Tag
+} from 'lucide-react';
+import { noteArchiveService } from '../../services/noteArchiveService';
+import { SaveNoteModal } from './notes/SaveNoteModal';
+import { NotesArchiveModal } from './notes/NotesArchiveModal';
+import { AISummaryModal } from './notes/AISummaryModal';
 
 interface QuickNotesWidgetProps {
   userId: string;
+  onNavigate?: (tab: string, params?: any) => void;
 }
 
-export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) => {
+export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNavigate }) => {
   const [content, setContent] = useState('');
   const [noteId, setNoteId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [isLoading, setIsLoading] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Modals state
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [isAISumModalOpen, setIsAISumModalOpen] = useState(false);
+  const [archivedCount, setArchivedCount] = useState<number>(0);
 
   // Refs for tracking latest values to avoid stale closures in event listeners/cleanup
   const contentRef = useRef(content);
@@ -31,11 +46,24 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
     userIdRef.current = userId;
   }, [userId]);
 
+  // Load total archived notes count
+  const refreshArchivedCount = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const count = await noteArchiveService.getNotesCount(userId);
+      setArchivedCount(count);
+    } catch {
+      // Ignore count errors
+    }
+  }, [userId]);
+
   // Fetch or initialize quick note
   const loadQuickNote = async () => {
     if (!userId) return;
     setIsLoading(true);
     try {
+      refreshArchivedCount();
+
       // Find the sticky note titled 'Quick Note'
       const { data, error } = await supabase
         .from('my_storage')
@@ -58,21 +86,18 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
         noteIdRef.current = dbId;
 
         if (isUnsaved && localContent !== null && localContent !== dbContent) {
-          // If we have newer unsaved local content, use it and push it to Supabase
           setContent(localContent);
           setSyncStatus('saving');
           hasUnsavedChangesRef.current = true;
-          // Trigger immediate save to Supabase
           saveNoteToDb(localContent, dbId);
         } else {
-          // Otherwise, sync DB content to local state and local storage
           setContent(dbContent);
           setSyncStatus('saved');
           localStorage.setItem(`smartlife_quicknote_${userId}`, dbContent);
           localStorage.setItem(`smartlife_quicknote_unsaved_${userId}`, 'false');
         }
       } else {
-        // Create a default quick note if not found
+        // Create default scratchpad
         const { data: newNote, error: createError } = await supabase
           .from('my_storage')
           .insert([
@@ -99,7 +124,6 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
       }
     } catch (err) {
       console.error('Lỗi tải Ghi chú nhanh:', err);
-      // Fallback to localStorage if Supabase query fails
       const localNotes = localStorage.getItem(`smartlife_quicknote_${userId}`);
       if (localNotes) {
         setContent(localNotes);
@@ -136,7 +160,6 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
         hasUnsavedChangesRef.current = false;
         localStorage.setItem(`smartlife_quicknote_unsaved_${currentUserId}`, 'false');
       } else {
-        // Fallback: Create if noteId is not yet loaded
         const { data, error } = await supabase
           .from('my_storage')
           .insert([
@@ -171,13 +194,11 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
     setSyncStatus('saving');
     hasUnsavedChangesRef.current = true;
 
-    // Save to localStorage immediately on keystroke as a backup
     if (userId) {
       localStorage.setItem(`smartlife_quicknote_${userId}`, text);
       localStorage.setItem(`smartlife_quicknote_unsaved_${userId}`, 'true');
     }
 
-    // Debounce database save (1.2 seconds of inactivity)
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
@@ -188,7 +209,6 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
   };
 
   const handleBlur = () => {
-    // If there are unsaved changes, save immediately when focus is lost
     if (hasUnsavedChangesRef.current) {
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
@@ -210,13 +230,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-
-      // Cleanup timer
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-
-      // Save any pending changes
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
       if (hasUnsavedChangesRef.current) {
         saveNoteToDb(contentRef.current, noteIdRef.current);
       }
@@ -229,57 +243,164 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId }) =>
     return trimmed.split(/\s+/).length;
   };
 
+  // Callback khi lưu thẻ ghi chú vào bộ nhớ
+  const handleNoteArchived = (clearedScratchpad: boolean) => {
+    refreshArchivedCount();
+    if (clearedScratchpad) {
+      setContent('');
+      contentRef.current = '';
+      if (userId) {
+        localStorage.setItem(`smartlife_quicknote_${userId}`, '');
+      }
+      saveNoteToDb('', noteIdRef.current);
+    }
+  };
+
+  // Callback khi nạp lại ghi chú từ kho vào bảng nháp
+  const handleRestoreToScratchpad = (restoredText: string) => {
+    const newContent = content.trim() ? `${content.trim()}\n\n---\n${restoredText}` : restoredText;
+    setContent(newContent);
+    contentRef.current = newContent;
+    if (userId) {
+      localStorage.setItem(`smartlife_quicknote_${userId}`, newContent);
+    }
+    saveNoteToDb(newContent, noteIdRef.current);
+  };
+
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 p-2.5 shadow-sm relative overflow-hidden flex flex-col h-full min-h-[300px]">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-          <StickyNote size={16} className="text-slate-700" />
-          Ghi chú
-        </h3>
-
-        <div className="flex items-center gap-3">
-          {/* Word count */}
-          <span className="text-[10px] font-bold text-slate-400">
-            {getWordCount(content)} từ
-          </span>
-
-          {/* Sync Status Badge */}
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold">
-            {isLoading ? (
-              <span className="text-slate-400 flex items-center gap-1">
-                <Loader2 size={10} className="animate-spin" />
-                Đang tải...
-              </span>
-            ) : syncStatus === 'saving' ? (
-              <span className="text-slate-500 flex items-center gap-1">
-                <Loader2 size={10} className="animate-spin" />
-                Tự động lưu...
-              </span>
-            ) : syncStatus === 'saved' ? (
-              <span className="text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100/50">
-                Đã lưu
-              </span>
-            ) : syncStatus === 'error' ? (
-              <span className="text-rose-605 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100/50">
-                Lưu máy (Offline)
-              </span>
-            ) : null}
+    <div className="bg-white rounded-3xl border border-slate-100 p-3 shadow-sm relative overflow-hidden flex flex-col h-full min-h-[340px]">
+      
+      {/* Header with Title & Action Badges */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 shadow-xs">
+            <StickyNote size={15} />
           </div>
+          <div>
+            <h3 className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
+              Ghi chú
+            </h3>
+          </div>
+        </div>
+
+        {/* Action Buttons Toolbar on Header */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          {/* Nút ✨ AI Sum */}
+          <button
+            onClick={() => setIsAISumModalOpen(true)}
+            title="Tóm tắt nội dung ghi chú bằng AI"
+            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-[10.5px] shadow-xs flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+          >
+            <Sparkles size={11} className="text-amber-300" />
+            <span>AI Sum</span>
+          </button>
+
+          {/* Nút 📁 Bộ nhớ (CRUDS) */}
+          <button
+            onClick={() => setIsArchiveModalOpen(true)}
+            title="Xem và quản lý kho ghi chú đã lưu"
+            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] border border-slate-200/60 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+          >
+            <BookOpen size={11} className="text-slate-600" />
+            <span>Bộ nhớ</span>
+            {archivedCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center">
+                {archivedCount > 99 ? '99+' : archivedCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Note Area */}
-      <div className="flex-1 min-h-0 bg-slate-50/50 rounded-2xl border border-slate-100 p-3.5 shadow-inner mt-1">
+      {/* Secondary Meta Row: Word count & Sync Status */}
+      <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold px-1 mb-1.5">
+        <span className="flex items-center gap-1 text-slate-400">
+          {getWordCount(content)} từ • Bảng nháp tự do
+        </span>
+
+        <div className="flex items-center gap-1">
+          {isLoading ? (
+            <span className="text-slate-400 flex items-center gap-1">
+              <Loader2 size={10} className="animate-spin" />
+              Đang tải...
+            </span>
+          ) : syncStatus === 'saving' ? (
+            <span className="text-slate-500 flex items-center gap-1">
+              <Loader2 size={10} className="animate-spin text-indigo-500" />
+              Tự lưu...
+            </span>
+          ) : syncStatus === 'saved' ? (
+            <span className="text-emerald-600 flex items-center gap-0.5 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100/60 font-bold text-[9.5px]">
+              <Check size={10} />
+              Đã lưu nháp
+            </span>
+          ) : syncStatus === 'error' ? (
+            <span className="text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-100/60 text-[9.5px]">
+              Offline
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Note Editable Textarea Area */}
+      <div className="flex-1 min-h-[140px] bg-slate-50/70 rounded-2xl border border-slate-100 p-3 shadow-inner relative group focus-within:bg-white focus-within:border-indigo-200 transition-colors">
         <textarea
           value={content}
           onChange={handleChange}
           onBlur={handleBlur}
           disabled={isLoading}
-          placeholder={isLoading ? "Đang tải dữ liệu..." : "Ý tưởng đột xuất, ghi chú nhanh bài học... Gõ vào đây sẽ tự động lưu."}
-          className="w-full h-full text-xs bg-transparent text-slate-750 placeholder-slate-400 focus:outline-none resize-none font-medium leading-relaxed"
+          placeholder={isLoading ? "Đang tải dữ liệu..." : "Ý tưởng đột xuất, ghi chú cuộc họp nhanh, to-do list... Gõ vào đây sẽ tự động lưu nháp."}
+          className="w-full h-full text-xs bg-transparent text-slate-800 placeholder-slate-400 focus:outline-none resize-none font-medium leading-relaxed"
         />
       </div>
+
+      {/* Footer Action Bar: Nút Icon "Lưu vào bộ nhớ" */}
+      <div className="pt-2 flex items-center justify-end border-t border-slate-100/80 mt-1.5">
+        <button
+          type="button"
+          onClick={() => setIsSaveModalOpen(true)}
+          disabled={!content.trim() || isLoading}
+          title="Lưu vào bộ nhớ ghi chú (Ctrl + Enter)"
+          className="p-1.5 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-600 border border-indigo-200/60 shadow-xs flex items-center justify-center transition-all active:scale-90 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+        >
+          <Save size={14} />
+        </button>
+      </div>
+
+      {/* Modal 1: Lưu vào bộ nhớ */}
+      <SaveNoteModal
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+        initialContent={content}
+        userId={userId}
+        onSaved={handleNoteArchived}
+      />
+
+      {/* Modal 2: Quản lý Kho Lưu Trữ Ghi Chú (CRUDS) */}
+      <NotesArchiveModal
+        isOpen={isArchiveModalOpen}
+        onClose={() => {
+          setIsArchiveModalOpen(false);
+          refreshArchivedCount();
+        }}
+        userId={userId}
+        onRestoreToScratchpad={handleRestoreToScratchpad}
+        onOpenAISum={() => setIsAISumModalOpen(true)}
+        onOpenNewNote={() => setIsSaveModalOpen(true)}
+      />
+
+      {/* Modal 3: Tóm tắt thông minh bằng AI (AI Sum) */}
+      <AISummaryModal
+        isOpen={isAISumModalOpen}
+        onClose={() => setIsAISumModalOpen(false)}
+        userId={userId}
+        onOpenAIAdvisor={(convId) => {
+          if (onNavigate) {
+            onNavigate('ai-advisor', { conversationId: convId });
+          }
+        }}
+      />
+
     </div>
   );
 };

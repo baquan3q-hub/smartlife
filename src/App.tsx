@@ -1888,6 +1888,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             activeTaskId={taskTracker.activeTask?.id || null}
                             onStartTracking={taskTracker.startTracking}
                             onRefresh={async () => { await fetchData(true); }}
+                            onNavigate={(tab: any) => setActiveTab(tab)}
                         />
                     )}
                     {deferredTab === 'gpa' && (

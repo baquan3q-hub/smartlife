@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartLife Quick Note</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="extension-container">
+    
+    <!-- Top Header -->
+    <header class="header">
+      <div class="logo-group">
+        <img src="../icons/icon48.png" alt="SmartLife" width="28" height="28" style="border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <div>
+          <h1 class="app-title">SmartLife Notes</h1>
+          <p class="app-subtitle" id="authStatusText">Đang kiểm tra kết nối...</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btnOpenWeb" class="icon-btn" title="Mở SmartLife Web App">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        </button>
+        <button id="btnToggleAuth" class="icon-btn" title="Tài khoản / Đăng nhập">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        </button>
+        <button id="btnLogout" class="icon-btn hidden" title="Đăng xuất khỏi Extension">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Quick 1-Click Sync Banner (Shown if not logged in) -->
+    <div id="quickSyncBanner" class="quick-sync-banner hidden">
+      <div class="sync-banner-content">
+        <span>⚡ Chưa kết nối tài khoản?</span>
+        <button id="btnAutoSyncTab" class="btn-sync-auto">Đồng bộ 1 chạm từ tab Web</button>
+      </div>
+    </div>
+
+    <!-- Login Panel (Collapsible) -->
+    <div id="loginPanel" class="login-panel hidden">
+      <div class="login-header">
+        <h3>Đăng nhập SmartLife</h3>
+        <button id="btnCloseLogin" class="close-btn">&times;</button>
+      </div>
+      
+      <!-- Option 1: 1-click Auto Sync from active tab -->
+      <button type="button" id="btnAutoSyncInside" class="btn-auto-sync-inside">
+        ⚡ Tự động nhận đăng nhập từ tab SmartLife đang mở
+      </button>
+      
+      <div class="divider-text"><span>hoặc nhập mật khẩu</span></div>
+
+      <form id="loginForm">
+        <input type="email" id="loginEmail" placeholder="Email của bạn" required class="input-field">
+        <input type="password" id="loginPassword" placeholder="Mật khẩu" required class="input-field">
+        <button type="submit" id="btnLoginSubmit" class="btn-primary">Đăng nhập</button>
+        <p id="loginError" class="error-text hidden"></p>
+      </form>
+    </div>
+
+    <!-- Main Note Form -->
+    <main class="main-content">
+      
+      <!-- Current Page Context Tag -->
+      <div id="pageContextBox" class="page-context-box">
+        <div class="context-info">
+          <span class="context-icon">🌐</span>
+          <span id="currentTabTitle" class="context-title">Đang lấy tiêu đề web...</span>
+        </div>
+        <label class="checkbox-label" title="Đính kèm link nguồn này vào cuối ghi chú">
+          <input type="checkbox" id="chkAttachSource" checked>
+          <span>Kèm nguồn</span>
+        </label>
+      </div>
+
+      <!-- Note Content Textarea -->
+      <div class="textarea-wrapper">
+        <textarea 
+          id="noteContent" 
+          placeholder="Ý tưởng, việc cần làm, tóm tắt cuộc họp... (Ctrl + Enter để lưu nhanh)"
+          rows="5"
+          autofocus
+        ></textarea>
+        <div class="word-count" id="wordCount">0 từ</div>
+      </div>
+
+      <!-- Label Selector -->
+      <div class="labels-section">
+        <label class="section-label">Gán nhãn phân loại:</label>
+        <div class="labels-grid" id="labelsGrid">
+          <button type="button" class="label-pill active" data-label="Work">💼 Work</button>
+          <button type="button" class="label-pill" data-label="University">🎓 University</button>
+          <button type="button" class="label-pill" data-label="Reminder">⏰ Reminder</button>
+          <button type="button" class="label-pill" data-label="Learning">📚 Learning</button>
+          <button type="button" class="label-pill" data-label="ToDo-List">📋 ToDo-List</button>
+          <button type="button" class="label-pill" data-label="Ideas">💡 Ideas</button>
+        </div>
+      </div>
+
+      <!-- Destination Option -->
+      <div class="dest-section">
+        <label class="dest-option">
+          <input type="radio" name="saveDest" value="archive" checked>
+          <span>Lưu vào Kho Bộ nhớ (Note Archives)</span>
+        </label>
+        <label class="dest-option">
+          <input type="radio" name="saveDest" value="scratchpad">
+          <span>Ghi vào Bảng nháp Widget (Quick Note)</span>
+        </label>
+      </div>
+
+      <!-- Action Footer -->
+      <div class="footer-actions">
+        <button id="btnSaveNote" class="btn-save">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+          <span id="btnSaveText">Lưu ghi chú</span>
+        </button>
+      </div>
+
+      <!-- Status / Toast Message -->
+      <div id="statusToast" class="status-toast hidden"></div>
+    </main>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
