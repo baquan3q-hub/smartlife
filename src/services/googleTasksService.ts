@@ -47,6 +47,7 @@ export interface GoogleTasksSyncResult {
 const STORAGE_KEYS = {
   CLIENT_ID: 'smartlife_gtasks_client_id',
   ACCESS_TOKEN: 'smartlife_gtasks_access_token',
+  REFRESH_TOKEN: 'smartlife_gtasks_refresh_token',
   EXPIRES_AT: 'smartlife_gtasks_expires_at',
   LIST_ID: 'smartlife_gtasks_list_id',
   LIST_TITLE: 'smartlife_gtasks_list_title',
@@ -90,7 +91,7 @@ export const getStoredAccessToken = (): string | null => {
     if (cachedSessionStr) {
       const cachedSession = JSON.parse(cachedSessionStr);
       if (cachedSession?.provider_token) {
-        saveGoogleToken(cachedSession.provider_token, 3600);
+        saveGoogleToken(cachedSession.provider_token, cachedSession.expires_in || 3600, cachedSession.provider_refresh_token);
         return cachedSession.provider_token;
       }
     }
@@ -103,11 +104,14 @@ export const isGoogleTasksConnected = (): boolean => {
   return getStoredAccessToken() !== null;
 };
 
-export const saveGoogleToken = (token: string, expiresInSeconds: number): void => {
+export const saveGoogleToken = (token: string, expiresInSeconds: number, refreshToken?: string): void => {
   if (typeof window === 'undefined') return;
   const expiresAt = Date.now() + expiresInSeconds * 1000;
   localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
   localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, expiresAt.toString());
+  if (refreshToken && refreshToken.trim()) {
+    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken.trim());
+  }
   window.dispatchEvent(new CustomEvent('google_tasks_auth_changed'));
 };
 
@@ -115,6 +119,7 @@ export const disconnectGoogleTasks = (): void => {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.EXPIRES_AT);
+  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   window.dispatchEvent(new CustomEvent('google_tasks_auth_changed'));
 };
 
@@ -918,7 +923,27 @@ export const syncTodoMutationToGoogle = async (
     // 2. Thao tác UPDATE (Đã có google_task_id)
     const currentListId = todo.google_list_id || targetListId;
 
-    // Kiểm tra xem có cần chuyển sang list khác không (ví dụ: Doing -> Done, Backlog -> Doing, hoặc targetListId !== currentListId)
+    // Khi hoàn thành task (Done), cập nhật trực tiếp status = 'completed' trên Google Tasks
+    if (isDone) {
+      await updateGoogleTask(
+        todo.google_task_id,
+        {
+          title: todo.content.trim(),
+          notes: formattedNotes || undefined,
+          due: todo.deadline || undefined,
+          status: 'completed',
+        },
+        currentListId,
+        accessToken
+      ).catch(() => {});
+
+      if (todo.subtasks) {
+        await syncSubtasksToGoogle(todo.google_task_id, currentListId, todo.subtasks as SubtaskItem[], accessToken).catch(() => {});
+      }
+      return;
+    }
+
+    // Kiểm tra xem có cần chuyển sang list khác không (ví dụ: Doing -> Backlog hoặc Todo -> Doing)
     if (targetListId !== currentListId) {
       // Di chuyển bằng cách tạo ở list mới và xóa ở list cũ
       const moved = await createGoogleTask(
@@ -1156,33 +1181,12 @@ export const syncGoogleTasksWithKanban = async (
       const parsedNotes = parseGoogleTaskNotes(gTask.notes);
 
       try {
-        // TRƯỜNG HỢP 1: Người dùng ấn Done / Complete trên Google Tasks (ở bất kỳ danh sách nào)
+        // TRƯỜNG HỢP 1: Người dùng ấn Hoàn thành trên Google Tasks (ở bất kỳ danh sách nào)
         if (isGoogleDone && !isLocalDone) {
           const completedAt = gTask.completed || gTask.updated || nowStr;
           // Ưu tiên đọc native subtasks (child tasks) từ Google
           const nativeSubtasks = readGoogleSubtasks(gTask.id, allGoogleRawTasks.filter(e => e.listId === currentListId).map(e => e.task));
           const finalSubtasks = nativeSubtasks.length > 0 ? nativeSubtasks : (parsedNotes.subtasks.length > 0 ? parsedNotes.subtasks : localTodo.subtasks);
-
-          let finalGoogleTaskId = gTask.id;
-          let finalGoogleListId = currentListId;
-
-          // Di chuyển task hoàn thành sang danh sách Done trên Google Tasks (nếu chưa ở trong Done)
-          if (doneListId && currentListId !== doneListId) {
-            try {
-              const movedTask = await createGoogleTask({
-                title: localTodo.content.trim(),
-                notes: gTask.notes,
-                due: gTask.due,
-                status: 'completed',
-              }, doneListId, token);
-              await deleteGoogleTask(gTask.id, currentListId, token).catch(() => {});
-              matchedGoogleTaskIds.add(movedTask.id);
-              finalGoogleTaskId = movedTask.id;
-              finalGoogleListId = doneListId;
-            } catch (e) {
-              console.warn('[GoogleTasks] Move completed task to Done list warning:', e);
-            }
-          }
 
           callbacks.onUpdateTodo({
             ...localTodo,
@@ -1192,116 +1196,96 @@ export const syncGoogleTasksWithKanban = async (
             deadline: gTask.due ? new Date(gTask.due).toISOString() : localTodo.deadline,
             description: parsedNotes.description || localTodo.description,
             subtasks: finalSubtasks,
-            google_task_id: finalGoogleTaskId,
-            google_list_id: finalGoogleListId,
-            google_synced_at: nowStr,
-          });
-          updatedCount++;
-        }
-        // TRƯỜNG HỢP 2: Người dùng mở lại task (uncomplete) trên Google Tasks
-        else if (!isGoogleDone && isLocalDone && gTask.updated && localTodo.completed_at && new Date(gTask.updated).getTime() > new Date(localTodo.completed_at).getTime()) {
-          const reopenedStatus = getKanbanStatusFromListName(listObj?.title || '', currentListId === myTasksListId);
-          // Ưu tiên đọc native subtasks (child tasks) từ Google
-          const nativeSubtasks2 = readGoogleSubtasks(gTask.id, allGoogleRawTasks.filter(e => e.listId === currentListId).map(e => e.task));
-          const finalSubtasks2 = nativeSubtasks2.length > 0 ? nativeSubtasks2 : (parsedNotes.subtasks.length > 0 ? parsedNotes.subtasks : localTodo.subtasks);
-          callbacks.onUpdateTodo({
-            ...localTodo,
-            status: reopenedStatus,
-            is_completed: false,
-            completed_at: null,
-            deadline: gTask.due ? new Date(gTask.due).toISOString() : localTodo.deadline,
-            description: parsedNotes.description || localTodo.description,
-            subtasks: finalSubtasks2,
             google_task_id: gTask.id,
             google_list_id: currentListId,
             google_synced_at: nowStr,
           });
           updatedCount++;
         }
-        // TRƯỜNG HỢP 3: Đồng bộ trạng thái và thông tin từ SmartLife sang Google Tasks
-        else {
-          const targetStatus = isLocalDone ? 'completed' : 'needsAction';
+        // TRƯỜNG HỢP 2: SmartLife là DONE (Người dùng đã hoàn thành task trên SmartLife)
+        // -> SmartLife là Master: Giữ nguyên trạng thái Done, ĐỒNG BỘ 'completed' sang Google Tasks (Tuyệt đối không revert về Doing)
+        else if (isLocalDone) {
           const formattedNotes = formatGoogleTaskNotes(localTodo.description, localTodo.subtasks as SubtaskItem[]);
 
-          // Nếu task nằm sai danh sách đích (ví dụ task Done chưa vào danh sách DONE, hoặc task Doing chưa vào My Tasks) -> di chuyển sang danh sách chuẩn
-          if (currentListId !== destListId) {
-            const movedTask = await createGoogleTask(
-              {
-                title: localTodo.content.trim(),
-                notes: formattedNotes || undefined,
-                due: localTodo.deadline || undefined,
-                status: targetStatus,
-              },
-              destListId,
-              token
-            );
-            await deleteGoogleTask(gTask.id, currentListId, token).catch(() => {});
-            matchedGoogleTaskIds.add(movedTask.id);
-
-            // Đồng bộ subtasks thật (child tasks) sang Google Tasks với cache có sẵn
-            if (localTodo.subtasks && (localTodo.subtasks as SubtaskItem[]).length > 0 && movedTask.id) {
-              const destCachedTasks = allGoogleRawTasks.filter(e => e.listId === destListId).map(e => e.task);
-              await syncSubtasksToGoogle(movedTask.id, destListId, localTodo.subtasks as SubtaskItem[], token, destCachedTasks).catch(() => {});
-            }
-
-            callbacks.onUpdateTodo({
-              ...localTodo,
-              google_task_id: movedTask.id,
-              google_list_id: destListId,
-              google_synced_at: nowStr,
-            });
-          } else {
-            // Cập nhật Google Tasks trong danh sách hiện tại
+          if (gTask.status !== 'completed') {
             await updateGoogleTask(
               gTask.id,
               {
-                title: localTodo.content.trim(),
+                status: 'completed',
                 notes: formattedNotes || undefined,
                 due: localTodo.deadline || undefined,
-                status: targetStatus,
               },
               currentListId,
               token
-            );
+            ).catch(() => {});
+          }
 
-            // Đồng bộ 2 chiều thời gian deadline và nhắc nhở
-            const gDueIso = gTask.due ? new Date(gTask.due).toISOString() : undefined;
-            const hasDueChangedOnGoogle = gDueIso && (!localTodo.deadline || new Date(gDueIso).getTime() !== new Date(localTodo.deadline).getTime());
+          if (!localTodo.google_task_id || localTodo.google_task_id !== gTask.id || localTodo.google_list_id !== currentListId) {
+            callbacks.onUpdateTodo({
+              ...localTodo,
+              status: 'done',
+              is_completed: true,
+              google_task_id: gTask.id,
+              google_list_id: currentListId,
+              google_synced_at: nowStr,
+            });
+          }
+          updatedCount++;
+        }
+        // TRƯỜNG HỢP 3: Cả hai đều chưa hoàn thành (Active tasks: Doing / Todo / Backlog)
+        else {
+          const formattedNotes = formatGoogleTaskNotes(localTodo.description, localTodo.subtasks as SubtaskItem[]);
 
-            if (hasDueChangedOnGoogle && gTask.updated && localTodo.google_synced_at && new Date(gTask.updated).getTime() > new Date(localTodo.google_synced_at).getTime()) {
-              callbacks.onUpdateTodo({
-                ...localTodo,
-                deadline: gDueIso,
-                email_notify: true,
-                email_notify_before_minutes: localTodo.email_notify_before_minutes || 60,
-                google_task_id: gTask.id,
-                google_list_id: currentListId,
-                google_synced_at: nowStr,
-              });
-            } else if (gTask.due && !localTodo.deadline) {
-              callbacks.onUpdateTodo({
-                ...localTodo,
-                deadline: new Date(gTask.due).toISOString(),
-                email_notify: true,
-                email_notify_before_minutes: localTodo.email_notify_before_minutes || 60,
-                google_task_id: gTask.id,
-                google_list_id: currentListId,
-                google_synced_at: nowStr,
-              });
-            } else if (!localTodo.google_task_id || localTodo.google_list_id !== currentListId) {
-              callbacks.onUpdateTodo({
-                ...localTodo,
-                google_task_id: gTask.id,
-                google_list_id: currentListId,
-                google_synced_at: nowStr,
-              });
-            }
+          // Cập nhật thông tin task trên Google Tasks
+          await updateGoogleTask(
+            gTask.id,
+            {
+              title: localTodo.content.trim(),
+              notes: formattedNotes || undefined,
+              due: localTodo.deadline || undefined,
+              status: 'needsAction',
+            },
+            currentListId,
+            token
+          ).catch(() => {});
 
-            // Đồng bộ subtasks thật (child tasks) sang Google Tasks với cache có sẵn
-            if (localTodo.subtasks && (localTodo.subtasks as SubtaskItem[]).length > 0) {
-              const currentCachedTasks = allGoogleRawTasks.filter(e => e.listId === currentListId).map(e => e.task);
-              await syncSubtasksToGoogle(gTask.id, currentListId, localTodo.subtasks as SubtaskItem[], token, currentCachedTasks).catch(() => {});
-            }
+          // Đồng bộ 2 chiều thời gian deadline và nhắc nhở
+          const gDueIso = gTask.due ? new Date(gTask.due).toISOString() : undefined;
+          const hasDueChangedOnGoogle = gDueIso && (!localTodo.deadline || new Date(gDueIso).getTime() !== new Date(localTodo.deadline).getTime());
+
+          if (hasDueChangedOnGoogle && gTask.updated && localTodo.google_synced_at && new Date(gTask.updated).getTime() > new Date(localTodo.google_synced_at).getTime()) {
+            callbacks.onUpdateTodo({
+              ...localTodo,
+              deadline: gDueIso,
+              email_notify: true,
+              email_notify_before_minutes: localTodo.email_notify_before_minutes || 60,
+              google_task_id: gTask.id,
+              google_list_id: currentListId,
+              google_synced_at: nowStr,
+            });
+          } else if (gTask.due && !localTodo.deadline) {
+            callbacks.onUpdateTodo({
+              ...localTodo,
+              deadline: new Date(gTask.due).toISOString(),
+              email_notify: true,
+              email_notify_before_minutes: localTodo.email_notify_before_minutes || 60,
+              google_task_id: gTask.id,
+              google_list_id: currentListId,
+              google_synced_at: nowStr,
+            });
+          } else if (!localTodo.google_task_id || localTodo.google_list_id !== currentListId) {
+            callbacks.onUpdateTodo({
+              ...localTodo,
+              google_task_id: gTask.id,
+              google_list_id: currentListId,
+              google_synced_at: nowStr,
+            });
+          }
+
+          // Đồng bộ subtasks thật (child tasks) sang Google Tasks với cache có sẵn
+          if (localTodo.subtasks && (localTodo.subtasks as SubtaskItem[]).length > 0) {
+            const currentCachedTasks = allGoogleRawTasks.filter(e => e.listId === currentListId).map(e => e.task);
+            await syncSubtasksToGoogle(gTask.id, currentListId, localTodo.subtasks as SubtaskItem[], token, currentCachedTasks).catch(() => {});
           }
           updatedCount++;
         }
