@@ -1,13 +1,16 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AppState, Goal, Todo, TimetableEvent, Habit, CountdownItem, CountUpItem, HabitLog, JournalEntry, MoodLevel } from '../types';
 import { calculateCumulativeGPA, calculateSemesterGPA, getAcademicStanding } from '../services/gpaCalculator';
-import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap, Crown, X, ShieldCheck, Flame, Timer, TrendingUp, Download, Share2, Edit2, BookOpen, Loader2, FileText, Eye, EyeOff } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Target, Zap, Clock, Calendar as CalendarIcon, Wallet, Gift, Heart, Flag, Star, Headphones, Play, Music, Archive, LockKeyhole, Sparkles, Bot, GraduationCap, Crown, X, ShieldCheck, Flame, Timer, TrendingUp, Download, Share2, Edit2, BookOpen, Loader2, FileText, Eye, EyeOff, MapPin, ExternalLink } from 'lucide-react';
 import MyStorage from './MyStorage';
 import { useProAccess } from '../hooks/useProAccess';
 import { supabase } from '../services/supabase';
 import html2canvas from 'html2canvas';
 import { journalService } from '../services/journalService';
 import { processJournalReward } from '../services/starBrainService';
+import { GoogleCalendarIcon } from './icons/GoogleCalendarIcon';
+import { getCachedCalendarEvents, syncGoogleCalendar, isGoogleCalendarConnected, CalendarEventLocal } from '../services/googleCalendarService';
+import { getLocalDateStr, getEventLocalDateStr, getEventLocalTimeStr, getHolidayVietnameseNote } from './tracker/GoogleCalendarHub';
 
 interface VisualBoardProps {
     appState: AppState;
@@ -38,6 +41,27 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
     const [showStorageGate, setShowStorageGate] = useState(false);
     const [activeTodoStatusTab, setActiveTodoStatusTab] = useState<'backlog' | 'todo' | 'doing'>('todo');
     const [showFinanceBalance, setShowFinanceBalance] = useState(true);
+    const [googleEvents, setGoogleEvents] = useState<CalendarEventLocal[]>(() => getCachedCalendarEvents());
+
+    // Sync Google Calendar for Visual Board
+    useEffect(() => {
+        const loadGCal = async () => {
+            if (isGoogleCalendarConnected()) {
+                try {
+                    const res = await syncGoogleCalendar();
+                    setGoogleEvents(res.events);
+                } catch {
+                    setGoogleEvents(getCachedCalendarEvents());
+                }
+            } else {
+                setGoogleEvents(getCachedCalendarEvents());
+            }
+        };
+        loadGCal();
+        const handleAuth = () => loadGCal();
+        window.addEventListener('google_auth_changed', handleAuth);
+        return () => window.removeEventListener('google_auth_changed', handleAuth);
+    }, []);
 
     // Draggable Storage Button State
     const [storagePos, setStoragePos] = useState({ x: 0, y: 0 });
@@ -416,30 +440,33 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
         });
     }, [appState.todos, activeTodoStatusTab]);
 
-    // Next 2 Upcoming Events Logic REPLACED with Today & Tomorrow Logic
+    // Next 2 Upcoming Events Logic REPLACED with Today & Tomorrow Logic (with Google Calendar Sync)
     const scheduleData = useMemo(() => {
         const today = new Date();
         const currentDay = today.getDay(); // 0-6 (0=Sun, 1=Mon, ..., 6=Sat)
 
-        // Use standard JS Day to match Database (ScheduleDashboard saves as 0-6)
         const todayTimetableDay = currentDay;
         const tomorrowTimetableDay = (currentDay + 1) % 7;
 
-        const getLocalDateString = (date: Date) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
-
-        const todayStr = getLocalDateString(today);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = getLocalDateString(tomorrow);
+        const todayStr = getLocalDateStr(today);
+        const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+        const tomorrowStr = getLocalDateStr(tomorrow);
 
         const calendarEvents = (appState as any).calendarEvents || [];
         const todayCalendarEvents = calendarEvents.filter((e: any) => e.date === todayStr);
         const tomorrowCalendarEvents = calendarEvents.filter((e: any) => e.date === tomorrowStr);
+
+        const todayGCalEvents = googleEvents.filter(e => {
+            const s = getEventLocalDateStr(e.startTime);
+            const en = getEventLocalDateStr(e.endTime);
+            return s <= todayStr && en >= todayStr;
+        });
+
+        const tomorrowGCalEvents = googleEvents.filter(e => {
+            const s = getEventLocalDateStr(e.startTime);
+            const en = getEventLocalDateStr(e.endTime);
+            return s <= tomorrowStr && en >= tomorrowStr;
+        });
 
         const mapTimetableEvent = (e: TimetableEvent) => ({
             id: e.id,
@@ -449,6 +476,10 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             location: e.location,
             description: null,
             isCalendarEvent: false,
+            isGoogleEvent: false,
+            color: '#6366f1',
+            htmlLink: '',
+            holidayNote: null as string | null,
             email_notify: e.email_notify || false,
             email_notify_before_minutes: e.email_notify_before_minutes ?? 0
         });
@@ -461,30 +492,57 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             location: e.location,
             description: e.description,
             isCalendarEvent: true,
+            isGoogleEvent: false,
+            color: '#8b5cf6',
+            htmlLink: '',
+            holidayNote: getHolidayVietnameseNote(e.title),
             email_notify: e.email_notify,
             email_notify_before_minutes: e.email_notify_before_minutes
         });
 
-        const getEventsForDay = (dayIndex: number, dayCalendarEvents: any[]) => {
-            const mappedTimetable = appState.timetable
-                .filter(e => e.day_of_week === dayIndex)
-                .map(mapTimetableEvent);
+        const mapGCalEvent = (e: CalendarEventLocal) => ({
+            id: e.id,
+            title: e.title,
+            start_time: e.isAllDay ? 'Cả ngày' : getEventLocalTimeStr(e.startTime),
+            end_time: e.isAllDay ? undefined : getEventLocalTimeStr(e.endTime),
+            location: e.location,
+            description: e.description,
+            isCalendarEvent: true,
+            isGoogleEvent: true,
+            color: e.color || '#4285f4',
+            htmlLink: e.htmlLink,
+            holidayNote: getHolidayVietnameseNote(e.title),
+            email_notify: false,
+            email_notify_before_minutes: 0
+        });
 
+        const getEventsForDay = (dayCalendarEvents: any[], dayGCalEvents: CalendarEventLocal[]) => {
             const mappedCalendar = dayCalendarEvents.map(mapCalendarEvent);
+            const mappedGCal = dayGCalEvents.map(mapGCalEvent);
 
-            return [...mappedTimetable, ...mappedCalendar]
-                .sort((a, b) => a.start_time.localeCompare(b.start_time));
+            // Deduplicate
+            const seen = new Set<string>();
+            const list: any[] = [];
+            [...mappedGCal, ...mappedCalendar].forEach(item => {
+                const key = `${item.title.trim().toLowerCase()}_${item.start_time}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    list.push(item);
+                }
+            });
+
+            return list.sort((a, b) => a.start_time.localeCompare(b.start_time));
         };
 
         const getDayLabel = (d: number) => d === 0 ? "Chủ Nhật" : `Thứ ${d + 1}`;
 
         return {
-            today: getEventsForDay(todayTimetableDay, todayCalendarEvents),
-            tomorrow: getEventsForDay(tomorrowTimetableDay, tomorrowCalendarEvents),
+            today: getEventsForDay(todayCalendarEvents, todayGCalEvents),
+            tomorrow: getEventsForDay(tomorrowCalendarEvents, tomorrowGCalEvents),
             todayLabel: getDayLabel(todayTimetableDay),
             tomorrowLabel: getDayLabel(tomorrowTimetableDay)
         };
-    }, [appState.timetable, (appState as any).calendarEvents]);
+    }, [(appState as any).calendarEvents, googleEvents]);
 
     const formatCurrency = (val: number) => {
         return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
@@ -901,27 +959,44 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                                 Hôm nay ({scheduleData.todayLabel})
                                             </h3>
 
-                                            <div className="space-y-2.5 max-h-[180px] overflow-y-auto pr-1">
-                                                {scheduleData.today.length > 0 ? scheduleData.today.map((ev, idx) => (
-                                                    <div key={idx} className={`flex gap-2.5 p-2 rounded-xl bg-white border ${ev.isCalendarEvent ? 'border-violet-100/80 bg-gradient-to-r from-violet-50/30 to-indigo-50/10 hover:from-violet-50/50 hover:to-indigo-50/30' : 'border-indigo-100/20 hover:border-indigo-100'} transition-colors`}>
-                                                        <div className={`flex flex-col items-center justify-center min-w-[50px] border-r ${ev.isCalendarEvent ? 'border-violet-100/30' : 'border-indigo-100/30'} pr-2`}>
-                                                            <span className={`text-xs font-black ${ev.isCalendarEvent ? 'text-violet-650' : 'text-indigo-600'} leading-none`}>{ev.start_time}</span>
+                                            <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+                                                {scheduleData.today.length > 0 ? scheduleData.today.map((ev: any, idx: number) => (
+                                                    <div key={idx} className={`flex gap-2.5 p-2.5 rounded-xl bg-white border ${ev.isGoogleEvent ? 'border-blue-200/80 bg-gradient-to-r from-blue-50/40 to-indigo-50/20 shadow-2xs' : ev.isCalendarEvent ? 'border-violet-100/80 bg-gradient-to-r from-violet-50/30 to-indigo-50/10 hover:from-violet-50/50 hover:to-indigo-50/30' : 'border-indigo-100/20 hover:border-indigo-100'} transition-colors`}>
+                                                        <div className={`flex flex-col items-center justify-center min-w-[52px] border-r ${ev.isGoogleEvent ? 'border-blue-200/60' : ev.isCalendarEvent ? 'border-violet-100/30' : 'border-indigo-100/30'} pr-2`}>
+                                                            <span className={`text-xs font-black ${ev.isGoogleEvent ? 'text-blue-600' : ev.isCalendarEvent ? 'text-violet-650' : 'text-indigo-600'} leading-none`}>{ev.start_time}</span>
                                                             <span className="text-[8px] text-gray-400 font-medium uppercase mt-0.5">{ev.end_time || '...'}</span>
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5 flex-wrap">
-                                                                <div className={`font-bold text-gray-700 text-xs truncate ${ev.isCalendarEvent ? 'text-violet-955 font-black' : ''}`}>{ev.title}</div>
-                                                                {ev.isCalendarEvent && (
+                                                                <div className={`font-bold text-gray-700 text-xs truncate ${ev.isGoogleEvent ? 'text-slate-900 font-black' : ev.isCalendarEvent ? 'text-violet-955 font-black' : ''}`}>{ev.title}</div>
+                                                                {ev.isGoogleEvent ? (
+                                                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-black px-1.5 py-0.2 rounded-md bg-blue-100/80 text-blue-700 uppercase tracking-wider shrink-0">
+                                                                        <GoogleCalendarIcon size={10} />
+                                                                        <span>Google</span>
+                                                                    </span>
+                                                                ) : ev.isCalendarEvent ? (
                                                                     <span className="text-[7.5px] font-black px-1.5 py-0.2 rounded bg-violet-100 text-violet-750 uppercase tracking-wider scale-90 shrink-0">
                                                                         Lịch hẹn
                                                                     </span>
-                                                                )}
+                                                                ) : null}
                                                             </div>
-                                                            {ev.location && (
-                                                                <div className="flex items-center gap-1 text-[9px] text-gray-400 mt-0.5 truncate">
-                                                                    <div className={`w-1 h-1 rounded-full ${ev.isCalendarEvent ? 'bg-violet-400' : 'bg-indigo-300'}`}></div>
-                                                                    {ev.location}
+                                                            {ev.holidayNote && (
+                                                                <div className="text-[9px] font-bold text-emerald-600 mt-0.5 flex items-center gap-1">
+                                                                    <Flag size={9} />
+                                                                    <span>{ev.holidayNote}</span>
                                                                 </div>
+                                                            )}
+                                                            {ev.location && (
+                                                                <a
+                                                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.location)}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="flex items-center gap-1 text-[9px] text-slate-500 hover:text-blue-600 hover:underline mt-0.5 truncate group/loc"
+                                                                    title="Mở Google Maps"
+                                                                >
+                                                                    <MapPin size={10} className="text-slate-400 group-hover/loc:text-blue-500 shrink-0" />
+                                                                    <span className="truncate">{ev.location}</span>
+                                                                </a>
                                                             )}
                                                             {ev.email_notify && (
                                                                 <div className={`text-[8px] font-semibold mt-0.5 flex items-center gap-0.5 ${ev.isCalendarEvent ? 'text-violet-650' : 'text-indigo-600'}`}>
@@ -945,27 +1020,44 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                                 Ngày mai ({scheduleData.tomorrowLabel})
                                             </h3>
 
-                                            <div className="space-y-2.5 max-h-[180px] overflow-y-auto pr-1">
-                                                {scheduleData.tomorrow.length > 0 ? scheduleData.tomorrow.map((ev, idx) => (
-                                                    <div key={idx} className={`flex gap-2.5 p-2 rounded-xl bg-white border ${ev.isCalendarEvent ? 'border-violet-100/80 bg-gradient-to-r from-violet-50/30 to-indigo-50/10 hover:from-violet-50/50 hover:to-indigo-50/30' : 'border-gray-100/80 hover:border-gray-200'} transition-colors`}>
-                                                        <div className={`flex flex-col items-center justify-center min-w-[50px] border-r ${ev.isCalendarEvent ? 'border-violet-100/30' : 'border-gray-100/30'} pr-2`}>
-                                                            <span className={`text-xs font-black ${ev.isCalendarEvent ? 'text-violet-650' : 'text-gray-500'} leading-none`}>{ev.start_time}</span>
+                                            <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+                                                {scheduleData.tomorrow.length > 0 ? scheduleData.tomorrow.map((ev: any, idx: number) => (
+                                                    <div key={idx} className={`flex gap-2.5 p-2.5 rounded-xl bg-white border ${ev.isGoogleEvent ? 'border-blue-200/80 bg-gradient-to-r from-blue-50/40 to-indigo-50/20 shadow-2xs' : ev.isCalendarEvent ? 'border-violet-100/80 bg-gradient-to-r from-violet-50/30 to-indigo-50/10 hover:from-violet-50/50 hover:to-indigo-50/30' : 'border-gray-100/80 hover:border-gray-200'} transition-colors`}>
+                                                        <div className={`flex flex-col items-center justify-center min-w-[52px] border-r ${ev.isGoogleEvent ? 'border-blue-200/60' : ev.isCalendarEvent ? 'border-violet-100/30' : 'border-gray-100/30'} pr-2`}>
+                                                            <span className={`text-xs font-black ${ev.isGoogleEvent ? 'text-blue-600' : ev.isCalendarEvent ? 'text-violet-650' : 'text-gray-500'} leading-none`}>{ev.start_time}</span>
                                                             <span className="text-[8px] text-gray-400 font-medium uppercase mt-0.5">{ev.end_time || '...'}</span>
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5 flex-wrap">
-                                                                <div className={`font-bold text-gray-700 text-xs truncate ${ev.isCalendarEvent ? 'text-violet-955 font-black' : ''}`}>{ev.title}</div>
-                                                                {ev.isCalendarEvent && (
+                                                                <div className={`font-bold text-gray-700 text-xs truncate ${ev.isGoogleEvent ? 'text-slate-900 font-black' : ev.isCalendarEvent ? 'text-violet-955 font-black' : ''}`}>{ev.title}</div>
+                                                                {ev.isGoogleEvent ? (
+                                                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-black px-1.5 py-0.2 rounded-md bg-blue-100/80 text-blue-700 uppercase tracking-wider shrink-0">
+                                                                        <GoogleCalendarIcon size={10} />
+                                                                        <span>Google</span>
+                                                                    </span>
+                                                                ) : ev.isCalendarEvent ? (
                                                                     <span className="text-[7.5px] font-black px-1.5 py-0.2 rounded bg-violet-100 text-violet-750 uppercase tracking-wider scale-90 shrink-0">
                                                                         Lịch hẹn
                                                                     </span>
-                                                                )}
+                                                                ) : null}
                                                             </div>
-                                                            {ev.location && (
-                                                                <div className="flex items-center gap-1 text-[9px] text-gray-450 mt-0.5 truncate">
-                                                                    <div className={`w-1 h-1 rounded-full ${ev.isCalendarEvent ? 'bg-violet-300' : 'bg-gray-350'}`}></div>
-                                                                    {ev.location}
+                                                            {ev.holidayNote && (
+                                                                <div className="text-[9px] font-bold text-emerald-600 mt-0.5 flex items-center gap-1">
+                                                                    <Flag size={9} />
+                                                                    <span>{ev.holidayNote}</span>
                                                                 </div>
+                                                            )}
+                                                            {ev.location && (
+                                                                <a
+                                                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.location)}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="flex items-center gap-1 text-[9px] text-slate-500 hover:text-blue-600 hover:underline mt-0.5 truncate group/loc"
+                                                                    title="Mở Google Maps"
+                                                                >
+                                                                    <MapPin size={10} className="text-slate-400 group-hover/loc:text-blue-500 shrink-0" />
+                                                                    <span className="truncate">{ev.location}</span>
+                                                                </a>
                                                             )}
                                                             {ev.email_notify && (
                                                                 <div className={`text-[8px] font-semibold mt-0.5 flex items-center gap-0.5 ${ev.isCalendarEvent ? 'text-violet-650' : 'text-indigo-600'}`}>
@@ -1001,24 +1093,35 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                                 </h3>
 
                                                 <div className="space-y-2">
-                                                    {scheduleData.today.length > 0 ? scheduleData.today.map((ev, idx) => (
-                                                        <div key={idx} className={`flex gap-3 p-2.5 rounded-xl bg-white border ${ev.isCalendarEvent ? 'border-violet-100 bg-gradient-to-r from-violet-50/30 to-indigo-50/10' : 'border-indigo-100/20'}`}>
-                                                            <div className={`flex flex-col items-center justify-center min-w-[50px] border-r ${ev.isCalendarEvent ? 'border-violet-100 text-violet-650' : 'border-indigo-100'} pr-2`}>
-                                                                <span className={`text-xs font-black ${ev.isCalendarEvent ? 'text-violet-600' : 'text-indigo-600'} leading-none`}>{ev.start_time}</span>
+                                                    {scheduleData.today.length > 0 ? scheduleData.today.map((ev: any, idx: number) => (
+                                                        <div key={idx} className={`flex gap-3 p-2.5 rounded-xl bg-white border ${ev.isGoogleEvent ? 'border-blue-200 bg-gradient-to-r from-blue-50/40 to-indigo-50/20' : ev.isCalendarEvent ? 'border-violet-100 bg-gradient-to-r from-violet-50/30 to-indigo-50/10' : 'border-indigo-100/20'}`}>
+                                                            <div className={`flex flex-col items-center justify-center min-w-[50px] border-r ${ev.isGoogleEvent ? 'border-blue-200' : ev.isCalendarEvent ? 'border-violet-100 text-violet-650' : 'border-indigo-100'} pr-2`}>
+                                                                <span className={`text-xs font-black ${ev.isGoogleEvent ? 'text-blue-600' : ev.isCalendarEvent ? 'text-violet-600' : 'text-indigo-600'} leading-none`}>{ev.start_time}</span>
                                                                 <span className="text-[8px] text-gray-400 font-medium uppercase mt-0.5">{ev.end_time || '...'}</span>
                                                             </div>
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                                    <div className={`font-bold text-gray-700 text-xs truncate ${ev.isCalendarEvent ? 'text-violet-955 font-black' : ''}`}>{ev.title}</div>
-                                                                    {ev.isCalendarEvent && (
+                                                                    <div className={`font-bold text-gray-700 text-xs truncate ${ev.isGoogleEvent ? 'text-slate-900 font-black' : ev.isCalendarEvent ? 'text-violet-955 font-black' : ''}`}>{ev.title}</div>
+                                                                    {ev.isGoogleEvent ? (
+                                                                        <span className="inline-flex items-center gap-0.5 text-[8px] font-black px-1.5 py-0.2 rounded-md bg-blue-100 text-blue-700 uppercase tracking-wider shrink-0">
+                                                                            <GoogleCalendarIcon size={10} />
+                                                                            <span>Google</span>
+                                                                        </span>
+                                                                    ) : ev.isCalendarEvent ? (
                                                                         <span className="text-[7px] font-black px-1.5 py-0.2 rounded bg-violet-100 text-violet-700 uppercase tracking-wider scale-90 shrink-0">
                                                                             Lịch hẹn
                                                                         </span>
-                                                                    )}
+                                                                    ) : null}
                                                                 </div>
+                                                                {ev.holidayNote && (
+                                                                    <div className="text-[9px] font-bold text-emerald-600 mt-0.5 flex items-center gap-1">
+                                                                        <Flag size={9} />
+                                                                        <span>{ev.holidayNote}</span>
+                                                                    </div>
+                                                                )}
                                                                 {ev.location && (
                                                                     <div className="flex items-center gap-1 text-[9px] text-gray-555 mt-0.5 truncate">
-                                                                        <div className={`w-1 h-1 rounded-full ${ev.isCalendarEvent ? 'bg-violet-300' : 'bg-indigo-300'}`}></div>
+                                                                        <div className={`w-1 h-1 rounded-full ${ev.isGoogleEvent ? 'bg-blue-400' : ev.isCalendarEvent ? 'bg-violet-300' : 'bg-indigo-300'}`}></div>
                                                                         {ev.location}
                                                                     </div>
                                                                 )}
@@ -1047,24 +1150,35 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                                 </h3>
 
                                                 <div className="space-y-2">
-                                                    {scheduleData.tomorrow.length > 0 ? scheduleData.tomorrow.map((ev, idx) => (
-                                                        <div key={idx} className={`flex gap-3 p-2.5 rounded-xl bg-white border ${ev.isCalendarEvent ? 'border-violet-100 bg-gradient-to-r from-violet-50/30 to-indigo-50/10' : 'border-transparent shadow-xs'}`}>
-                                                            <div className={`flex flex-col items-center justify-center min-w-[50px] border-r ${ev.isCalendarEvent ? 'border-violet-100 text-violet-650' : 'border-gray-200/50'} pr-2`}>
-                                                                <span className={`text-xs font-black ${ev.isCalendarEvent ? 'text-violet-600' : 'text-gray-500'} leading-none`}>{ev.start_time}</span>
+                                                    {scheduleData.tomorrow.length > 0 ? scheduleData.tomorrow.map((ev: any, idx: number) => (
+                                                        <div key={idx} className={`flex gap-3 p-2.5 rounded-xl bg-white border ${ev.isGoogleEvent ? 'border-blue-200 bg-gradient-to-r from-blue-50/40 to-indigo-50/20' : ev.isCalendarEvent ? 'border-violet-100 bg-gradient-to-r from-violet-50/30 to-indigo-50/10' : 'border-transparent shadow-xs'}`}>
+                                                            <div className={`flex flex-col items-center justify-center min-w-[50px] border-r ${ev.isGoogleEvent ? 'border-blue-200' : ev.isCalendarEvent ? 'border-violet-100 text-violet-650' : 'border-gray-200/50'} pr-2`}>
+                                                                <span className={`text-xs font-black ${ev.isGoogleEvent ? 'text-blue-600' : ev.isCalendarEvent ? 'text-violet-600' : 'text-gray-500'} leading-none`}>{ev.start_time}</span>
                                                                 <span className="text-[8px] text-gray-400 font-medium uppercase mt-0.5">{ev.end_time || '...'}</span>
                                                             </div>
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                                    <div className={`font-bold text-gray-700 text-xs truncate ${ev.isCalendarEvent ? 'text-violet-955 font-black' : ''}`}>{ev.title}</div>
-                                                                    {ev.isCalendarEvent && (
+                                                                    <div className={`font-bold text-gray-700 text-xs truncate ${ev.isGoogleEvent ? 'text-slate-900 font-black' : ev.isCalendarEvent ? 'text-violet-955 font-black' : ''}`}>{ev.title}</div>
+                                                                    {ev.isGoogleEvent ? (
+                                                                        <span className="inline-flex items-center gap-0.5 text-[8px] font-black px-1.5 py-0.2 rounded-md bg-blue-100 text-blue-700 uppercase tracking-wider shrink-0">
+                                                                            <GoogleCalendarIcon size={10} />
+                                                                            <span>Google</span>
+                                                                        </span>
+                                                                    ) : ev.isCalendarEvent ? (
                                                                         <span className="text-[7px] font-black px-1.5 py-0.2 rounded bg-violet-100 text-violet-750 uppercase tracking-wider scale-90 shrink-0">
                                                                             Lịch hẹn
                                                                         </span>
-                                                                    )}
+                                                                    ) : null}
                                                                 </div>
+                                                                {ev.holidayNote && (
+                                                                    <div className="text-[9px] font-bold text-emerald-600 mt-0.5 flex items-center gap-1">
+                                                                        <Flag size={9} />
+                                                                        <span>{ev.holidayNote}</span>
+                                                                    </div>
+                                                                )}
                                                                 {ev.location && (
                                                                     <div className="flex items-center gap-1 text-[9px] text-gray-450 mt-0.5 truncate">
-                                                                        <div className={`w-1 h-1 rounded-full ${ev.isCalendarEvent ? 'bg-violet-300' : 'bg-gray-350'}`}></div>
+                                                                        <div className={`w-1 h-1 rounded-full ${ev.isGoogleEvent ? 'bg-blue-400' : ev.isCalendarEvent ? 'bg-violet-300' : 'bg-gray-350'}`}></div>
                                                                         {ev.location}
                                                                     </div>
                                                                 )}

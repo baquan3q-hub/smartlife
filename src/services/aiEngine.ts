@@ -1,6 +1,6 @@
 // File: src/services/aiEngine.ts
 // SmartLife AI Engine v2 — Orchestrator with Function Calling
-// Handles: query_database, add_timetable, add_todo, add_transaction, render_chart, GPA tools
+// Handles: query_database, add_timetable, add_todo, add_transaction, render_chart, GPA tools, Maps, Calendar
 
 import { supabase } from './supabase';
 import {
@@ -448,6 +448,45 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
                 id: { type: 'string', description: 'ID của lịch hẹn cần xóa' }
             },
             required: ['id']
+        }
+    },
+    {
+        name: 'search_nearby_places',
+        description: 'Tìm kiếm và gợi ý địa điểm gần vị trí hiện tại của người dùng. Dùng khi người dùng hỏi về: cây xăng, quán ăn, quán café, tiệm sửa xe, nhà thuốc, bệnh viện, ATM, siêu thị, hoặc bất kỳ địa điểm nào gần đây. Trả về danh sách gợi ý kèm link Google Maps để chỉ đường. QUAN TRỌNG: Luôn gọi tool này khi người dùng cần tìm địa điểm — tool sẽ cung cấp GPS và link Maps.',
+        parameters: {
+            type: 'object',
+            properties: {
+                query: {
+                    type: 'string',
+                    description: 'Loại địa điểm cần tìm. VD: "cây xăng", "quán phở", "tiệm sửa xe máy", "nhà thuốc Long Châu", "quán cafe yên tĩnh có wifi"'
+                },
+                is_emergency: {
+                    type: 'boolean',
+                    description: 'True nếu là tình huống khẩn cấp (xe hỏng, cần cứu hộ, tai nạn). Sẽ ưu tiên kết quả gần nhất.'
+                },
+                additional_context: {
+                    type: 'string',
+                    description: 'Thông tin bổ sung từ người dùng. VD: "giá sinh viên", "mở cửa sau 22h", "có chỗ để xe"'
+                }
+            },
+            required: ['query']
+        }
+    },
+    {
+        name: 'get_google_calendar_events',
+        description: 'Lấy danh sách sự kiện từ Google Calendar của người dùng trong một khoảng thời gian. Dùng khi người dùng hỏi về lịch Google, sự kiện sắp tới, hoặc muốn kiểm tra lịch trình từ Google Calendar.',
+        parameters: {
+            type: 'object',
+            properties: {
+                days_ahead: {
+                    type: 'integer',
+                    description: 'Số ngày tới cần lấy sự kiện. Mặc định 7. VD: 1 = hôm nay, 7 = tuần này, 30 = tháng này.'
+                },
+                days_back: {
+                    type: 'integer',
+                    description: 'Số ngày trước cần lấy sự kiện. Mặc định 0.'
+                }
+            }
         }
     }
 ];
@@ -903,7 +942,120 @@ export interface AIAttachment {
     data: string; // Base64 representation of the file
 }
 
+// ────────────────────────────────────────
+// Maps & Location Tool Executors
+// ────────────────────────────────────────
 
+async function executeSearchNearbyPlaces(args: any): Promise<any> {
+    const { query, is_emergency = false, additional_context = '' } = args;
+
+    try {
+        // Dynamic import to avoid bundling issues
+        const { getCurrentLocation, buildGoogleMapsSearchUrl, buildGoogleMapsDirectionsUrl } = await import('./geolocationService');
+
+        let location;
+        try {
+            location = await getCurrentLocation({ timeout: is_emergency ? 5000 : 10000 });
+        } catch (locError: any) {
+            return {
+                success: false,
+                has_location: false,
+                error: locError.message,
+                suggestion: 'Không thể xác định vị trí GPS. Hãy hỏi người dùng đang ở khu vực nào để gợi ý chính xác hơn.',
+                maps_search_url: `https://www.google.com/maps/search/${encodeURIComponent(query)}`,
+            };
+        }
+
+        const { lat, lng, accuracy } = location;
+
+        // Build useful Maps URLs
+        const searchUrl = buildGoogleMapsSearchUrl(query, lat, lng);
+
+        return {
+            success: true,
+            has_location: true,
+            user_location: {
+                lat: Math.round(lat * 10000) / 10000,
+                lng: Math.round(lng * 10000) / 10000,
+                accuracy_meters: Math.round(accuracy),
+            },
+            query,
+            is_emergency,
+            additional_context,
+            maps_search_url: searchUrl,
+            maps_directions_template: `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination={PLACE_ADDRESS}&travelmode=driving`,
+            instructions_for_ai: `Bạn có GPS của người dùng: ${lat}, ${lng} (độ chính xác ±${Math.round(accuracy)}m).
+Hãy dùng kiến thức của bạn để gợi ý 2-4 địa điểm "${query}" phổ biến gần khu vực này.
+Với mỗi địa điểm, hãy trả lời theo format:
+📍 **Tên địa điểm**
+📍 Địa chỉ ước tính
+🕐 Giờ mở cửa (nếu biết)
+📞 Hotline (nếu biết, đặc biệt cho cứu hộ/sửa xe)
+
+Cuối cùng, LUÔN kèm link tìm kiếm Google Maps: ${searchUrl}
+${is_emergency ? '⚠️ ĐÂY LÀ TÌNH HUỐNG KHẨN CẤP — ưu tiên kết quả GẦN NHẤT và số điện thoại liên hệ.' : ''}
+${additional_context ? `📝 Yêu cầu thêm từ người dùng: ${additional_context}` : ''}`,
+        };
+    } catch (error: any) {
+        return {
+            success: false,
+            error: error.message,
+            maps_search_url: `https://www.google.com/maps/search/${encodeURIComponent(query)}`,
+        };
+    }
+}
+
+async function executeGetGoogleCalendarEvents(args: any): Promise<any> {
+    const { days_ahead = 7, days_back = 0 } = args;
+
+    try {
+        const { isGoogleCalendarConnected, listCalendarEvents } = await import('./googleCalendarService');
+
+        if (!isGoogleCalendarConnected()) {
+            return {
+                success: false,
+                error: 'Google Calendar chưa được kết nối. Người dùng cần đăng nhập lại bằng Google để cấp quyền Calendar.',
+            };
+        }
+
+        const now = new Date();
+        const timeMin = new Date(now);
+        timeMin.setDate(timeMin.getDate() - days_back);
+        timeMin.setHours(0, 0, 0, 0);
+        const timeMax = new Date(now);
+        timeMax.setDate(timeMax.getDate() + days_ahead);
+        timeMax.setHours(23, 59, 59, 999);
+
+        const events = await listCalendarEvents(
+            'primary',
+            timeMin.toISOString(),
+            timeMax.toISOString(),
+            50
+        );
+
+        const simplifiedEvents = events.map((e: any) => ({
+            title: e.summary || '(Không có tiêu đề)',
+            start: e.start?.dateTime || e.start?.date || '',
+            end: e.end?.dateTime || e.end?.date || '',
+            location: e.location || '',
+            description: e.description ? e.description.substring(0, 200) : '',
+            is_all_day: !e.start?.dateTime,
+            status: e.status || 'confirmed',
+        }));
+
+        return {
+            success: true,
+            events: simplifiedEvents,
+            count: simplifiedEvents.length,
+            range: `${timeMin.toISOString().slice(0, 10)} → ${timeMax.toISOString().slice(0, 10)}`,
+        };
+    } catch (error: any) {
+        return {
+            success: false,
+            error: `Lỗi khi lấy Google Calendar: ${error.message}`,
+        };
+    }
+}
 
 async function executeBatchAddTransactions(
     args: any,
@@ -1293,6 +1445,14 @@ export async function chatWithAI(
                     case 'get_journal_entries':
                         result = { result: await buildJournalContext() };
                         break;
+                    case 'search_nearby_places': {
+                        result = await executeSearchNearbyPlaces(args);
+                        break;
+                    }
+                    case 'get_google_calendar_events': {
+                        result = await executeGetGoogleCalendarEvents(args);
+                        break;
+                    }
                     default:
                         result = { error: `Unknown tool: ${name}` };
                 }

@@ -109,9 +109,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             localStorage.setItem('smartlife_cached_session', JSON.stringify(freshSession));
                         } catch (e) {}
 
-                        // Tự động nhận diện Google OAuth Token để đồng bộ Google Tasks ngay khi login
+                        // Tự động nhận diện Google OAuth Token để đồng bộ Google Tasks + Calendar + Sheets ngay khi login
                         if ((freshSession as any)?.provider_token) {
-                            import('../services/googleTasksService').then(({ saveGoogleToken }) => {
+                            import('../services/googleAuthTokenManager').then(({ saveGoogleToken }) => {
                                 saveGoogleToken(
                                     (freshSession as any).provider_token,
                                     (freshSession as any).expires_in || 3600,
@@ -152,9 +152,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             key: 'smartlife_cached_session',
                             value: JSON.stringify(session)
                         });
-                        // Tự động nhận diện Google OAuth Token để đồng bộ Google Tasks
+                        // Tự động nhận diện Google OAuth Token để đồng bộ Google Tasks + Calendar + Sheets
                         if ((session as any)?.provider_token) {
-                            import('../services/googleTasksService').then(({ saveGoogleToken }) => {
+                            import('../services/googleAuthTokenManager').then(({ saveGoogleToken }) => {
                                 saveGoogleToken(
                                     (session as any).provider_token,
                                     (session as any).expires_in || 3600,
@@ -275,7 +275,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 provider: 'google',
                 options: {
                     redirectTo: redirectUrl,
-                    scopes: 'https://www.googleapis.com/auth/tasks',
+                    scopes: 'https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',

@@ -3,12 +3,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import {
   StickyNote, Loader2, Save, Sparkles, BookOpen, Plus,
-  Check, ArrowRight, Layers, Tag
+  Check, ArrowRight, Layers, Tag, FileSpreadsheet
 } from 'lucide-react';
 import { noteArchiveService } from '../../services/noteArchiveService';
 import { SaveNoteModal } from './notes/SaveNoteModal';
 import { NotesArchiveModal } from './notes/NotesArchiveModal';
 import { AISummaryModal } from './notes/AISummaryModal';
+import { GoogleSheetViewerModal } from './notes/GoogleSheetViewerModal';
 
 interface QuickNotesWidgetProps {
   userId: string;
@@ -26,6 +27,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isAISumModalOpen, setIsAISumModalOpen] = useState(false);
+  const [isGoogleSheetOpen, setIsGoogleSheetOpen] = useState(false);
   const [archivedCount, setArchivedCount] = useState<number>(0);
 
   // Refs for tracking latest values to avoid stale closures in event listeners/cleanup
@@ -285,28 +287,36 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
 
         {/* Action Buttons Toolbar on Header */}
         <div className="flex items-center gap-1.5 ml-auto">
-          {/* Nút AI Sum */}
+          {/* Nút AI Sum (Icon Logo AI Sum tinh gọn) */}
           <button
             onClick={() => setIsAISumModalOpen(true)}
-            title="Tóm tắt nội dung ghi chú bằng AI"
-            className="px-2.5 py-1 rounded-lg bg-black hover:bg-slate-900 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-extrabold text-[10.5px] shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            title="Tóm tắt thông minh bằng AI (AI Sum)"
+            className="p-1.5 px-2 rounded-lg bg-black hover:bg-slate-900 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
           >
-            AI Sum
+            <Sparkles size={14} className="text-amber-400" />
           </button>
 
-          {/* Nút 📁 Bộ nhớ (CRUDS) */}
+          {/* Nút 📁 Bộ nhớ (Icon-only + badge số lượng) */}
           <button
             onClick={() => setIsArchiveModalOpen(true)}
-            title="Xem và quản lý kho ghi chú đã lưu"
-            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] border border-slate-200/60 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+            title="Kho bộ nhớ ghi chú đã lưu"
+            className="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold border border-slate-200/60 flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
           >
-            <BookOpen size={11} className="text-slate-600" />
-            <span>Bộ nhớ</span>
+            <BookOpen size={13} className="text-slate-700" />
             {archivedCount > 0 && (
               <span className="w-4 h-4 rounded-full bg-slate-800 text-white text-[9px] font-black flex items-center justify-center">
                 {archivedCount > 99 ? '99+' : archivedCount}
               </span>
             )}
+          </button>
+
+          {/* Nút 📊 Google Sheets (Icon-only) */}
+          <button
+            onClick={() => setIsGoogleSheetOpen(true)}
+            title="Bảng tính Google Sheets"
+            className="p-1.5 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold border border-emerald-200/60 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+          >
+            <FileSpreadsheet size={14} className="text-emerald-700" />
           </button>
         </div>
       </div>
@@ -398,6 +408,13 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
             onNavigate('ai-advisor', { conversationId: convId });
           }
         }}
+      />
+
+      {/* Modal 4: Google Sheets In-App Viewer */}
+      <GoogleSheetViewerModal
+        isOpen={isGoogleSheetOpen}
+        onClose={() => setIsGoogleSheetOpen(false)}
+        userId={userId}
       />
 
     </div>

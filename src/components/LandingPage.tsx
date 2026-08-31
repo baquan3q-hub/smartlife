@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen, Target, CheckCircle2, Star, Facebook, FileText, Image, AudioLines, Users, ChevronUp, BarChart3, ArrowRightLeft, Bot } from 'lucide-react';
+import { LayoutDashboard, Wallet, CalendarDays, Rocket, ArrowRight, ShieldCheck, Zap, Download, Globe, Mail, User, Archive, LockKeyhole, Headphones, Sparkles, Brain, GraduationCap, Music, PlayCircle, Flame, BookOpen, Target, CheckCircle2, Star, Facebook, FileText, Image, AudioLines, Users, ChevronUp, BarChart3, ArrowRightLeft, Bot, Radio, Flag, MapPin, Clock, Compass, Layers, Check, RefreshCw, Smartphone, ExternalLink, Cpu, Workflow } from 'lucide-react';
+import { GoogleCalendarIcon } from './icons/GoogleCalendarIcon';
+import { GoogleTasksIcon } from './icons/GoogleTasksIcon';
 import InstallGuideModal from './InstallGuideModal';
 import { Lang } from '../i18n/i18n';
 
@@ -14,12 +16,65 @@ const translations = {
     vi: {
         install: 'Cài App',
         login: 'Đăng nhập',
-        heroTag: 'Trợ lý cá nhân All-in-One',
+        heroTag: 'Trợ lý cá nhân All-in-One Thế Hệ Mới',
         heroTitle1: 'Quản lý cuộc sống',
         heroTitle2: 'Thông minh & Hiệu quả',
         heroDesc: 'SmartLife giúp bạn làm chủ tài chính, sắp xếp thời gian biểu và chinh phục mục tiêu cá nhân. Tất cả trong một ứng dụng duy nhất.',
         startNow: 'Bắt đầu miễn phí',
-        learnMore: 'Tìm hiểu ngay',
+        learnMore: 'Khám phá ngay',
+
+        // 4 Ý CỐT LÕI MỚI (4 CORE HIGHLIGHTS)
+        coreUpdatesTag: 'Bản Nâng Cấp Đột Phá 2026',
+        coreUpdatesTitle: '4 Nâng Cấp & Tích Hợp Cốt Lõi Mới',
+        coreUpdatesSubtitle: 'Trải nghiệm hệ điều hành cá nhân (Life OS) toàn diện: đồng bộ Google 2 chiều, Kanban siêu mượt, AI cá nhân hóa và trung tâm tự động hóa thời gian thực.',
+
+        coreCard1Tag: 'Google Ecosystem',
+        coreCard1Title: 'Đồng Bộ 2 Chiều Google Tasks & Calendar',
+        coreCard1Desc: 'Tự động ánh xạ 4 cột Kanban sang 4 danh sách Google Tasks, đồng bộ Subtask phân cấp đa tầng (Native Child Tasks), quản lý thời khóa biểu Google Calendar và kết nối Google Sheets thời gian thực.',
+        coreCard1Points: [
+            'Ánh xạ 4 cột Kanban (Doing, Todo, Backlog, Done) tức thì',
+            'Đồng bộ Subtasks phân cấp thực thụ (Native Child Tasks)',
+            'Google Calendar & Google Sheets đồng bộ 2 chiều'
+        ],
+
+        coreCard2Tag: 'Smart Workflow',
+        coreCard2Title: 'Bảng Kanban Siêu Tốc & Deep Clean',
+        coreCard2Desc: 'Kéo thả mượt mà tối ưu 95% re-render với thuật toán va chạm thông minh. Động cơ Deep Clean tự động khử trùng lặp toàn cục và dọn sạch task mồ côi.',
+        coreCard2Points: [
+            'Kéo thả mượt mà, tối ưu 95% hiệu năng re-render',
+            'Động cơ Deep Clean & Rebuild dọn sạch task trùng lặp',
+            'Theo dõi thời gian (Time Tracking) & Subtasks đa tầng'
+        ],
+
+        coreCard3Tag: 'AI Multi-Modal',
+        coreCard3Title: 'Trợ Lý AI Đa Năng & Cố Vấn Sự Nghiệp',
+        coreCard3Desc: 'Truy xuất toàn bộ ngữ cảnh dữ liệu, đọc hiểu tài liệu đa định dạng, phân tích ảnh hóa đơn & giọng nói. Kết hợp MBTI/DISC & GPA để định hướng nghề nghiệp và tạo CV chuẩn.',
+        coreCard3Points: [
+            'Phân tích đa phương thức: Ảnh hóa đơn, Tệp tin, Voice audio',
+            'Cố vấn nghề nghiệp dựa trên GPA & trắc nghiệm MBTI/DISC',
+            'Tự động trích xuất thông tin tạo CV chuẩn PDF chuyên nghiệp'
+        ],
+
+        coreCard4Tag: 'Realtime Engine',
+        coreCard4Title: 'Tự Động Hóa Realtime & Dual Auth',
+        coreCard4Desc: 'Đăng nhập 1 chạm qua Google OAuth hoặc Supabase không cần login lần 2 (Dual Auth). Tự động đồng bộ ngầm khi chuyển tab và lưu trữ tệp tin bảo mật cao.',
+        coreCard4Points: [
+            'Cơ chế Dual Auth tự động bắt Google Token không rào cản',
+            'Auto Sync ngầm thông minh khi focus / chuyển đổi tab',
+            'Lưu trữ file đính kèm đa phương tiện & dữ liệu an toàn'
+        ],
+
+        // Section Hệ sinh thái Google
+        featGoogleBadge: 'Tích hợp Đỉnh cao',
+        featGoogleTitle: 'Hệ sinh thái Google,\nĐồng bộ 2 chiều không độ trễ.',
+        featGoogleDesc: 'Kết nối trực tiếp tài khoản Google của bạn để đồng bộ lịch trình Google Calendar, danh sách công việc Google Tasks và bảng tính Google Sheets. Mọi thay đổi đều được cập nhật hai chiều tức thì, giúp bạn quản lý mọi thứ xuyên suốt trên mọi thiết bị.',
+        featGoogleItems: [
+            'Tự động ánh xạ 4 cột Kanban sang Doing, Todo, Backlog, Done trên Google Tasks',
+            'Đồng bộ Subtasks phân cấp tự nhiên (Native Child Tasks) lên Google Tasks',
+            'Google Calendar Hub: xem lịch trình, thời khóa biểu và tạo sự kiện trực tiếp',
+            'Động cơ Deep Clean & Khử trùng lặp toàn diện (Global Deduplication)',
+            'Dual Auth Flow: Tự động bắt Google Token qua Supabase hoặc GIS SDK'
+        ],
 
         featVisualTitle: 'Visualboard - Góc nhìn toàn cảnh,\nKiểm soát mọi thứ.',
         featVisualDesc: 'Theo dõi tổng quan lịch trình, mục tiêu và đếm ngược ngày lễ sắp tới. Nắm bắt bức tranh tài chính toàn diện với số liệu thu chi tổng hợp.',
@@ -39,9 +94,15 @@ const translations = {
             'Phân tích & gợi ý ngân sách thông minh từ Trợ lý AI'
         ],
 
-        featScheduleTitle: 'Làm chủ thời gian,\nNâng cao hiệu suất.',
-        featScheduleDesc: 'Tích hợp toàn diện các siêu công cụ giúp tối ưu hóa thời gian học tập và làm việc của bạn: từ bảng Kanban quản lý dự án, lưu trữ liên kết Bookmark, rèn luyện thói quen (Habits) đến bộ đếm giờ Pomodoro tập trung cao độ.',
-        featScheduleItems: ['Lịch trình & Thời khóa biểu tuần/ngày trực quan', 'Bảng Kanban thông minh & Danh sách công việc ưu tiên', 'Bấm giờ Pomodoro tăng năng suất & Ghi chú nhanh', 'Lưu trữ Bookmark tiện ích cho liên kết học tập', 'Theo dõi thói quen (Habits Widget) kỷ luật bản thân'],
+        featScheduleTitle: 'Làm chủ thời gian,\nNâng cao hiệu suất với Kanban & Google.',
+        featScheduleDesc: 'Tích hợp toàn diện các siêu công cụ giúp tối ưu hóa thời gian học tập và làm việc của bạn: từ bảng Kanban quản lý dự án 4 cột chuẩn Google Tasks, lưu trữ liên kết Bookmark, rèn luyện thói quen (Habits) đến bộ đếm giờ Pomodoro tập trung cao độ.',
+        featScheduleItems: [
+            'Bảng Kanban thông minh 4 cột (Backlog, Todo, Doing, Done) kéo thả siêu mượt',
+            'Đồng bộ Subtasks phân cấp đa tầng (Native Child Tasks) với Google Tasks',
+            'Lịch trình & Thời khóa biểu tuần/ngày trực quan kết nối Google Calendar',
+            'Bấm giờ Pomodoro tăng năng suất & Ghi chú nhanh gắn kèm file',
+            'Lưu trữ Bookmark tiện ích & Theo dõi thói quen (Habits Widget) kỷ luật bản thân'
+        ],
 
         featJournalTitle: 'Nhật ký cá nhân,\nChữa lành & Tự kiến tạo.',
         featJournalDesc: 'Không gian ghi chép an toàn, riêng tư. Giúp bạn nhìn nhận lại cảm xúc, ghi nhận lòng biết ơn hàng ngày và xây dựng thói quen viết lách lành mạnh.',
@@ -121,12 +182,65 @@ const translations = {
     en: {
         install: 'Install App',
         login: 'Login',
-        heroTag: 'All-in-One Personal Assistant',
+        heroTag: 'Next-Gen All-in-One Personal Assistant',
         heroTitle1: 'Manage Your Life',
         heroTitle2: 'Smart & Efficiently',
         heroDesc: 'SmartLife helps you master your finances, organize your schedule, and conquer personal goals. All in one single app.',
         startNow: 'Start for Free',
-        learnMore: 'Learn More',
+        learnMore: 'Discover More',
+
+        // 4 CORE HIGHLIGHTS (EN)
+        coreUpdatesTag: 'Major 2026 Breakthrough Release',
+        coreUpdatesTitle: '4 Core New Upgrades & Integrations',
+        coreUpdatesSubtitle: 'Experience the comprehensive personal Life OS: 2-way Google ecosystem sync, ultra-smooth Kanban, multi-modal AI, and seamless realtime automation.',
+
+        coreCard1Tag: 'Google Ecosystem',
+        coreCard1Title: 'Two-Way Google Tasks & Calendar Sync',
+        coreCard1Desc: 'Automatically map 4 Kanban columns to 4 Google Tasks lists, sync hierarchical child subtasks, manage Google Calendar timetables and connect Google Sheets in realtime.',
+        coreCard1Points: [
+            'Instant 4-column Kanban mapping (Doing, Todo, Backlog, Done)',
+            'Native hierarchical subtasks synchronization',
+            'Full two-way Google Calendar & Google Sheets sync'
+        ],
+
+        coreCard2Tag: 'Smart Workflow',
+        coreCard2Title: 'Ultra-Smooth Kanban & Deep Clean',
+        coreCard2Desc: 'Ultra-smooth drag & drop reducing 95% re-renders with smart collision detection. Deep Clean engine wipes duplicates and cleans orphan tasks automatically.',
+        coreCard2Points: [
+            'Fluid drag & drop with 95% render optimization',
+            'Deep Clean & Rebuild engine wipes duplicate tasks',
+            'Time tracking & multi-level subtask management'
+        ],
+
+        coreCard3Tag: 'AI Multi-Modal',
+        coreCard3Title: 'Multi-Modal AI & Career Advisor',
+        coreCard3Desc: 'Retrieves full context data, reads documents, analyzes invoice images & voice audio. Combines MBTI/DISC & GPA to build career roadmaps and generate CVs.',
+        coreCard3Points: [
+            'Multi-modal analysis: Receipts, Documents, Voice Audio',
+            'Career guidance tailored to GPA & MBTI/DISC personality',
+            'Autofill credentials into professional printable PDF CV'
+        ],
+
+        coreCard4Tag: 'Realtime Engine',
+        coreCard4Title: 'Realtime Automation & Dual Auth',
+        coreCard4Desc: '1-click login via Google OAuth or Supabase with no second login (Dual Auth). Smart background sync on tab switch and encrypted media storage.',
+        coreCard4Points: [
+            'Seamless Dual Auth capturing Google OAuth token automatically',
+            'Smart background auto-sync upon tab focus / visibility',
+            'Encrypted multimedia file attachments & note storage'
+        ],
+
+        // Google Ecosystem Section
+        featGoogleBadge: 'Top Tier Integration',
+        featGoogleTitle: 'Google Ecosystem,\nZero-Latency 2-Way Sync.',
+        featGoogleDesc: 'Directly connect your Google account to synchronize Google Calendar events, Google Tasks to-do items, and Google Sheets data. All updates are bidirectional in realtime.',
+        featGoogleItems: [
+            'Auto-map 4 Kanban columns to Doing, Todo, Backlog, Done lists on Google Tasks',
+            'Hierarchical Subtasks (Native Child Tasks) synced directly with Google Tasks',
+            'Google Calendar Hub: inspect schedules, timetables, and create events on the fly',
+            'Deep Clean & Global Deduplication engine keeping your tasks spotless',
+            'Dual Auth Flow: Auto capture Google Token via Supabase or GIS SDK'
+        ],
 
         featVisualTitle: 'Holistic View,\nControl Everything.',
         featVisualDesc: 'Get an overview of schedules, goals, and upcoming holiday countdowns. Master your financial picture with comprehensive income and expense data.',
@@ -146,9 +260,15 @@ const translations = {
             'Smart budget analysis & recommendations from AI Assistant'
         ],
 
-        featScheduleTitle: 'Master Your Time,\nBoost Productivity.',
-        featScheduleDesc: 'A comprehensive suite of productivity tools designed to optimize your studying and work: featuring a Kanban project board, Bookmark manager, Habit tracking streaks, and a Pomodoro focus timer.',
-        featScheduleItems: ['Visual daily/weekly schedules & timetables', 'Smart Kanban Board & prioritized task list', 'Productivity Pomodoro Timer & Quick Notes widget', 'Bookmark manager for saving learning resources', 'Habit tracker widget to build self-discipline'],
+        featScheduleTitle: 'Master Your Time,\nBoost Productivity with Kanban & Google.',
+        featScheduleDesc: 'A comprehensive suite of productivity tools designed to optimize your studying and work: featuring a 4-column Kanban project board synced with Google Tasks, Bookmark manager, Habit tracking streaks, and a Pomodoro focus timer.',
+        featScheduleItems: [
+            'Smart 4-column Kanban Board (Backlog, Todo, Doing, Done) with ultra-smooth drag & drop',
+            'Hierarchical Subtasks (Native Child Tasks) synchronized with Google Tasks',
+            'Visual daily/weekly schedules & timetables connected to Google Calendar',
+            'Productivity Pomodoro Timer & Quick Notes widget with attachments',
+            'Bookmark manager for saving learning resources & Habit tracker widget'
+        ],
 
         featJournalTitle: 'Personal Digital Journal,\nHeal & Grow.',
         featJournalDesc: 'Capture every moment, mood, and 3 gratitudes daily. An intuitive Word-like editor and StarBrain rewards help you maintain your writing habits.',
@@ -228,12 +348,65 @@ const translations = {
     ko: {
         install: '앱 설치',
         login: '로그인',
-        heroTag: '올인원 개인 비서',
+        heroTag: '차세대 올인원 개인 비서',
         heroTitle1: '라이프 매니지먼트',
         heroTitle2: '스마트하고 효율적으로',
         heroDesc: 'SmartLife는 자산 관리, 일정 조율 및 개인 목표 달성을 도와줍니다. 하나의 통합 앱으로 해결하세요.',
         startNow: '무료로 시작하기',
         learnMore: '자세히 알아보기',
+
+        // 4 CORE HIGHLIGHTS (KO)
+        coreUpdatesTag: '2026 대규모 혁신 릴리즈',
+        coreUpdatesTitle: '4대 핵심 업데이트 및 연동 기능',
+        coreUpdatesSubtitle: '구글 2방향 동기화, 초고속 Kanban, 멀티모달 AI 및 실시간 자동화로 완벽해진 통합 Life OS를 경험하세요.',
+
+        coreCard1Tag: 'Google Ecosystem',
+        coreCard1Title: '구글 Tasks & Calendar 2방향 실시간 동기화',
+        coreCard1Desc: '4개 Kanban 컬럼을 구글 Tasks의 4개 목록으로 자동 매핑하고, 계층형 서브태스크 연동, 구글 캘린더 시간표 및 구글 스프레드시트 실시간 동기화를 지원합니다.',
+        coreCard1Points: [
+            '4개 Kanban 컬럼 (Doing, Todo, Backlog, Done) 실시간 매핑',
+            '계층형 서브태스크 (Native Child Tasks) 완벽 동기화',
+            '구글 캘린더 & 구글 스프레드시트 2방향 실시간 연동'
+        ],
+
+        coreCard2Tag: 'Smart Workflow',
+        coreCard2Title: '초고속 Kanban 보드 & Deep Clean',
+        coreCard2Desc: '리렌더링 95% 최적화 드래그 앤 드롭 및 스마트 충돌 감지. 중복 태스크를 일괄 정리하는 Deep Clean & Rebuild 엔진 탑재.',
+        coreCard2Points: [
+            '리렌더링 95% 감소로 부드러운 드래그 앤 드롭',
+            '중복 및 고아 태스크를 완벽 제거하는 Deep Clean 엔진',
+            '작업 소요 시간 측정 (Time Tracking) 및 다계층 서브태스크'
+        ],
+
+        coreCard3Tag: 'AI Multi-Modal',
+        coreCard3Title: '다중 모달 AI 비서 & 진로 설계',
+        coreCard3Desc: '모든 데이터 맥락을 파악하고 영수증 이미지, 문서 파일, 음성 메모를 분석합니다. MBTI/DISC & GPA를 결합하여 맞춤 진로 로드맵 및 자동 CV를 생성합니다.',
+        coreCard3Points: [
+            '멀티모달 분석: 영수증 이미지, 문서, 음성 오디오',
+            'GPA 성적 및 MBTI/DISC 기반 맞춤 진로 상담',
+            '인쇄용 표준 PDF 이력서 자동 생성 (Autofill)'
+        ],
+
+        coreCard4Tag: 'Realtime Engine',
+        coreCard4Title: '실시간 자동화 & Dual Auth',
+        coreCard4Desc: '구글 OAuth 또는 Supabase로 재로그인 없는 1초 간편 로그인 (Dual Auth). 탭 전환 시 스마트 백그라운드 동기화 및 안전한 미디어 저장소.',
+        coreCard4Points: [
+            '구글 OAuth 토큰을 자동 추출하는 원활한 Dual Auth',
+            '탭 활성화 및 전환 시 스마트 백그라운드 자동 동기화',
+            '안전한 첨부파일 및 프라이빗 미디어 저장'
+        ],
+
+        // Google Ecosystem Section (KO)
+        featGoogleBadge: '최고 등급 통합',
+        featGoogleTitle: '구글 생태계,\n지연 없는 2방향 실시간 동기화.',
+        featGoogleDesc: '구글 계정을 직접 연결하여 구글 캘린더 일정, 구글 Tasks 할 일 목록, 구글 스프레드시트 데이터를 실시간으로 동기화합니다. 모든 변경 사항이 양방향으로 즉시 반영됩니다.',
+        featGoogleItems: [
+            'Kanban 4개 컬럼을 구글 Tasks의 Doing, Todo, Backlog, Done 목록에 자동 매핑',
+            '계층형 서브태스크(Native Child Tasks)를 구글 Tasks에 완벽 반영',
+            '구글 캘린더 허브: 일정표, 주간 시간표 확인 및 즉시 이벤트 등록',
+            'Deep Clean & 중복 태스크 전역 제거 (Global Deduplication) 엔진',
+            'Dual Auth Flow: Supabase 또는 GIS SDK를 통한 구글 토큰 자동 연동'
+        ],
 
         featVisualTitle: '비주얼보드 - 한눈에 보기,\n모든 것을 통제하세요.',
         featVisualDesc: '전체 일정, 목표 및 다가오는 휴일 카운트다운을 모니터링합니다. 수입 및 지출 종합 데이터로 완벽한 재정 상태를 파악하세요.',
@@ -318,7 +491,7 @@ const translations = {
         promoTitle: 'My Storage 둘러보기',
         promoDesc: '안전하고 프라이빗한 클라우드 보관소. 텍스트 노트, 파일, 미디어 - 무엇이든 저장하세요.',
         promoBtn: '지금 체험하기',
-        featStorageItems: ['서식 있는 미디어 노트 작성', '파일/이미지 업로드 및 미리보기', '최고 수준의 정보 보안'],
+        featStorageItems: ['서식 있는 미디어 노트 작성', '파일/이미지 업로드 및 미리보기', '최고 수준 của 정보 보안'],
 
         contactTitle: '문의 및 제안',
         contactDesc: '앱 제휴 협력 및 발전을 위한 소중한 피드백을 기다립니다.',
@@ -352,50 +525,49 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
     const t = translations[lang];
 
     const marqueeFeatures = lang === 'vi' ? [
-        { name: 'AI Your Own', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
+        { name: 'Đồng bộ Google 2 Chiều', icon: '⚡', color: 'from-blue-500/10 to-indigo-500/10 text-blue-700 border-blue-200', targetId: 'google-ecosystem' },
+        { name: 'Bảng Kanban & Subtasks', icon: '📋', color: 'from-teal-500/10 to-emerald-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
+        { name: 'AI Your Own Đa Năng', icon: '🤖', color: 'from-indigo-500/10 to-purple-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
         { name: 'Cố vấn sự nghiệp AI', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
         { name: 'Xây dựng CV tự động', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
+        { name: 'Deep Clean Khử Trùng Lặp', icon: '✨', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'google-ecosystem' },
         { name: 'Nhật ký chữa lành', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
         { name: 'GPA Tracker VNU', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
+        { name: 'Quản lý Tài chính', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-250', targetId: 'finance' },
         { name: 'Nghe nhạc Spotify', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
         { name: 'Kỷ luật Thói quen', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
-        { name: 'Bảng Kanban', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
         { name: 'Lưu trữ Bookmark', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
         { name: 'Tập trung Pomodoro', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
-        { name: 'Quản lý Tài chính', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-250', targetId: 'finance' },
-        { name: 'Thời khóa biểu', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
-        { name: 'Lưu trữ Bảo mật', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
-        { name: 'Đếm ngược Sự kiện', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
+        { name: 'Lưu trữ Bảo mật', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' }
     ] : lang === 'ko' ? [
+        { name: '구글 2방향 동기화', icon: '⚡', color: 'from-blue-500/10 to-indigo-500/10 text-blue-700 border-blue-200', targetId: 'google-ecosystem' },
+        { name: 'Kanban 보드 & 서브태스크', icon: '📋', color: 'from-teal-500/10 to-emerald-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
         { name: 'AI Your Own', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
         { name: 'AI 커리어 상담사', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
         { name: '자동 이력서 빌더', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
+        { name: 'Deep Clean 중복정리', icon: '✨', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'google-ecosystem' },
         { name: '힐링 다이어리', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
         { name: 'GPA 트래커', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
+        { name: '자산 관리', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
         { name: '스포티파이 음악', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
         { name: '습관 관리', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
-        { name: 'Kanban 보드', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
         { name: '북마크 관리자', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
         { name: '뽀모도로 타이머', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
-        { name: '자산 관리', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
-        { name: '시각적 일정표', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
-        { name: '안전한 보관소', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
-        { name: '이벤트 카운트다운', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
+        { name: '안전한 보관소', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' }
     ] : [
+        { name: 'Google 2-Way Sync', icon: '⚡', color: 'from-blue-500/10 to-indigo-500/10 text-blue-700 border-blue-200', targetId: 'google-ecosystem' },
+        { name: 'Kanban & Subtasks', icon: '📋', color: 'from-teal-500/10 to-emerald-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
         { name: 'AI Your Own', icon: '🤖', color: 'from-blue-500/10 to-indigo-500/10 text-indigo-700 border-indigo-200', targetId: 'ai-advisor' },
         { name: 'AI Career Guidance', icon: '💼', color: 'from-indigo-500/10 to-cyan-500/10 text-cyan-700 border-cyan-200', targetId: 'ai-career-advisor' },
         { name: 'Auto CV Builder', icon: '📝', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'cv-builder' },
+        { name: 'Deep Clean & Deduplicate', icon: '✨', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'google-ecosystem' },
         { name: 'Healing Journal', icon: '📔', color: 'from-emerald-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'journal' },
         { name: 'GPA Tracker', icon: '🎓', color: 'from-cyan-500/10 to-blue-500/10 text-cyan-700 border-cyan-200', targetId: 'gpa-tracker' },
+        { name: 'Finance Manager', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
         { name: 'Spotify Music Player', icon: '🎵', color: 'from-purple-500/10 to-pink-500/10 text-purple-700 border-purple-200', targetId: 'spotify' },
         { name: 'Habit & Streaks', icon: '🌟', color: 'from-orange-500/10 to-amber-500/10 text-orange-700 border-orange-200', targetId: 'habit-tracker' },
-        { name: 'Kanban Board', icon: '📋', color: 'from-blue-500/10 to-teal-500/10 text-teal-700 border-teal-200', targetId: 'schedule' },
-        { name: 'Bookmark Manager', icon: '🔖', color: 'from-pink-500/10 to-rose-500/10 text-rose-700 border-rose-200', targetId: 'schedule' },
         { name: 'Pomodoro Focus', icon: '⏱️', color: 'from-rose-500/10 to-red-500/10 text-rose-700 border-rose-200', targetId: 'focus-music' },
-        { name: 'Finance Manager', icon: '💰', color: 'from-emerald-500/10 to-green-500/10 text-emerald-700 border-emerald-255', targetId: 'finance' },
-        { name: 'Visual Schedule', icon: '📅', color: 'from-blue-500/10 to-sky-500/10 text-blue-700 border-blue-200', targetId: 'schedule' },
-        { name: 'Secure Storage', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' },
-        { name: 'Event Countdown', icon: '⏳', color: 'from-amber-500/10 to-yellow-500/10 text-amber-700 border-amber-200', targetId: 'habit-tracker' }
+        { name: 'Secure Storage', icon: '🔒', color: 'from-zinc-500/10 to-slate-500/10 text-zinc-700 border-zinc-300', targetId: 'secure-storage' }
     ];
 
     const scrollToSection = (id: string) => {
@@ -432,6 +604,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                     {/* Centered navigation links */}
                     <nav className="hidden md:flex items-center gap-6 sm:gap-8 absolute left-1/2 transform -translate-x-1/2">
                         <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="px-3 py-2 text-sm font-bold text-gray-900 bg-gray-100 rounded-lg transition-all">{lang === 'vi' ? 'Trang chủ' : lang === 'ko' ? '홈' : 'Home'}</button>
+                        <button onClick={() => scrollToSection('dashboard-preview')} className="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">{lang === 'vi' ? 'Tổng quan' : lang === 'ko' ? '미리보기' : 'Overview'}</button>
+                        <button onClick={() => scrollToSection('google-ecosystem')} className="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">{lang === 'vi' ? 'Google Hub' : lang === 'ko' ? '구글 연동' : 'Google Hub'}</button>
                         <button onClick={() => onNavigate('features')} className="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">{lang === 'vi' ? 'Tính năng' : lang === 'ko' ? '기능' : 'Features'}</button>
                         <button onClick={() => onNavigate('pricing')} className="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">{lang === 'vi' ? 'Bảng giá' : lang === 'ko' ? '요금제' : 'Pricing'}</button>
                         <button onClick={() => onNavigate('contact')} className="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">{lang === 'vi' ? 'Liên hệ' : lang === 'ko' ? '문의' : 'Contact'}</button>
@@ -465,29 +639,25 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                 </div>
             </header>
 
-            {/* Hero Section */}
-            <section className="pt-[76px] pb-6 sm:pt-[92px] sm:pb-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden flex flex-col justify-center">
+            {/* Hero Section & Showcase */}
+            <section className="pt-[76px] pb-10 sm:pt-[92px] sm:pb-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden flex flex-col justify-center">
                 {/* Background Animated Glows */}
                 <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-purple-300/30 rounded-full blur-[80px] sm:blur-[120px] mix-blend-multiply animate-pulse" style={{ animationDuration: '4s' }}></div>
                 <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-indigo-300/30 rounded-full blur-[80px] sm:blur-[120px] mix-blend-multiply animate-pulse" style={{ animationDuration: '6s', animationDelay: '1s' }}></div>
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] sm:w-[800px] sm:h-[400px] bg-pink-200/20 rounded-full blur-[100px] sm:blur-[150px] pointer-events-none"></div>
 
-                {/* Floating Elements (Hidden on very small screens) */}
+                {/* Floating Elements */}
                 <div className="hidden md:block absolute inset-0 pointer-events-none z-0">
-                    {/* Floating Wallet */}
-                    <div className="absolute top-[20%] left-[15%] w-16 h-16 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '4s' }}>
+                    <div className="absolute top-[18%] left-[12%] w-16 h-16 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '4s' }}>
                         <Wallet className="text-emerald-500" size={32} />
                     </div>
-                    {/* Floating Calendar */}
-                    <div className="absolute top-[15%] right-[15%] w-14 h-14 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '5s', animationDelay: '0.5s' }}>
+                    <div className="absolute top-[14%] right-[12%] w-14 h-14 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '5s', animationDelay: '0.5s' }}>
                         <CalendarDays className="text-blue-500" size={28} />
                     </div>
-                    {/* Floating Music */}
-                    <div className="absolute bottom-[20%] left-[20%] w-14 h-14 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '1s' }}>
+                    <div className="absolute bottom-[28%] left-[16%] w-14 h-14 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '1s' }}>
                         <Music className="text-purple-500" size={28} />
                     </div>
-                    {/* Floating AI */}
-                    <div className="absolute bottom-[25%] right-[20%] w-16 h-16 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '0.2s' }}>
+                    <div className="absolute bottom-[30%] right-[16%] w-16 h-16 bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white flex items-center justify-center animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '0.2s' }}>
                         <Brain className="text-indigo-500" size={32} />
                     </div>
                 </div>
@@ -524,7 +694,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                                 SmartLife <strong>super tools</strong> dành cho sinh viên. Tools giúp user về việc quản trị cuộc sống như : <strong>tài chính</strong>, <strong>lịch trình</strong>, <strong>todolist mục tiêu cá nhân, mục tiêu nghề nghiệp dài hạn</strong>, <strong>thói quen</strong>, <strong>countdown/up</strong> và cả <strong>Viết nhật kí</strong>.
                                 {isDescExpanded ? (
                                     <span>
-                                        {' '}Ngoài ra còn có <strong>GPA tracker</strong> cho sinh viên VNU, Và CV Builder cùng với AI phân tích cá nhân hóa thêm <strong>DISC và MBTI</strong> để đề xuất nghề nghiệp phù hợp, <strong>My spotify</strong> nghe nhạc và podcast mình tự thêm, <strong>Pomodoro</strong> và các phương pháp bấm giờ học tập, <strong>Không gian học</strong>, <strong>Kho lưu trữ tập trung</strong>. Đặc biệt là <strong>Own AI Advisor</strong> nó truy cập toàn bộ dữ liệu cũng như phân tích ảnh,file,audio để có thể  action theo yêu cầu của người dùng một cách thông minh và cá nhân hóa. Tất cả các tính năng sinh viên cần đều trong Smartlife. Mọi thứ mượt và chi tiết thông minh + tối giản, Trải nghiệm nagy để quản trị cuộc sống SMART hơn nhé... Tks
+                                        {' '}Đặc biệt với các nâng cấp mới nhất: <strong>Đồng bộ Google Tasks 2 chiều</strong> (4 cột Kanban Doing/Todo/Backlog/Done), <strong>Google Calendar Hub</strong> & <strong>Google Sheets</strong>, <strong>Bảng Kanban tối ưu 95% render</strong>, <strong>Native Child Subtasks</strong>, động cơ <strong>Deep Clean khử trùng lặp</strong>, <strong>GPA tracker VNU</strong>, <strong>Auto CV Builder</strong> cùng <strong>AI Your Own đa phương thức</strong> (phân tích file, ảnh hóa đơn, audio). Mọi thứ mượt và chi tiết thông minh + tối giản, Trải nghiệm ngay để quản trị cuộc sống SMART hơn nhé!
                                         <button onClick={() => setIsDescExpanded(false)} className="text-indigo-600 font-semibold hover:underline ml-2 text-sm md:text-base whitespace-nowrap">Ẩn bớt</button>
                                     </span>
                                 ) : (
@@ -538,7 +708,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                                 SmartLife는 대학생을 위한 <strong>슈퍼 툴(Super Tool)</strong>입니다. <strong>자산 관리</strong>, <strong>일정 계획</strong>, <strong>목표 달성</strong>, <strong>습관 관리</strong>, <strong>카운트다운/업</strong>, 그리고 <strong>일기 기록</strong>까지 하나로 해결하세요.
                                 {isDescExpanded ? (
                                     <span>
-                                        {' '}추가로 VNU 학생들을 위한 <strong>GPA 트래커</strong>, 자유롭게 감상하는 <strong>My Spotify</strong> 음악 플레이어, <strong>뽀모도로 집중 타이머</strong>, <strong>학습 공간</strong> 및 <strong>프라이빗 저장소</strong>를 제공합니다. 특히 사용자의 데이터를 안전하게 연동하여 스마트하고 맞춤화된 조언을 주는 <strong>나만의 AI 어드바이저</strong> 기능이 탑재되어 있습니다. 대학 생활에 필요한 모든 도구를 스마트하고 심플한 디자인으로 만나보세요.
+                                        {' '}최신 대규모 업데이트: <strong>구글 Tasks 2방향 실시간 동기화</strong> (Kanban 4개 컬럼 연동), <strong>구글 캘린더 허브 & 스프레드시트</strong>, <strong>95% 렌더 최적화 Kanban</strong>, <strong>계층형 서브태스크</strong>, <strong>Deep Clean 중복제거 엔진</strong>, <strong>GPA 트래커</strong>, <strong>자동 이력서 빌더</strong> 및 <strong>멀티모달 AI 비서</strong>를 모두 경험해보세요!
                                         <button onClick={() => setIsDescExpanded(false)} className="text-indigo-600 font-semibold hover:underline ml-2 text-sm md:text-base whitespace-nowrap">접기</button>
                                     </span>
                                 ) : (
@@ -552,7 +722,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                                 SmartLife is a <strong>super tool</strong> designed for students. It helps them manage <strong>finances</strong>, <strong>schedules</strong>, <strong>personal goals</strong>, <strong>habits</strong>, <strong>countdowns/ups</strong>, and <strong>healing journals</strong>.
                                 {isDescExpanded ? (
                                     <span>
-                                        {' '}It also features a VNU-specific <strong>GPA tracker</strong>, a custom <strong>My Spotify</strong> client, <strong>Pomodoro</strong> focus modes, <strong>learning spaces</strong>, and <strong>secure storage</strong>. Most importantly, your <strong>own AI Advisor</strong> analyzes your data to take smart, personalized actions. Every single tool you need is wrapped in a fluid, beautiful, and minimal interface.
+                                        {' '}Featuring the latest breakthroughs: <strong>Two-Way Google Tasks Sync</strong> (4-column Kanban mapping), <strong>Google Calendar Hub & Sheets</strong>, <strong>95% render-optimized Kanban</strong>, <strong>Native child subtasks</strong>, <strong>Deep Clean deduplication engine</strong>, <strong>GPA tracker</strong>, <strong>Auto CV Builder</strong>, and <strong>Multi-modal AI Advisor</strong> (analyzing docs, receipt images, audio).
                                         <button onClick={() => setIsDescExpanded(false)} className="text-indigo-600 font-semibold hover:underline ml-2 text-sm md:text-base whitespace-nowrap">Show less</button>
                                     </span>
                                 ) : (
@@ -563,7 +733,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                             </div>
                         )}
                     </div>
-                    <div className="flex flex-col xs:flex-row items-center justify-center gap-3 sm:gap-4 animate-fade-in-up delay-300 w-full max-w-md sm:max-w-none mx-auto pb-2">
+                    <div className="flex flex-col xs:flex-row items-center justify-center gap-3 sm:gap-4 animate-fade-in-up delay-300 w-full max-w-md sm:max-w-none mx-auto pb-4">
                         <div className="relative group w-full xs:w-auto">
                             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-60 transition duration-500"></div>
                             <button
@@ -573,9 +743,55 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                                 {t.startNow} <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                             </button>
                         </div>
-                        <button onClick={() => scrollToSection('site-footer')} className="w-full xs:w-auto px-5 py-3 xs:px-8 xs:py-4 bg-white text-gray-700 border border-gray-200 shadow-sm rounded-full font-bold text-sm xs:text-base sm:text-lg hover:bg-gray-50 hover:shadow-md transition-all flex items-center justify-center group">
+                        <button onClick={() => scrollToSection('dashboard-preview')} className="w-full xs:w-auto px-5 py-3 xs:px-8 xs:py-4 bg-white text-gray-700 border border-gray-200 shadow-sm rounded-full font-bold text-sm xs:text-base sm:text-lg hover:bg-gray-50 hover:shadow-md transition-all flex items-center justify-center group">
                             {t.learnMore}
                         </button>
+                    </div>
+                </div>
+
+                {/* ══════════════════════════════════════════════════════════════════ */}
+                {/* SECTION ĐẦU TIÊN: TRƯNG BÀY ẢNH MOCKUP LANDINGPAGE                 */}
+                {/* ══════════════════════════════════════════════════════════════════ */}
+                <div id="dashboard-preview" className="max-w-7xl mx-auto mt-6 sm:mt-10 w-full relative z-20">
+                    {/* Mockup Showcase with Glassmorphism Frame */}
+                    <div className="relative group">
+                        {/* Ambient Backlight Glow */}
+                        <div className="absolute -inset-2 sm:-inset-4 bg-gradient-to-r from-indigo-500/40 via-purple-500/35 to-pink-500/40 rounded-3xl sm:rounded-[36px] blur-2xl sm:blur-3xl opacity-60 group-hover:opacity-85 transition-all duration-700"></div>
+                        
+                        {/* App Browser / Desktop Window */}
+                        <div className="relative bg-slate-900/95 backdrop-blur-2xl rounded-2xl sm:rounded-[28px] border border-white/20 p-2.5 sm:p-4 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.6)] overflow-hidden">
+                            {/* Window Header */}
+                            <div className="flex items-center justify-between px-3 py-2 sm:px-4 sm:py-2.5 mb-2.5 bg-slate-800/70 rounded-xl border border-white/5 text-xs text-slate-300">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-3 h-3 rounded-full bg-rose-500/90 border border-rose-600"></div>
+                                        <div className="w-3 h-3 rounded-full bg-amber-500/90 border border-amber-600"></div>
+                                        <div className="w-3 h-3 rounded-full bg-emerald-500/90 border border-emerald-600"></div>
+                                    </div>
+                                    <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-900/60 rounded-lg text-slate-400 font-mono text-[12px] border border-white/5">
+                                        <LockKeyhole size={12} className="text-emerald-400" />
+                                        <span>https://smartlife.app/dashboard</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-[11px] border border-indigo-500/30 shadow-sm">
+                                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                                        {lang === 'vi' ? 'Bản phát hành Life OS 2026' : lang === 'ko' ? '2026 통합 Life OS' : 'Life OS 2026 Release'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Main Image from landingpage.png */}
+                            <div className="relative rounded-xl overflow-hidden bg-slate-950 shadow-inner group">
+                                <img
+                                    src="/landingpage.png"
+                                    alt="SmartLife Dashboard Preview"
+                                    className="w-full h-auto object-cover rounded-xl transform transition-transform duration-700 group-hover:scale-[1.01]"
+                                    loading="eager"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -921,21 +1137,84 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                     </div>
                 </section>
 
-                {/* Feature 2: Schedule */}
-                <section id="schedule" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gray-50/50 py-12 sm:py-20 rounded-3xl">
+                {/* Feature NEW: Google Ecosystem Two-Way Integration */}
+                <section id="google-ecosystem" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gradient-to-br from-blue-50/40 via-indigo-50/30 to-cyan-50/40 py-12 sm:py-20 rounded-3xl border border-blue-100 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
+                    <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center relative z-10">
+                        <div className="order-2 md:order-1 relative group">
+                            <div className="absolute -inset-4 bg-gradient-to-r from-blue-300/40 via-indigo-300/30 to-cyan-300/40 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700"></div>
+                            <div className="relative">
+                                <img
+                                    src="/smartlife-google-ecosystem.jpg"
+                                    alt="Google Ecosystem Integration"
+                                    className="relative rounded-2xl shadow-2xl border border-white/60 transform group-hover:scale-[1.02] transition-transform duration-500 z-10 w-full object-cover"
+                                    onError={(e) => {
+                                        const target = e.currentTarget;
+                                        target.src = '/google-calendar-hero.jpg';
+                                    }}
+                                />
+                                <div className="absolute -bottom-3 -right-2 sm:-bottom-6 sm:-right-4 bg-white/90 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-xl border border-blue-100 z-20 flex items-center gap-3">
+                                    <div className="flex items-center gap-1.5">
+                                        <GoogleTasksIcon size={20} />
+                                        <GoogleCalendarIcon size={20} />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="text-[11px] text-gray-500 font-bold uppercase">{lang === 'vi' ? 'Trạng thái' : lang === 'ko' ? '상태' : 'Status'}</div>
+                                        <div className="text-xs font-extrabold text-emerald-600 flex items-center gap-1">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                            {lang === 'vi' ? 'Đồng bộ 2 Chiều Realtime' : lang === 'ko' ? '2방향 실시간 동기화' : '2-Way Realtime Sync'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="order-1 md:order-2 space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold uppercase tracking-wider mb-2 shadow-sm">
+                                <Zap size={14} className="animate-pulse" /> {t.featGoogleBadge}
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featGoogleTitle}</h2>
+                            <p className="text-gray-600 text-lg leading-relaxed">
+                                {t.featGoogleDesc}
+                            </p>
+                            <ul className="space-y-3 pt-2">
+                                {t.featGoogleItems && t.featGoogleItems.map((item: string, i: number) => {
+                                    const googleIcons = [
+                                        <LayoutDashboard className="text-blue-600" size={18} />,
+                                        <Workflow className="text-indigo-600" size={18} />,
+                                        <CalendarDays className="text-cyan-600" size={18} />,
+                                        <RefreshCw className="text-emerald-600" size={18} />,
+                                        <ShieldCheck className="text-amber-600" size={18} />
+                                    ];
+                                    const googleIconBgs = ['bg-blue-100', 'bg-indigo-100', 'bg-cyan-100', 'bg-emerald-100', 'bg-amber-100'];
+                                    return (
+                                        <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/70 p-3 rounded-xl border border-blue-50/80 shadow-sm backdrop-blur-sm">
+                                            <div className={`${googleIconBgs[i] || 'bg-blue-100'} p-1.5 rounded-lg shrink-0 mt-0.5`}>
+                                                {googleIcons[i] || <CheckCircle2 className="text-blue-600" size={18} />}
+                                            </div>
+                                            <span>{item}</span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature 2: Schedule & Smart Kanban */}
+                <section id="schedule" className="max-w-7xl mx-4 sm:mx-6 lg:mx-8 xl:mx-auto px-4 sm:px-8 lg:px-12 bg-gray-50/60 py-12 sm:py-20 rounded-3xl border border-gray-100">
                     <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                         <div className="space-y-6">
-                            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
-                                <CalendarDays size={28} />
+                            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 shrink-0 shadow-sm">
+                                <LayoutDashboard size={28} />
                             </div>
-                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 whitespace-pre-line">{t.featScheduleTitle}</h2>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 whitespace-pre-line leading-tight">{t.featScheduleTitle}</h2>
                             <p className="text-gray-600 text-lg leading-relaxed">
                                 {t.featScheduleDesc}
                             </p>
-                            <ul className="space-y-3">
+                            <ul className="space-y-3 pt-2">
                                 {t.featScheduleItems.map((item, i) => (
-                                    <li key={i} className="flex items-start gap-3 text-gray-700 font-medium">
-                                        <ShieldCheck className="text-blue-500 shrink-0 mt-1" size={20} />
+                                    <li key={i} className="flex items-start gap-3 text-gray-800 font-semibold bg-white/70 p-3 rounded-xl border border-gray-100 shadow-sm">
+                                        <ShieldCheck className="text-blue-500 shrink-0 mt-0.5" size={20} />
                                         <span>{item}</span>
                                     </li>
                                 ))}
@@ -945,8 +1224,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                             <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-3xl blur-xl opacity-70 group-hover:opacity-100 transition-opacity"></div>
                             <img
                                 src="/assets/schedule_preview.png"
-                                alt="Quản lý Lịch trình"
-                                className="relative rounded-2xl shadow-2xl border border-gray-100 transform group-hover:-translate-y-2 transition-transform duration-500"
+                                alt="Quản lý Lịch trình & Bảng Kanban"
+                                className="relative rounded-2xl shadow-2xl border border-gray-100 transform group-hover:-translate-y-2 transition-transform duration-500 w-full"
                             />
                         </div>
                     </div>
@@ -1300,39 +1579,45 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                             <h4 className="text-white font-bold text-sm tracking-wider uppercase mb-5">{t.footerCol1Title}</h4>
                             <ul className="space-y-3.5 text-sm">
                                 <li>
-                                    <button onClick={() => scrollToSection('ai-advisor')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                    <button onClick={() => scrollToSection('google-ecosystem')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
+                                        <Globe size={16} className="text-emerald-400 shrink-0" />
+                                        <span className="font-bold text-white">{lang === 'vi' ? 'Hệ Sinh Thái Google 2 Chiều' : lang === 'ko' ? '구글 2방향 동기화 생태계' : 'Google Ecosystem 2-Way'}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('schedule')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
+                                        <LayoutDashboard size={16} className="text-teal-400 shrink-0" />
+                                        <span className="font-bold text-white">{lang === 'vi' ? 'Bảng Kanban & Subtasks' : lang === 'ko' ? 'Kanban 보드 & 서브태스크' : 'Kanban & Subtasks'}</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button onClick={() => scrollToSection('ai-advisor')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
                                         <Brain size={16} className="text-blue-400 shrink-0" />
                                         <span>{t.footerAIAdvisor}</span>
                                     </button>
                                 </li>
                                 <li>
-                                    <button onClick={() => scrollToSection('ai-career-advisor')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                    <button onClick={() => scrollToSection('ai-career-advisor')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
                                         <Target size={16} className="text-purple-400 shrink-0" />
                                         <span>{t.footerCareer}</span>
                                     </button>
                                 </li>
                                 <li>
-                                    <button onClick={() => scrollToSection('cv-builder')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                    <button onClick={() => scrollToSection('cv-builder')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
                                         <FileText size={16} className="text-rose-400 shrink-0" />
                                         <span>{t.footerCVBuilder}</span>
                                     </button>
                                 </li>
                                 <li>
-                                    <button onClick={() => scrollToSection('finance')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                    <button onClick={() => scrollToSection('finance')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
                                         <Wallet size={16} className="text-emerald-400 shrink-0" />
                                         <span>{t.footerFinance}</span>
                                     </button>
                                 </li>
                                 <li>
-                                    <button onClick={() => scrollToSection('journal')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                    <button onClick={() => scrollToSection('journal')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
                                         <BookOpen size={16} className="text-teal-400 shrink-0" />
                                         <span>{t.footerJournal}</span>
-                                    </button>
-                                </li>
-                                <li>
-                                    <button onClick={() => scrollToSection('focus-music')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
-                                        <Headphones size={16} className="text-pink-400 shrink-0" />
-                                        <span>{t.footerFocus}</span>
                                     </button>
                                 </li>
                             </ul>
@@ -1343,31 +1628,31 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
                             <h4 className="text-white font-bold text-sm tracking-wider uppercase mb-5">{t.footerCol2Title}</h4>
                             <ul className="space-y-3.5 text-sm">
                                 <li>
-                                    <button onClick={() => scrollToSection('schedule')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
-                                        <CalendarDays size={16} className="text-indigo-400 shrink-0" />
-                                        <span>{t.footerSchedule}</span>
+                                    <button onClick={() => scrollToSection('focus-music')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
+                                        <Headphones size={16} className="text-pink-400 shrink-0" />
+                                        <span>{t.footerFocus}</span>
                                     </button>
                                 </li>
                                 <li>
-                                    <button onClick={() => scrollToSection('habit-tracker')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                    <button onClick={() => scrollToSection('habit-tracker')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
                                         <Flame size={16} className="text-orange-400 shrink-0" />
                                         <span>{t.footerHabit}</span>
                                     </button>
                                 </li>
                                 <li>
-                                    <button onClick={() => scrollToSection('gpa-tracker')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                    <button onClick={() => scrollToSection('gpa-tracker')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
                                         <GraduationCap size={16} className="text-cyan-400 shrink-0" />
                                         <span>{t.footerGPATracker}</span>
                                     </button>
                                 </li>
                                 <li>
-                                    <button onClick={() => scrollToSection('spotify')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                    <button onClick={() => scrollToSection('spotify')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
                                         <Music size={16} className="text-green-400 shrink-0" />
                                         <span>{t.footerSpotify}</span>
                                     </button>
                                 </li>
                                 <li>
-                                    <button onClick={() => scrollToSection('secure-storage')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200">
+                                    <button onClick={() => scrollToSection('secure-storage')} className="flex items-center gap-2.5 hover:text-white transition-colors duration-200 text-left">
                                         <LockKeyhole size={16} className="text-zinc-400 shrink-0" />
                                         <span>{t.footerStorage}</span>
                                     </button>
