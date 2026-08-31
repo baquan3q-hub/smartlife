@@ -9,6 +9,7 @@ import {
 import { NoteArchive, NoteLabelType, NoteArchiveFilter } from '../../../types';
 import { noteArchiveService } from '../../../services/noteArchiveService';
 import { NOTE_LABELS, DEFAULT_NOTE_LABELS_LIST } from './noteConstants';
+import { GoogleSheetViewerModal } from './GoogleSheetViewerModal';
 
 interface NotesArchiveModalProps {
   isOpen: boolean;
@@ -46,6 +47,43 @@ export const NotesArchiveModal: React.FC<NotesArchiveModalProps> = ({
   // Copy toast state
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [restoredId, setRestoredId] = useState<string | null>(null);
+  const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+  const [isSheetViewerOpen, setIsSheetViewerOpen] = useState(false);
+
+  const handleSyncAllToSheets = async () => {
+    try {
+      setIsSyncingSheets(true);
+      const { isSheetsConnected, syncNoteToSheets, getSpreadsheetUrl } = await import('../../../services/googleSheetsService');
+      if (!isSheetsConnected()) {
+        alert('Vui lòng đăng nhập Google để sử dụng tính năng đồng bộ Google Sheets.');
+        return;
+      }
+      for (const note of notes) {
+        await syncNoteToSheets({
+          id: note.id,
+          title: note.title || 'Ghi chú',
+          content: note.content,
+          labels: note.labels,
+          is_pinned: note.is_pinned,
+          created_at: note.note_date,
+          updated_at: note.updated_at,
+        });
+      }
+      const url = await getSpreadsheetUrl();
+      if (url) {
+        if (window.confirm('Đã đồng bộ toàn bộ ghi chú lên Google Sheets thành công! Bạn có muốn mở bảng tính ngay bây giờ?')) {
+          window.open(url, '_blank');
+        }
+      } else {
+        alert('Đã đồng bộ toàn bộ ghi chú lên Google Sheets thành công! ✓');
+      }
+    } catch (err: any) {
+      console.error('Lỗi sync Sheets:', err);
+      alert(`Lỗi đồng bộ Google Sheets: ${err.message || err}`);
+    } finally {
+      setIsSyncingSheets(false);
+    }
+  };
 
   // Load notes
   const fetchNotes = async () => {
@@ -236,6 +274,16 @@ export const NotesArchiveModal: React.FC<NotesArchiveModalProps> = ({
                 <span>Lưu ghi chú mới</span>
               </button>
             )}
+
+            {/* Nút Xem & Đồng bộ Google Sheets */}
+            <button
+              onClick={() => setIsSheetViewerOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs"
+              title="Xem và quản lý bảng tính Google Sheets của SmartLife"
+            >
+              <span>📊</span>
+              <span>Google Sheets</span>
+            </button>
 
             <button
               onClick={onClose}
@@ -622,6 +670,12 @@ export const NotesArchiveModal: React.FC<NotesArchiveModalProps> = ({
           </div>
         )}
 
+        {/* Google Sheets Viewer Modal */}
+        <GoogleSheetViewerModal
+          isOpen={isSheetViewerOpen}
+          onClose={() => setIsSheetViewerOpen(false)}
+          userId={userId}
+        />
       </div>
     </div>
   );

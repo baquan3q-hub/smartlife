@@ -1662,7 +1662,36 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                                         thead: ({ node, ...props }) => <thead className="bg-blue-50" {...props} />,
                                                         th: ({ node, ...props }) => <th className="border border-blue-200 px-4 py-2 text-left font-semibold text-blue-900" {...props} />,
                                                         td: ({ node, ...props }) => <td className="border border-blue-100 px-4 py-2 text-gray-700" {...props} />,
-                                                        tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
+                                                        tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />,
+                                                        a: ({ node, href, children, ...props }: any) => {
+                                                            const isGoogleMaps = href && (href.includes('google.com/maps') || href.includes('maps.google.com') || href.includes('maps.app.goo.gl'));
+                                                            if (isGoogleMaps) {
+                                                                return (
+                                                                    <a
+                                                                        href={href}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 my-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all no-underline not-prose"
+                                                                        {...props}
+                                                                    >
+                                                                        <span>🗺️</span>
+                                                                        <span>{children || 'Mở Google Maps chỉ đường'}</span>
+                                                                        <span className="text-[10px]">↗</span>
+                                                                    </a>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <a
+                                                                    href={href}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="text-blue-600 font-bold hover:underline inline-flex items-center gap-0.5"
+                                                                    {...props}
+                                                                >
+                                                                    {children}
+                                                                </a>
+                                                            );
+                                                        }
                                                     }}
                                                 >
                                                     {displayContent}

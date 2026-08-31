@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Star, Plus, MapPin, Clock, AlignLeft, Trash2, X, Edit2, List, Grid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Star, Plus, MapPin, Clock, AlignLeft, Trash2, X, Edit2, List, Grid, ExternalLink } from 'lucide-react';
 import { Solar, Lunar } from 'lunar-javascript';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,6 +14,9 @@ interface CalendarEvent {
     type: 'HOLIDAY' | 'PERSONAL' | 'WORK';
     email_notify?: boolean;
     email_notify_before_minutes?: number;
+    source?: 'supabase' | 'google';
+    color?: string;
+    htmlLink?: string;
 }
 
 interface CalendarWidgetProps {
@@ -34,31 +37,57 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ className }) => {
     const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
     // Fetch events
-    useEffect(() => {
+    const fetchAllEvents = async () => {
         if (!user) return;
 
-        const fetchEvents = async () => {
-            const { data, error } = await supabase
-                .from('calendar_events')
-                .select('*')
-                .eq('user_id', user.id)
-                // Filter by a large range if needed, for now all
-                .order('date', { ascending: true }); // Sort by date for list view
+        const { data } = await supabase
+            .from('calendar_events')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('date', { ascending: true });
 
-            if (data) {
-                setEvents(data);
+        const localEvents: CalendarEvent[] = (data || []).map((e: any) => ({ ...e, source: 'supabase' as const }));
+
+        try {
+            const { isGoogleCalendarConnected, getCachedCalendarEvents, syncGoogleCalendar } = await import('../services/googleCalendarService');
+            let gEvents = getCachedCalendarEvents();
+            if (isGoogleCalendarConnected() && gEvents.length === 0) {
+                const res = await syncGoogleCalendar();
+                gEvents = res.events;
             }
-        };
+            const mappedGCal: CalendarEvent[] = gEvents.map((ge: any) => {
+                const datePart = ge.startTime.slice(0, 10);
+                const timePart = ge.isAllDay ? undefined : ge.startTime.slice(11, 16);
+                return {
+                    id: ge.id,
+                    title: ge.title,
+                    description: ge.description,
+                    date: datePart,
+                    time: timePart,
+                    location: ge.location,
+                    type: 'PERSONAL',
+                    source: 'google',
+                    color: ge.color,
+                    htmlLink: ge.htmlLink,
+                };
+            });
+            setEvents([...localEvents, ...mappedGCal]);
+            return;
+        } catch (err) {
+            console.warn('[CalendarWidget] GCal load notice:', err);
+        }
 
-        fetchEvents();
-    }, [user, currentDate]); // Reload on mount/user change
+        setEvents(localEvents);
+    };
+
+    useEffect(() => {
+        fetchAllEvents();
+    }, [user, currentDate]);
 
     // Reload helper
     const reloadEvents = async () => {
-        if (!user) return;
-        const { data } = await supabase.from('calendar_events').select('*').eq('user_id', user.id).order('date', { ascending: true });
-        if (data) setEvents(data);
-    }
+        await fetchAllEvents();
+    };
 
     const daysInMonth = useMemo(() => {
         const year = currentDate.getFullYear();
@@ -399,7 +428,14 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ className }) => {
                                     <div key={ev.id} className="group p-2 rounded-xl border border-slate-100 bg-slate-50/40 hover:border-indigo-200 hover:bg-white transition-all">
                                         <div className="flex items-start justify-between gap-1.5">
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-[10.5px] font-bold text-slate-800 truncate">{ev.title}</p>
+                                                <div className="flex items-center gap-1.5">
+                                                    <p className="text-[10.5px] font-bold text-slate-800 truncate">{ev.title}</p>
+                                                    {ev.source === 'google' && (
+                                                        <span className="px-1.5 py-0.2 text-[8px] font-extrabold bg-blue-50 text-blue-600 rounded shrink-0">
+                                                            Google
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="flex items-center gap-2 mt-0.5">
                                                     {ev.time && (
                                                         <span className="flex items-center gap-0.5 text-[9px] font-semibold text-indigo-500">
@@ -414,12 +450,27 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ className }) => {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                                <button onClick={() => { setEditingEvent(ev); setIsModalOpen(true); }} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors">
-                                                    <Edit2 size={10} />
-                                                </button>
-                                                <button onClick={() => handleDelete(ev.id)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors">
-                                                    <Trash2 size={10} />
-                                                </button>
+                                                {ev.htmlLink && (
+                                                    <a
+                                                        href={ev.htmlLink}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                                        title="Mở Google Calendar"
+                                                    >
+                                                        <ExternalLink size={10} />
+                                                    </a>
+                                                )}
+                                                {ev.source !== 'google' && (
+                                                    <>
+                                                        <button onClick={() => { setEditingEvent(ev); setIsModalOpen(true); }} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors">
+                                                            <Edit2 size={10} />
+                                                        </button>
+                                                        <button onClick={() => handleDelete(ev.id)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors">
+                                                            <Trash2 size={10} />
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

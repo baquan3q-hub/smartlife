@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { AppState, TimetableEvent, Goal, Todo, TodoStatus, TaskLink, parseTaskLinks, encodeTaskLinks } from '../types';
 import { Calendar, Clock, Target, Plus, Trash2, Edit2, X, MapPin, Star, ChevronDown, ChevronUp, Download, CheckCircle, RefreshCw, BarChart2, ListTodo, LayoutGrid, Settings, Paperclip, Upload, Eye, ExternalLink, Link2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import CalendarWidget from './CalendarWidget';
 import MusicSpace from './MusicSpace';
 import { TaskAttachment, saveAttachment, getAttachments, deleteAttachment, downloadAttachment, formatFileSize, getFileIcon, isPreviewable } from '../services/taskAttachmentService';
 
@@ -15,6 +14,7 @@ import { HabitsWidget } from './tracker/HabitsWidget';
 import { QuickNotesWidget } from './tracker/QuickNotesWidget';
 import { GoogleTasksModal } from './tracker/GoogleTasksModal';
 import { GoogleTasksIcon } from './icons/GoogleTasksIcon';
+import { GoogleCalendarHub } from './tracker/GoogleCalendarHub';
 import { isGoogleTasksConnected, syncTaskStatusAndDueToGoogle, updateGoogleTask, deleteGoogleTask, completeGoogleTask, uncompleteGoogleTask, syncGoogleTasksWithKanban, isAutoSyncEnabled } from '../services/googleTasksService';
 import ConfirmModal from './ConfirmModal';
 
@@ -180,6 +180,132 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
   // Calendar states
   const [calendarDate, setCalendarDate] = useState(new Date());
+
+  // Google Calendar Sync state
+  const [isGCalCollapsed, setIsGCalCollapsed] = useState(false);
+  const [gCalEvents, setGCalEvents] = useState<any[]>([]);
+  const [isGCalSyncing, setIsGCalSyncing] = useState(false);
+  const [gCalLastSync, setGCalLastSync] = useState<string | null>(null);
+  const [isGCalConnected, setIsGCalConnected] = useState(false);
+
+  // Google Calendar auto-sync
+  useEffect(() => {
+    let mounted = true;
+
+    const syncGCal = async () => {
+      try {
+        const { isGoogleCalendarConnected, syncGoogleCalendar, getCachedCalendarEvents } = await import('../services/googleCalendarService');
+        const connected = isGoogleCalendarConnected();
+        if (mounted) setIsGCalConnected(connected);
+
+        if (!connected) {
+          // Load cached events if available
+          const cached = getCachedCalendarEvents();
+          if (mounted && cached.length > 0) setGCalEvents(cached);
+          return;
+        }
+
+        if (mounted) setIsGCalSyncing(true);
+        const result = await syncGoogleCalendar();
+        if (mounted) {
+          setGCalEvents(result.events);
+          setGCalLastSync(result.syncedAt);
+          setIsGCalSyncing(false);
+        }
+      } catch (err) {
+        console.warn('[GoogleCalendar] Sync error:', err);
+        if (mounted) setIsGCalSyncing(false);
+      }
+    };
+
+    syncGCal();
+
+    // Refresh every 60 seconds
+    const interval = setInterval(syncGCal, 60000);
+
+    // Refresh when tab becomes visible
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') syncGCal();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Listen for auth changes
+    const handleAuthChange = () => syncGCal();
+    window.addEventListener('google_auth_changed', handleAuthChange);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('google_auth_changed', handleAuthChange);
+    };
+  }, []);
+
+  // Helper: Get upcoming Google Calendar events (next 7 days)
+  const upcomingGCalEvents = useMemo(() => {
+    const now = new Date();
+    const weekLater = new Date(now);
+    weekLater.setDate(weekLater.getDate() + 7);
+
+    return gCalEvents
+      .filter(e => {
+        const start = new Date(e.startTime);
+        return start >= now && start <= weekLater;
+      })
+      .slice(0, 10);
+  }, [gCalEvents]);
+
+  // Google Calendar Quick Event Modal State
+  const [isGCalModalOpen, setIsGCalModalOpen] = useState(false);
+  const [gCalTitle, setGCalTitle] = useState('');
+  const [gCalDate, setGCalDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [gCalStartTime, setGCalStartTime] = useState('09:00');
+  const [gCalEndTime, setGCalEndTime] = useState('10:00');
+  const [gCalLocation, setGCalLocation] = useState('');
+  const [gCalDescription, setGCalDescription] = useState('');
+  const [gCalIsCreating, setGCalIsCreating] = useState(false);
+
+  const handleManualGCalSync = async () => {
+    try {
+      setIsGCalSyncing(true);
+      const { syncGoogleCalendar } = await import('../services/googleCalendarService');
+      const res = await syncGoogleCalendar();
+      setGCalEvents(res.events);
+      setGCalLastSync(res.syncedAt);
+    } catch (err: any) {
+      console.error('Lỗi đồng bộ Google Calendar:', err);
+      alert(`Lỗi đồng bộ Google Calendar: ${err?.message || err}`);
+    } finally {
+      setIsGCalSyncing(false);
+    }
+  };
+
+  const handleCreateGCalEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gCalTitle.trim()) return;
+    try {
+      setGCalIsCreating(true);
+      const { createEventFromSimpleParams } = await import('../services/googleCalendarService');
+      const newEvent = await createEventFromSimpleParams({
+        title: gCalTitle.trim(),
+        date: gCalDate,
+        time: gCalStartTime,
+        endTime: gCalEndTime,
+        location: gCalLocation.trim() || undefined,
+        description: gCalDescription.trim() || undefined,
+      });
+      setGCalEvents(prev => [newEvent, ...prev]);
+      setIsGCalModalOpen(false);
+      setGCalTitle('');
+      setGCalLocation('');
+      setGCalDescription('');
+    } catch (err: any) {
+      console.error('Lỗi tạo sự kiện Google Calendar:', err);
+      alert(`Lỗi tạo sự kiện: ${err?.message || err}`);
+    } finally {
+      setGCalIsCreating(false);
+    }
+  };
 
   // Goals/Timetable dialog states
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -517,238 +643,6 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
     setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
   };
 
-  // Render weekly timetable grid
-  const renderTimetableGrid = () => {
-    return (
-      <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden flex flex-col">
-        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
-          <div>
-            <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <Calendar className="text-indigo-600 w-4 h-4" />
-              Thời khóa biểu tuần cố định
-            </h4>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleExportTimetable}
-              className="px-3 py-1.5 text-xs bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition font-bold flex items-center gap-1.5"
-            >
-              <Download size={14} />
-              Tải ảnh lịch
-            </button>
-            <button onClick={() => { setEditingEvent(null); setIsTimeModalOpen(true); }} className="px-3 py-1.5 text-xs bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition font-bold flex items-center gap-1.5">
-              <Plus size={14} />
-              Thêm lịch mới
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto custom-scrollbar">
-          <div className="grid grid-cols-7 min-h-[450px] min-w-[850px] divide-x divide-slate-100 bg-white" ref={timetableRef}>
-            {DISPLAY_DAYS.map((day) => {
-              const dayEvents = timetable.filter(e => e.day_of_week === day.value).sort((a, b) => a.start_time.localeCompare(b.start_time));
-              const isToday = new Date().getDay() === day.value;
-
-              return (
-                <div key={day.value} className={`flex flex-col h-full ${isToday ? 'bg-indigo-50/15' : ''}`}>
-                  <div className={`text-center py-3 border-b border-slate-100 ${isToday ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-50/80 text-slate-600'}`}>
-                    <span className="text-xs tracking-wide">{day.label}</span>
-                  </div>
-                  <div className="p-2.5 space-y-2.5 flex-1 max-h-[380px] overflow-y-auto scrollbar-thin scroll-smooth pb-4">
-                    {dayEvents.map(e => (
-                      <div
-                        key={e.id}
-                        onClick={() => { setEditingEvent(e); setIsTimeModalOpen(true); }}
-                        className={`relative group p-2.5 rounded-xl border border-transparent shadow-[0_2px_8px_rgba(99,102,241,0.04)] shadow-sm hover:shadow-[0_6px_16px_rgba(99,102,241,0.08)] cursor-pointer transition-all duration-300 hover:-translate-y-0.5 bg-white hover:border-indigo-100`}
-                      >
-                        <div className="font-bold text-slate-800 text-xs leading-snug mb-1">{e.title}</div>
-                        <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                          <Clock size={10} />
-                          <span>{e.start_time.slice(0, 5)} - {e.end_time?.slice(0, 5)}</span>
-                          {e.email_notify && (
-                            <span className="text-indigo-600 font-bold ml-1" title={`Nhắc nhở email trước ${formatBeforeMinutes(e.email_notify_before_minutes ?? 60)}`}>
-                              🔔
-                            </span>
-                          )}
-                        </div>
-                        {e.location && (
-                          <div className="flex items-center gap-1 text-[9px] text-slate-400 mt-1">
-                            <MapPin size={10} /> {e.location}
-                          </div>
-                        )}
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onDeleteTimetable(e.id);
-                          }}
-                          className="absolute top-1 right-1 p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Render roadmap timeline today
-  const renderRoadmapTimeline = () => {
-    const getLocalDateString = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-
-    const todayStr = getLocalDateString(new Date());
-    const todayIndex = new Date().getDay();
-    const todayTimetableEvents = timetable.filter(t => t.day_of_week === todayIndex);
-    const todayCalendarEvents = (calendarEvents || []).filter((e: any) => e.date === todayStr);
-
-    const mappedTimetable = todayTimetableEvents.map(e => ({
-      id: e.id,
-      title: e.title,
-      start_time: e.start_time ? e.start_time.slice(0, 5) : '00:00',
-      end_time: e.end_time ? e.end_time.slice(0, 5) : undefined,
-      location: e.location,
-      description: null,
-      isCalendarEvent: false,
-      email_notify: false,
-      email_notify_before_minutes: 0
-    }));
-
-    const mappedCalendar = todayCalendarEvents.map(e => ({
-      id: e.id,
-      title: e.title,
-      start_time: e.time ? e.time.slice(0, 5) : '00:00',
-      end_time: undefined,
-      location: e.location,
-      description: e.description,
-      isCalendarEvent: true,
-      email_notify: e.email_notify,
-      email_notify_before_minutes: e.email_notify_before_minutes
-    }));
-
-    const combinedEvents = [...mappedTimetable, ...mappedCalendar].sort((a, b) => a.start_time.localeCompare(b.start_time));
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-    return (
-      <div className="bg-white rounded-3xl border border-slate-100 p-5 mt-4">
-        <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2 mb-4">
-          <Clock size={16} className="text-indigo-600 animate-pulse" />
-          Tiến trình hoạt động hôm nay
-        </h4>
-
-        {combinedEvents.length === 0 ? (
-          <div className="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            Không có lịch trình cố định hoặc lịch hẹn nào cho ngày hôm nay.
-          </div>
-        ) : (
-          <div className="relative pl-3 space-y-6 before:absolute before:inset-0 before:left-3 before:-translate-x-px before:h-full before:w-0.5 before:bg-indigo-100">
-            {combinedEvents.map((event) => {
-              const isPast = event.end_time 
-                ? event.end_time < currentTime 
-                : (() => {
-                    const [sh, sm] = event.start_time.split(':').map(Number);
-                    const [ch, cm] = currentTime.split(':').map(Number);
-                    return (ch * 60 + cm) >= (sh * 60 + sm + 60);
-                  })();
-
-              const isHappening = event.end_time 
-                ? (event.start_time <= currentTime && event.end_time >= currentTime)
-                : (() => {
-                    const [sh, sm] = event.start_time.split(':').map(Number);
-                    const [ch, cm] = currentTime.split(':').map(Number);
-                    const startMin = sh * 60 + sm;
-                    const currentMin = ch * 60 + cm;
-                    return currentMin >= startMin && currentMin < startMin + 60;
-                  })();
-
-              return (
-                <div key={event.id} className="relative flex items-start gap-4">
-                  {/* Bullet Node */}
-                  <div className={`absolute left-0 flex items-center justify-center w-6 h-6 -translate-x-1/2 rounded-full border-2 shadow-sm z-10 ${
-                    event.isCalendarEvent
-                      ? (isHappening ? 'bg-violet-600 border-white ring-4 ring-violet-100' : isPast ? 'bg-slate-200 border-white' : 'bg-white border-violet-300')
-                      : (isHappening ? 'bg-indigo-600 border-white ring-4 ring-indigo-100' : isPast ? 'bg-slate-200 border-white' : 'bg-white border-indigo-300')
-                  }`}>
-                    {isHappening ? (
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                    ) : (
-                      <div className={`w-1.5 h-1.5 rounded-full ${
-                        isPast 
-                          ? 'bg-slate-400' 
-                          : (event.isCalendarEvent ? 'bg-violet-400' : 'bg-indigo-400')
-                      }`} />
-                    )}
-                  </div>
-
-                  {/* Activity Card */}
-                  <div className={`flex-1 ml-6 p-3 rounded-2xl border ${
-                    event.isCalendarEvent
-                      ? 'border-violet-100 bg-gradient-to-r from-violet-50/40 to-indigo-50/20 hover:from-violet-100/40 hover:to-indigo-100/30 transition-all'
-                      : 'border-slate-100 bg-white hover:border-slate-200 transition-all'
-                  }`}>
-                    <div className="flex justify-between items-center mb-0.5">
-                      <div className="flex items-center gap-2">
-                        <h5 className={`text-xs font-bold ${event.isCalendarEvent ? 'text-violet-950' : 'text-slate-800'}`}>{event.title}</h5>
-                        {event.isCalendarEvent && (
-                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-700 uppercase tracking-wider scale-90 shrink-0">
-                            Lịch hẹn
-                          </span>
-                        )}
-                      </div>
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
-                        event.isCalendarEvent 
-                          ? 'bg-violet-100 text-violet-700' 
-                          : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {event.start_time}
-                      </span>
-                    </div>
-                    <div className={`text-[10px] ${event.isCalendarEvent ? 'text-violet-700/80' : 'text-slate-500'}`}>
-                      {event.isCalendarEvent ? (
-                        <>
-                          {event.start_time}{event.location && ` · ${event.location}`}
-                          {event.email_notify && (
-                            <span className="inline-flex items-center gap-0.5 text-[9px] text-violet-600 font-bold ml-2">
-                              🔔 Gmail (-{formatBeforeMinutes(event.email_notify_before_minutes)})
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          {event.start_time} - {event.end_time} {event.location && `· ${event.location}`}
-                          {event.email_notify && (
-                            <span className="inline-flex items-center gap-0.5 text-[9px] text-indigo-600 font-bold ml-2">
-                              🔔 Gmail (-{formatBeforeMinutes(event.email_notify_before_minutes)})
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {event.description && (
-                      <div className="text-[9.5px] text-violet-750/70 italic mt-1 border-t border-violet-100/30 pt-1 leading-normal">
-                        Ghi chú: {event.description}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div
       onTouchStart={handleTouchStart}
@@ -954,77 +848,21 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
       </div>
 
-      {/* Accordions bottom section: Weekly Timetable, Daily Roadmap, Goals, Calendar */}
+      {/* ── Google Calendar & Schedule Workspace (Transparent Glassmorphism) ── */}
       <div className="mt-8 space-y-4">
-        {/* Weekly Timetable accordion */}
-        <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
-          <button
-            onClick={() => setIsTimetableCollapsed(!isTimetableCollapsed)}
-            className="w-full px-5 py-4 flex items-center justify-between font-bold text-slate-800 text-sm hover:bg-slate-50 transition-colors bg-white border-b border-transparent"
-          >
-            <span className="flex items-center gap-2">
-              <Calendar size={16} className="text-slate-700" />
-              Thời khóa biểu tuần cố định
-            </span>
-            {isTimetableCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </button>
-          {!isTimetableCollapsed && (
-            <div className="p-5 pt-0 border-t border-slate-50 animate-in fade-in duration-250 bg-slate-50/20">
-              <div className="pt-4">
-                {renderTimetableGrid()}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Daily activity roadmap accordion */}
-        <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
-          <button
-            onClick={() => setIsRoadmapCollapsed(!isRoadmapCollapsed)}
-            className="w-full px-5 py-4 flex items-center justify-between font-bold text-slate-800 text-sm hover:bg-slate-50 transition-colors"
-          >
-            <span className="flex items-center gap-2">
-              <Clock size={16} className="text-slate-700" />
-              Lịch trình sự kiện hôm nay
-            </span>
-            {isRoadmapCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </button>
-          {!isRoadmapCollapsed && (
-            <div className="p-5 pt-0 border-t border-slate-50 animate-in fade-in duration-250 bg-slate-50/20">
-              {renderRoadmapTimeline()}
-            </div>
-          )}
-        </div>
-
-        {/* Monthly Calendar accordion */}
-        <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
-          <button
-            onClick={() => setIsCalendarCollapsed(!isCalendarCollapsed)}
-            className="w-full px-5 py-4 flex items-center justify-between font-bold text-slate-800 text-sm hover:bg-slate-50 transition-colors"
-          >
-            <span className="flex items-center gap-2">
-              <Calendar size={16} className="text-slate-700" />
-              Lịch biểu tháng chi tiết
-            </span>
-            {isCalendarCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </button>
-          {!isCalendarCollapsed && (
-            <div className="p-5 pt-0 border-t border-slate-50 animate-in fade-in duration-250 bg-slate-50/20">
-              <div className="pt-4">
-                <CalendarWidget />
-              </div>
-            </div>
-          )}
-        </div>
+        <GoogleCalendarHub
+          userId={effectiveUserId}
+          onOpenGoogleAuth={() => setIsGoogleTasksModalOpen(true)}
+        />
 
         {/* Goals accordion */}
-        <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl border border-white/60 dark:border-slate-800 overflow-hidden shadow-xs">
           <button
             onClick={() => setIsGoalsCollapsed(!isGoalsCollapsed)}
-            className="w-full px-5 py-4 flex items-center justify-between font-bold text-slate-800 text-sm hover:bg-slate-50 transition-colors"
+            className="w-full px-5 py-4 flex items-center justify-between font-bold text-slate-800 dark:text-white text-sm hover:bg-slate-50/50 transition-colors"
           >
             <span className="flex items-center gap-2">
-              <Target size={16} className="text-slate-700" />
+              <Target size={16} className="text-indigo-600 dark:text-indigo-400" />
               Mục tiêu học tập & cá nhân
             </span>
             {isGoalsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
@@ -1825,6 +1663,138 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
           }}
           onCancel={() => setTodoToDeleteId(null)}
         />
+      )}
+
+      {/* Google Calendar Quick Event Modal */}
+      {isGCalModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-blue-50/40">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                  <Calendar size={16} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-800">Thêm sự kiện Google Calendar</h3>
+                  <p className="text-[10px] text-slate-400 font-medium">Tự động đồng bộ lên Google Calendar</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGCalModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateGCalEvent} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">
+                  Tiêu đề sự kiện *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="VD: Lịch học React, Cuộc hẹn cà phê, Phỏng vấn..."
+                  value={gCalTitle}
+                  onChange={(e) => setGCalTitle(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">
+                    Ngày
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={gCalDate}
+                    onChange={(e) => setGCalDate(e.target.value)}
+                    className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">
+                    Bắt đầu
+                  </label>
+                  <input
+                    type="time"
+                    value={gCalStartTime}
+                    onChange={(e) => setGCalStartTime(e.target.value)}
+                    className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">
+                    Kết thúc
+                  </label>
+                  <input
+                    type="time"
+                    value={gCalEndTime}
+                    onChange={(e) => setGCalEndTime(e.target.value)}
+                    className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">
+                  Địa điểm (tuỳ chọn)
+                </label>
+                <div className="relative">
+                  <MapPin size={13} className="absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="VD: Phòng 402 - Giảng đường A, Tầng 3..."
+                    value={gCalLocation}
+                    onChange={(e) => setGCalLocation(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">
+                  Ghi chú / Mô tả (tuỳ chọn)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ghi chú thêm về sự kiện..."
+                  value={gCalDescription}
+                  onChange={(e) => setGCalDescription(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none focus:border-blue-500 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsGCalModalOpen(false)}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50 transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={gCalIsCreating || !gCalTitle.trim()}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {gCalIsCreating ? (
+                    <>
+                      <RefreshCw size={13} className="animate-spin" />
+                      Đang tạo...
+                    </>
+                  ) : (
+                    'Thêm vào Google Calendar'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Google Tasks Sync & Management Modal */}
