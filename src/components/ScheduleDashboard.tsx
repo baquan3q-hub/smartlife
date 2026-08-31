@@ -17,16 +17,19 @@ import { GoogleTasksIcon } from './icons/GoogleTasksIcon';
 import { GoogleCalendarHub } from './tracker/GoogleCalendarHub';
 import { isGoogleTasksConnected, syncTaskStatusAndDueToGoogle, updateGoogleTask, deleteGoogleTask, completeGoogleTask, uncompleteGoogleTask, syncGoogleTasksWithKanban, isAutoSyncEnabled } from '../services/googleTasksService';
 import ConfirmModal from './ConfirmModal';
+import { ReminderTimeSelector } from './common/ReminderTimeSelector';
 
-const formatBeforeMinutes = (minutes: number) => {
-  if (minutes <= 0) return 'Đúng giờ';
-  if (minutes < 60) return `${minutes}p`;
+const formatBeforeMinutes = (minutes?: number) => {
+  if (minutes === undefined || minutes === null || minutes <= 0) return 'Đúng giờ';
+  if (minutes < 60) return `-${minutes}p`;
   if (minutes < 1440) {
     const hrs = Math.floor(minutes / 60);
-    return `${hrs}h`;
+    const mins = minutes % 60;
+    return mins > 0 ? `-${hrs}h${mins}p` : `-${hrs}h`;
   }
   const days = Math.floor(minutes / 1440);
-  return `${days} ngày`;
+  const hrs = Math.floor((minutes % 1440) / 60);
+  return hrs > 0 ? `-${days}d${hrs}h` : `-${days} ngày`;
 };
 
 interface ScheduleDashboardProps {
@@ -314,6 +317,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
   const [isTimeModalOpen, setIsTimeModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<TimetableEvent | null>(null);
+  const [timetableEmailBefore, setTimetableEmailBefore] = useState(60);
   const timetableRef = React.useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -1103,26 +1107,11 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 </div>
                 
                 <div>
-                  <label className="text-[9px] font-extrabold text-slate-400 uppercase ml-0.5 block mb-1">Thời gian nhắc trước</label>
-                  <select
-                    name="email_notify_before_minutes"
-                    defaultValue={editingEvent?.email_notify_before_minutes ?? 60}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl outline-none font-semibold text-xs text-slate-700 focus:ring-1 focus:ring-indigo-400 cursor-pointer"
-                  >
-                    <option value={5}>Trước 5 phút</option>
-                    <option value={10}>Trước 10 phút</option>
-                    <option value={15}>Trước 15 phút</option>
-                    <option value={30}>Trước 30 phút</option>
-                    <option value={60}>Trước 1 giờ</option>
-                    <option value={120}>Trước 2 giờ</option>
-                    <option value={180}>Trước 3 giờ</option>
-                    <option value={360}>Trước 6 giờ</option>
-                    <option value={720}>Trước 12 giờ</option>
-                    <option value={1440}>Trước 1 ngày</option>
-                    <option value={2880}>Trước 2 ngày</option>
-                    <option value={4320}>Trước 3 ngày</option>
-                    <option value={10080}>Trước 7 ngày</option>
-                  </select>
+                  <input type="hidden" name="email_notify_before_minutes" value={timetableEmailBefore} />
+                  <ReminderTimeSelector
+                    value={timetableEmailBefore}
+                    onChange={setTimetableEmailBefore}
+                  />
                 </div>
               </div>
 
@@ -1541,20 +1530,10 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 </div>
                 {modalEmailNotify && (
                   <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-                    <label className="block text-[9px] font-extrabold text-slate-400 uppercase ml-0.5 mb-1.5 tracking-wider">
-                      Thời gian nhắc trước
-                    </label>
-                    <select
+                    <ReminderTimeSelector
                       value={modalEmailNotifyBefore}
-                      onChange={(e) => setModalEmailNotifyBefore(Number(e.target.value))}
-                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none font-semibold text-xs text-slate-700 focus:border-slate-400 cursor-pointer"
-                    >
-                      <option value={15}>Trước 15 phút</option>
-                      <option value={30}>Trước 30 phút</option>
-                      <option value={60}>Trước 1 giờ</option>
-                      <option value={120}>Trước 2 giờ</option>
-                      <option value={1440}>Trước 1 ngày</option>
-                    </select>
+                      onChange={setModalEmailNotifyBefore}
+                    />
                   </div>
                 )}
               </div>
