@@ -195,7 +195,7 @@ export const NotesArchiveModal: React.FC<NotesArchiveModalProps> = ({
         {/* Top Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+            <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-800 dark:text-slate-200 shadow-sm">
               <BookOpen size={20} />
             </div>
             <div>
@@ -217,10 +217,9 @@ export const NotesArchiveModal: React.FC<NotesArchiveModalProps> = ({
                   onClose();
                   onOpenAISum();
                 }}
-                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-100 flex items-center gap-1.5 transition-all active:scale-95"
+                className="px-3.5 py-1.5 rounded-xl bg-black hover:bg-slate-900 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-extrabold text-xs shadow-xs flex items-center justify-center transition-all active:scale-95"
               >
-                <Sparkles size={13} className="text-amber-300" />
-                <span>AI Sum</span>
+                AI Sum
               </button>
             )}
 

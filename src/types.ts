@@ -199,6 +199,9 @@ export interface Todo {
   email_notify?: boolean;
   email_notify_before_minutes?: number;
   attach_link?: string;
+  google_task_id?: string;
+  google_list_id?: string;
+  google_synced_at?: string;
 }
 
 // Interface cho link đính kèm trong task (hỗ trợ nhiều link)

@@ -273,7 +273,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
       {/* Header with Title & Action Badges */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 shadow-xs">
+          <div className="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 flex items-center justify-center text-slate-800 dark:text-slate-200 shadow-xs">
             <StickyNote size={15} />
           </div>
           <div>
@@ -285,14 +285,13 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
 
         {/* Action Buttons Toolbar on Header */}
         <div className="flex items-center gap-1.5 ml-auto">
-          {/* Nút ✨ AI Sum */}
+          {/* Nút AI Sum */}
           <button
             onClick={() => setIsAISumModalOpen(true)}
             title="Tóm tắt nội dung ghi chú bằng AI"
-            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-[10.5px] shadow-xs flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+            className="px-2.5 py-1 rounded-lg bg-black hover:bg-slate-900 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-extrabold text-[10.5px] shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
           >
-            <Sparkles size={11} className="text-amber-300" />
-            <span>AI Sum</span>
+            AI Sum
           </button>
 
           {/* Nút 📁 Bộ nhớ (CRUDS) */}
@@ -304,7 +303,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
             <BookOpen size={11} className="text-slate-600" />
             <span>Bộ nhớ</span>
             {archivedCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center">
+              <span className="w-4 h-4 rounded-full bg-slate-800 text-white text-[9px] font-black flex items-center justify-center">
                 {archivedCount > 99 ? '99+' : archivedCount}
               </span>
             )}
@@ -326,7 +325,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
             </span>
           ) : syncStatus === 'saving' ? (
             <span className="text-slate-500 flex items-center gap-1">
-              <Loader2 size={10} className="animate-spin text-indigo-500" />
+              <Loader2 size={10} className="animate-spin text-slate-600" />
               Tự lưu...
             </span>
           ) : syncStatus === 'saved' ? (
@@ -343,7 +342,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
       </div>
 
       {/* Note Editable Textarea Area */}
-      <div className="flex-1 min-h-[140px] bg-slate-50/70 rounded-2xl border border-slate-100 p-3 shadow-inner relative group focus-within:bg-white focus-within:border-indigo-200 transition-colors">
+      <div className="flex-1 min-h-[140px] bg-slate-50/70 rounded-2xl border border-slate-100 p-3 shadow-inner relative group focus-within:bg-white focus-within:border-slate-300 transition-colors">
         <textarea
           value={content}
           onChange={handleChange}
@@ -361,7 +360,7 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
           onClick={() => setIsSaveModalOpen(true)}
           disabled={!content.trim() || isLoading}
           title="Lưu vào bộ nhớ ghi chú (Ctrl + Enter)"
-          className="p-1.5 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-600 border border-indigo-200/60 shadow-xs flex items-center justify-center transition-all active:scale-90 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+          className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 shadow-xs flex items-center justify-center transition-all active:scale-90 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
         >
           <Save size={14} />
         </button>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { AppState, TimetableEvent, Goal, Todo, TodoStatus, TaskLink, parseTaskLinks, encodeTaskLinks } from '../types';
-import { Calendar, Clock, Target, Plus, Trash2, Edit2, X, MapPin, Star, ChevronDown, ChevronUp, Download, CheckCircle, RefreshCw, BarChart2, ListTodo, LayoutGrid, Settings, Paperclip, Upload, Eye } from 'lucide-react';
+import { Calendar, Clock, Target, Plus, Trash2, Edit2, X, MapPin, Star, ChevronDown, ChevronUp, Download, CheckCircle, RefreshCw, BarChart2, ListTodo, LayoutGrid, Settings, Paperclip, Upload, Eye, ExternalLink, Link2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import CalendarWidget from './CalendarWidget';
 import MusicSpace from './MusicSpace';
@@ -12,6 +13,9 @@ import { PomodoroWidget } from './tracker/PomodoroWidget';
 import { BookmarkWidget } from './tracker/BookmarkWidget';
 import { HabitsWidget } from './tracker/HabitsWidget';
 import { QuickNotesWidget } from './tracker/QuickNotesWidget';
+import { GoogleTasksModal } from './tracker/GoogleTasksModal';
+import { GoogleTasksIcon } from './icons/GoogleTasksIcon';
+import { isGoogleTasksConnected, syncTaskStatusAndDueToGoogle, updateGoogleTask, deleteGoogleTask, completeGoogleTask, uncompleteGoogleTask, syncGoogleTasksWithKanban, isAutoSyncEnabled } from '../services/googleTasksService';
 import ConfirmModal from './ConfirmModal';
 
 const formatBeforeMinutes = (minutes: number) => {
@@ -34,7 +38,7 @@ interface ScheduleDashboardProps {
   onAddTimetable: (t: any) => void;
   onUpdateTimetable: (t: any) => void;
   onDeleteTimetable: (id: string) => void;
-  onAddTodo: (content: string, priority: any, deadline?: string, status?: TodoStatus, description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string, customId?: string) => void;
+  onAddTodo: (content: string, priority: any, deadline?: string, status?: TodoStatus, description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string, customId?: string, googleTaskId?: string, googleListId?: string) => void;
   onUpdateTodo: (t: any) => void;
   onDeleteTodo: (id: string) => void;
   onReorderTodos: (reordered: Todo[]) => void;
@@ -99,6 +103,54 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const startY = React.useRef(0);
   const isDragging = React.useRef(false);
+
+  // Google Tasks sync modal state & real-time background sync
+  const [isGoogleTasksModalOpen, setIsGoogleTasksModalOpen] = useState(false);
+  const [isGTasksConnected, setIsGTasksConnected] = useState(isGoogleTasksConnected());
+  const isSyncingGTasksRef = useRef(false);
+
+  const handleSilentGTasksSync = useCallback(async () => {
+    if (!isGoogleTasksConnected() || !isAutoSyncEnabled() || isSyncingGTasksRef.current) return;
+    try {
+      isSyncingGTasksRef.current = true;
+      await syncGoogleTasksWithKanban(todos, { onAddTodo, onUpdateTodo });
+    } catch (e) {
+      console.warn('[GoogleTasks] Silent sync notice:', e);
+    } finally {
+      isSyncingGTasksRef.current = false;
+    }
+  }, [todos, onAddTodo, onUpdateTodo]);
+
+  useEffect(() => {
+    const checkGTasks = () => {
+      const connected = isGoogleTasksConnected();
+      setIsGTasksConnected(connected);
+      if (connected) handleSilentGTasksSync();
+    };
+    checkGTasks();
+    window.addEventListener('google_tasks_auth_changed', checkGTasks);
+
+    // Tự động đồng bộ ngay khi người dùng quay lại tab/cửa sổ (Focus / Visibility)
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible') {
+        handleSilentGTasksSync();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // Đồng bộ định kỳ mỗi 45 giây
+    const interval = setInterval(() => {
+      handleSilentGTasksSync();
+    }, 45000);
+
+    return () => {
+      window.removeEventListener('google_tasks_auth_changed', checkGTasks);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      clearInterval(interval);
+    };
+  }, [handleSilentGTasksSync]);
 
   // Unified Task creation/edit modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -391,7 +443,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         modalDraftTaskId
       );
     } else if (modalMode === 'edit' && selectedTodo) {
-      onUpdateTodo({
+      const updatedTodo = {
         ...selectedTodo,
         content: modalContent.trim(),
         status: modalStatus,
@@ -401,7 +453,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         subtasks: modalSubtasks,
         email_notify: modalEmailNotify,
         email_notify_before_minutes: modalEmailNotifyBefore,
-      });
+      };
+      onUpdateTodo(updatedTodo);
     }
     setIsModalOpen(false);
   };
@@ -754,6 +807,21 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                     Lịch
                   </button>
                 </div>
+
+                {/* Google Tasks Sync Button (Icon-Only) */}
+                <button
+                  type="button"
+                  onClick={() => setIsGoogleTasksModalOpen(true)}
+                  className={`w-7 h-7 rounded-full transition-all flex items-center justify-center relative border shrink-0 cursor-pointer ${
+                    isGTasksConnected
+                      ? 'bg-white hover:bg-emerald-50/50 border-emerald-200/80 shadow-xs dark:bg-card dark:border-emerald-800/60'
+                      : 'bg-slate-100 hover:bg-slate-200/80 border-slate-200/60 dark:bg-slate-800 dark:border-slate-700'
+                  }`}
+                  title={isGTasksConnected ? 'Google Tasks (Đã kết nối)' : 'Kết nối Google Tasks'}
+                >
+                  <GoogleTasksIcon size={16} />
+                  <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-card ${isGTasksConnected ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                </button>
 
                 {/* + Thêm task button */}
                 <button
@@ -1231,7 +1299,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
       {/* UNIFIED TASK CREATION/DETAIL MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col animate-in zoom-in-95 duration-200 relative max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col animate-in zoom-in-95 duration-200 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
             {/* Modal Header */}
             <div className="flex justify-between items-center mb-4 select-none pb-2">
               <span className="text-sm font-black text-slate-800">
@@ -1348,15 +1416,16 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                           href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors shrink-0"
+                          className="p-1.5 text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-400 dark:hover:bg-indigo-900/60 rounded-lg transition-colors shrink-0 flex items-center justify-center cursor-pointer"
                           onClick={(e) => e.stopPropagation()}
+                          title="Mở liên kết"
                         >
-                          Mở ↗
+                          <ExternalLink size={12} />
                         </a>
                         <button
                           type="button"
                           onClick={() => setModalAttachLinks(modalAttachLinks.filter(l => l.id !== link.id))}
-                          className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
                           title="Xóa link"
                         >
                           <X size={12} />
@@ -1532,24 +1601,24 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
               </div>
 
               {/* Enhanced File Preview Modal */}
-              {previewAttachment && (
+              {previewAttachment && typeof document !== 'undefined' && createPortal(
                 <div
-                  className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
+                  className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200"
                   onClick={() => {
                     URL.revokeObjectURL(previewAttachment.url);
                     setPreviewAttachment(null);
                   }}
                 >
                   <div
-                    className="relative bg-white dark:bg-card border border-border rounded-2xl shadow-2xl max-w-[90vw] max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+                    className="relative bg-white dark:bg-card border border-border/80 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-slate-50/50 dark:bg-card shrink-0 gap-3">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-sm shrink-0">{getFileIcon(previewAttachment.type)}</span>
-                        <p className="text-xs font-bold text-foreground truncate">{previewAttachment.name}</p>
+                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-slate-50/80 dark:bg-card shrink-0 gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-base shrink-0">{getFileIcon(previewAttachment.type)}</span>
+                        <p className="text-xs sm:text-sm font-bold text-foreground truncate">{previewAttachment.name}</p>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={() => {
@@ -1560,11 +1629,11 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                             a.click();
                             document.body.removeChild(a);
                           }}
-                          className="flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                          className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
                           title="Tải xuống"
                         >
-                          <Download size={12} />
-                          Tải về
+                          <Download size={13} />
+                          <span>Tải về</span>
                         </button>
                         <button
                           type="button"
@@ -1572,50 +1641,50 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                             URL.revokeObjectURL(previewAttachment.url);
                             setPreviewAttachment(null);
                           }}
-                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer"
+                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors cursor-pointer"
                           title="Đóng"
                         >
-                          <X size={16} />
+                          <X size={18} />
                         </button>
                       </div>
                     </div>
 
-                    <div className="flex-1 overflow-auto flex items-center justify-center p-2 min-h-[200px] max-h-[70vh] bg-slate-900/5 dark:bg-black/30">
+                    <div className="flex-1 overflow-auto flex items-center justify-center p-3 sm:p-4 min-h-[300px] max-h-[78vh] bg-slate-900/5 dark:bg-black/40">
                       {previewAttachment.type.startsWith('image/') ? (
                         <img
                           src={previewAttachment.url}
                           alt={previewAttachment.name}
-                          className="max-w-full max-h-[68vh] object-contain rounded-lg"
+                          className="max-w-full max-h-[74vh] object-contain rounded-xl shadow-sm"
                         />
                       ) : previewAttachment.type === 'application/pdf' ? (
                         <iframe
                           src={previewAttachment.url}
                           title={previewAttachment.name}
-                          className="w-[85vw] max-w-4xl h-[68vh] rounded-lg border-0 bg-white"
+                          className="w-full h-[74vh] rounded-xl border-0 shadow-sm bg-white"
                         />
                       ) : previewAttachment.type.startsWith('video/') ? (
                         <video
                           src={previewAttachment.url}
                           controls
                           autoPlay
-                          className="max-w-full max-h-[68vh] rounded-lg"
+                          className="max-w-full max-h-[74vh] rounded-xl shadow-sm"
                         />
                       ) : previewAttachment.type.startsWith('audio/') ? (
                         <div className="p-8 flex flex-col items-center gap-3">
-                          <span className="text-3xl">🎵</span>
-                          <p className="text-xs font-bold">{previewAttachment.name}</p>
-                          <audio src={previewAttachment.url} controls autoPlay className="w-80" />
+                          <p className="text-xs font-bold text-foreground">{previewAttachment.name}</p>
+                          <audio src={previewAttachment.url} controls autoPlay className="w-80 sm:w-96" />
                         </div>
                       ) : (
                         <iframe
                           src={previewAttachment.url}
                           title={previewAttachment.name}
-                          className="w-[85vw] max-w-3xl h-[65vh] rounded-lg bg-white p-4 font-mono text-xs"
+                          className="w-full h-[70vh] rounded-xl bg-white p-4 font-mono text-xs shadow-sm"
                         />
                       )}
                     </div>
                   </div>
-                </div>
+                </div>,
+                document.body
               )}
 
               {/* Email Notifications */}
@@ -1735,15 +1804,21 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
       {todoToDeleteId !== null && (
         <ConfirmModal
           isOpen={todoToDeleteId !== null}
-          title="Xác nhận xóa nhiệm vụ"
-          message="Bạn có chắc chắn muốn xóa nhiệm vụ này không? Hành động này không thể hoàn tác."
-          confirmText="Xóa"
+          title="Bạn có chắc muốn xóa?"
+          message="Nhiệm vụ này sẽ bị xóa vĩnh viễn khỏi bảng Kanban SmartLife và Google Tasks."
+          confirmText="Xóa luôn"
           cancelText="Hủy"
           onConfirm={() => {
             if (todoToDeleteId) {
+              const target = todos.find(t => t.id === todoToDeleteId);
+              if (target?.google_task_id && isGoogleTasksConnected()) {
+                deleteGoogleTask(target.google_task_id, target.google_list_id || '@default')
+                  .catch(e => console.warn('[AutoSync] Delete task error:', e));
+              }
               onDeleteTodo(todoToDeleteId);
               setTodoToDeleteId(null);
             }
@@ -1751,6 +1826,17 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
           onCancel={() => setTodoToDeleteId(null)}
         />
       )}
+
+      {/* Google Tasks Sync & Management Modal */}
+      <GoogleTasksModal
+        isOpen={isGoogleTasksModalOpen}
+        onClose={() => setIsGoogleTasksModalOpen(false)}
+        todos={todos}
+        syncCallbacks={{
+          onAddTodo,
+          onUpdateTodo,
+        }}
+      />
     </div>
   );
 };

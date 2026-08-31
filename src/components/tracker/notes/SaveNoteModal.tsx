@@ -104,7 +104,7 @@ export const SaveNoteModal: React.FC<SaveNoteModalProps> = ({
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+            <div className="w-9 h-9 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-800 dark:text-slate-200 shadow-sm">
               <Save size={18} />
             </div>
             <div>
@@ -243,7 +243,7 @@ export const SaveNoteModal: React.FC<SaveNoteModalProps> = ({
               type="button"
               onClick={() => handleSave()}
               disabled={isSaving || !content.trim()}
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-xs shadow-md shadow-indigo-200 hover:opacity-95 active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5 transition-all"
+              className="px-5 py-2 rounded-xl bg-black hover:bg-slate-900 text-white font-extrabold text-xs shadow-sm hover:opacity-95 active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5 transition-all cursor-pointer"
             >
               {isSaving ? (
                 <>

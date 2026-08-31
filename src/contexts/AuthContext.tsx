@@ -108,6 +108,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         try {
                             localStorage.setItem('smartlife_cached_session', JSON.stringify(freshSession));
                         } catch (e) {}
+
+                        // Tự động nhận diện Google OAuth Token để đồng bộ Google Tasks ngay khi login
+                        if ((freshSession as any)?.provider_token) {
+                            import('../services/googleTasksService').then(({ saveGoogleToken }) => {
+                                saveGoogleToken((freshSession as any).provider_token, 3600);
+                            }).catch(() => {});
+                        }
                         await Preferences.set({
                             key: 'smartlife_cached_session',
                             value: JSON.stringify(freshSession)
@@ -141,11 +148,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             key: 'smartlife_cached_session',
                             value: JSON.stringify(session)
                         });
+                        // Tự động nhận diện Google OAuth Token để đồng bộ Google Tasks
+                        if ((session as any)?.provider_token) {
+                            import('../services/googleTasksService').then(({ saveGoogleToken }) => {
+                                saveGoogleToken((session as any).provider_token, 3600);
+                            }).catch(() => {});
+                        }
                     }
                 } else if (event === 'SIGNED_OUT') {
                     setSession(null);
                     setUser(null);
                     await Preferences.remove({ key: 'smartlife_cached_session' });
+                    import('../services/googleTasksService').then(({ disconnectGoogleTasks }) => {
+                        disconnectGoogleTasks();
+                    }).catch(() => {});
                 } else if (event === 'USER_UPDATED') {
                     setUser(session?.user ?? null);
                     if (session) {
@@ -251,6 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 provider: 'google',
                 options: {
                     redirectTo: redirectUrl,
+                    scopes: 'https://www.googleapis.com/auth/tasks',
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',

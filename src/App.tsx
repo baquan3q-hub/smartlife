@@ -54,6 +54,7 @@ import type { AppState, Transaction, Todo, TodoStatus, SmartInsight, GPASemester
 import { INITIAL_BUDGET, INITIAL_GOALS, INITIAL_TRANSACTIONS, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './constants';
 import { walletService } from './services/walletService';
 import { debtService } from './services/debtService';
+import { isGoogleTasksConnected, isAutoSyncEnabled, syncTodoMutationToGoogle, deleteGoogleTask } from './services/googleTasksService';
 
 const RealtimeClock: React.FC = () => {
     const [time, setTime] = useState(new Date());
@@ -1265,13 +1266,45 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         setCalendarEvents((prev) => prev.filter(e => e.id !== id));
     };
 
-    const handleAddTodo = async (content: string, priority: any, deadline?: string, status: TodoStatus = 'todo', description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string, customId?: string) => {
+    // Callback cập nhật Google Task ID & List ID sau khi Google Tasks tạo/di chuyển thành công
+    const handleUpdateTodoGoogleId = React.useCallback((id: string, googleTaskId: string, googleListId: string) => {
+        const nowStr = new Date().toISOString();
+        setAppState((prev: AppState) => ({
+            ...prev,
+            todos: prev.todos.map(t => t.id === id ? {
+                ...t,
+                google_task_id: googleTaskId,
+                google_list_id: googleListId,
+                google_synced_at: nowStr,
+            } : t)
+        }));
+    }, []);
+
+    const handleAddTodo = async (content: string, priority: any, deadline?: string, status: TodoStatus = 'todo', description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string, customId?: string, googleTaskId?: string, googleListId?: string) => {
         if (!user) return;
         const tempId = customId || crypto.randomUUID();
         // New todos get sort_order = 0 (top), existing items shift up
         const minOrder = appState.todos.length > 0 ? Math.min(...appState.todos.map(t => t.sort_order ?? 0)) : 0;
         const newSortOrder = minOrder - 1;
-        const newItem = { id: tempId, content, priority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder, description, subtasks, email_notify: emailNotify, email_notify_before_minutes: emailNotifyBeforeMinutes, attach_link: attachLink };
+        const newItem = { 
+            id: tempId, 
+            content, 
+            priority, 
+            is_completed: status === 'done', 
+            status, 
+            completed_at: status === 'done' ? new Date().toISOString() : null,
+            user_id: user.id, 
+            deadline, 
+            sort_order: newSortOrder, 
+            description, 
+            subtasks, 
+            email_notify: emailNotify, 
+            email_notify_before_minutes: emailNotifyBeforeMinutes, 
+            attach_link: attachLink,
+            google_task_id: googleTaskId,
+            google_list_id: googleListId,
+            google_synced_at: googleTaskId ? new Date().toISOString() : undefined
+        };
 
         setAppState((prev: AppState) => ({ ...prev, todos: [newItem, ...prev.todos] }));
 
@@ -1289,6 +1322,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             const insertPayload: any = {
                 id: tempId,
                 content, priority: dbPriority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder,
+                completed_at: status === 'done' ? new Date().toISOString() : null,
                 description, subtasks,
                 email_notify: emailNotify,
                 email_notify_before_minutes: emailNotifyBeforeMinutes,
@@ -1302,7 +1336,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             error = res.error;
 
             if (error) {
-                if (error.code === '42703') {
+                if (error.code === '42703' || error.code === 'PGRST204' || String(error.message || '').includes('schema cache')) {
                     console.warn("[SmartLife] Column error. Retrying insertion without optional columns.");
                     const fallbackPayload = {
                         id: tempId,
@@ -1330,6 +1364,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (attachLink) {
                 syncTaskLinkToBookmark(user.id, finalId, content, attachLink);
             }
+
+            // Tự động đẩy sang Google Tasks ngay lập tức (SmartLife là Khóa chính)
+            if (isGoogleTasksConnected() && isAutoSyncEnabled() && !googleTaskId) {
+                const todoForGoogleSync = { ...newItem, id: finalId };
+                syncTodoMutationToGoogle(todoForGoogleSync, 'create', undefined, {
+                    onUpdateTodoId: handleUpdateTodoGoogleId
+                }).catch(e => console.warn('[AutoSync] Create task to Google error:', e));
+            }
         } catch (error: any) {
             console.error(error);
             alert("Lỗi thêm việc: " + error.message);
@@ -1351,9 +1393,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             if (item.status !== undefined) {
                 updatedItem.is_completed = item.status === 'done';
                 if (item.status === 'done') {
-                    const ts = (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
+                    const ts = item.completed_at || (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
                     updatedItem.completed_at = ts;
                     localStorage.setItem(`todo_completed_at_${item.id}`, ts);
+                    if (!wasAlreadyDone) {
+                        const doneTodos = prev.todos.filter(t => (t.status === 'done' || t.is_completed) && t.id !== item.id);
+                        const minDoneOrder = doneTodos.length > 0 ? Math.min(...doneTodos.map(t => typeof t.sort_order === 'number' ? t.sort_order : 0)) : 0;
+                        updatedItem.sort_order = minDoneOrder - 1;
+                    }
                 } else {
                     updatedItem.completed_at = null;
                     localStorage.removeItem(`todo_completed_at_${item.id}`);
@@ -1361,9 +1408,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             } else if (item.is_completed !== undefined) {
                 updatedItem.status = item.is_completed ? 'done' : 'todo';
                 if (item.is_completed) {
-                    const ts = (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
+                    const ts = item.completed_at || (wasAlreadyDone && existingTodo?.completed_at) || new Date().toISOString();
                     updatedItem.completed_at = ts;
                     localStorage.setItem(`todo_completed_at_${item.id}`, ts);
+                    if (!wasAlreadyDone) {
+                        const doneTodos = prev.todos.filter(t => (t.status === 'done' || t.is_completed) && t.id !== item.id);
+                        const minDoneOrder = doneTodos.length > 0 ? Math.min(...doneTodos.map(t => typeof t.sort_order === 'number' ? t.sort_order : 0)) : 0;
+                        updatedItem.sort_order = minDoneOrder - 1;
+                    }
                 } else {
                     updatedItem.completed_at = null;
                     localStorage.removeItem(`todo_completed_at_${item.id}`);
@@ -1380,21 +1432,48 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             syncTaskLinkToBookmark(user.id, item.id, targetContent || '', targetLink);
         }
 
+        // Tự động đẩy sang Google Tasks ngay lập tức (SmartLife là Khóa chính)
+        if (isGoogleTasksConnected() && isAutoSyncEnabled()) {
+            const prevTodo = prevTodos.find(t => t.id === item.id);
+            const mergedItemForGoogle = { ...(prevTodo || {}), ...updatedItem };
+            syncTodoMutationToGoogle(mergedItemForGoogle, 'update', prevTodo?.status, {
+                onUpdateTodoId: handleUpdateTodoGoogleId
+            }).catch(e => console.warn('[AutoSync] Update task to Google error:', e));
+        }
+
         try {
-            // Only send DB-safe fields
-            const { id, user_id, created_at, ...updateFields } = updatedItem;
+            // Only send DB-safe fields (exclude local Google Tasks sync metadata from DB payload)
+            const { id, user_id, created_at, google_task_id, google_list_id, google_synced_at, ...updateFields } = updatedItem;
             if (!isCompletedAtSupportedRef.current) {
                 delete updateFields.completed_at;
             }
+
+            // Normalize priority to satisfy Supabase check constraint ('high', 'medium', 'low')
+            if (updateFields.priority) {
+                if (['high', 'medium', 'low'].includes(updateFields.priority)) {
+                    // Valid
+                } else if (updateFields.priority === 'urgent') {
+                    updateFields.priority = 'high';
+                } else if (updateFields.priority === 'focus') {
+                    updateFields.priority = 'medium';
+                } else if (updateFields.priority === 'chill' || updateFields.priority === 'temp') {
+                    updateFields.priority = 'low';
+                } else {
+                    updateFields.priority = 'medium';
+                }
+            }
+
             const { error } = await supabase.from('todos').update(updateFields).eq('id', item.id);
             if (error) {
-                if (error.code === '42703') {
-                    console.warn("[SmartLife] Column error. Retrying update with only core fields (omitting completed_at).");
+                if (error.code === '42703' || error.code === 'PGRST204' || String(error.message || '').includes('schema cache')) {
+                    console.warn("[SmartLife] Column error. Retrying update with only core fields.");
                     isCompletedAtSupportedRef.current = false;
                     const safeFields: any = {};
-                    const allowed = ['content', 'is_completed', 'status', 'priority', 'deadline', 'sort_order'];
+                    const allowed = ['content', 'is_completed', 'status', 'priority', 'deadline', 'sort_order', 'description', 'subtasks', 'email_notify', 'email_notify_before_minutes', 'attach_link', 'time_spent'];
                     allowed.forEach(k => {
-                        if (k in updateFields) safeFields[k] = (updateFields as any)[k];
+                        if (k in updateFields && (updateFields as any)[k] !== undefined) {
+                            safeFields[k] = (updateFields as any)[k];
+                        }
                     });
                     const { error: retryError } = await supabase.from('todos').update(safeFields).eq('id', item.id);
                     if (retryError) throw retryError;
@@ -1407,7 +1486,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             alert("Lỗi cập nhật việc: " + error.message);
             setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
         }
-    }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [user, handleUpdateTodoGoogleId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleMoveTodoStatus = React.useCallback(async (id: string, status: TodoStatus) => {
         lastReorderTimeRef.current = Date.now();
@@ -1415,7 +1494,11 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     }, [handleUpdateTodo]);
 
     const handleDeleteTodo = async (id: string) => {
-        if (!window.confirm("Bạn có chắc chắn muốn xóa công việc này không?")) return;
+        const target = appState.todos.find(t => t.id === id);
+        if (target && isGoogleTasksConnected()) {
+            syncTodoMutationToGoogle(target, 'delete').catch(e => console.warn('[AutoSync] Delete task from Google error:', e));
+        }
+
         const prevTodos = [...appState.todos];
         setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.filter(t => t.id !== id) }));
 
@@ -1482,6 +1565,24 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
         if (changedTodos.length === 0) return;
 
+        // Tự động đồng bộ các task bị thay đổi trạng thái/cột sang đúng danh sách trên Google Tasks (Master Sync)
+        if (isGoogleTasksConnected() && isAutoSyncEnabled()) {
+            const statusChangedTodos = changedTodos.filter(t => {
+                const prev = prevTodosMap.get(t.id);
+                if (!prev) return false;
+                const prevStatus = prev.status || (prev.is_completed ? 'done' : 'todo');
+                const nextStatus = t.status || (t.is_completed ? 'done' : 'todo');
+                return prevStatus !== nextStatus || prev.is_completed !== t.is_completed;
+            });
+
+            for (const t of statusChangedTodos) {
+                const prev = prevTodosMap.get(t.id);
+                syncTodoMutationToGoogle(t, 'update', prev?.status, {
+                    onUpdateTodoId: handleUpdateTodoGoogleId
+                }).catch(e => console.warn('[AutoSync] Reorder status move to Google error:', e));
+            }
+        }
+
         try {
             // Batch update sort_order, status, is_completed, and completed_at for each changed item
             const updates = changedTodos.map(t => {
@@ -1520,7 +1621,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             alert("Lỗi sắp xếp việc: " + error.message);
             setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
         }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [handleUpdateTodoGoogleId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // --- GPA HANDLERS ---
     const handleAddGPASemester = async (newSem: Omit<GPASemester, 'id' | 'courses'>) => {
