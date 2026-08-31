@@ -131,14 +131,22 @@ function buildEmailHtml(sourceType, title, desc, timeLeftStr, item, lang = 'vi')
 }
 
 export default async function handler(req, res) {
-    // 1. Security Check: Support Header Bearer, Vercel internal cron, or ?key=smartlife2026 query param
+    // 1. Security Check: Support Header Bearer, Vercel internal cron, header x-cron-key, or ?key=smartlife2026 query param
     const authHeader = req.headers['authorization'] || '';
-    const queryKey = req.query?.key || req.query?.secret || '';
+    const xCronKey = req.headers['x-cron-key'] || '';
+    let queryKey = '';
+    try {
+        const parsedUrl = new URL(req.url, `https://${req.headers?.host || 'localhost'}`);
+        queryKey = req.query?.key || req.query?.secret || parsedUrl.searchParams.get('key') || parsedUrl.searchParams.get('secret') || '';
+    } catch (_) {
+        queryKey = req.query?.key || req.query?.secret || '';
+    }
     const isVercelCron = req.headers['user-agent']?.includes('vercel-cron');
 
     const isAuthorized = !CRON_SECRET 
         || authHeader === `Bearer ${CRON_SECRET}` 
         || authHeader === 'Bearer SmartLifeSecureToken2026!@#'
+        || xCronKey === 'smartlife2026'
         || queryKey === 'smartlife2026'
         || queryKey === 'SmartLifeSecureToken2026!@#'
         || (CRON_SECRET && queryKey === CRON_SECRET)
