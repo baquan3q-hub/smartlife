@@ -1,9 +1,9 @@
-// File: src/components/tracker/notes/GoogleSheetViewerModal.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, RefreshCw, ExternalLink, FileSpreadsheet, Search,
   Download, Table, Eye, CheckCircle2, AlertCircle, Sparkles, Layers
 } from 'lucide-react';
+import { GoogleSheetsIcon } from '../../icons/GoogleSheetsIcon';
 import {
   isSheetsConnected,
   findOrCreateSpreadsheet,
@@ -115,8 +115,8 @@ export const GoogleSheetViewerModal: React.FC<GoogleSheetViewerModalProps> = ({
         {/* Header with Glassmorphism */}
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
-              <FileSpreadsheet size={20} />
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 flex items-center justify-center shadow-md shadow-emerald-500/10">
+              <GoogleSheetsIcon size={24} />
             </div>
             <div>
               <div className="flex items-center gap-2">

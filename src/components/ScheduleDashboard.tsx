@@ -719,11 +719,12 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
                 {/* + Thêm task button */}
                 <button
+                  type="button"
                   onClick={() => handleOpenCreateModal('todo')}
-                  className="bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground font-extrabold text-[10px] px-3.5 py-1.5 rounded-full flex items-center gap-1 transition-all duration-200 active:scale-95 shrink-0"
+                  className="w-7 h-7 rounded-full flex items-center justify-center bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground transition-all duration-200 active:scale-95 shrink-0 cursor-pointer shadow-xs"
+                  title="Thêm task"
                 >
-                  <Plus size={12} className="stroke-[3]" />
-                  Thêm task
+                  <Plus size={14} className="stroke-[2.5]" />
                 </button>
               </div>
             </div>

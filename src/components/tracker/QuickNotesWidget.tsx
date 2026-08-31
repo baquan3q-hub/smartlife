@@ -1,10 +1,10 @@
-// File: src/components/tracker/QuickNotesWidget.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import {
   StickyNote, Loader2, Save, Sparkles, BookOpen, Plus,
   Check, ArrowRight, Layers, Tag, FileSpreadsheet
 } from 'lucide-react';
+import { GoogleSheetsIcon } from '../icons/GoogleSheetsIcon';
 import { noteArchiveService } from '../../services/noteArchiveService';
 import { SaveNoteModal } from './notes/SaveNoteModal';
 import { NotesArchiveModal } from './notes/NotesArchiveModal';
@@ -287,64 +287,61 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
 
         {/* Action Buttons Toolbar on Header */}
         <div className="flex items-center gap-1.5 ml-auto">
-          {/* Nút AI Sum (Icon Logo AI Sum tinh gọn) */}
+          {/* Nút AI Sum (Màu xám & trắng nhẹ) */}
           <button
+            type="button"
             onClick={() => setIsAISumModalOpen(true)}
             title="Tóm tắt thông minh bằng AI (AI Sum)"
-            className="p-1.5 px-2 rounded-lg bg-black hover:bg-slate-900 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            className="p-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
           >
-            <Sparkles size={14} className="text-amber-400" />
+            <Sparkles size={14} className="text-slate-600 dark:text-slate-300" />
           </button>
 
-          {/* Nút 📁 Bộ nhớ (Icon-only + badge số lượng) */}
+          {/* Nút 📁 Bộ nhớ (Chỉ hiển thị số lượng) */}
           <button
+            type="button"
             onClick={() => setIsArchiveModalOpen(true)}
             title="Kho bộ nhớ ghi chú đã lưu"
-            className="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold border border-slate-200/60 flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+            className="h-7 min-w-[28px] px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-bold border border-slate-200/80 dark:border-slate-700 flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-xs"
           >
-            <BookOpen size={13} className="text-slate-700" />
-            {archivedCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-slate-800 text-white text-[9px] font-black flex items-center justify-center">
-                {archivedCount > 99 ? '99+' : archivedCount}
-              </span>
-            )}
+            <span className="text-[11px] font-black text-slate-700 dark:text-slate-200">
+              {archivedCount > 99 ? '99+' : archivedCount}
+            </span>
           </button>
 
-          {/* Nút 📊 Google Sheets (Icon-only) */}
+          {/* Nút 📊 Google Sheets (Icon Google Sheets 2026) */}
           <button
+            type="button"
             onClick={() => setIsGoogleSheetOpen(true)}
             title="Bảng tính Google Sheets"
-            className="p-1.5 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold border border-emerald-200/60 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            className="p-1.5 px-2 rounded-lg bg-emerald-50/80 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-xs"
           >
-            <FileSpreadsheet size={14} className="text-emerald-700" />
+            <GoogleSheetsIcon size={14} />
           </button>
         </div>
       </div>
 
       {/* Secondary Meta Row: Word count & Sync Status */}
       <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold px-1 mb-1.5">
-        <span className="flex items-center gap-1 text-slate-400">
-          {getWordCount(content)} từ • Bảng nháp tự do
+        <span className="flex items-center gap-1 text-slate-400 font-medium">
+          {getWordCount(content)} từ
         </span>
 
         <div className="flex items-center gap-1">
           {isLoading ? (
             <span className="text-slate-400 flex items-center gap-1">
-              <Loader2 size={10} className="animate-spin" />
-              Đang tải...
+              <Loader2 size={10} className="animate-spin text-slate-400" />
             </span>
           ) : syncStatus === 'saving' ? (
-            <span className="text-slate-500 flex items-center gap-1">
-              <Loader2 size={10} className="animate-spin text-slate-600" />
-              Tự lưu...
+            <span className="text-slate-400 flex items-center gap-1" title="Đang lưu...">
+              <Loader2 size={10} className="animate-spin text-slate-400" />
             </span>
           ) : syncStatus === 'saved' ? (
-            <span className="text-emerald-600 flex items-center gap-0.5 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100/60 font-bold text-[9.5px]">
-              <Check size={10} />
-              Đã lưu nháp
+            <span className="text-slate-400 dark:text-slate-500 flex items-center justify-center p-0.5" title="Đã lưu nháp">
+              <Check size={11} className="text-slate-400 dark:text-slate-500 stroke-[2.5]" />
             </span>
           ) : syncStatus === 'error' ? (
-            <span className="text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-100/60 text-[9.5px]">
+            <span className="text-rose-500 text-[9.5px] font-medium" title="Lỗi đồng bộ">
               Offline
             </span>
           ) : null}
