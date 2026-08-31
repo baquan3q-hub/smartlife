@@ -188,19 +188,19 @@ export const AISummaryModal: React.FC<AISummaryModalProps> = ({
       <div className="bg-white w-full max-w-3xl max-h-[92vh] rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-purple-50 via-indigo-50/40 to-white">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-200">
-              <Sparkles size={20} className="text-amber-300" />
+            <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md">
+              <Sparkles size={20} className="text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black text-slate-800">AI Sum — Tóm tắt Ghi chú Thông minh</h3>
-                <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold">
-                  Gemini 2.5 Flash
+                <h3 className="text-base font-black text-slate-800">AI Sum — Tóm tắt Ghi chú</h3>
+                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                  AI Assistant
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-medium">Tổng hợp cuộc họp, việc cần làm & đồng bộ AI Your Own</p>
+              <p className="text-xs text-slate-400 font-medium">Tổng hợp cuộc họp, việc cần làm & ghi chú tự do</p>
             </div>
           </div>
           <button
@@ -556,16 +556,16 @@ export const AISummaryModal: React.FC<AISummaryModalProps> = ({
               type="button"
               onClick={handleRunAISummary}
               disabled={isGenerating || isCounting || matchingCount === 0}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:opacity-95 active:scale-95 text-white font-bold text-xs shadow-md shadow-indigo-200 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2 transition-all"
+              className="px-5 py-2.5 rounded-xl bg-black hover:bg-slate-900 active:scale-95 text-white font-extrabold text-xs shadow-sm disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2 transition-all cursor-pointer"
             >
               {isGenerating ? (
                 <>
-                  <Loader2 size={14} className="animate-spin" />
+                  <Loader2 size={14} className="animate-spin text-white" />
                   <span>Đang tổng hợp...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles size={14} className="text-amber-300" />
+                  <Sparkles size={14} className="text-white" />
                   <span>Bắt đầu tóm tắt bằng AI ({matchingCount ?? 0} ghi chú)</span>
                 </>
               )}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   closestCenter,
   closestCorners,
@@ -8,6 +9,7 @@ import {
   DragOverlay,
   DragStartEvent,
   MouseSensor,
+  pointerWithin,
   rectIntersection,
   TouchSensor,
   useDroppable,
@@ -54,7 +56,18 @@ const getEffectiveStatus = (todo: Todo): TodoStatus => {
 };
 
 const getTodosForColumn = (allTodos: Todo[], colId: TodoStatus): Todo[] => {
-  return allTodos.filter((todo) => getEffectiveStatus(todo) === colId);
+  const colTodos = allTodos.filter((todo) => getEffectiveStatus(todo) === colId);
+  return colTodos.sort((a, b) => {
+    const orderA = typeof a.sort_order === 'number' ? a.sort_order : Number.MAX_SAFE_INTEGER;
+    const orderB = typeof b.sort_order === 'number' ? b.sort_order : Number.MAX_SAFE_INTEGER;
+    if (orderA !== orderB) return orderA - orderB;
+    if (colId === 'done') {
+      const timeA = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+      const timeB = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+      if (timeA !== timeB) return timeB - timeA;
+    }
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
 };
 
 const sortTodosForBoard = (items: Todo[]): Todo[] => {
@@ -107,6 +120,17 @@ const moveTodoInBoard = (items: Todo[], activeId: string, overId: string): Todo[
   const withoutActive = items.filter(todo => todo.id !== activeId);
 
   if (overIsColumn) {
+    if (targetStatus === 'done') {
+      // Khi kéo vào cột Done, đưa ngay lên đầu cột Done để dễ dàng theo dõi
+      const firstDoneIndex = withoutActive.findIndex(todo => getEffectiveStatus(todo) === 'done');
+      const insertIndex = firstDoneIndex === -1 ? withoutActive.length : firstDoneIndex;
+      return [
+        ...withoutActive.slice(0, insertIndex),
+        movedTodo,
+        ...withoutActive.slice(insertIndex),
+      ];
+    }
+
     const lastTargetIndex = withoutActive.reduce((lastIndex, todo, index) => {
       return getEffectiveStatus(todo) === targetStatus ? index : lastIndex;
     }, -1);
@@ -166,10 +190,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }, []);
 
   const mouseSensorOptions = useMemo(() => ({
-    activationConstraint: { distance: 8 },
+    activationConstraint: { distance: 4 },
   }), []);
   const touchSensorOptions = useMemo(() => ({
-    activationConstraint: { delay: 180, tolerance: 8 },
+    activationConstraint: { delay: 150, tolerance: 6 },
   }), []);
 
   const sensors = useSensors(
@@ -195,18 +219,25 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     const { active, over } = event;
     if (!over) return;
 
-    // Throttle: skip if called within 50ms of last update
-    const now = Date.now();
-    if (now - dragOverThrottleRef.current < 50) return;
-    dragOverThrottleRef.current = now;
-
-    const nextActiveId = active.id as string;
+    const activeId = active.id as string;
     const overId = over.id as string;
 
-    updateLocalTodos((prev) => {
-      const next = moveTodoInBoard(prev, nextActiveId, overId);
-      return hasSameBoardState(prev, next) ? prev : next;
-    });
+    if (activeId === overId) return;
+
+    const activeTodo = localTodosRef.current.find(t => t.id === activeId);
+    const overIsColumn = COLUMN_IDS.includes(overId as TodoStatus);
+    const overTodo = overIsColumn ? null : localTodosRef.current.find(t => t.id === overId);
+
+    const activeContainer = activeTodo ? getEffectiveStatus(activeTodo) : null;
+    const overContainer = overIsColumn ? (overId as TodoStatus) : (overTodo ? getEffectiveStatus(overTodo) : null);
+
+    // Chỉ cập nhật state khi di chuyển XUYÊN CỘT (Cross-column) để loại bỏ 95% re-render thừa
+    if (activeContainer && overContainer && activeContainer !== overContainer) {
+      updateLocalTodos((prev) => {
+        const next = moveTodoInBoard(prev, activeId, overId);
+        return hasSameBoardState(prev, next) ? prev : next;
+      });
+    }
   }, [updateLocalTodos]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -244,6 +275,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }, [updateLocalTodos]);
 
   const collisionDetectionStrategy = useCallback((args: any) => {
+    // 1. Phản hồi tức thì theo con trỏ chuột
+    const pointerCollisions = pointerWithin(args);
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions;
+    }
+    // 2. Fallback sang rectIntersection
     const intersections = rectIntersection(args);
     if (intersections.length > 0) {
       return intersections;
@@ -298,7 +335,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         </div>
       </div>
 
-      <DragOverlay adjustScale={false}>
+      <DragOverlay dropAnimation={{
+        duration: 150,
+        easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+      }}>
         {activeId && activeTodoRef.current ? (
           <TaskCardShell todo={activeTodoRef.current} width={activeWidth || undefined} isOverlay />
         ) : null}
@@ -359,6 +399,8 @@ interface SortableCardProps {
   onDelete: (id: string) => void;
 }
 
+const attachmentCountCache = new Map<string, number>();
+
 const SortableCard = React.memo<SortableCardProps>(({
   todo,
   onEdit,
@@ -369,8 +411,9 @@ const SortableCard = React.memo<SortableCardProps>(({
   });
 
   const style = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transform: transform ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` : undefined,
     transition,
+    willChange: isDragging ? 'transform' : undefined,
     opacity: isDragging ? 0.25 : 1,
   };
 
@@ -381,7 +424,7 @@ const SortableCard = React.memo<SortableCardProps>(({
         style={style}
         className="w-full opacity-30 pointer-events-none"
       >
-        <TaskCardShell todo={todo} />
+        <TaskCardShell todo={todo} isOverlay />
       </div>
     );
   }
@@ -394,7 +437,7 @@ const SortableCard = React.memo<SortableCardProps>(({
       onClick={() => onEdit(todo)}
       {...attributes}
       {...listeners}
-      className="group relative cursor-grab active:cursor-grabbing"
+      className="group relative cursor-grab active:cursor-grabbing will-change-transform select-none"
     >
       <TaskCardShell todo={todo} onDelete={onDelete} />
     </div>
@@ -415,7 +458,7 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
   const totalSubtasks = todo.subtasks?.length || 0;
   const links = useMemo(() => parseTaskLinks(todo.attach_link), [todo.attach_link]);
   const [showLinksPopup, setShowLinksPopup] = useState(false);
-  const [fileCount, setFileCount] = useState(0);
+  const [fileCount, setFileCount] = useState<number>(() => attachmentCountCache.get(todo.id) || 0);
   const [showFilesPopup, setShowFilesPopup] = useState(false);
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [previewAttachment, setPreviewAttachment] = useState<{ url: string; name: string; type: string } | null>(null);
@@ -423,12 +466,14 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
   const popupRef = useRef<HTMLDivElement>(null);
   const filePopupRef = useRef<HTMLDivElement>(null);
 
-  // Load attachment count and listen for updates
+  // Load attachment count with cache and skip overlay queries to maintain 60fps
   useEffect(() => {
+    if (isOverlay) return;
     let isMounted = true;
     const updateCount = () => {
       getAttachmentCount(todo.id)
         .then((cnt) => {
+          attachmentCountCache.set(todo.id, cnt);
           if (isMounted) setFileCount(cnt);
         })
         .catch(() => {
@@ -442,7 +487,7 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
       isMounted = false;
       window.removeEventListener('task_attachments_updated', updateCount);
     };
-  }, [todo.id]);
+  }, [todo.id, isOverlay]);
 
   // Close popup on click outside
   useEffect(() => {
@@ -547,32 +592,32 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
                 type="button"
                 onClick={handleLinkClick}
                 className="text-[9px] px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-1 bg-sky-50 border-sky-100 text-sky-600 hover:text-sky-800 hover:bg-sky-100 dark:bg-sky-950/40 dark:border-sky-800 dark:text-sky-400 dark:hover:bg-sky-900/60 transition-colors z-10 cursor-pointer"
-                title={links.length === 1 ? links[0].name : `${links.length} liên kết (Bấm để xem)`}
+                title={links.length === 1 ? (links[0].name || links[0].url) : `${links.length} liên kết (Bấm để xem)`}
               >
-                <Link2 size={9} />
-                {links.length === 1 ? 'Link' : `${links.length} links`}
+                <Link2 size={10} className="shrink-0" />
+                {links.length > 1 && <span className="text-[9px] font-bold leading-none">{links.length}</span>}
               </button>
 
-              {/* Multi-link popup with dedicated close button and clean styling */}
+              {/* Multi-link popup with compact styling and truncated titles */}
               {showLinksPopup && links.length > 1 && (
                 <div
-                  className="absolute left-0 top-full mt-1.5 w-56 max-w-[calc(100vw-32px)] bg-white dark:bg-card border border-border rounded-xl shadow-2xl z-50 py-1.5 animate-in fade-in zoom-in-95 duration-150"
+                  className="absolute left-0 top-full mt-1.5 w-48 max-w-[calc(100vw-32px)] bg-white/95 dark:bg-card/95 backdrop-blur-md border border-border/80 rounded-xl shadow-xl z-50 p-1 animate-in fade-in zoom-in-95 duration-150"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="flex items-center justify-between px-3 py-1 border-b border-border/50 mb-1">
-                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Liên kết ({links.length})
-                    </p>
+                  <div className="flex items-center justify-between px-2 py-1 border-b border-border/40 mb-1">
+                    <span className="text-[9px] font-extrabold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                      <Link2 size={10} className="text-sky-500" /> {links.length}
+                    </span>
                     <button
                       type="button"
                       onClick={() => setShowLinksPopup(false)}
                       className="p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors"
                       title="Đóng"
                     >
-                      <X size={11} />
+                      <X size={10} />
                     </button>
                   </div>
-                  <div className="max-h-44 overflow-y-auto custom-scrollbar">
+                  <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-0.5">
                     {links.map((link) => {
                       const href = link.url.startsWith('http') ? link.url : `https://${link.url}`;
                       return (
@@ -581,14 +626,14 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
                           href={href}
                           target="_blank"
                           rel="noopener noreferrer"
+                          title={link.name || link.url}
                           onClick={(e) => { e.stopPropagation(); setShowLinksPopup(false); }}
-                          className="flex items-center gap-2 px-3 py-1.5 hover:bg-sky-50 dark:hover:bg-sky-950/30 transition-colors group/link"
+                          className="flex items-center gap-1.5 px-2 py-1.5 hover:bg-sky-50 dark:hover:bg-sky-950/30 rounded-lg transition-colors group/link text-left"
                         >
                           <ExternalLink size={10} className="text-sky-500 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-bold text-foreground truncate group-hover/link:text-sky-600 transition-colors">{link.name}</p>
-                            <p className="text-[8px] text-muted-foreground truncate">{link.url}</p>
-                          </div>
+                          <span className="text-[10px] font-semibold text-foreground truncate max-w-[140px] group-hover/link:text-sky-600 transition-colors leading-tight">
+                            {link.name || link.url}
+                          </span>
                         </a>
                       );
                     })}
@@ -602,49 +647,49 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
               <button
                 type="button"
                 onClick={handleFileBadgeClick}
-                className="text-[9px] px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-0.5 bg-emerald-50 border-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors z-10 cursor-pointer"
-                title={`${fileCount} file đính kèm (Bấm để xem/tải)`}
+                className="text-[9px] px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-1 bg-emerald-50 border-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors z-10 cursor-pointer"
+                title={`${fileCount} tệp đính kèm (Bấm để xem/tải)`}
               >
-                <FileText size={9} />
-                {fileCount > 1 ? <span>{fileCount}</span> : <span>Xem</span>}
+                <FileText size={10} className="shrink-0" />
+                {fileCount > 1 && <span className="text-[9px] font-bold leading-none">{fileCount}</span>}
               </button>
 
-              {/* Multi-file popup */}
+              {/* Multi-file popup with compact styling and truncated titles */}
               {showFilesPopup && attachments.length > 1 && (
                 <div
-                  className="absolute right-0 sm:left-0 top-full mt-1.5 w-64 max-w-[calc(100vw-32px)] bg-white dark:bg-card border border-border rounded-xl shadow-2xl z-50 py-1.5 animate-in fade-in zoom-in-95 duration-150"
+                  className="absolute right-0 sm:left-0 top-full mt-1.5 w-52 max-w-[calc(100vw-32px)] bg-white/95 dark:bg-card/95 backdrop-blur-md border border-border/80 rounded-xl shadow-xl z-50 p-1 animate-in fade-in zoom-in-95 duration-150"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="flex items-center justify-between px-3 py-1 border-b border-border/50 mb-1">
-                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Tệp đính kèm ({attachments.length})
-                    </p>
+                  <div className="flex items-center justify-between px-2 py-1 border-b border-border/40 mb-1">
+                    <span className="text-[9px] font-extrabold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                      <FileText size={10} className="text-emerald-500" /> {attachments.length}
+                    </span>
                     <button
                       type="button"
                       onClick={() => setShowFilesPopup(false)}
                       className="p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors"
                       title="Đóng"
                     >
-                      <X size={11} />
+                      <X size={10} />
                     </button>
                   </div>
-                  <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                  <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-0.5">
                     {attachments.map((att) => {
                       const canPreview = isPreviewable(att.type, att.name);
                       const icon = getFileIcon(att.type);
                       return (
                         <div
                           key={att.id}
-                          className="flex items-center justify-between gap-1.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group/item"
+                          title={att.name}
+                          className="flex items-center justify-between gap-1 px-2 py-1.5 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-lg transition-colors group/item"
                         >
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
                             <span className="text-xs shrink-0">{icon}</span>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[10px] font-bold text-foreground truncate">{att.name}</p>
-                              <p className="text-[8px] text-muted-foreground">{formatFileSize(att.size)}</p>
-                            </div>
+                            <span className="text-[10px] font-semibold text-foreground truncate max-w-[110px] leading-tight">
+                              {att.name}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-0.5 shrink-0">
                             {canPreview && (
                               <button
                                 type="button"
@@ -655,11 +700,10 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
                                   setPreviewAttachment({ url, name: att.name, type: att.type });
                                   setShowFilesPopup(false);
                                 }}
-                                className="p-1 hover:bg-blue-50 text-slate-400 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 text-[9px] font-bold"
+                                className="p-1 hover:bg-blue-50 text-slate-400 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 rounded-md transition-colors cursor-pointer"
                                 title="Xem trước"
                               >
-                                <Eye size={11} />
-                                <span>Xem</span>
+                                <Eye size={10} />
                               </button>
                             )}
                             <button
@@ -668,10 +712,10 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
                                 e.stopPropagation();
                                 downloadAttachment(att);
                               }}
-                              className="p-1 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 rounded-lg transition-colors cursor-pointer"
+                              className="p-1 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 rounded-md transition-colors cursor-pointer"
                               title="Tải về"
                             >
-                              <Download size={11} />
+                              <Download size={10} />
                             </button>
                           </div>
                         </div>
@@ -685,9 +729,9 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
         </div>
       )}
 
-      {previewAttachment && (
+      {previewAttachment && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
+          className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200"
           onClick={(e) => {
             e.stopPropagation();
             URL.revokeObjectURL(previewAttachment.url);
@@ -695,15 +739,15 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
           }}
         >
           <div
-            className="relative bg-white dark:bg-card border border-border rounded-2xl shadow-2xl max-w-[90vw] max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+            className="relative bg-white dark:bg-card border border-border/80 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-slate-50/50 dark:bg-card shrink-0 gap-3">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="text-sm shrink-0">{getFileIcon(previewAttachment.type)}</span>
-                <p className="text-xs font-bold text-foreground truncate">{previewAttachment.name}</p>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-slate-50/80 dark:bg-card shrink-0 gap-3">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <span className="text-base shrink-0">{getFileIcon(previewAttachment.type)}</span>
+                <p className="text-xs sm:text-sm font-bold text-foreground truncate">{previewAttachment.name}</p>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -714,11 +758,11 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
                     a.click();
                     document.body.removeChild(a);
                   }}
-                  className="flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
                   title="Tải xuống"
                 >
-                  <Download size={12} />
-                  Tải về
+                  <Download size={13} />
+                  <span>Tải về</span>
                 </button>
                 <button
                   type="button"
@@ -726,48 +770,50 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
                     URL.revokeObjectURL(previewAttachment.url);
                     setPreviewAttachment(null);
                   }}
-                  className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer"
+                  className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors cursor-pointer"
                   title="Đóng"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto flex items-center justify-center p-2 min-h-[200px] max-h-[70vh] bg-slate-900/5 dark:bg-black/30">
+            <div className="flex-1 overflow-auto flex items-center justify-center p-3 sm:p-4 min-h-[300px] max-h-[78vh] bg-slate-900/5 dark:bg-black/40">
               {previewAttachment.type.startsWith('image/') ? (
                 <img
                   src={previewAttachment.url}
                   alt={previewAttachment.name}
-                  className="max-w-full max-h-[68vh] object-contain rounded-lg"
+                  className="max-w-full max-h-[74vh] object-contain rounded-xl shadow-sm"
                 />
               ) : previewAttachment.type === 'application/pdf' ? (
                 <iframe
                   src={previewAttachment.url}
                   title={previewAttachment.name}
-                  className="w-[80vw] max-w-3xl h-[65vh] rounded-lg border-0"
+                  className="w-full h-[74vh] rounded-xl border-0 shadow-sm"
                 />
               ) : previewAttachment.type.startsWith('video/') ? (
                 <video
                   src={previewAttachment.url}
                   controls
                   autoPlay
-                  className="max-w-full max-h-[65vh] rounded-lg"
+                  className="max-w-full max-h-[74vh] rounded-xl shadow-sm"
                 />
               ) : previewAttachment.type.startsWith('audio/') ? (
-                <div className="p-8">
-                  <audio src={previewAttachment.url} controls autoPlay className="w-80" />
+                <div className="p-8 flex flex-col items-center gap-3">
+                  <p className="text-xs font-bold text-foreground">{previewAttachment.name}</p>
+                  <audio src={previewAttachment.url} controls autoPlay className="w-80 sm:w-96" />
                 </div>
               ) : (
                 <iframe
                   src={previewAttachment.url}
                   title={previewAttachment.name}
-                  className="w-[80vw] max-w-2xl h-[60vh] rounded-lg bg-white p-4 font-mono text-xs"
+                  className="w-full h-[70vh] rounded-xl bg-white p-4 font-mono text-xs shadow-sm"
                 />
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {!isOverlay && onDelete && (
