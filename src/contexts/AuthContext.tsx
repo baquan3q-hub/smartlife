@@ -112,7 +112,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         // Tự động nhận diện Google OAuth Token để đồng bộ Google Tasks ngay khi login
                         if ((freshSession as any)?.provider_token) {
                             import('../services/googleTasksService').then(({ saveGoogleToken }) => {
-                                saveGoogleToken((freshSession as any).provider_token, 3600);
+                                saveGoogleToken(
+                                    (freshSession as any).provider_token,
+                                    (freshSession as any).expires_in || 3600,
+                                    (freshSession as any).provider_refresh_token
+                                );
                             }).catch(() => {});
                         }
                         await Preferences.set({
@@ -151,7 +155,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         // Tự động nhận diện Google OAuth Token để đồng bộ Google Tasks
                         if ((session as any)?.provider_token) {
                             import('../services/googleTasksService').then(({ saveGoogleToken }) => {
-                                saveGoogleToken((session as any).provider_token, 3600);
+                                saveGoogleToken(
+                                    (session as any).provider_token,
+                                    (session as any).expires_in || 3600,
+                                    (session as any).provider_refresh_token
+                                );
                             }).catch(() => {});
                         }
                     }
