@@ -135,7 +135,6 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
   // Save categories list to database
   const saveCategoriesToDb = async (updatedGroups: string[]) => {
     if (!userId) return;
-    localStorage.setItem(`bookmark_groups_${userId}`, JSON.stringify(updatedGroups));
     
     try {
       const { data, error } = await supabase
@@ -192,7 +191,6 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
         }
       }
       setGroups(categoryList);
-      localStorage.setItem(`bookmark_groups_${userId}`, JSON.stringify(categoryList));
 
       if (!data || data.length === 0) {
         await supabase.from('my_storage').insert([
@@ -206,17 +204,7 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
       }
     } catch (err) {
       console.error('Lỗi tải danh mục bookmark:', err);
-      const saved = localStorage.getItem(`bookmark_groups_${userId}`);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setGroups(Array.from(new Set(['Tasks', ...parsed])));
-        } catch (e) {
-          setGroups(['Tasks', 'dự án', 'Sách']);
-        }
-      } else {
-        setGroups(['Tasks', 'dự án', 'Sách']);
-      }
+      setGroups(['Tasks', 'dự án', 'Sách']);
     }
   };
 

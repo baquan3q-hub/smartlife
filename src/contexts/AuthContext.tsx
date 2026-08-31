@@ -40,10 +40,40 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = 6000): Promise<T> {
     ]);
 }
 
+const getInitialCachedSession = (): Session | null => {
+    try {
+        if (typeof window === 'undefined') return null;
+        if (localStorage.getItem('smartlife_logged_out_flag') === 'true') return null;
+
+        // 1. Check custom cached session
+        const custom = localStorage.getItem('smartlife_cached_session');
+        if (custom) {
+            const parsed = JSON.parse(custom);
+            if (parsed && parsed.user) return parsed;
+        }
+
+        // 2. Check standard Supabase localStorage tokens
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                const sbRaw = localStorage.getItem(key);
+                if (sbRaw) {
+                    const parsed = JSON.parse(sbRaw);
+                    if (parsed && parsed.user) return parsed;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('[AuthContext] Error reading initial session from localStorage:', e);
+    }
+    return null;
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [session, setSession] = useState<Session | null>(null);
-    const [loading, setLoading] = useState(true);
+    const initialSession = React.useMemo(() => getInitialCachedSession(), []);
+    const [user, setUser] = useState<User | null>(() => initialSession?.user || null);
+    const [session, setSession] = useState<Session | null>(() => initialSession || null);
+    const [loading, setLoading] = useState<boolean>(() => !initialSession);
 
     useEffect(() => {
         let isMounted = true;
@@ -51,57 +81,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let deepLinkListener: any = null;
 
         const initializeAuth = async () => {
-            // 1. Read local cached session first for instant-on startup
+            // 1. Read local cached session for Capacitor Preferences if not already loaded
             try {
                 const { value } = await Preferences.get({ key: 'smartlife_cached_session' });
-                if (value && isMounted) {
+                if (value && isMounted && !session) {
                     const cachedSession = JSON.parse(value);
                     if (cachedSession && cachedSession.user) {
-                        console.log('[AuthContext] Restoring cached session:', cachedSession.user.email);
                         setSession(cachedSession);
                         setUser(cachedSession.user);
-                        setLoading(false); // Render the authenticated UI immediately!
+                        setLoading(false);
                     }
                 }
             } catch (e) {
                 console.error('[AuthContext] Failed to read cached session:', e);
             }
 
-            // 2. Perform verification with Supabase
+            // 2. Perform verification with Supabase in background
             try {
-                console.log('[AuthContext] Verifying session with Supabase...');
-                const { data: { session: freshSession } } = await withTimeout(supabase.auth.getSession(), 6000);
+                const { data: { session: freshSession } } = await withTimeout(supabase.auth.getSession(), 4000);
                 
                 if (isMounted) {
                     if (freshSession) {
-                        console.log('[AuthContext] Supabase verification success:', freshSession.user.email);
                         setSession(freshSession);
                         setUser(freshSession.user);
+                        localStorage.removeItem('smartlife_logged_out_flag');
+                        try {
+                            localStorage.setItem('smartlife_cached_session', JSON.stringify(freshSession));
+                        } catch (e) {}
                         await Preferences.set({
                             key: 'smartlife_cached_session',
                             value: JSON.stringify(freshSession)
                         });
-                    } else {
-                        console.log('[AuthContext] No active session found on Supabase.');
+                    } else if (!session) {
                         setSession(null);
                         setUser(null);
+                        localStorage.removeItem('smartlife_cached_session');
                         await Preferences.remove({ key: 'smartlife_cached_session' });
                     }
                 }
             } catch (error: any) {
-                console.error('[AuthContext] Supabase getSession error:', error);
-                
-                // If it's a network issue or timeout, preserve the cached session
-                if (isNetworkError(error)) {
-                    console.warn('[AuthContext] Network/Timeout error, retaining cached session for offline use.');
-                } else {
-                    // Actual authentication failure (e.g. revoked token), clear the state
-                    if (isMounted) {
-                        setSession(null);
-                        setUser(null);
-                    }
-                    await Preferences.remove({ key: 'smartlife_cached_session' });
-                }
+                console.warn('[AuthContext] Supabase getSession non-blocking error:', error);
             } finally {
                 if (isMounted) {
                     setLoading(false);
