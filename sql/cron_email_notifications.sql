@@ -48,7 +48,7 @@ BEGIN
           (t.email_notify = true) OR 
           ((p.email_notifications->>'enabled')::boolean = true AND (p.email_notifications->>'todo_deadline')::boolean = true)
       )
-      AND t.deadline > now()
+      AND t.deadline >= now() - interval '10 minutes'
       AND t.deadline <= now() + (
           COALESCE(
               t.email_notify_before_minutes,
@@ -90,7 +90,7 @@ BEGIN
           (ce.email_notify = true) OR 
           ((p.email_notifications->>'enabled')::boolean = true AND (p.email_notifications->>'calendar_deadline')::boolean = true)
       )
-      AND (ce.date::text || COALESCE(' ' || ce.time::text, ' 00:00:00'))::timestamptz > now()
+      AND (ce.date::text || COALESCE(' ' || ce.time::text, ' 00:00:00'))::timestamptz >= now() - interval '10 minutes'
       AND (ce.date::text || COALESCE(' ' || ce.time::text, ' 00:00:00'))::timestamptz <= now() + (
           COALESCE(
               ce.email_notify_before_minutes,
@@ -132,7 +132,7 @@ BEGIN
           (tt.email_notify = true) OR 
           ((p.email_notifications->>'enabled')::boolean = true AND (p.email_notifications->>'timetable_deadline')::boolean = true)
       )
-      AND (to_char(now(), 'YYYY-MM-DD') || ' ' || tt.start_time)::timestamptz > now()
+      AND (to_char(now(), 'YYYY-MM-DD') || ' ' || tt.start_time)::timestamptz >= now() - interval '10 minutes'
       AND (to_char(now(), 'YYYY-MM-DD') || ' ' || tt.start_time)::timestamptz <= now() + (
           COALESCE(
               tt.email_notify_before_minutes,
@@ -157,26 +157,55 @@ BEGIN
         (SELECT (to_char(now(), 'YYYY-MM-DD') || ' ' || start_time)::timestamptz FROM timetable WHERE id::text = email_notification_logs.source_id) AS deadline,
         (SELECT EXTRACT(EPOCH FROM ((to_char(now(), 'YYYY-MM-DD') || ' ' || start_time)::timestamptz - now()))/60 FROM timetable WHERE id::text = email_notification_logs.source_id)::integer AS minutes_left;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ====================================================================
--- 4. pg_cron Setup (Run manually in Supabase SQL Editor)
--- ====================================================================
--- 
--- Step 4a. Enable pg_cron extension (if not already enabled via Dashboard > Database > Extensions)
--- CREATE EXTENSION IF NOT EXISTS pg_cron;
---
--- Step 4b. Schedule the deadline scanner every 5 minutes (improved from 15 minutes)
--- SELECT cron.schedule(
---     'smartlife-deadline-scanner',
---     '*/5 * * * *',
---     $$ SELECT check_deadline_notifications(); $$
--- );
---
--- Step 4c. To unschedule:
--- SELECT cron.unschedule('smartlife-deadline-scanner');
---
--- NOTE: pg_cron only creates pending logs. Actual email sending is handled by
--- the Vercel Cron Job (api/cron-check-emails.js) which polls pending logs
--- and sends via Resend API.
--- ====================================================================
+-- 4. Helper Function: Cập nhật trạng thái log (Security Definer - không bị chặn bởi RLS)
+CREATE OR REPLACE FUNCTION mark_email_log_status(p_log_id UUID, p_status TEXT)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE email_notification_logs 
+    SET status = p_status, sent_at = NOW() 
+    WHERE id = p_log_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 5. Trigger tự động xóa log cũ khi sửa Deadline / Giờ nhắc
+CREATE OR REPLACE FUNCTION reset_todo_email_log_on_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (OLD.deadline IS DISTINCT FROM NEW.deadline) 
+       OR (OLD.email_notify_before_minutes IS DISTINCT FROM NEW.email_notify_before_minutes)
+       OR (OLD.is_completed = true AND NEW.is_completed = false) THEN
+        DELETE FROM email_notification_logs 
+        WHERE source_id = NEW.id::text 
+          AND source_type = 'todo';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trigger_reset_todo_email_log ON todos;
+CREATE TRIGGER trigger_reset_todo_email_log
+AFTER UPDATE ON todos
+FOR EACH ROW
+EXECUTE FUNCTION reset_todo_email_log_on_change();
+
+CREATE OR REPLACE FUNCTION reset_calendar_email_log_on_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (OLD.date IS DISTINCT FROM NEW.date) 
+       OR (OLD.time IS DISTINCT FROM NEW.time)
+       OR (OLD.email_notify_before_minutes IS DISTINCT FROM NEW.email_notify_before_minutes) THEN
+        DELETE FROM email_notification_logs 
+        WHERE source_id = NEW.id::text 
+          AND source_type = 'calendar_event';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trigger_reset_calendar_email_log ON calendar_events;
+CREATE TRIGGER trigger_reset_calendar_email_log
+AFTER UPDATE ON calendar_events
+FOR EACH ROW
+EXECUTE FUNCTION reset_calendar_email_log_on_change();

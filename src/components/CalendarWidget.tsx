@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Star, Plus, MapPin
 import { Solar, Lunar } from 'lunar-javascript';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { ReminderTimeSelector } from './common/ReminderTimeSelector';
 
 interface CalendarEvent {
     id: string;
@@ -35,6 +36,11 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ className }) => {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+    const [emailBeforeMinutes, setEmailBeforeMinutes] = useState(60);
+
+    useEffect(() => {
+        setEmailBeforeMinutes(editingEvent?.email_notify_before_minutes ?? 60);
+    }, [editingEvent, isModalOpen]);
 
     // Fetch events
     const fetchAllEvents = async () => {
@@ -634,26 +640,11 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ className }) => {
                                 </div>
                                 
                                 <div>
-                                    <label className="text-[9px] font-extrabold text-slate-400 uppercase ml-0.5 block mb-1">Thời gian nhắc trước</label>
-                                    <select
-                                        name="email_notify_before_minutes"
-                                        defaultValue={editingEvent?.email_notify_before_minutes ?? 60}
-                                        className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl outline-none font-bold text-xs text-slate-700 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/10 cursor-pointer"
-                                    >
-                                        <option value={5}>Trước 5 phút</option>
-                                        <option value={10}>Trước 10 phút</option>
-                                        <option value={15}>Trước 15 phút</option>
-                                        <option value={30}>Trước 30 phút</option>
-                                        <option value={60}>Trước 1 giờ</option>
-                                        <option value={120}>Trước 2 giờ</option>
-                                        <option value={180}>Trước 3 giờ</option>
-                                        <option value={360}>Trước 6 giờ</option>
-                                        <option value={720}>Trước 12 giờ</option>
-                                        <option value={1440}>Trước 1 ngày</option>
-                                        <option value={2880}>Trước 2 ngày</option>
-                                        <option value={4320}>Trước 3 ngày</option>
-                                        <option value={10080}>Trước 7 ngày</option>
-                                    </select>
+                                    <input type="hidden" name="email_notify_before_minutes" value={emailBeforeMinutes} />
+                                    <ReminderTimeSelector
+                                        value={emailBeforeMinutes}
+                                        onChange={setEmailBeforeMinutes}
+                                    />
                                 </div>
                             </div>
 
