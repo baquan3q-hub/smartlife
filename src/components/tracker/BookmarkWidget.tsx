@@ -425,12 +425,12 @@ export const BookmarkWidget: React.FC<BookmarkWidgetProps> = ({ userId }) => {
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setShowAddForm(!showAddForm)}
-              className="bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground font-bold text-[10px] px-3.5 py-1.5 rounded-full flex items-center gap-1 transition-all duration-200 active:scale-95 shrink-0 cursor-pointer"
+              className="w-8 h-8 rounded-full flex items-center justify-center bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground transition-all duration-200 active:scale-95 shrink-0 cursor-pointer shadow-xs"
               title="Thêm bookmark"
             >
-              <Plus size={11} className="stroke-[3]" />
-              Thêm bookmark
+              <Plus size={15} className="stroke-[2.5]" />
             </button>
             <button
               onClick={() => setIsManageGroupsOpen(true)}

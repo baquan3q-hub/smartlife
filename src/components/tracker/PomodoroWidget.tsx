@@ -128,26 +128,23 @@ export const PomodoroWidget: React.FC<PomodoroWidgetProps> = ({ timer, onOpenMus
       {/* Control Buttons */}
       <div className="flex justify-center items-center gap-2 mb-3.5 relative z-10">
         <button
+          type="button"
           onClick={toggleTimer}
-          className="bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground font-extrabold text-xs px-5 py-2.5 rounded-full flex items-center gap-1.5 shadow-sm transition-all duration-200 active:scale-95 shrink-0"
+          className="w-9 h-9 bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground rounded-full flex items-center justify-center shadow-xs transition-all duration-200 active:scale-90 shrink-0 cursor-pointer"
+          title={status === 'RUNNING' ? 'Tạm dừng' : 'Bắt đầu'}
         >
           {status === 'RUNNING' ? (
-            <>
-              <Pause size={12} fill="currentColor" className="stroke-[3]" />
-              Tạm dừng
-            </>
+            <Pause size={14} fill="currentColor" className="stroke-[3]" />
           ) : (
-            <>
-              <Play size={12} fill="currentColor" className="ml-0.5 stroke-[3]" />
-              Bắt đầu
-            </>
+            <Play size={14} fill="currentColor" className="ml-0.5 stroke-[3]" />
           )}
         </button>
 
         {engineMode === 'TIMER' && (
           <button
+            type="button"
             onClick={() => skipSession?.()}
-            className="w-9 h-9 bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-all flex items-center justify-center active:scale-90"
+            className="w-9 h-9 bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-all flex items-center justify-center active:scale-90 cursor-pointer shadow-xs"
             title="Bỏ qua"
           >
             <SkipForward size={14} className="stroke-[2.5]" />
@@ -155,20 +152,14 @@ export const PomodoroWidget: React.FC<PomodoroWidgetProps> = ({ timer, onOpenMus
         )}
 
         <button
+          type="button"
           onClick={resetTimer}
-          className="w-9 h-9 bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-all flex items-center justify-center active:scale-90"
+          className="w-9 h-9 bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-all flex items-center justify-center active:scale-90 cursor-pointer shadow-xs"
           title="Reset"
         >
           <RotateCcw size={14} className="stroke-[2.5]" />
         </button>
       </div>
-
-      {/* Description / Setting Text */}
-      <p className="text-[10px] font-bold text-slate-400 mb-2">
-        {engineMode === 'STOPWATCH'
-          ? 'Đếm giờ tự do'
-          : `Tập trung ${currentPreset.work}' · Nghỉ ${currentPreset.break}'`}
-      </p>
 
       {/* Custom timer drawer toggler */}
       {engineMode === 'TIMER' && (
