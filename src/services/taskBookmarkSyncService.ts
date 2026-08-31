@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { parseTaskLinks } from '../types';
 
 /**
  * Ensures the system category "Tasks" is included in user's saved bookmark categories.
@@ -43,7 +44,8 @@ export async function ensureTasksCategoryExists(userId: string): Promise<void> {
 }
 
 /**
- * Automatically syncs a Kanban Task link to the Bookmark manager under group "Tasks".
+ * Automatically syncs Kanban Task links to the Bookmark manager under group "Tasks".
+ * Supports both old single URL format and new JSON array format.
  */
 export async function syncTaskLinkToBookmark(
   userId: string,
@@ -53,57 +55,65 @@ export async function syncTaskLinkToBookmark(
 ): Promise<void> {
   if (!userId || !taskId) return;
 
-  const rawLink = attachLink ? attachLink.trim() : '';
+  // Parse links (handles both old string URL and new JSON array format)
+  const links = parseTaskLinks(attachLink);
 
-  // If no link, remove any existing bookmark synced for this task
-  if (!rawLink) {
+  // If no links, remove any existing bookmarks synced for this task
+  if (links.length === 0) {
     await deleteTaskLinkBookmark(userId, taskId);
     return;
-  }
-
-  let formattedUrl = rawLink;
-  if (!/^https?:\/\//i.test(formattedUrl)) {
-    formattedUrl = `https://${formattedUrl}`;
   }
 
   try {
     // Ensure "Tasks" group is in category list
     await ensureTasksCategoryExists(userId);
 
-    // Find existing bookmark linked to this task
+    // Find existing bookmarks linked to this task
     const { data: existing } = await supabase
       .from('my_storage')
       .select('id, metadata')
       .eq('user_id', userId)
       .eq('type', 'link')
-      .limit(100);
+      .limit(200);
 
-    const taskBookmark = (existing || []).find(
+    const taskBookmarks = (existing || []).filter(
       (b: any) => b.metadata && (b.metadata.task_id === taskId || b.metadata.taskId === taskId)
     );
 
-    if (taskBookmark) {
-      // Update existing bookmark
-      await supabase
-        .from('my_storage')
-        .update({
-          title: taskContent.trim() || 'Task Link',
-          content: formattedUrl,
-          metadata: { ...taskBookmark.metadata, group: 'Tasks', task_id: taskId },
-        })
-        .eq('id', taskBookmark.id);
-    } else {
-      // Create new bookmark
-      await supabase.from('my_storage').insert([
-        {
-          user_id: userId,
-          type: 'link',
-          title: taskContent.trim() || 'Task Link',
-          content: formattedUrl,
-          is_pinned: false,
-          metadata: { group: 'Tasks', task_id: taskId },
-        },
-      ]);
+    // Delete old bookmarks that no longer match any link
+    const linkUrls = new Set(links.map(l => {
+      let url = l.url;
+      if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+      return url;
+    }));
+
+    for (const old of taskBookmarks) {
+      // We'll just delete all and re-create to keep things simple
+    }
+    if (taskBookmarks.length > 0) {
+      await Promise.all(
+        taskBookmarks.map((b: any) => supabase.from('my_storage').delete().eq('id', b.id))
+      );
+    }
+
+    // Create new bookmarks for each link
+    const inserts = links.map((link) => {
+      let formattedUrl = link.url;
+      if (!/^https?:\/\//i.test(formattedUrl)) {
+        formattedUrl = `https://${formattedUrl}`;
+      }
+      return {
+        user_id: userId,
+        type: 'link' as const,
+        title: link.name || taskContent.trim() || 'Task Link',
+        content: formattedUrl,
+        is_pinned: false,
+        metadata: { group: 'Tasks', task_id: taskId },
+      };
+    });
+
+    if (inserts.length > 0) {
+      await supabase.from('my_storage').insert(inserts);
     }
   } catch (err) {
     console.error('[TaskBookmarkSync] Error syncing task link to bookmark:', err);
@@ -111,7 +121,7 @@ export async function syncTaskLinkToBookmark(
 }
 
 /**
- * Deletes any bookmark associated with a deleted task or cleared link.
+ * Deletes any bookmarks associated with a deleted task or cleared link.
  */
 export async function deleteTaskLinkBookmark(userId: string, taskId: string): Promise<void> {
   if (!userId || !taskId) return;
@@ -121,14 +131,16 @@ export async function deleteTaskLinkBookmark(userId: string, taskId: string): Pr
       .select('id, metadata')
       .eq('user_id', userId)
       .eq('type', 'link')
-      .limit(100);
+      .limit(200);
 
-    const match = (existing || []).find(
+    const matches = (existing || []).filter(
       (b: any) => b.metadata && (b.metadata.task_id === taskId || b.metadata.taskId === taskId)
     );
 
-    if (match) {
-      await supabase.from('my_storage').delete().eq('id', match.id);
+    if (matches.length > 0) {
+      await Promise.all(
+        matches.map((b: any) => supabase.from('my_storage').delete().eq('id', b.id))
+      );
     }
   } catch (err) {
     console.error('[TaskBookmarkSync] Error deleting task link bookmark:', err);

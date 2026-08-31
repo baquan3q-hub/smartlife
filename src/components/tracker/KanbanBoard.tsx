@@ -19,8 +19,17 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Calendar, CheckSquare, Plus, Trash2, Link2 } from 'lucide-react';
-import { Todo, TodoStatus } from '../../types';
+import { Calendar, CheckSquare, Plus, Trash2, Link2, ExternalLink, FileText, Eye, Download, X } from 'lucide-react';
+import { Todo, TodoStatus, TaskLink, parseTaskLinks } from '../../types';
+import {
+  TaskAttachment,
+  getAttachmentCount,
+  getAttachments,
+  downloadAttachment,
+  formatFileSize,
+  getFileIcon,
+  isPreviewable
+} from '../../services/taskAttachmentService';
 
 interface KanbanBoardProps {
   todos: Todo[];
@@ -404,11 +413,103 @@ interface TaskCardShellProps {
 const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay = false, onDelete }) => {
   const completedSubtasks = todo.subtasks?.filter((subtask) => subtask.is_completed).length || 0;
   const totalSubtasks = todo.subtasks?.length || 0;
+  const links = useMemo(() => parseTaskLinks(todo.attach_link), [todo.attach_link]);
+  const [showLinksPopup, setShowLinksPopup] = useState(false);
+  const [fileCount, setFileCount] = useState(0);
+  const [showFilesPopup, setShowFilesPopup] = useState(false);
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [previewAttachment, setPreviewAttachment] = useState<{ url: string; name: string; type: string } | null>(null);
+  
+  const popupRef = useRef<HTMLDivElement>(null);
+  const filePopupRef = useRef<HTMLDivElement>(null);
+
+  // Load attachment count and listen for updates
+  useEffect(() => {
+    let isMounted = true;
+    const updateCount = () => {
+      getAttachmentCount(todo.id)
+        .then((cnt) => {
+          if (isMounted) setFileCount(cnt);
+        })
+        .catch(() => {
+          if (isMounted) setFileCount(0);
+        });
+    };
+
+    updateCount();
+    window.addEventListener('task_attachments_updated', updateCount);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('task_attachments_updated', updateCount);
+    };
+  }, [todo.id]);
+
+  // Close popup on click outside
+  useEffect(() => {
+    if (!showLinksPopup) return;
+    const handler = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        setShowLinksPopup(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showLinksPopup]);
+
+  useEffect(() => {
+    if (!showFilesPopup) return;
+    const handler = (e: MouseEvent) => {
+      if (filePopupRef.current && !filePopupRef.current.contains(e.target as Node)) {
+        setShowFilesPopup(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showFilesPopup]);
+
+  const handleLinkClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setShowFilesPopup(false);
+    if (links.length === 1) {
+      const url = links[0].url.startsWith('http') ? links[0].url : `https://${links[0].url}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else if (links.length > 1) {
+      setShowLinksPopup(prev => !prev);
+    }
+  };
+
+  const handleFileBadgeClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setShowLinksPopup(false);
+    try {
+      const list = await getAttachments(todo.id);
+      setAttachments(list);
+
+      if (list.length === 0) return;
+
+      if (list.length === 1) {
+        const single = list[0];
+        if (isPreviewable(single.type, single.name)) {
+          const blob = new Blob([single.data], { type: single.type });
+          const url = URL.createObjectURL(blob);
+          setPreviewAttachment({ url, name: single.name, type: single.type });
+        } else {
+          downloadAttachment(single);
+        }
+      } else {
+        setShowFilesPopup(prev => !prev);
+      }
+    } catch (err) {
+      console.error('Lỗi khi mở tệp đính kèm:', err);
+    }
+  };
 
   return (
     <div
       style={width ? { width: `${width}px` } : undefined}
-      className={`relative flex min-h-[38px] flex-col gap-1 rounded-xl bg-card pl-2 pr-2 py-2 select-none ${isOverlay
+      className={`relative flex min-h-[38px] flex-col gap-1 rounded-xl bg-card pl-2 pr-2 py-2 select-none ${(showLinksPopup || showFilesPopup) ? 'z-40' : 'z-10'} ${isOverlay
         ? 'border border-border/80 shadow-2xl cursor-grabbing pointer-events-none opacity-95'
         : 'border border-border shadow-sm hover:border-primary/40 transition-all'
         }`}
@@ -423,7 +524,7 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
         </p>
       )}
 
-      {(totalSubtasks > 0 || todo.deadline || todo.attach_link) && (
+      {(totalSubtasks > 0 || todo.deadline || links.length > 0 || fileCount > 0) && (
         <div className="flex items-center gap-2 mt-1 flex-wrap select-none">
           {totalSubtasks > 0 && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-md border text-muted-foreground border-border bg-secondary font-bold flex items-center gap-1">
@@ -440,19 +541,232 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({ todo, width, isOverlay =
               {formatDate(todo.deadline)}
             </span>
           )}
-          {todo.attach_link && (
-            <a
-              href={todo.attach_link.startsWith('http') ? todo.attach_link : `https://${todo.attach_link}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-[9px] px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-1 bg-sky-50 border-sky-100 text-sky-600 hover:text-sky-800 hover:bg-sky-100 transition-colors z-10"
-              title={todo.attach_link}
-            >
-              <Link2 size={9} />
-              Link
-            </a>
+          {links.length > 0 && (
+            <div className="relative" ref={popupRef}>
+              <button
+                type="button"
+                onClick={handleLinkClick}
+                className="text-[9px] px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-1 bg-sky-50 border-sky-100 text-sky-600 hover:text-sky-800 hover:bg-sky-100 dark:bg-sky-950/40 dark:border-sky-800 dark:text-sky-400 dark:hover:bg-sky-900/60 transition-colors z-10 cursor-pointer"
+                title={links.length === 1 ? links[0].name : `${links.length} liên kết (Bấm để xem)`}
+              >
+                <Link2 size={9} />
+                {links.length === 1 ? 'Link' : `${links.length} links`}
+              </button>
+
+              {/* Multi-link popup with dedicated close button and clean styling */}
+              {showLinksPopup && links.length > 1 && (
+                <div
+                  className="absolute left-0 top-full mt-1.5 w-56 max-w-[calc(100vw-32px)] bg-white dark:bg-card border border-border rounded-xl shadow-2xl z-50 py-1.5 animate-in fade-in zoom-in-95 duration-150"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between px-3 py-1 border-b border-border/50 mb-1">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Liên kết ({links.length})
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowLinksPopup(false)}
+                      className="p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                      title="Đóng"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                  <div className="max-h-44 overflow-y-auto custom-scrollbar">
+                    {links.map((link) => {
+                      const href = link.url.startsWith('http') ? link.url : `https://${link.url}`;
+                      return (
+                        <a
+                          key={link.id}
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => { e.stopPropagation(); setShowLinksPopup(false); }}
+                          className="flex items-center gap-2 px-3 py-1.5 hover:bg-sky-50 dark:hover:bg-sky-950/30 transition-colors group/link"
+                        >
+                          <ExternalLink size={10} className="text-sky-500 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] font-bold text-foreground truncate group-hover/link:text-sky-600 transition-colors">{link.name}</p>
+                            <p className="text-[8px] text-muted-foreground truncate">{link.url}</p>
+                          </div>
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
+          {fileCount > 0 && (
+            <div className="relative" ref={filePopupRef}>
+              <button
+                type="button"
+                onClick={handleFileBadgeClick}
+                className="text-[9px] px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-0.5 bg-emerald-50 border-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors z-10 cursor-pointer"
+                title={`${fileCount} file đính kèm (Bấm để xem/tải)`}
+              >
+                <FileText size={9} />
+                {fileCount > 1 ? <span>{fileCount}</span> : <span>Xem</span>}
+              </button>
+
+              {/* Multi-file popup */}
+              {showFilesPopup && attachments.length > 1 && (
+                <div
+                  className="absolute right-0 sm:left-0 top-full mt-1.5 w-64 max-w-[calc(100vw-32px)] bg-white dark:bg-card border border-border rounded-xl shadow-2xl z-50 py-1.5 animate-in fade-in zoom-in-95 duration-150"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between px-3 py-1 border-b border-border/50 mb-1">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Tệp đính kèm ({attachments.length})
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowFilesPopup(false)}
+                      className="p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                      title="Đóng"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                    {attachments.map((att) => {
+                      const canPreview = isPreviewable(att.type, att.name);
+                      const icon = getFileIcon(att.type);
+                      return (
+                        <div
+                          key={att.id}
+                          className="flex items-center justify-between gap-1.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group/item"
+                        >
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="text-xs shrink-0">{icon}</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[10px] font-bold text-foreground truncate">{att.name}</p>
+                              <p className="text-[8px] text-muted-foreground">{formatFileSize(att.size)}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {canPreview && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const blob = new Blob([att.data], { type: att.type });
+                                  const url = URL.createObjectURL(blob);
+                                  setPreviewAttachment({ url, name: att.name, type: att.type });
+                                  setShowFilesPopup(false);
+                                }}
+                                className="p-1 hover:bg-blue-50 text-slate-400 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 text-[9px] font-bold"
+                                title="Xem trước"
+                              >
+                                <Eye size={11} />
+                                <span>Xem</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                downloadAttachment(att);
+                              }}
+                              className="p-1 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 rounded-lg transition-colors cursor-pointer"
+                              title="Tải về"
+                            >
+                              <Download size={11} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {previewAttachment && (
+        <div
+          className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            URL.revokeObjectURL(previewAttachment.url);
+            setPreviewAttachment(null);
+          }}
+        >
+          <div
+            className="relative bg-white dark:bg-card border border-border rounded-2xl shadow-2xl max-w-[90vw] max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-slate-50/50 dark:bg-card shrink-0 gap-3">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="text-sm shrink-0">{getFileIcon(previewAttachment.type)}</span>
+                <p className="text-xs font-bold text-foreground truncate">{previewAttachment.name}</p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = previewAttachment.url;
+                    a.download = previewAttachment.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  }}
+                  className="flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  title="Tải xuống"
+                >
+                  <Download size={12} />
+                  Tải về
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    URL.revokeObjectURL(previewAttachment.url);
+                    setPreviewAttachment(null);
+                  }}
+                  className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer"
+                  title="Đóng"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto flex items-center justify-center p-2 min-h-[200px] max-h-[70vh] bg-slate-900/5 dark:bg-black/30">
+              {previewAttachment.type.startsWith('image/') ? (
+                <img
+                  src={previewAttachment.url}
+                  alt={previewAttachment.name}
+                  className="max-w-full max-h-[68vh] object-contain rounded-lg"
+                />
+              ) : previewAttachment.type === 'application/pdf' ? (
+                <iframe
+                  src={previewAttachment.url}
+                  title={previewAttachment.name}
+                  className="w-[80vw] max-w-3xl h-[65vh] rounded-lg border-0"
+                />
+              ) : previewAttachment.type.startsWith('video/') ? (
+                <video
+                  src={previewAttachment.url}
+                  controls
+                  autoPlay
+                  className="max-w-full max-h-[65vh] rounded-lg"
+                />
+              ) : previewAttachment.type.startsWith('audio/') ? (
+                <div className="p-8">
+                  <audio src={previewAttachment.url} controls autoPlay className="w-80" />
+                </div>
+              ) : (
+                <iframe
+                  src={previewAttachment.url}
+                  title={previewAttachment.name}
+                  className="w-[80vw] max-w-2xl h-[60vh] rounded-lg bg-white p-4 font-mono text-xs"
+                />
+              )}
+            </div>
+          </div>
         </div>
       )}
 

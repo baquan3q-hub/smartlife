@@ -201,6 +201,39 @@ export interface Todo {
   attach_link?: string;
 }
 
+// Interface cho link đính kèm trong task (hỗ trợ nhiều link)
+export interface TaskLink {
+  id: string;
+  name: string;  // Tên hiển thị do user đặt
+  url: string;   // URL đầy đủ
+}
+
+// Helper: parse attach_link field (backward-compatible với chuỗi URL cũ)
+export function parseTaskLinks(attachLink?: string | null): TaskLink[] {
+  if (!attachLink) return [];
+  const trimmed = attachLink.trim();
+  if (!trimmed) return [];
+
+  // Thử parse JSON array
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      // Không phải JSON → xử lý như URL đơn
+    }
+  }
+
+  // Backward-compatible: chuỗi URL đơn → chuyển thành array 1 phần tử
+  return [{ id: crypto.randomUUID(), name: trimmed, url: trimmed }];
+}
+
+// Helper: encode TaskLink[] thành string để lưu DB
+export function encodeTaskLinks(links: TaskLink[]): string | null {
+  if (!links || links.length === 0) return null;
+  return JSON.stringify(links);
+}
+
 export interface QuickNote {
   id: string;
   content: string;

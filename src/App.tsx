@@ -28,6 +28,7 @@ import { GlobalLoader } from './components/GlobalLoader';
 import ClickRippleEffect from './components/ClickRippleEffect';
 import { careerGoalService } from './services/careerGoalService';
 import { syncTaskLinkToBookmark, deleteTaskLinkBookmark } from './services/taskBookmarkSyncService';
+import { deleteAllForTask as deleteTaskAttachments, reassignAttachments } from './services/taskAttachmentService';
 
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -150,22 +151,36 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         };
     }, [user?.id]);
 
-    // App State - Khởi tạo dữ liệu mặc định
-    const [appState, setAppState] = useState<AppState>({
-        transactions: INITIAL_TRANSACTIONS,
-        budget: INITIAL_BUDGET,
-        budgets: [], // New Budget Configs
-        timetable: [], // Khởi tạo rỗng, sẽ fetch từ Supabase
-        todos: [],
-        goals: INITIAL_GOALS,
-        currentBalance: 0,
-        profile: null,
-        gpaSemesters: [], // GPA Module — khởi tạo rỗng, fetch từ Supabase
-        gpaTargetCredits: 135,
-        gpaTargetGPA: null,
-        gpaTargetSemesters: 4,
-        wallets: [],
-        debts: [],
+    // App State - Khởi tạo dữ liệu mặc định (đọc cache localStorage nếu có để load tức thì 0ms khi reload trang)
+    const [appState, setAppState] = useState<AppState>(() => {
+        let cachedTodos: Todo[] = [];
+        try {
+            const raw = localStorage.getItem(`smartlife_cached_todos_${user?.id || 'default'}`);
+            if (raw) cachedTodos = JSON.parse(raw);
+        } catch (e) {}
+
+        let cachedGoals = INITIAL_GOALS;
+        try {
+            const raw = localStorage.getItem(`smartlife_cached_goals_${user?.id || 'default'}`);
+            if (raw) cachedGoals = JSON.parse(raw);
+        } catch (e) {}
+
+        return {
+            transactions: INITIAL_TRANSACTIONS,
+            budget: INITIAL_BUDGET,
+            budgets: [],
+            timetable: [],
+            todos: Array.isArray(cachedTodos) ? cachedTodos : [],
+            goals: Array.isArray(cachedGoals) ? cachedGoals : INITIAL_GOALS,
+            currentBalance: 0,
+            profile: null,
+            gpaSemesters: [],
+            gpaTargetCredits: 135,
+            gpaTargetGPA: null,
+            gpaTargetSemesters: 4,
+            wallets: [],
+            debts: [],
+        };
     });
 
     const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals' | 'expand'>(() => {
@@ -257,15 +272,21 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     // Header Shortcuts State (Spotify & Habit buttons on mobile header)
     const [headerShortcuts, setHeaderShortcuts] = useState<{ spotify: boolean; habit: boolean }>(() => {
-        const saved = localStorage.getItem(`smartlife_header_shortcuts_${user?.id}`);
-        return saved ? JSON.parse(saved) : { spotify: true, habit: true };
+        const savedHabit = localStorage.getItem('smartlife_header_shortcut_habit');
+        const savedSpotify = localStorage.getItem('smartlife_header_shortcut_spotify');
+        return {
+            habit: savedHabit === null ? true : savedHabit === 'true',
+            spotify: savedSpotify === null ? true : savedSpotify === 'true'
+        };
     });
 
     useEffect(() => {
-        if (user?.id) {
-            const saved = localStorage.getItem(`smartlife_header_shortcuts_${user.id}`);
-            setHeaderShortcuts(saved ? JSON.parse(saved) : { spotify: true, habit: true });
-        }
+        const savedHabit = localStorage.getItem('smartlife_header_shortcut_habit');
+        const savedSpotify = localStorage.getItem('smartlife_header_shortcut_spotify');
+        setHeaderShortcuts({
+            habit: savedHabit === null ? true : savedHabit === 'true',
+            spotify: savedSpotify === null ? true : savedSpotify === 'true'
+        });
     }, [user?.id]);
 
     // Fixed mobile navbar tabs (4 items only)
@@ -429,6 +450,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         setIsPricingOpen(true);
     };
 
+    const handleUpgradeFromExpired = () => {
+        setIsPricingOpen(true);
+    };
+
     const handleOpenPricing = React.useCallback(async () => {
         if (!user) return;
 
@@ -479,36 +504,48 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     }, [user?.id, appState.profile?.plan]);
 
-    // Fetch Data từ Supabase khi user đăng nhập
+    // Fetch Data từ Supabase khi user đăng nhập (Chạy an toàn, không bị nghẽn hay mất data)
     const fetchData = async (silent = false) => {
         if (!user) return;
         if (!silent) setIsLoadingData(true);
         try {
-            function withTimeout<T>(promise: Promise<T>, timeoutMs = 8000): Promise<T> {
-                return Promise.race([
-                    promise,
-                    new Promise<never>((_, reject) =>
-                        setTimeout(() => reject(new Error('Yêu cầu dữ liệu quá thời gian (Timeout)')), timeoutMs)
-                    )
-                ]);
-            }
-
-            // Gọi song song các bảng dữ liệu bao gồm wallets và debts
-            const [txRes, goalRes, timeRes, todoRes, profileRes, eventsRes, budgetRes, gpaSemRes, gpaCourseRes, walletRes, debtRes] = await withTimeout(Promise.all([
+            const results = await Promise.allSettled([
                 supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
                 supabase.from('goals').select('*').eq('user_id', user.id).order('deadline', { ascending: true }),
                 supabase.from('timetable').select('*').eq('user_id', user.id).order('start_time', { ascending: true }),
                 supabase.from('todos').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-                supabase.from('profiles').select('*').eq('id', user.id).single(),
+                supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
                 supabase.from('calendar_events').select('*').eq('user_id', user.id),
                 supabase.from('budgets').select('*').eq('user_id', user.id),
                 supabase.from('gpa_semesters').select('*').eq('user_id', user.id).order('academic_year', { ascending: true }),
                 supabase.from('gpa_courses').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
                 supabase.from('wallets').select('*').eq('user_id', user.id),
                 supabase.from('debts').select('*').eq('user_id', user.id),
-            ]), 8000);
+            ]);
 
-            if (txRes.error) throw txRes.error;
+            const txRes = results[0].status === 'fulfilled' && !results[0].value.error ? results[0].value : { data: null };
+            const goalRes = results[1].status === 'fulfilled' && !results[1].value.error ? results[1].value : { data: null };
+            const timeRes = results[2].status === 'fulfilled' && !results[2].value.error ? results[2].value : { data: null };
+            const todoRes = results[3].status === 'fulfilled' && !results[3].value.error ? results[3].value : { data: null };
+            const profileRes = results[4].status === 'fulfilled' && !results[4].value.error ? results[4].value : { data: null };
+            const eventsRes = results[5].status === 'fulfilled' && !results[5].value.error ? results[5].value : { data: null };
+            const budgetRes = results[6].status === 'fulfilled' && !results[6].value.error ? results[6].value : { data: null };
+            const gpaSemRes = results[7].status === 'fulfilled' && !results[7].value.error ? results[7].value : { data: null };
+            const gpaCourseRes = results[8].status === 'fulfilled' && !results[8].value.error ? results[8].value : { data: null };
+            const walletRes = results[9].status === 'fulfilled' && !results[9].value.error ? results[9].value : { data: null };
+            const debtRes = results[10].status === 'fulfilled' && !results[10].value.error ? results[10].value : { data: null };
+
+            // Cache todos & goals vào localStorage để load tức thì trong lần tới
+            if (todoRes.data) {
+                try {
+                    localStorage.setItem(`smartlife_cached_todos_${user.id}`, JSON.stringify(todoRes.data));
+                } catch (e) {}
+            }
+            if (goalRes.data) {
+                try {
+                    localStorage.setItem(`smartlife_cached_goals_${user.id}`, JSON.stringify(goalRes.data));
+                } catch (e) {}
+            }
 
             // Cập nhật State
             setAppState((prev: AppState) => {
@@ -516,7 +553,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 const shouldSkipTodos = now - lastReorderTimeRef.current < 3000;
                 return {
                     ...prev,
-                    transactions: txRes.data.map(t => ({
+                    transactions: txRes.data ? txRes.data.map((t: any) => ({
                         id: t.id,
                         user_id: t.user_id,
                         amount: Number(t.amount),
@@ -527,28 +564,28 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         created_at: t.created_at,
                         wallet_id: t.wallet_id || null,
                         debt_id: t.debt_id || null,
-                    })),
-                    goals: (goalRes.data || []).map((g: any) => ({
+                    })) : prev.transactions,
+                    goals: goalRes.data ? goalRes.data.map((g: any) => ({
                         ...g,
                         monthly_target: g.monthly_target ?? (Number(localStorage.getItem(`goal_monthly_target_${g.id}`)) || 0)
-                    })),
-                    budgets: budgetRes.data || [],
-                    timetable: timeRes.data || [],
-                    todos: shouldSkipTodos ? prev.todos : (todoRes.data || []).map((t: any) => ({
+                    })) : prev.goals,
+                    budgets: budgetRes.data ?? prev.budgets,
+                    timetable: timeRes.data ?? prev.timetable,
+                    todos: (todoRes.data && !shouldSkipTodos) ? todoRes.data.map((t: any) => ({
                         ...t,
                         completed_at: t.completed_at || localStorage.getItem(`todo_completed_at_${t.id}`) || null
-                    })),
-                    profile: profileRes.data || null,
+                    })) : prev.todos,
+                    profile: profileRes.data ?? prev.profile,
                     // GPA: Combine semesters with their courses
-                    gpaSemesters: (gpaSemRes.data || []).map((sem: any) => ({
+                    gpaSemesters: gpaSemRes.data ? gpaSemRes.data.map((sem: any) => ({
                         ...sem,
                         courses: (gpaCourseRes.data || []).filter((c: any) => c.semester_id === sem.id),
-                    })),
+                    })) : prev.gpaSemesters,
                     gpaTargetCredits: Number(localStorage.getItem(`gpaTargetCredits_${user.id}`)) || 135,
                     gpaTargetGPA: localStorage.getItem(`gpaTargetGPA_${user.id}`) ? Number(localStorage.getItem(`gpaTargetGPA_${user.id}`)) : null,
                     gpaTargetSemesters: Number(localStorage.getItem(`gpaTargetSemesters_${user.id}`)) || 4,
-                    wallets: walletRes.data || [],
-                    debts: debtRes.data || [],
+                    wallets: walletRes.data ?? prev.wallets,
+                    debts: debtRes.data ?? prev.debts,
                 };
             });
 
@@ -557,12 +594,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 const customCats = profileRes.data.custom_categories;
                 if (customCats.expense) setCustomExpenseCats(customCats.expense);
                 if (customCats.income) setCustomIncomeCats(customCats.income);
-            } else {
-                if (profileRes.data && !profileRes.data.custom_categories) {
-                    await supabase.from('profiles').update({
-                        custom_categories: { expense: [], income: [] }
-                    }).eq('id', user.id);
-                }
             }
 
             if (eventsRes.data) {
@@ -1234,9 +1265,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         setCalendarEvents((prev) => prev.filter(e => e.id !== id));
     };
 
-    const handleAddTodo = async (content: string, priority: any, deadline?: string, status: TodoStatus = 'todo', description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string) => {
+    const handleAddTodo = async (content: string, priority: any, deadline?: string, status: TodoStatus = 'todo', description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string, customId?: string) => {
         if (!user) return;
-        const tempId = crypto.randomUUID();
+        const tempId = customId || crypto.randomUUID();
         // New todos get sort_order = 0 (top), existing items shift up
         const minOrder = appState.todos.length > 0 ? Math.min(...appState.todos.map(t => t.sort_order ?? 0)) : 0;
         const newSortOrder = minOrder - 1;
@@ -1256,6 +1287,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
         try {
             const insertPayload: any = {
+                id: tempId,
                 content, priority: dbPriority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder,
                 description, subtasks,
                 email_notify: emailNotify,
@@ -1273,6 +1305,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 if (error.code === '42703') {
                     console.warn("[SmartLife] Column error. Retrying insertion without optional columns.");
                     const fallbackPayload = {
+                        id: tempId,
                         content, priority: dbPriority, is_completed: status === 'done', status, user_id: user.id, deadline, sort_order: newSortOrder
                     };
                     const fallbackRes = await supabase.from('todos').insert([fallbackPayload]).select().single();
@@ -1288,6 +1321,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     ...prev,
                     todos: prev.todos.map(t => t.id === tempId ? { ...t, ...data } : t)
                 }));
+            }
+
+            if (finalId !== tempId) {
+                reassignAttachments(tempId, finalId).catch(() => {});
             }
 
             if (attachLink) {
@@ -1385,6 +1422,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         if (user) {
             deleteTaskLinkBookmark(user.id, id);
         }
+
+        // Clean up local file attachments
+        deleteTaskAttachments(id).catch(() => {});
 
         try {
             const { error } = await supabase.from('todos').delete().eq('id', id);
@@ -1878,6 +1918,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     )}
                     {deferredTab === 'schedule' && (
                         <ScheduleDashboard
+                            userId={user?.id}
                             state={{ ...appState, todos: filteredTodos, calendarEvents, timer, onOpenMusic: () => setActiveTab('music') } as any}
                             onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
                             onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}

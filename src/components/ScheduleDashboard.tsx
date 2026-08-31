@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { AppState, TimetableEvent, Goal, Todo, TodoStatus } from '../types';
-import { Calendar, Clock, Target, Plus, Trash2, Edit2, X, MapPin, Star, ChevronDown, ChevronUp, Download, CheckCircle, RefreshCw, BarChart2, ListTodo, LayoutGrid, Settings } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { AppState, TimetableEvent, Goal, Todo, TodoStatus, TaskLink, parseTaskLinks, encodeTaskLinks } from '../types';
+import { Calendar, Clock, Target, Plus, Trash2, Edit2, X, MapPin, Star, ChevronDown, ChevronUp, Download, CheckCircle, RefreshCw, BarChart2, ListTodo, LayoutGrid, Settings, Paperclip, Upload, Eye } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import CalendarWidget from './CalendarWidget';
 import MusicSpace from './MusicSpace';
+import { TaskAttachment, saveAttachment, getAttachments, deleteAttachment, downloadAttachment, formatFileSize, getFileIcon, isPreviewable } from '../services/taskAttachmentService';
 
 // Import our new tracker widgets
 import { KanbanBoard } from './tracker/KanbanBoard';
@@ -26,13 +27,14 @@ const formatBeforeMinutes = (minutes: number) => {
 
 interface ScheduleDashboardProps {
   state: AppState;
+  userId?: string;
   onAddGoal: (g: any) => void;
   onUpdateGoal: (g: any) => void;
   onDeleteGoal: (id: string) => void;
   onAddTimetable: (t: any) => void;
   onUpdateTimetable: (t: any) => void;
   onDeleteTimetable: (id: string) => void;
-  onAddTodo: (content: string, priority: any, deadline?: string, status?: TodoStatus, description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string) => void;
+  onAddTodo: (content: string, priority: any, deadline?: string, status?: TodoStatus, description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string, customId?: string) => void;
   onUpdateTodo: (t: any) => void;
   onDeleteTodo: (id: string) => void;
   onReorderTodos: (reordered: Todo[]) => void;
@@ -64,6 +66,7 @@ const COLUMNS: { id: TodoStatus; label: string; bg: string; border: string; dot:
 
 const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   state,
+  userId,
   onAddGoal, onUpdateGoal, onDeleteGoal,
   onAddTodo, onUpdateTodo, onDeleteTodo, onReorderTodos, onMoveTodoStatus,
   initialFocusMode = false, onResetFocusMode,
@@ -75,10 +78,11 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 }) => {
   const { timetable, goals, todos } = state;
   const { timer, onOpenMusic, calendarEvents = [] } = state as any;
+  const effectiveUserId = userId || state.profile?.id || '';
 
   // View state: 'board' (Kanban) or 'list' (Calendar Grid view for todos)
   const [todoView, setTodoView] = useState<'board' | 'list'>(() => {
-    const saved = localStorage.getItem(`smartlife_todo_view_${state.profile?.id}`);
+    const saved = localStorage.getItem(`smartlife_todo_view_${effectiveUserId}`);
     return (saved === 'board' || saved === 'list') ? saved : 'board';
   });
 
@@ -106,11 +110,21 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   const [modalStatus, setModalStatus] = useState<TodoStatus>('todo');
   const [modalDeadline, setModalDeadline] = useState('');
   const [modalDescription, setModalDescription] = useState('');
-  const [modalAttachLink, setModalAttachLink] = useState('');
+  const [modalAttachLinks, setModalAttachLinks] = useState<TaskLink[]>([]);
+  const [newLinkName, setNewLinkName] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [showAddLinkForm, setShowAddLinkForm] = useState(false);
   const [modalSubtasks, setModalSubtasks] = useState<{ id: string; title: string; is_completed: boolean }[]>([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [modalEmailNotify, setModalEmailNotify] = useState(false);
   const [modalEmailNotifyBefore, setModalEmailNotifyBefore] = useState(60);
+
+  // File attachments (local/IndexedDB)
+  const [modalAttachments, setModalAttachments] = useState<TaskAttachment[]>([]);
+  const [modalDraftTaskId, setModalDraftTaskId] = useState<string>('');
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<{ url: string; name: string; type: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Calendar states
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -267,12 +281,18 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
   // Open Unified Modal for Creation
   const handleOpenCreateModal = (status?: TodoStatus, defaultDate?: Date) => {
+    const newDraftId = crypto.randomUUID();
+    setModalDraftTaskId(newDraftId);
     setModalMode('create');
     setSelectedTodo(null);
     setModalContent('');
     setModalStatus(status || 'todo');
     setModalDescription('');
-    setModalAttachLink('');
+    setModalAttachLinks([]);
+    setNewLinkName('');
+    setNewLinkUrl('');
+    setShowAddLinkForm(false);
+    setModalAttachments([]);
     setModalSubtasks([]);
     setNewSubtaskTitle('');
     setModalEmailNotify(false);
@@ -292,12 +312,24 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
   // Open Unified Modal for Editing
   const handleOpenEditModal = (todo: Todo) => {
+    setModalDraftTaskId(todo.id);
     setModalMode('edit');
     setSelectedTodo(todo);
     setModalContent(todo.content);
     setModalStatus(todo.status || (todo.is_completed ? 'done' : 'todo'));
     setModalDescription(todo.description || '');
-    setModalAttachLink(todo.attach_link || '');
+    setModalAttachLinks(parseTaskLinks(todo.attach_link));
+    setNewLinkName('');
+    setNewLinkUrl('');
+    setShowAddLinkForm(false);
+
+    // Load file attachments from IndexedDB
+    if (todo.id) {
+      getAttachments(todo.id).then(atts => setModalAttachments(atts)).catch(() => setModalAttachments([]));
+    } else {
+      setModalAttachments([]);
+    }
+
     setModalSubtasks(todo.subtasks || []);
     setNewSubtaskTitle('');
     setModalEmailNotify(todo.email_notify || false);
@@ -355,7 +387,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         modalSubtasks,
         modalEmailNotify,
         modalEmailNotifyBefore,
-        modalAttachLink.trim() || undefined
+        encodeTaskLinks(modalAttachLinks) || undefined,
+        modalDraftTaskId
       );
     } else if (modalMode === 'edit' && selectedTodo) {
       onUpdateTodo({
@@ -364,7 +397,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         status: modalStatus,
         deadline: formattedDeadline || null,
         description: modalDescription.trim() || null,
-        attach_link: modalAttachLink.trim() || null,
+        attach_link: encodeTaskLinks(modalAttachLinks),
         subtasks: modalSubtasks,
         email_notify: modalEmailNotify,
         email_notify_before_minutes: modalEmailNotifyBefore,
@@ -838,8 +871,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
 
           {/* Bookmarks and Habits widgets side-by-side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 items-stretch">
-            <BookmarkWidget userId={state.profile?.id || ''} />
-            <HabitsWidget userId={state.profile?.id || ''} />
+            <BookmarkWidget userId={effectiveUserId} />
+            <HabitsWidget userId={effectiveUserId} />
           </div>
         </div>
 
@@ -847,7 +880,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
         <div className="flex flex-col gap-3 md:gap-4 w-full">
           <PomodoroWidget timer={timer} onOpenMusic={onOpenMusic} />
           <div className="flex-1">
-            <QuickNotesWidget userId={state.profile?.id || ''} onNavigate={onNavigate} />
+            <QuickNotesWidget userId={effectiveUserId} onNavigate={onNavigate} />
           </div>
         </div>
 
@@ -1296,31 +1329,294 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 />
               </div>
 
-              {/* Attach Link Input */}
+              {/* Multi-Link Manager */}
               <div>
                 <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">
-                  LINK ĐÍNH KÈM (ATTACH LINK)
+                  LINK ĐÍNH KÈM ({modalAttachLinks.length})
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={modalAttachLink}
-                    onChange={(e) => setModalAttachLink(e.target.value)}
-                    placeholder="Ví dụ: https://github.com/my-project"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400 text-xs font-semibold bg-white text-slate-800 pr-20"
-                  />
-                  {modalAttachLink.trim() && (
-                    <a
-                      href={modalAttachLink.trim().startsWith('http') ? modalAttachLink.trim() : `https://${modalAttachLink.trim()}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors flex items-center gap-1"
-                    >
-                      Mở link ↗
-                    </a>
-                  )}
-                </div>
+
+                {/* List of added links */}
+                {modalAttachLinks.length > 0 && (
+                  <div className="space-y-1.5 mb-2.5">
+                    {modalAttachLinks.map((link) => (
+                      <div key={link.id} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100 group">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-bold text-slate-700 truncate">{link.name}</p>
+                          <p className="text-[9px] text-slate-400 truncate">{link.url}</p>
+                        </div>
+                        <a
+                          href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Mở ↗
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setModalAttachLinks(modalAttachLinks.filter(l => l.id !== link.id))}
+                          className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                          title="Xóa link"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Link Form */}
+                {showAddLinkForm ? (
+                  <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 space-y-2">
+                    <input
+                      type="text"
+                      value={newLinkName}
+                      onChange={(e) => setNewLinkName(e.target.value)}
+                      placeholder="Tên link (VD: Google Classroom)"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400 text-xs font-semibold bg-white text-slate-800"
+                    />
+                    <input
+                      type="text"
+                      value={newLinkUrl}
+                      onChange={(e) => setNewLinkUrl(e.target.value)}
+                      placeholder="URL (VD: https://classroom.google.com)"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400 text-xs font-semibold bg-white text-slate-800"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newLinkUrl.trim()) {
+                          e.preventDefault();
+                          let formattedUrl = newLinkUrl.trim();
+                          if (!/^https?:\/\//i.test(formattedUrl)) formattedUrl = `https://${formattedUrl}`;
+                          setModalAttachLinks([...modalAttachLinks, { id: crypto.randomUUID(), name: newLinkName.trim() || formattedUrl, url: formattedUrl }]);
+                          setNewLinkName('');
+                          setNewLinkUrl('');
+                          setShowAddLinkForm(false);
+                        }
+                      }}
+                    />
+                    <div className="flex justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => { setShowAddLinkForm(false); setNewLinkName(''); setNewLinkUrl(''); }}
+                        className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!newLinkUrl.trim()}
+                        onClick={() => {
+                          let formattedUrl = newLinkUrl.trim();
+                          if (!/^https?:\/\//i.test(formattedUrl)) formattedUrl = `https://${formattedUrl}`;
+                          setModalAttachLinks([...modalAttachLinks, { id: crypto.randomUUID(), name: newLinkName.trim() || formattedUrl, url: formattedUrl }]);
+                          setNewLinkName('');
+                          setNewLinkUrl('');
+                          setShowAddLinkForm(false);
+                        }}
+                        className="px-3 py-1.5 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <Plus size={11} /> Thêm
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddLinkForm(true)}
+                    className="w-full py-2 rounded-xl border-2 border-dashed border-slate-200 hover:border-blue-300 text-[10px] font-bold text-slate-400 hover:text-blue-500 transition-colors cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <Plus size={12} /> Thêm link đính kèm
+                  </button>
+                )}
               </div>
+
+              {/* File Attachments (Local) */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-wider">
+                  <Paperclip size={10} className="inline mr-1" />
+                  TỆP ĐÍNH KÈM ({modalAttachments.length})
+                </label>
+
+                {modalAttachments.length > 0 && (
+                  <div className="space-y-1.5 mb-2.5">
+                    {modalAttachments.map((att) => {
+                      const icon = getFileIcon(att.type);
+                      const isImage = att.type.startsWith('image/');
+                      return (
+                        <div key={att.id} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100 group">
+                          <span className="text-sm shrink-0">{icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold text-slate-700 truncate">{att.name}</p>
+                            <p className="text-[9px] text-slate-400">{formatFileSize(att.size)}</p>
+                          </div>
+                          {isPreviewable(att.type, att.name) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const blob = new Blob([att.data], { type: att.type });
+                                const url = URL.createObjectURL(blob);
+                                setPreviewAttachment({ url, name: att.name, type: att.type });
+                              }}
+                              className="p-1 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                              title="Xem trước"
+                            >
+                              <Eye size={12} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => downloadAttachment(att)}
+                            className="p-1 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                            title="Tải xuống"
+                          >
+                            <Download size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await deleteAttachment(att.id, att.taskId || modalDraftTaskId);
+                              setModalAttachments(modalAttachments.filter(a => a.id !== att.id));
+                            }}
+                            className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                            title="Xóa file"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  multiple
+                  onChange={async (e) => {
+                    const files = e.target.files;
+                    if (!files || files.length === 0) return;
+
+                    const taskId = modalDraftTaskId || selectedTodo?.id || crypto.randomUUID();
+                    if (!modalDraftTaskId) setModalDraftTaskId(taskId);
+                    setIsUploadingFile(true);
+                    try {
+                      const newAtts: TaskAttachment[] = [];
+                      for (let i = 0; i < files.length; i++) {
+                        const att = await saveAttachment(taskId, files[i]);
+                        newAtts.push(att);
+                      }
+                      setModalAttachments(prev => [...prev, ...newAtts]);
+                    } catch (err: any) {
+                      alert(err.message || 'Lỗi tải file lên');
+                    } finally {
+                      setIsUploadingFile(false);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }
+                  }}
+                />
+
+                <button
+                  type="button"
+                  disabled={isUploadingFile}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-2 rounded-xl border-2 border-dashed border-slate-200 hover:border-emerald-300 text-[10px] font-bold text-slate-400 hover:text-emerald-500 transition-colors cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
+                >
+                  {isUploadingFile ? (
+                    <><RefreshCw size={12} className="animate-spin" /> Đang tải lên...</>
+                  ) : (
+                    <><Upload size={12} /> Tải file lên (lưu local)</>   
+                  )}
+                </button>
+                <p className="text-[8px] text-slate-400 mt-1 text-center">Tối đa 10MB/file · Lưu trên thiết bị của bạn</p>
+              </div>
+
+              {/* Enhanced File Preview Modal */}
+              {previewAttachment && (
+                <div
+                  className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
+                  onClick={() => {
+                    URL.revokeObjectURL(previewAttachment.url);
+                    setPreviewAttachment(null);
+                  }}
+                >
+                  <div
+                    className="relative bg-white dark:bg-card border border-border rounded-2xl shadow-2xl max-w-[90vw] max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-slate-50/50 dark:bg-card shrink-0 gap-3">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-sm shrink-0">{getFileIcon(previewAttachment.type)}</span>
+                        <p className="text-xs font-bold text-foreground truncate">{previewAttachment.name}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const a = document.createElement('a');
+                            a.href = previewAttachment.url;
+                            a.download = previewAttachment.name;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          }}
+                          className="flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                          title="Tải xuống"
+                        >
+                          <Download size={12} />
+                          Tải về
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            URL.revokeObjectURL(previewAttachment.url);
+                            setPreviewAttachment(null);
+                          }}
+                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer"
+                          title="Đóng"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-auto flex items-center justify-center p-2 min-h-[200px] max-h-[70vh] bg-slate-900/5 dark:bg-black/30">
+                      {previewAttachment.type.startsWith('image/') ? (
+                        <img
+                          src={previewAttachment.url}
+                          alt={previewAttachment.name}
+                          className="max-w-full max-h-[68vh] object-contain rounded-lg"
+                        />
+                      ) : previewAttachment.type === 'application/pdf' ? (
+                        <iframe
+                          src={previewAttachment.url}
+                          title={previewAttachment.name}
+                          className="w-[85vw] max-w-4xl h-[68vh] rounded-lg border-0 bg-white"
+                        />
+                      ) : previewAttachment.type.startsWith('video/') ? (
+                        <video
+                          src={previewAttachment.url}
+                          controls
+                          autoPlay
+                          className="max-w-full max-h-[68vh] rounded-lg"
+                        />
+                      ) : previewAttachment.type.startsWith('audio/') ? (
+                        <div className="p-8 flex flex-col items-center gap-3">
+                          <span className="text-3xl">🎵</span>
+                          <p className="text-xs font-bold">{previewAttachment.name}</p>
+                          <audio src={previewAttachment.url} controls autoPlay className="w-80" />
+                        </div>
+                      ) : (
+                        <iframe
+                          src={previewAttachment.url}
+                          title={previewAttachment.name}
+                          className="w-[85vw] max-w-3xl h-[65vh] rounded-lg bg-white p-4 font-mono text-xs"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Email Notifications */}
               <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-200/60 space-y-2.5">
