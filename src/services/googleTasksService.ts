@@ -8,6 +8,17 @@
  */
 
 import { Todo, TodoStatus } from '../types';
+import {
+  getValidGoogleToken,
+  saveGoogleToken as saveSharedGoogleToken,
+  isGoogleConnected,
+  disconnectGoogle,
+  getGoogleClientId as getSharedGoogleClientId,
+  setGoogleClientId as setSharedGoogleClientId,
+  requestUnifiedGoogleToken,
+  ensureValidGoogleToken,
+  googleApiFetch,
+} from './googleAuthTokenManager';
 
 export interface GoogleTaskList {
   id: string;
@@ -45,10 +56,6 @@ export interface GoogleTasksSyncResult {
 }
 
 const STORAGE_KEYS = {
-  CLIENT_ID: 'smartlife_gtasks_client_id',
-  ACCESS_TOKEN: 'smartlife_gtasks_access_token',
-  REFRESH_TOKEN: 'smartlife_gtasks_refresh_token',
-  EXPIRES_AT: 'smartlife_gtasks_expires_at',
   LIST_ID: 'smartlife_gtasks_list_id',
   LIST_TITLE: 'smartlife_gtasks_list_title',
   AUTO_SYNC: 'smartlife_gtasks_auto_sync',
@@ -57,70 +64,28 @@ const STORAGE_KEYS = {
 
 // 1. Quản lý Client ID
 export const getGoogleClientId = (): string => {
-  if (typeof window === 'undefined') return '';
-  const stored = localStorage.getItem(STORAGE_KEYS.CLIENT_ID);
-  if (stored && stored.trim()) return stored.trim();
-  const envId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID;
-  return (envId && typeof envId === 'string') ? envId.trim() : '';
+  return getSharedGoogleClientId();
 };
 
 export const setGoogleClientId = (clientId: string): void => {
-  if (typeof window === 'undefined') return;
-  if (clientId.trim()) {
-    localStorage.setItem(STORAGE_KEYS.CLIENT_ID, clientId.trim());
-  } else {
-    localStorage.removeItem(STORAGE_KEYS.CLIENT_ID);
-  }
+  setSharedGoogleClientId(clientId);
 };
 
 // 2. Quản lý Access Token & Trạng thái kết nối
 export const getStoredAccessToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-  const expiresAtStr = localStorage.getItem(STORAGE_KEYS.EXPIRES_AT);
-  if (token && expiresAtStr) {
-    const expiresAt = parseInt(expiresAtStr, 10);
-    if (!Number.isNaN(expiresAt) && Date.now() < expiresAt - 30000) {
-      return token;
-    }
-  }
-
-  // Tự động lấy token từ Supabase Google Provider Token
-  try {
-    const cachedSessionStr = localStorage.getItem('smartlife_cached_session');
-    if (cachedSessionStr) {
-      const cachedSession = JSON.parse(cachedSessionStr);
-      if (cachedSession?.provider_token) {
-        saveGoogleToken(cachedSession.provider_token, cachedSession.expires_in || 3600, cachedSession.provider_refresh_token);
-        return cachedSession.provider_token;
-      }
-    }
-  } catch (e) {}
-
-  return null;
+  return getValidGoogleToken();
 };
 
 export const isGoogleTasksConnected = (): boolean => {
-  return getStoredAccessToken() !== null;
+  return isGoogleConnected();
 };
 
 export const saveGoogleToken = (token: string, expiresInSeconds: number, refreshToken?: string): void => {
-  if (typeof window === 'undefined') return;
-  const expiresAt = Date.now() + expiresInSeconds * 1000;
-  localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
-  localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, expiresAt.toString());
-  if (refreshToken && refreshToken.trim()) {
-    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken.trim());
-  }
-  window.dispatchEvent(new CustomEvent('google_tasks_auth_changed'));
+  saveSharedGoogleToken(token, expiresInSeconds, refreshToken);
 };
 
 export const disconnectGoogleTasks = (): void => {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-  localStorage.removeItem(STORAGE_KEYS.EXPIRES_AT);
-  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-  window.dispatchEvent(new CustomEvent('google_tasks_auth_changed'));
+  disconnectGoogle();
 };
 
 // 3. Quản lý cấu hình danh sách đồng bộ
@@ -381,38 +346,10 @@ export const loadGoogleGisScript = (): Promise<void> => {
 };
 
 export const requestGoogleTasksToken = async (clientId?: string): Promise<string> => {
-  await loadGoogleGisScript();
-
-  const finalClientId = clientId || getGoogleClientId();
-  if (!finalClientId) {
-    throw new Error('Vui lòng cấu hình Google Client ID để cấp quyền Google Tasks.');
+  if (clientId) {
+    setGoogleClientId(clientId);
   }
-
-  return new Promise<string>((resolve, reject) => {
-    try {
-      const client = window.google.accounts.oauth2.initTokenClient({
-        client_id: finalClientId,
-        scope: 'https://www.googleapis.com/auth/tasks',
-        callback: (response: any) => {
-          if (response.error) {
-            reject(new Error(response.error_description || response.error));
-            return;
-          }
-          if (response.access_token) {
-            const expiresIn = parseInt(response.expires_in, 10) || 3600;
-            saveGoogleToken(response.access_token, expiresIn);
-            resolve(response.access_token);
-          } else {
-            reject(new Error('Không nhận được Access Token từ Google.'));
-          }
-        },
-      });
-
-      client.requestAccessToken({ prompt: 'consent' });
-    } catch (err: any) {
-      reject(new Error(err.message || 'Lỗi khởi tạo Google Token Client.'));
-    }
-  });
+  return requestUnifiedGoogleToken({ prompt: 'consent' });
 };
 
 // 6. REST API Client cho Google Tasks
@@ -423,16 +360,27 @@ const authHeaders = (token: string) => ({
   'Content-Type': 'application/json',
 });
 
+const tasksApiFetch = async (
+  url: string,
+  options: RequestInit = {},
+  customToken?: string
+): Promise<Response> => {
+  if (customToken) {
+    const headers = new Headers(options.headers || {});
+    headers.set('Authorization', `Bearer ${customToken}`);
+    if (options.body && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    return fetch(url, { ...options, headers });
+  }
+  return googleApiFetch(url, options);
+};
+
 /**
  * Lấy tất cả Task Lists của người dùng
  */
 export const fetchGoogleTaskLists = async (token?: string): Promise<GoogleTaskList[]> => {
-  const accessToken = token || getStoredAccessToken();
-  if (!accessToken) throw new Error('Chưa kết nối tài khoản Google Tasks.');
-
-  const res = await fetch(`${API_BASE}/users/@me/lists?maxResults=50`, {
-    headers: authHeaders(accessToken),
-  });
+  const res = await tasksApiFetch(`${API_BASE}/users/@me/lists?maxResults=50`, {}, token);
 
   if (!res.ok) {
     if (res.status === 401) {
@@ -451,14 +399,14 @@ export const fetchGoogleTaskLists = async (token?: string): Promise<GoogleTaskLi
  * Tạo mới 1 Task List trên Google Tasks
  */
 export const createGoogleTaskList = async (title: string, token?: string): Promise<GoogleTaskList> => {
-  const accessToken = token || getStoredAccessToken();
-  if (!accessToken) throw new Error('Chưa kết nối tài khoản Google Tasks.');
-
-  const res = await fetch(`${API_BASE}/users/@me/lists`, {
-    method: 'POST',
-    headers: authHeaders(accessToken),
-    body: JSON.stringify({ title }),
-  });
+  const res = await tasksApiFetch(
+    `${API_BASE}/users/@me/lists`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    },
+    token
+  );
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
@@ -472,14 +420,14 @@ export const createGoogleTaskList = async (title: string, token?: string): Promi
  * Đổi tên (Rename) 1 Task List trên Google Tasks
  */
 export const updateGoogleTaskList = async (listId: string, title: string, token?: string): Promise<GoogleTaskList> => {
-  const accessToken = token || getStoredAccessToken();
-  if (!accessToken) throw new Error('Chưa kết nối tài khoản Google Tasks.');
-
-  const res = await fetch(`${API_BASE}/users/@me/lists/${encodeURIComponent(listId)}`, {
-    method: 'PATCH',
-    headers: authHeaders(accessToken),
-    body: JSON.stringify({ title }),
-  });
+  const res = await tasksApiFetch(
+    `${API_BASE}/users/@me/lists/${encodeURIComponent(listId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    },
+    token
+  );
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
@@ -638,9 +586,6 @@ export const ensureTimeframeTaskLists = async (token?: string, forceRefresh = fa
  * Lấy toàn bộ danh sách task trong 1 list (hỗ trợ phân trang pageToken đầy đủ)
  */
 export const fetchGoogleTasks = async (listId = '@default', token?: string): Promise<GoogleTaskItem[]> => {
-  const accessToken = token || getStoredAccessToken();
-  if (!accessToken) throw new Error('Chưa kết nối tài khoản Google Tasks.');
-
   const allItems: GoogleTaskItem[] = [];
   let pageToken: string | undefined = undefined;
   let pageCount = 0;
@@ -649,9 +594,7 @@ export const fetchGoogleTasks = async (listId = '@default', token?: string): Pro
   do {
     const pageParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
     const url = `${API_BASE}/lists/${encodeURIComponent(listId)}/tasks?showCompleted=true&showHidden=true&maxResults=100${pageParam}`;
-    const res = await fetch(url, {
-      headers: authHeaders(accessToken),
-    });
+    const res = await tasksApiFetch(url, {}, token);
 
     if (!res.ok) {
       if (res.status === 401) {
@@ -681,9 +624,6 @@ export const createGoogleTask = async (
   listId = '@default',
   token?: string
 ): Promise<GoogleTaskItem> => {
-  const accessToken = token || getStoredAccessToken();
-  if (!accessToken) throw new Error('Chưa kết nối tài khoản Google Tasks.');
-
   const body: any = {
     title: taskData.title,
   };
@@ -698,11 +638,14 @@ export const createGoogleTask = async (
   }
 
   const parentQuery = taskData.parent ? `?parent=${encodeURIComponent(taskData.parent)}` : '';
-  const res = await fetch(`${API_BASE}/lists/${encodeURIComponent(listId)}/tasks${parentQuery}`, {
-    method: 'POST',
-    headers: authHeaders(accessToken),
-    body: JSON.stringify(body),
-  });
+  const res = await tasksApiFetch(
+    `${API_BASE}/lists/${encodeURIComponent(listId)}/tasks${parentQuery}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+    token
+  );
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
@@ -721,9 +664,6 @@ export const updateGoogleTask = async (
   listId = '@default',
   token?: string
 ): Promise<GoogleTaskItem> => {
-  const accessToken = token || getStoredAccessToken();
-  if (!accessToken) throw new Error('Chưa kết nối tài khoản Google Tasks.');
-
   const body: any = {};
   if (updates.title !== undefined) body.title = updates.title;
   if (updates.notes !== undefined) body.notes = updates.notes;
@@ -737,11 +677,14 @@ export const updateGoogleTask = async (
     }
   }
 
-  const res = await fetch(`${API_BASE}/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`, {
-    method: 'PATCH',
-    headers: authHeaders(accessToken),
-    body: JSON.stringify(body),
-  });
+  const res = await tasksApiFetch(
+    `${API_BASE}/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    },
+    token
+  );
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
@@ -769,13 +712,13 @@ export const uncompleteGoogleTask = async (taskId: string, listId = '@default', 
  * Xóa task khỏi Google Tasks
  */
 export const deleteGoogleTask = async (taskId: string, listId = '@default', token?: string): Promise<void> => {
-  const accessToken = token || getStoredAccessToken();
-  if (!accessToken) return;
-
-  await fetch(`${API_BASE}/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`, {
-    method: 'DELETE',
-    headers: authHeaders(accessToken),
-  }).catch((e) => console.warn('[GoogleTasks] Delete task warning:', e));
+  await tasksApiFetch(
+    `${API_BASE}/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`,
+    {
+      method: 'DELETE',
+    },
+    token
+  ).catch((e) => console.warn('[GoogleTasks] Delete task warning:', e));
 };
 
 /**

@@ -4,7 +4,7 @@
  * Sử dụng shared Google Auth Token Manager
  */
 
-import { googleApiFetch, getValidGoogleToken } from './googleAuthTokenManager';
+import { googleApiFetch, getValidGoogleToken, requestUnifiedGoogleToken } from './googleAuthTokenManager';
 
 const CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3';
 
@@ -138,6 +138,10 @@ export const setSelectedCalendarIds = (ids: string[]): void => {
 
 export const isGoogleCalendarConnected = (): boolean => {
   return getValidGoogleToken() !== null;
+};
+
+export const requestGoogleCalendarToken = async (): Promise<string> => {
+  return requestUnifiedGoogleToken({ prompt: 'consent' });
 };
 
 // ────────────────────────────────────────
