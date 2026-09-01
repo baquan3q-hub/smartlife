@@ -115,8 +115,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 saveGoogleToken(
                                     (freshSession as any).provider_token,
                                     (freshSession as any).expires_in || 3600,
-                                    (freshSession as any).provider_refresh_token
+                                    (freshSession as any).provider_refresh_token,
+                                    freshSession.user?.email
                                 );
+                            }).catch(() => {});
+                        } else if (freshSession?.user?.email) {
+                            // Tự động kích hoạt Silent SSO kết nối Google Calendar, Tasks, Sheets trong nền
+                            import('../services/googleAuthTokenManager').then(({ ensureValidGoogleToken }) => {
+                                ensureValidGoogleToken(freshSession.user?.email);
                             }).catch(() => {});
                         }
                         await Preferences.set({
@@ -158,8 +164,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 saveGoogleToken(
                                     (session as any).provider_token,
                                     (session as any).expires_in || 3600,
-                                    (session as any).provider_refresh_token
+                                    (session as any).provider_refresh_token,
+                                    session?.user?.email
                                 );
+                            }).catch(() => {});
+                        } else if (session?.user?.email) {
+                            import('../services/googleAuthTokenManager').then(({ ensureValidGoogleToken }) => {
+                                ensureValidGoogleToken(session?.user?.email);
                             }).catch(() => {});
                         }
                     }
@@ -167,8 +178,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setSession(null);
                     setUser(null);
                     await Preferences.remove({ key: 'smartlife_cached_session' });
-                    import('../services/googleTasksService').then(({ disconnectGoogleTasks }) => {
-                        disconnectGoogleTasks();
+                    import('../services/googleAuthTokenManager').then(({ disconnectGoogle }) => {
+                        disconnectGoogle();
                     }).catch(() => {});
                 } else if (event === 'USER_UPDATED') {
                     setUser(session?.user ?? null);
@@ -246,6 +257,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         };
 
+        // 5. Visibility Change & Focus Auto-Renewal for Google SSO
+        const handleVisibilityAndFocus = () => {
+            if (document.visibilityState === 'visible' && !loading) {
+                import('../services/googleAuthTokenManager').then(({ getValidGoogleToken, autoSilentGoogleAuth }) => {
+                    if (!getValidGoogleToken()) {
+                        autoSilentGoogleAuth();
+                    }
+                }).catch(() => {});
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityAndFocus);
+        window.addEventListener('focus', handleVisibilityAndFocus);
+
+        // 6. Periodic Keep-Alive Renewal (every 45 minutes)
+        const keepAliveInterval = setInterval(() => {
+            import('../services/googleAuthTokenManager').then(({ autoSilentGoogleAuth }) => {
+                autoSilentGoogleAuth();
+            }).catch(() => {});
+        }, 45 * 60 * 1000);
+
         initializeAuth();
         setupDeepLinks();
 
@@ -257,6 +288,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (deepLinkListener) {
                 deepLinkListener.remove();
             }
+            document.removeEventListener('visibilitychange', handleVisibilityAndFocus);
+            window.removeEventListener('focus', handleVisibilityAndFocus);
+            clearInterval(keepAliveInterval);
         };
     }, []);
 
