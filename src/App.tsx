@@ -56,6 +56,23 @@ import { walletService } from './services/walletService';
 import { debtService } from './services/debtService';
 import { isGoogleTasksConnected, isAutoSyncEnabled, syncTodoMutationToGoogle, deleteGoogleTask } from './services/googleTasksService';
 
+// Helper: Phát hiện lỗi mạng tạm thời (dùng để không hiện alert khi sync background bị lỗi mạng)
+const isNetworkError = (error: any): boolean => {
+    if (!error) return false;
+    const msg = String(error.message || error).toLowerCase();
+    return (
+        msg.includes('failed to fetch') ||
+        msg.includes('fetch') && msg.includes('error') ||
+        msg.includes('network') ||
+        msg.includes('timeout') ||
+        msg.includes('load failed') ||
+        msg.includes('status 0') ||
+        msg.includes('offline') ||
+        msg.includes('aborted') ||
+        msg.includes('err_connection')
+    );
+};
+
 const RealtimeClock: React.FC = () => {
     const [time, setTime] = useState(new Date());
 
@@ -1373,9 +1390,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 }).catch(e => console.warn('[AutoSync] Create task to Google error:', e));
             }
         } catch (error: any) {
-            console.error(error);
-            alert("Lỗi thêm việc: " + error.message);
-            setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.filter(t => t.id !== tempId) }));
+            console.error('[SmartLife] handleAddTodo error:', error);
+            if (isNetworkError(error)) {
+                console.warn('[SmartLife] Lỗi mạng tạm thời khi thêm việc — sẽ tự đồng bộ lại sau.');
+            } else {
+                alert("Lỗi thêm việc: " + error.message);
+                setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.filter(t => t.id !== tempId) }));
+            }
         }
     };
 
@@ -1482,9 +1503,27 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 }
             }
         } catch (error: any) {
-            console.error(error);
-            alert("Lỗi cập nhật việc: " + error.message);
-            setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
+            console.error('[SmartLife] handleUpdateTodo error:', error);
+            if (isNetworkError(error)) {
+                // Lỗi mạng tạm thời (thường do sync Google Tasks background) — retry 1 lần im lặng
+                console.warn('[SmartLife] Lỗi mạng tạm thời khi cập nhật việc — retry sau 3 giây...');
+                setTimeout(async () => {
+                    try {
+                        const { id, user_id, created_at, google_task_id, google_list_id, google_synced_at, ...retryFields } = updatedItem;
+                        if (!isCompletedAtSupportedRef.current) delete retryFields.completed_at;
+                        if (retryFields.priority && !['high', 'medium', 'low'].includes(retryFields.priority)) {
+                            retryFields.priority = retryFields.priority === 'urgent' ? 'high' : retryFields.priority === 'focus' ? 'medium' : 'medium';
+                        }
+                        await supabase.from('todos').update(retryFields).eq('id', item.id);
+                        console.log('[SmartLife] Retry cập nhật thành công.');
+                    } catch (retryErr) {
+                        console.warn('[SmartLife] Retry cập nhật cũng thất bại:', retryErr);
+                    }
+                }, 3000);
+            } else {
+                alert("Lỗi cập nhật việc: " + error.message);
+                setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
+            }
         }
     }, [user, handleUpdateTodoGoogleId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1513,9 +1552,13 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             const { error } = await supabase.from('todos').delete().eq('id', id);
             if (error) throw error;
         } catch (error: any) {
-            console.error(error);
-            alert("Lỗi xóa việc: " + error.message);
-            setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
+            console.error('[SmartLife] handleDeleteTodo error:', error);
+            if (isNetworkError(error)) {
+                console.warn('[SmartLife] Lỗi mạng tạm thời khi xóa việc — sẽ tự đồng bộ lại sau.');
+            } else {
+                alert("Lỗi xóa việc: " + error.message);
+                setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
+            }
         }
     };
 
