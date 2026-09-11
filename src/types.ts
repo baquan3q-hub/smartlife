@@ -124,6 +124,22 @@ export interface Transaction {
   debt_id?: string | null;
 }
 
+export interface RecurringTransaction {
+  id: string;
+  user_id?: string;
+  title: string;
+  amount: number;
+  type: TransactionType;
+  category: string;
+  wallet_id?: string | null;
+  day_of_month: number; // 1 - 31
+  status: 'active' | 'paused';
+  description?: string;
+  auto_apply: boolean;
+  last_applied_month?: string | null; // format: 'YYYY-MM', ví dụ '2026-09'
+  created_at?: string;
+}
+
 export interface Goal {
   id: string;
   user_id?: string;
@@ -318,6 +334,7 @@ export interface Profile {
   currency?: string;
   avatar_url?: string;
   custom_categories?: { expense: string[]; income: string[] };
+  pinned_categories?: string[];
   plan?: string;
   pro_expiry_date?: string;
   trial_started_at?: string;

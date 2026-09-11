@@ -3,7 +3,7 @@ import { Transaction, Task, TaskPriority, ScheduleType, Goal, BudgetSummary } fr
 
 // Danh mục Chi tiêu
 export const EXPENSE_CATEGORIES = [
-  'Ăn uống', 'Di chuyển', 'Nhà cửa', 'Điện nước', 'Mua sắm',
+  'Ăn uống', 'Di chuyển', 'Nhà cửa', 'Điện nước', 'Tiền mạng', 'Mua sắm',
   'Giải trí', 'Sức khỏe', 'Giáo dục', 'Đầu tư', 'Trả nợ',
   'Cho vay', 'Hiếu hỉ', 'Dating', 'Du lịch', 'Khác'
 ];

@@ -439,11 +439,56 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     const proAccess = useProAccess(appState.profile, user?.email || undefined);
 
     // Custom Category Management
-    const [customExpenseCats, setCustomExpenseCats] = useState<string[]>([]);
-    const [customIncomeCats, setCustomIncomeCats] = useState<string[]>([]);
+    const [customExpenseCats, setCustomExpenseCats] = useState<string[]>(() => {
+        try {
+            const local = localStorage.getItem('smartlife_custom_expense_cats');
+            if (local) return JSON.parse(local);
+        } catch (e) {}
+        return [];
+    });
+    const [customIncomeCats, setCustomIncomeCats] = useState<string[]>(() => {
+        try {
+            const local = localStorage.getItem('smartlife_custom_income_cats');
+            if (local) return JSON.parse(local);
+        } catch (e) {}
+        return [];
+    });
+    const [pinnedCategories, setPinnedCategories] = useState<string[]>(() => {
+        try {
+            const local = localStorage.getItem('smartlife_pinned_categories');
+            if (local) return JSON.parse(local);
+        } catch (e) {}
+        return ['Ăn uống', 'Di chuyển', 'Mua sắm', 'Hóa đơn', 'Tiền mạng', 'Lương', 'Thưởng'];
+    });
 
-    const allExpenseCategories = [...EXPENSE_CATEGORIES, ...customExpenseCats];
-    const allIncomeCategories = [...INCOME_CATEGORIES, ...customIncomeCats];
+    const handleTogglePinCategory = (categoryName: string) => {
+        setPinnedCategories(prev => {
+            const next = prev.includes(categoryName)
+                ? prev.filter(c => c !== categoryName)
+                : [categoryName, ...prev];
+            try {
+                localStorage.setItem('smartlife_pinned_categories', JSON.stringify(next));
+                if (user) {
+                    supabase.from('profiles').update({ pinned_categories: next } as any).eq('id', user.id).then();
+                }
+            } catch (e) {}
+            return next;
+        });
+    };
+
+    const allExpenseCategories = React.useMemo(() => {
+        const txCats = appState.transactions
+            .filter(t => t.type === TransactionType.EXPENSE && t.category && t.category !== 'Điều chỉnh số dư')
+            .map(t => t.category);
+        return Array.from(new Set([...EXPENSE_CATEGORIES, ...customExpenseCats, ...txCats]));
+    }, [customExpenseCats, appState.transactions]);
+
+    const allIncomeCategories = React.useMemo(() => {
+        const txCats = appState.transactions
+            .filter(t => t.type === TransactionType.INCOME && t.category && t.category !== 'Điều chỉnh số dư')
+            .map(t => t.category);
+        return Array.from(new Set([...INCOME_CATEGORIES, ...customIncomeCats, ...txCats]));
+    }, [customIncomeCats, appState.transactions]);
 
     // Smart Insights State 🧠
     const [insights, setInsights] = useState<SmartInsight[]>([]);
@@ -610,8 +655,26 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             // Parse Custom Categories from Profile
             if (profileRes.data?.custom_categories) {
                 const customCats = profileRes.data.custom_categories;
-                if (customCats.expense) setCustomExpenseCats(customCats.expense);
-                if (customCats.income) setCustomIncomeCats(customCats.income);
+                if (customCats.expense && Array.isArray(customCats.expense)) {
+                    setCustomExpenseCats(prev => {
+                        const merged = Array.from(new Set([...prev, ...customCats.expense]));
+                        try { localStorage.setItem('smartlife_custom_expense_cats', JSON.stringify(merged)); } catch (e) {}
+                        return merged;
+                    });
+                }
+                if (customCats.income && Array.isArray(customCats.income)) {
+                    setCustomIncomeCats(prev => {
+                        const merged = Array.from(new Set([...prev, ...customCats.income]));
+                        try { localStorage.setItem('smartlife_custom_income_cats', JSON.stringify(merged)); } catch (e) {}
+                        return merged;
+                    });
+                }
+            }
+            if (profileRes.data?.pinned_categories && Array.isArray(profileRes.data.pinned_categories) && profileRes.data.pinned_categories.length > 0) {
+                setPinnedCategories(profileRes.data.pinned_categories);
+                try {
+                    localStorage.setItem('smartlife_pinned_categories', JSON.stringify(profileRes.data.pinned_categories));
+                } catch (e) {}
             }
 
             if (eventsRes.data) {
@@ -861,6 +924,78 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     };
 
+    const handleBatchAddTransactions = async (newTxList: Omit<Transaction, 'id'>[]) => {
+        if (!user || newTxList.length === 0) return;
+        const tempTxs: Transaction[] = newTxList.map((tx, idx) => ({
+            ...tx,
+            id: `temp_${Date.now()}_${idx}`,
+            user_id: user.id
+        }));
+
+        setAppState((prev: AppState) => ({
+            ...prev,
+            transactions: [...tempTxs, ...prev.transactions]
+        }));
+
+        // Cập nhật số dư ví trong local state & database
+        const walletDeltas: Record<string, number> = {};
+        newTxList.forEach(tx => {
+            if (tx.wallet_id) {
+                const delta = tx.type === 'income' ? tx.amount : -tx.amount;
+                walletDeltas[tx.wallet_id] = (walletDeltas[tx.wallet_id] || 0) + delta;
+            }
+        });
+
+        if (Object.keys(walletDeltas).length > 0) {
+            setAppState(prev => ({
+                ...prev,
+                wallets: prev.wallets.map(w => {
+                    if (walletDeltas[w.id]) {
+                        const newBal = Number(w.balance) + walletDeltas[w.id];
+                        supabase.from('wallets').update({ balance: newBal }).eq('id', w.id).then();
+                        return { ...w, balance: newBal };
+                    }
+                    return w;
+                })
+            }));
+        }
+
+        try {
+            const toInsert = newTxList.map(tx => ({
+                user_id: user.id,
+                amount: tx.amount,
+                category: tx.category,
+                date: tx.date,
+                type: tx.type,
+                description: tx.description,
+                wallet_id: tx.wallet_id || null,
+                debt_id: tx.debt_id || null
+            }));
+
+            const { data, error } = await supabase.from('transactions').insert(toInsert).select();
+            if (error) throw error;
+            if (data && Array.isArray(data)) {
+                const insertedMap = new Map();
+                data.forEach((d, i) => {
+                    if (tempTxs[i]) insertedMap.set(tempTxs[i].id, d);
+                });
+                setAppState((prev: AppState) => ({
+                    ...prev,
+                    transactions: prev.transactions.map(t => insertedMap.has(t.id) ? {
+                        ...insertedMap.get(t.id),
+                        amount: Number(insertedMap.get(t.id).amount),
+                        wallet_id: insertedMap.get(t.id).wallet_id || null,
+                        debt_id: insertedMap.get(t.id).debt_id || null
+                    } : t)
+                }));
+            }
+        } catch (error: any) {
+            console.error('Lỗi thêm giao dịch hàng loạt:', error);
+            alert(`Lỗi: ${error.message}`);
+            fetchData(true);
+        }
+    };
+
     const handleUpdateTransaction = async (updatedTx: Transaction) => {
         const previousTransactions = [...appState.transactions];
         const oldTx = appState.transactions.find(t => t.id === updatedTx.id);
@@ -1050,80 +1185,166 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     // --- CATEGORY HANDLER ---
     const handleAddCategory = async (type: 'expense' | 'income', newCategory: string) => {
-        if (!user || !newCategory.trim()) return;
+        const cleanName = newCategory.trim();
+        if (!cleanName) return;
 
         const currentList = type === 'expense' ? allExpenseCategories : allIncomeCategories;
-        if (currentList.includes(newCategory)) {
+        if (currentList.includes(cleanName)) {
             alert("Danh mục này đã tồn tại!");
             return;
         }
 
-        if (type === 'expense') setCustomExpenseCats(prev => [...prev, newCategory]);
-        else setCustomIncomeCats(prev => [...prev, newCategory]);
+        if (type === 'expense') {
+            setCustomExpenseCats(prev => {
+                const next = Array.from(new Set([...prev, cleanName]));
+                try { localStorage.setItem('smartlife_custom_expense_cats', JSON.stringify(next)); } catch (e) {}
+                return next;
+            });
+        } else {
+            setCustomIncomeCats(prev => {
+                const next = Array.from(new Set([...prev, cleanName]));
+                try { localStorage.setItem('smartlife_custom_income_cats', JSON.stringify(next)); } catch (e) {}
+                return next;
+            });
+        }
 
-        try {
-            const currentProfile = appState.profile;
-            const existingCustom = currentProfile?.custom_categories || { expense: [], income: [] };
+        if (user) {
+            try {
+                const currentProfile = appState.profile;
+                const existingCustom = currentProfile?.custom_categories || { expense: [], income: [] };
 
-            const updatedCustom = {
-                ...existingCustom,
-                [type]: [...(existingCustom[type as keyof typeof existingCustom] || []), newCategory]
-            };
+                const updatedCustom = {
+                    ...existingCustom,
+                    [type]: Array.from(new Set([...(existingCustom[type as keyof typeof existingCustom] || []), cleanName]))
+                };
 
-            const { error } = await supabase.from('profiles').update({
-                custom_categories: updatedCustom
-            }).eq('id', user.id);
+                const { error } = await supabase.from('profiles').update({
+                    custom_categories: updatedCustom
+                }).eq('id', user.id);
 
-            if (error) throw error;
-
-            setAppState(prev => ({
-                ...prev,
-                profile: prev.profile ? { ...prev.profile, custom_categories: updatedCustom } : null
-            }));
-
-        } catch (error: any) {
-            console.error("Lỗi thêm danh mục:", error);
-            alert("Không thể lưu danh mục mới. Vui lòng thử lại.");
-            if (type === 'expense') setCustomExpenseCats(prev => prev.filter(c => c !== newCategory));
-            else setCustomIncomeCats(prev => prev.filter(c => c !== newCategory));
+                if (!error) {
+                    setAppState(prev => ({
+                        ...prev,
+                        profile: prev.profile ? { ...prev.profile, custom_categories: updatedCustom } : null
+                    }));
+                }
+            } catch (error: any) {
+                console.error("Lỗi thêm danh mục lên cloud:", error);
+            }
         }
     };
 
     const handleDeleteCategory = async (type: 'expense' | 'income', categoryToDelete: string) => {
-        if (!user || !categoryToDelete) return;
+        if (!categoryToDelete) return;
 
         if (!window.confirm(`Bạn có chắc muốn xóa danh mục "${categoryToDelete}"?`)) return;
 
-        if (type === 'expense') setCustomExpenseCats(prev => prev.filter(c => c !== categoryToDelete));
-        else setCustomIncomeCats(prev => prev.filter(c => c !== categoryToDelete));
+        if (type === 'expense') {
+            setCustomExpenseCats(prev => {
+                const next = prev.filter(c => c !== categoryToDelete);
+                try { localStorage.setItem('smartlife_custom_expense_cats', JSON.stringify(next)); } catch (e) {}
+                return next;
+            });
+        } else {
+            setCustomIncomeCats(prev => {
+                const next = prev.filter(c => c !== categoryToDelete);
+                try { localStorage.setItem('smartlife_custom_income_cats', JSON.stringify(next)); } catch (e) {}
+                return next;
+            });
+        }
 
-        try {
-            const currentProfile = appState.profile;
-            const existingCustom = currentProfile?.custom_categories || { expense: [], income: [] };
+        if (user) {
+            try {
+                const currentProfile = appState.profile;
+                const existingCustom = currentProfile?.custom_categories || { expense: [], income: [] };
 
-            const updatedList = (existingCustom[type as keyof typeof existingCustom] || []).filter((c: string) => c !== categoryToDelete);
+                const updatedList = (existingCustom[type as keyof typeof existingCustom] || []).filter((c: string) => c !== categoryToDelete);
 
-            const updatedCustom = {
-                ...existingCustom,
-                [type]: updatedList
-            };
+                const updatedCustom = {
+                    ...existingCustom,
+                    [type]: updatedList
+                };
 
-            const { error } = await supabase.from('profiles').update({
-                custom_categories: updatedCustom
-            }).eq('id', user.id);
+                const { error } = await supabase.from('profiles').update({
+                    custom_categories: updatedCustom
+                }).eq('id', user.id);
 
-            if (error) throw error;
+                if (!error) {
+                    setAppState(prev => ({
+                        ...prev,
+                        profile: prev.profile ? { ...prev.profile, custom_categories: updatedCustom } : null
+                    }));
+                }
+            } catch (error: any) {
+                console.error("Lỗi xóa danh mục trên cloud:", error);
+            }
+        }
+    };
 
-            setAppState(prev => ({
-                ...prev,
-                profile: prev.profile ? { ...prev.profile, custom_categories: updatedCustom } : null
-            }));
+    const handleEditCategory = async (type: 'expense' | 'income', oldCategory: string, newCategory: string) => {
+        if (!oldCategory || !newCategory.trim() || oldCategory === newCategory.trim()) return;
+        const cleanNewName = newCategory.trim();
+        const currentList = type === 'expense' ? allExpenseCategories : allIncomeCategories;
+        if (currentList.includes(cleanNewName)) {
+            alert("Danh mục mới đã tồn tại!");
+            return;
+        }
 
-        } catch (error: any) {
-            console.error("Lỗi xóa danh mục:", error);
-            alert("Không thể xóa danh mục. Vui lòng thử lại.");
-            if (type === 'expense') setCustomExpenseCats(prev => [...prev, categoryToDelete]);
-            else setCustomIncomeCats(prev => [...prev, categoryToDelete]);
+        // Cập nhật state danh mục & localStorage
+        if (type === 'expense') {
+            setCustomExpenseCats(prev => {
+                const next = prev.map(c => c === oldCategory ? cleanNewName : c);
+                try { localStorage.setItem('smartlife_custom_expense_cats', JSON.stringify(next)); } catch (e) {}
+                return next;
+            });
+        } else {
+            setCustomIncomeCats(prev => {
+                const next = prev.map(c => c === oldCategory ? cleanNewName : c);
+                try { localStorage.setItem('smartlife_custom_income_cats', JSON.stringify(next)); } catch (e) {}
+                return next;
+            });
+        }
+
+        // Cập nhật danh mục ghim nếu có
+        setPinnedCategories(prev => {
+            const next = prev.map(c => c === oldCategory ? cleanNewName : c);
+            localStorage.setItem('smartlife_pinned_categories', JSON.stringify(next));
+            return next;
+        });
+
+        // Cập nhật toàn bộ các giao dịch cũ có category này
+        setAppState(prev => ({
+            ...prev,
+            transactions: prev.transactions.map(t => t.category === oldCategory ? { ...t, category: cleanNewName } : t)
+        }));
+
+        if (user) {
+            try {
+                const currentProfile = appState.profile;
+                const existingCustom = currentProfile?.custom_categories || { expense: [], income: [] };
+                const curList = (existingCustom[type as keyof typeof existingCustom] || []) as string[];
+                const updatedList = curList.map(c => c === oldCategory ? cleanNewName : c);
+
+                const updatedCustom = {
+                    ...existingCustom,
+                    [type]: updatedList
+                };
+
+                await Promise.allSettled([
+                    supabase.from('profiles').update({ 
+                        custom_categories: updatedCustom,
+                        pinned_categories: pinnedCategories.map(c => c === oldCategory ? cleanNewName : c)
+                    } as any).eq('id', user.id),
+                    supabase.from('transactions').update({ category: cleanNewName }).eq('user_id', user.id).eq('category', oldCategory)
+                ]);
+
+                setAppState(prev => ({
+                    ...prev,
+                    profile: prev.profile ? { ...prev.profile, custom_categories: updatedCustom } : null
+                }));
+            } catch (error: any) {
+                console.error("Lỗi sửa danh mục:", error);
+            }
         }
     };
 
@@ -1997,6 +2218,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         <FinanceDashboard
                             state={appState}
                             onAddTransaction={handleAddTransaction}
+                            onBatchAddTransactions={handleBatchAddTransactions}
                             onUpdateTransaction={handleUpdateTransaction}
                             onDeleteTransaction={handleDeleteTransaction}
                             onAddGoal={handleAddGoal}
@@ -2006,7 +2228,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             lang={lang}
                             expenseCategories={allExpenseCategories}
                             incomeCategories={allIncomeCategories}
+                            pinnedCategories={pinnedCategories}
+                            onTogglePinCategory={handleTogglePinCategory}
                             onAddCategory={handleAddCategory}
+                            onEditCategory={handleEditCategory}
                             onDeleteCategory={handleDeleteCategory}
                             onAddBudget={async (b) => {
                                 if (!user) return;
