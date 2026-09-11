@@ -20,6 +20,23 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [fullName, setFullName] = useState('');
+    const [showLocalhostHelper, setShowLocalhostHelper] = useState(false);
+    const [manualToken, setManualToken] = useState('');
+
+    const handleApplyLocalhostToken = () => {
+        if (!manualToken.trim()) {
+            alert('Vui lòng dán mã token phiên từ web chính!');
+            return;
+        }
+        try {
+            const trimmed = manualToken.trim();
+            JSON.parse(trimmed);
+            localStorage.setItem('sb-toanywkdbhfqdfvtrrzm-auth-token', trimmed);
+            window.location.reload();
+        } catch (e) {
+            alert('Token không đúng định dạng JSON. Vui lòng kiểm tra lại!');
+        }
+    };
 
     // 1. Check for Configuration Issues first
     if (!isSupabaseConfigured) {
@@ -268,6 +285,62 @@ const Login: React.FC<LoginProps> = ({ onBack }) => {
                             />
                             <span>Google</span>
                         </button>
+
+                        {/* Localhost Dev Helper Card */}
+                        {(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
+                            <div className="mt-4 p-3 bg-amber-50/80 border border-amber-200 rounded-2xl text-xs text-amber-900 animate-fade-in">
+                                <div className="flex items-center justify-between font-bold mb-1">
+                                    <span className="flex items-center gap-1 text-amber-800">
+                                        💻 Localhost Helper
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowLocalhostHelper(!showLocalhostHelper)}
+                                        className="text-[11px] text-amber-700 underline font-semibold"
+                                    >
+                                        {showLocalhostHelper ? 'Thu gọn' : 'Bị chuyển hướng về Web thật?'}
+                                    </button>
+                                </div>
+
+                                {showLocalhostHelper && (
+                                    <div className="space-y-2 mt-2 pt-2 border-t border-amber-200/60 text-[11px]">
+                                        <p className="text-amber-800 leading-relaxed">
+                                            <strong>Lý do:</strong> Supabase chưa thêm <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">http://localhost:3000/**</code> vào <em>Redirect URLs</em> nên tự động đẩy về web thật khi đăng nhập Google.
+                                        </p>
+
+                                        <div className="bg-white/80 p-2 rounded-xl border border-amber-200 space-y-1.5">
+                                            <p className="font-bold text-gray-800">Cách 1 (Nhanh nhất): Dán Token từ web thật</p>
+                                            <p className="text-gray-500">
+                                                Mở web thật đã đăng nhập &rarr; Bấm F12 &rarr; Console gõ: <code className="bg-gray-100 text-pink-600 px-1 py-0.5 rounded font-mono">copy(localStorage.getItem('sb-toanywkdbhfqdfvtrrzm-auth-token'))</code> rồi dán vào đây:
+                                            </p>
+                                            <div className="flex gap-1.5">
+                                                <input
+                                                    type="password"
+                                                    placeholder="Dán token vào đây..."
+                                                    value={manualToken}
+                                                    onChange={(e) => setManualToken(e.target.value)}
+                                                    className="flex-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:bg-white"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleApplyLocalhostToken}
+                                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs shrink-0"
+                                                >
+                                                    Vào ngay
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white/80 p-2 rounded-xl border border-amber-200">
+                                            <p className="font-bold text-gray-800">Cách 2 (Triệt để cho Google Login):</p>
+                                            <p className="text-gray-500 mt-0.5">
+                                                Vào Supabase Dashboard &rarr; <strong>Authentication</strong> &rarr; <strong>URL Configuration</strong> &rarr; Thêm <code className="bg-amber-100 text-gray-800 px-1 rounded font-mono">http://localhost:3000/**</code> vào <strong>Redirect URLs</strong> &rarr; Bấm Save.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <p className="mt-8 text-center text-sm text-gray-600">
                             {isLoginMode ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}

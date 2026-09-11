@@ -1,11 +1,16 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { AppState, TransactionType, Transaction, Goal, BudgetConfig, Wallet, Debt, DebtRepayment, SavingsLog } from '../types';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { AppState, TransactionType, Transaction, Goal, BudgetConfig, Wallet, Debt, DebtRepayment, SavingsLog, RecurringTransaction } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, LineChart, Line } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet as WalletIcon, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart, Loader2, Utensils, Car, ShoppingBag, FileText, Tv, Heart, BookOpen, Coffee, Gift, Briefcase, Coins, PiggyBank, GraduationCap, Home, Droplets, Landmark, Plane, Eye, EyeOff, ArrowRightLeft, CreditCard, History, Flame, Target, Sliders, BarChart2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet as WalletIcon, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart, Loader2, Utensils, Car, ShoppingBag, FileText, Tv, Heart, BookOpen, Coffee, Gift, Briefcase, Coins, PiggyBank, GraduationCap, Home, Droplets, Landmark, Plane, Eye, EyeOff, ArrowRightLeft, CreditCard, History, Flame, Target, Sliders, BarChart2, Repeat, Pin } from 'lucide-react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
 import { Lang } from '../i18n/i18n';
 import { savingsService } from '../services/savingsService';
+import { TransactionEntryModal } from './finance/TransactionEntryModal';
+import { CategoryManagerModal } from './finance/CategoryManagerModal';
+import { RecurringTransactionsModal } from './finance/RecurringTransactionsModal';
+import { recurringTransactionService } from '../services/recurringTransactionService';
+import { getCategoryIconInfo, getCustomCategoryIcons } from '../utils/categoryIcons';
 
 
 
@@ -40,6 +45,10 @@ interface FinanceDashboardProps {
     onAddDebt: (d: Omit<Debt, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
     onDeleteDebt: (id: string) => Promise<void>;
     onRepayDebt: (debtId: string, amount: number, date: string, walletId?: string | null, note?: string) => Promise<void>;
+    onBatchAddTransactions?: (txList: Omit<Transaction, 'id'>[]) => Promise<void>;
+    pinnedCategories?: string[];
+    onTogglePinCategory?: (categoryName: string) => void;
+    onEditCategory?: (type: 'expense' | 'income', oldName: string, newName: string) => Promise<void>;
 }
 
 const COLORS = ['#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#14B8A6', '#F97316', '#64748B'];
@@ -188,6 +197,19 @@ const hashString = (str: string): number => {
 const getCategoryStyles = (category: string) => {
     const cat = category.toLowerCase().trim();
     const emoji = getCategoryEmoji(category);
+
+    // If user customized this category's icon via the Icon Picker
+    const customMap = getCustomCategoryIcons();
+    if (customMap[category] || customMap[cat]) {
+        const info = getCategoryIconInfo(category);
+        return {
+            emoji,
+            icon: info.icon,
+            bgClass: `${info.bgClass} ${info.colorClass} group-hover:bg-sky-600 group-hover:text-white`,
+            borderColor: 'border-gray-200',
+            accentColor: 'sky'
+        };
+    }
 
     // Dynamic keyword matching
     if (cat.includes('cà phê') || cat.includes('cafe') || cat.includes('coffee') || cat.includes('caffe') || cat.includes('trà sữa')) {
@@ -451,7 +473,7 @@ const keypadKeys = [
     { label: '=', value: '=', bg: 'col-span-4 bg-gradient-to-r from-sky-500 via-sky-600 to-blue-600 text-white font-extrabold hover:from-sky-600 hover:to-blue-700 shadow-md shadow-sky-100 py-3.5' }
 ];
 
-const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, onNavigateToCashFlow, onNavigateToAI, isLoading, lang, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onAddBudget, onUpdateBudget, onDeleteBudget, onRefresh, onAddWallet, onUpdateWallet, onDeleteWallet, onTransferMoney, onAddDebt, onDeleteDebt, onRepayDebt }) => {
+const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransaction, onBatchAddTransactions, onUpdateTransaction, onDeleteTransaction, onAddGoal, onUpdateGoal, onDeleteGoal, onNavigateToCashFlow, onNavigateToAI, isLoading, lang, expenseCategories, incomeCategories, pinnedCategories = [], onTogglePinCategory, onAddCategory, onEditCategory, onDeleteCategory, onAddBudget, onUpdateBudget, onDeleteBudget, onRefresh, onAddWallet, onUpdateWallet, onDeleteWallet, onTransferMoney, onAddDebt, onDeleteDebt, onRepayDebt }) => {
     const t = translations[lang];
     const { transactions } = state;
 
@@ -512,6 +534,27 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
     // UI State
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+    const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
+    const [recurringItems, setRecurringItems] = useState<RecurringTransaction[]>([]);
+
+    const fetchRecurring = async () => {
+        const userId = state.profile?.id || 'guest';
+        const data = await recurringTransactionService.fetchRecurringTransactions(userId);
+        setRecurringItems(data);
+    };
+
+    useEffect(() => {
+        fetchRecurring();
+    }, [state.profile?.id]);
+
+    const [, setCategoryIconsTick] = useState(0);
+    useEffect(() => {
+        const handleUpdate = () => setCategoryIconsTick(t => t + 1);
+        window.addEventListener('category_icons_updated', handleUpdate);
+        return () => window.removeEventListener('category_icons_updated', handleUpdate);
+    }, []);
+
     const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'overview' | 'calendar' | 'history' | 'report' | 'wallets'>('overview');
@@ -604,6 +647,23 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
     const [editingBudget, setEditingBudget] = useState<BudgetConfig | null>(null);
     const [selectedBudgetForDetails, setSelectedBudgetForDetails] = useState<BudgetConfig | null>(null);
     const [detailViewMonth, setDetailViewMonth] = useState<string | null>(null);
+
+    // Chart Interactive Highlight & Double-Click Detail States
+    const [selectedPieCategory, setSelectedPieCategory] = useState<string | null>(null);
+    const [selectedBarMonth, setSelectedBarMonth] = useState<string | null>(null);
+    const [selectedBarRawKey, setSelectedBarRawKey] = useState<string | null>(null);
+    const lastPieClickRef = useRef<{ name: string; time: number }>({ name: '', time: 0 });
+    const lastBarClickRef = useRef<{ name: string; time: number }>({ name: '', time: 0 });
+
+    // Chart Detail History Modal State
+    const [isChartDetailModalOpen, setIsChartDetailModalOpen] = useState(false);
+    const [chartDetailInfo, setChartDetailInfo] = useState<{
+        type: 'category' | 'month';
+        title: string;
+        subtitle: string;
+        category?: string;
+        monthKey: string;
+    } | null>(null);
 
     // Filter State (Month)
     const today = new Date();
@@ -771,6 +831,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
         const monthlyChartData = Object.keys(monthlyDataMap).sort().map(key => ({
             name: `Tháng ${key.split('-')[1]}`,
+            rawKey: key,
             ...monthlyDataMap[key]
         })).slice(-6);
 
@@ -808,6 +869,53 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             currentMonthTransactions
         };
     }, [transactions, selectedMonth, selectedYear]);
+
+    // Chart Click Handlers (Single click to highlight, Double click to open detail popup)
+    const handlePieCategoryClick = (catName: string) => {
+        const now = Date.now();
+        const isDouble = lastPieClickRef.current.name === catName && (now - lastPieClickRef.current.time < 500);
+
+        if (isDouble || selectedPieCategory === catName) {
+            setChartDetailInfo({
+                type: 'category',
+                title: `Chi tiết chi tiêu: ${catName}`,
+                subtitle: `Tháng ${selectedMonth + 1}/${selectedYear}`,
+                category: catName,
+                monthKey: `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`
+            });
+            setIsChartDetailModalOpen(true);
+            lastPieClickRef.current = { name: '', time: 0 };
+        } else {
+            setSelectedPieCategory(catName);
+            lastPieClickRef.current = { name: catName, time: now };
+        }
+    };
+
+    const handleBarMonthClick = (monthName: string, rawKey?: string) => {
+        const now = Date.now();
+        const isDouble = lastBarClickRef.current.name === monthName && (now - lastBarClickRef.current.time < 500);
+
+        let targetKey = rawKey;
+        if (!targetKey) {
+            const found = stats.monthlyChartData.find(d => d.name === monthName);
+            targetKey = (found as any)?.rawKey || '';
+        }
+
+        if (isDouble || selectedBarMonth === monthName) {
+            setChartDetailInfo({
+                type: 'month',
+                title: `Chi tiết giao dịch: ${monthName}`,
+                subtitle: targetKey ? `Kỳ ${targetKey}` : '',
+                monthKey: targetKey || ''
+            });
+            setIsChartDetailModalOpen(true);
+            lastBarClickRef.current = { name: '', time: 0 };
+        } else {
+            setSelectedBarMonth(monthName);
+            setSelectedBarRawKey(targetKey || null);
+            lastBarClickRef.current = { name: monthName, time: now };
+        }
+    };
 
     const financeContext = useMemo(() => {
         // Prepare ALL Data for AI (We send ALL history for "Expert" analysis)
@@ -1222,7 +1330,6 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                                         </div>
                                                         <div className="min-w-0">
                                                             <span className="font-bold text-gray-800 text-xs md:text-sm block truncate" title={cleanName}>{cleanName}</span>
-                                                            {isOver && <span className="text-[9px] md:text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full font-bold inline-block whitespace-nowrap mt-0.5">Vượt</span>}
                                                         </div>
                                                     </div>
                                                     <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -2259,9 +2366,9 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
             </div>
 
             {/* Top Header & Actions */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4 w-full">
-                <div className="w-full md:w-auto">
-                    <div className="flex items-center justify-between md:justify-start gap-3 w-full">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3.5 md:gap-4 w-full">
+                <div className="w-full lg:w-auto">
+                    <div className="flex items-center justify-between lg:justify-start gap-3 w-full">
                         <h2 className="text-2xl font-bold text-gray-800"> Tổng quan tài chính </h2>
                         {/* Notebook Gray Circular Background Icon for Debtor Ledger */}
                         <button
@@ -2274,7 +2381,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     </div>
                     <p className="text-gray-400 text-sm">Manage Your Assets Wisely </p>
                 </div>
-                <div className="flex flex-wrap gap-3.5 md:gap-3 items-center w-full md:w-auto justify-between md:justify-end">
+                <div className="flex flex-wrap gap-2.5 md:gap-3 items-center w-full lg:w-auto justify-between lg:justify-end">
                     {/* Unified Selector Toolbar: Month Picker + View Switcher */}
                     <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-gray-200/80 shadow-sm w-full md:w-auto justify-between md:justify-start">
                         {/* Compact Month Picker Button */}
@@ -2335,34 +2442,45 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                         </div>
                     </div>
 
-                    {/* Buttons Group */}
-                    <div className="flex flex-1 w-full md:w-auto gap-3 flex-wrap sm:flex-nowrap">
+                    {/* Desktop Quick Actions: Placed right on the same line as tab category on desktop */}
+                    <div className="hidden md:flex items-center gap-2 shrink-0">
                         {/* AI Analysis Button */}
                         <button
+                            type="button"
                             onClick={handleAnalyzeFinance}
-                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-fuchsia-600 via-pink-600 to-rose-500 text-white px-3 h-11 rounded-2xl font-extrabold shadow-[0_4px_14px_rgba(219,39,119,0.3)] hover:from-fuchsia-700 hover:via-pink-700 hover:to-rose-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 whitespace-nowrap border border-pink-500/20"
+                            className="h-10 px-3.5 rounded-xl font-bold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 hover:border-purple-300 transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm hover:shadow active:scale-95 text-xs"
+                            title="AI Own - Phân tích tài chính"
                         >
-                            <Sparkles size={16} className="text-yellow-300 animate-pulse" />
-                            <span className="text-xs md:text-sm">AI Own</span>
+                            <Bot size={16} className="text-purple-600" />
+                            <span>AI Own</span>
                         </button>
 
-
+                        {/* Recurring Transactions Button */}
+                        <button
+                            type="button"
+                            onClick={() => setIsRecurringModalOpen(true)}
+                            className="h-10 px-3.5 rounded-xl font-bold bg-white text-gray-700 border border-gray-200/80 hover:bg-gray-50 hover:text-sky-600 hover:border-gray-300 transition-all flex items-center justify-center gap-1.5 whitespace-nowrap relative shadow-sm hover:shadow active:scale-95 text-xs"
+                            title="Khoản cố định hàng tháng"
+                        >
+                            <Repeat size={15} className="text-gray-600" />
+                            <span>Khoản cố định</span>
+                            {recurringItems.filter(i => i.status === 'active' && i.last_applied_month !== `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`).length > 0 && (
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-white absolute -top-1 -right-1 animate-pulse"></span>
+                            )}
+                        </button>
 
                         {/* Add Transaction Button */}
                         <button
+                            type="button"
                             onClick={() => {
                                 setEditingTransaction(null);
                                 setIsModalOpen(true);
-                                setType(TransactionType.EXPENSE);
-                                setAmount('');
-                                setDesc('');
-                                setCategory(expenseCategories[0] || EXPENSE_CATEGORIES[0]);
-                                setSelectedWalletId('');
                             }}
-                            className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-sky-700 via-blue-600 to-blue-800 text-white px-3 h-11 rounded-2xl font-extrabold shadow-[0_4px_14px_rgba(2,132,199,0.35)] hover:from-sky-800 hover:via-blue-700 hover:to-blue-900 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 whitespace-nowrap border border-sky-500/20"
+                            className="h-10 px-4 rounded-xl font-bold bg-sky-500 hover:bg-sky-600 text-white transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm shadow-sky-200 hover:shadow-md active:scale-95 text-xs"
+                            title="Thêm giao dịch mới"
                         >
-                            <Plus size={18} className="animate-pulse text-sky-100" />
-                            <span className="text-xs md:text-sm">Thêm giao dịch</span>
+                            <Plus size={16} className="stroke-[2.5]" />
+                            <span>Thêm giao dịch</span>
                         </button>
                     </div>
                 </div>
@@ -2449,6 +2567,150 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     </button>
                 </div>
             )}
+
+            {/* Quick Action Buttons (Mobile only: Placed right below Income & Expense cards, above Budget & Recurring) */}
+            {viewMode === 'overview' && (
+                <div className="flex md:hidden items-center gap-2.5 mb-4 w-full">
+                    {/* AI Analysis Button */}
+                    <button
+                        type="button"
+                        onClick={handleAnalyzeFinance}
+                        className="flex-1 sm:flex-initial h-10 px-3 rounded-xl font-bold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+                        title="AI Own - Phân tích tài chính"
+                    >
+                        <Bot size={16} />
+                        <span className="hidden sm:inline text-xs font-bold">AI Own</span>
+                    </button>
+
+                    {/* Recurring Transactions Button */}
+                    <button
+                        type="button"
+                        onClick={() => setIsRecurringModalOpen(true)}
+                        className="flex-1 sm:flex-initial h-10 px-3 rounded-xl font-bold bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:text-sky-600 transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap relative"
+                        title="Khoản cố định hàng tháng"
+                    >
+                        <Repeat size={15} className="text-gray-600" />
+                        <span className="hidden sm:inline text-xs font-bold">Khoản cố định</span>
+                        {recurringItems.filter(i => i.status === 'active' && i.last_applied_month !== `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`).length > 0 && (
+                            <span className="w-2 h-2 rounded-full bg-amber-400 absolute top-2 right-2"></span>
+                        )}
+                    </button>
+
+                    {/* Add Transaction Button */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setEditingTransaction(null);
+                            setIsModalOpen(true);
+                        }}
+                        className="flex-1 sm:flex-initial h-10 px-3.5 rounded-xl font-bold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+                        title="Thêm giao dịch"
+                    >
+                        <Plus size={16} />
+                        <span className="hidden sm:inline text-xs font-bold">Thêm giao dịch</span>
+                    </button>
+                </div>
+            )}
+
+            {/* In other view modes on Mobile, show quick actions toolbar */}
+            {viewMode !== 'overview' && (
+                <div className="flex md:hidden items-center gap-2 mb-4 w-full justify-end">
+                    <button
+                        type="button"
+                        onClick={handleAnalyzeFinance}
+                        className="h-10 px-3 rounded-xl font-bold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+                        title="AI Own - Phân tích tài chính"
+                    >
+                        <Bot size={16} />
+                        <span className="hidden sm:inline text-xs font-bold">AI Own</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setIsRecurringModalOpen(true)}
+                        className="h-10 px-3 rounded-xl font-bold bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:text-sky-600 transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap relative"
+                        title="Khoản cố định hàng tháng"
+                    >
+                        <Repeat size={15} className="text-gray-600" />
+                        <span className="hidden sm:inline text-xs font-bold">Khoản cố định</span>
+                        {recurringItems.filter(i => i.status === 'active' && i.last_applied_month !== `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`).length > 0 && (
+                            <span className="w-2 h-2 rounded-full bg-amber-400 absolute top-2 right-2"></span>
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setEditingTransaction(null);
+                            setIsModalOpen(true);
+                        }}
+                        className="h-10 px-3.5 rounded-xl font-bold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+                        title="Thêm giao dịch"
+                    >
+                        <Plus size={16} />
+                        <span className="hidden sm:inline text-xs font-bold">Thêm giao dịch</span>
+                    </button>
+                </div>
+            )}
+
+            {/* Recurring / Fixed Monthly Expenses Widget */}
+            {viewMode === 'overview' && (() => {
+                const monthStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+                const activeRecurring = recurringItems.filter(i => i.status === 'active');
+                const unappliedCount = activeRecurring.filter(i => i.last_applied_month !== monthStr).length;
+                const totalActiveAmount = activeRecurring.reduce((s, i) => s + (i.type === TransactionType.EXPENSE ? i.amount : 0), 0);
+
+                if (recurringItems.length === 0) return null;
+
+                return (
+                    <div className="md:hidden bg-gray-50/70 p-3.5 rounded-2xl border border-gray-200/80 mb-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-gray-200/70 text-gray-700 flex items-center justify-center shrink-0">
+                                    <Repeat size={15} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="text-xs md:text-sm font-bold text-gray-800">
+                                            Khoản cố định T{selectedMonth + 1}
+                                        </h4>
+                                        {unappliedCount > 0 ? (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold">
+                                                {unappliedCount} chưa ghi
+                                            </span>
+                                        ) : activeRecurring.length > 0 ? (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                                                Đã ghi sổ
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 mt-0.5">
+                                        {activeRecurring.length} khoản • {formatCurrency(totalActiveAmount, lang)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                                {unappliedCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsRecurringModalOpen(true)}
+                                        className="px-3 py-1.5 bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 rounded-xl text-xs font-bold transition-colors"
+                                    >
+                                        Áp dụng T{selectedMonth + 1}
+                                    </button>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setIsRecurringModalOpen(true)}
+                                    className="px-3 py-1.5 bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-medium transition-colors"
+                                >
+                                    Quản lý
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Budget Section */}
             {viewMode === 'overview' && renderBudgets()}
@@ -2569,10 +2831,35 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                 {viewMode === 'overview' && (
                     <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6">
                         <div className="order-2 lg:order-1 lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-800 mb-6">Biểu đồ Thu - Chi 6 tháng gần nhất</h3>
+                            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                                <h3 className="text-lg font-bold text-gray-800">Biểu đồ Thu - Chi 6 tháng gần nhất</h3>
+                                {selectedBarMonth && (
+                                    <div className="flex items-center gap-1.5 text-xs bg-sky-50 text-sky-800 px-2.5 py-1 rounded-xl border border-sky-200">
+                                        <span className="font-medium">
+                                            Đang chọn: <strong className="font-bold">{selectedBarMonth}</strong> (Nhấn lại để xem chi tiết)
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setSelectedBarMonth(null); setSelectedBarRawKey(null); }}
+                                            className="text-[11px] font-bold text-sky-600 hover:text-sky-900 ml-1"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                             <div className="h-64 md:h-80 w-full min-h-[300px]" >
                                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                                    <BarChart data={stats.monthlyChartData} barGap={8}>
+                                    <BarChart
+                                        data={stats.monthlyChartData}
+                                        barGap={8}
+                                        onClick={(data: any) => {
+                                            if (data && data.activePayload && data.activePayload.length > 0) {
+                                                const item = data.activePayload[0].payload;
+                                                handleBarMonthClick(item.name, item.rawKey);
+                                            }
+                                        }}
+                                    >
                                         <defs>
                                             <linearGradient id="colorBarIncome" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="0%" stopColor="#34D399" stopOpacity={1} />
@@ -2593,8 +2880,38 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                             itemStyle={{ fontWeight: 600, paddingBottom: '4px' }}
                                         />
                                         <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                                        <Bar dataKey="income" name="Thu nhập" fill="url(#colorBarIncome)" radius={[6, 6, 0, 0]} maxBarSize={50} />
-                                        <Bar dataKey="expense" name="Chi tiêu" fill="url(#colorBarExpense)" radius={[6, 6, 0, 0]} maxBarSize={50} />
+                                        <Bar dataKey="income" name="Thu nhập" radius={[6, 6, 0, 0]} maxBarSize={50} cursor="pointer">
+                                            {stats.monthlyChartData.map((entry, index) => {
+                                                const isSelected = selectedBarMonth === entry.name;
+                                                const isDimmed = selectedBarMonth !== null && !isSelected;
+                                                return (
+                                                    <Cell
+                                                        key={`bar-inc-${index}`}
+                                                        fill="url(#colorBarIncome)"
+                                                        opacity={isDimmed ? 0.25 : 1}
+                                                        stroke={isSelected ? '#059669' : 'none'}
+                                                        strokeWidth={isSelected ? 2 : 0}
+                                                        style={{ transition: 'opacity 0.25s ease' }}
+                                                    />
+                                                );
+                                            })}
+                                        </Bar>
+                                        <Bar dataKey="expense" name="Chi tiêu" radius={[6, 6, 0, 0]} maxBarSize={50} cursor="pointer">
+                                            {stats.monthlyChartData.map((entry, index) => {
+                                                const isSelected = selectedBarMonth === entry.name;
+                                                const isDimmed = selectedBarMonth !== null && !isSelected;
+                                                return (
+                                                    <Cell
+                                                        key={`bar-exp-${index}`}
+                                                        fill="url(#colorBarExpense)"
+                                                        opacity={isDimmed ? 0.25 : 1}
+                                                        stroke={isSelected ? '#dc2626' : 'none'}
+                                                        strokeWidth={isSelected ? 2 : 0}
+                                                        style={{ transition: 'opacity 0.25s ease' }}
+                                                    />
+                                                );
+                                            })}
+                                        </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -2602,15 +2919,56 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
                         <div className="order-1 lg:order-2 space-y-6">
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                                <h3 className="text-lg font-bold text-gray-800 mb-2">Cơ cấu chi tiêu tháng {selectedMonth + 1}</h3>
+                                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                    <h3 className="text-lg font-bold text-gray-800">Cơ cấu chi tiêu tháng {selectedMonth + 1}</h3>
+                                    {selectedPieCategory && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedPieCategory(null)}
+                                            className="text-[11px] font-bold text-sky-600 hover:text-sky-800"
+                                        >
+                                            ✕ Bỏ chọn
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="h-48 relative w-full min-h-[200px]" >
                                     {stats.categoryData.length > 0 ? (
                                         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                             <PieChart>
-                                                <Pie data={stats.categoryData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="value">
-                                                    {stats.categoryData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                    ))}
+                                                <Pie
+                                                    data={stats.categoryData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={40}
+                                                    outerRadius={70}
+                                                    paddingAngle={2}
+                                                    dataKey="value"
+                                                    cursor="pointer"
+                                                    onClick={(data: any) => {
+                                                        if (data && data.name) {
+                                                            handlePieCategoryClick(data.name);
+                                                        }
+                                                    }}
+                                                >
+                                                    {stats.categoryData.map((entry, index) => {
+                                                        const isSelected = selectedPieCategory === entry.name;
+                                                        const isDimmed = selectedPieCategory !== null && !isSelected;
+                                                        return (
+                                                            <Cell
+                                                                key={`cell-${index}`}
+                                                                fill={COLORS[index % COLORS.length]}
+                                                                opacity={isDimmed ? 0.25 : 1}
+                                                                stroke={isSelected ? '#0f172a' : '#ffffff'}
+                                                                strokeWidth={isSelected ? 2.5 : 1}
+                                                                style={{
+                                                                    filter: isSelected ? 'drop-shadow(0 0 6px rgba(0,0,0,0.3))' : 'none',
+                                                                    transition: 'all 0.25s ease',
+                                                                    outline: 'none',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
                                                 </Pie>
                                                 <Tooltip formatter={(value: number | undefined) => formatCurrency(value || 0, lang)} />
                                             </PieChart>
@@ -2619,16 +2977,40 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                         <div className="flex items-center justify-center h-full text-gray-400 text-sm">Chưa có dữ liệu</div>
                                     )}
                                 </div>
-                                <div className="space-y-2 mt-4 max-h-40 overflow-y-auto scrollbar-thin">
-                                    {stats.categoryData.map((entry, index) => (
-                                        <div key={index} className="flex justify-between text-xs">
-                                            <span className="flex items-center gap-1.5">
-                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                                                {entry.name}
-                                            </span>
-                                            <span className="font-semibold">{Math.round(entry.percent)}%</span>
-                                        </div>
-                                    ))}
+
+                                {selectedPieCategory && (
+                                    <div className="text-[11px] text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg mt-2 border border-sky-100 font-medium">
+                                        Đang chọn: <strong>{selectedPieCategory}</strong> (Nhấn lại để xem chi tiết)
+                                    </div>
+                                )}
+
+                                <div className="space-y-1.5 mt-3 max-h-40 overflow-y-auto scrollbar-thin">
+                                    {stats.categoryData.map((entry, index) => {
+                                        const isSelected = selectedPieCategory === entry.name;
+                                        return (
+                                            <div
+                                                key={index}
+                                                onClick={() => handlePieCategoryClick(entry.name)}
+                                                className={`flex justify-between items-center text-xs p-1.5 rounded-xl cursor-pointer transition-all ${
+                                                    isSelected
+                                                        ? 'bg-sky-50 text-sky-800 font-bold border border-sky-200'
+                                                        : selectedPieCategory !== null
+                                                        ? 'opacity-40 hover:opacity-80'
+                                                        : 'hover:bg-gray-50 text-gray-600'
+                                                }`}
+                                                title="Nhấn để sáng màu, nhấn đúp để xem chi tiết"
+                                            >
+                                                <span className="flex items-center gap-1.5 truncate">
+                                                    <div
+                                                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                                    ></div>
+                                                    <span className="truncate">{entry.name}</span>
+                                                </span>
+                                                <span className="font-semibold shrink-0 ml-2">{Math.round(entry.percent)}%</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -3407,279 +3789,188 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                 )
             }
 
-            {
-                isModalOpen && (
-                    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 pb-24 md:p-6 backdrop-blur-md animate-fade-in">
-                        <div className="bg-white rounded-[32px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] w-full max-w-md max-h-[80vh] md:max-h-[92vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100 border border-white/20 relative animate-scale-up">
+            {/* Redesigned Compact Transaction Entry Modal (Continuous & Batch) */}
+            <TransactionEntryModal
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setEditingTransaction(null);
+                }}
+                state={state}
+                onAddTransaction={onAddTransaction}
+                onBatchAddTransactions={onBatchAddTransactions}
+                onUpdateTransaction={onUpdateTransaction}
+                editingTransaction={editingTransaction}
+                expenseCategories={expenseCategories}
+                incomeCategories={incomeCategories}
+                pinnedCategories={pinnedCategories || []}
+                onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
+                lang={lang}
+            />
 
-                            {/* Header Close button */}
-                            <div className="absolute top-4 right-4 z-20">
+            {/* Category Manager Modal (Pinned, Add, Edit, Delete) */}
+            <CategoryManagerModal
+                isOpen={isCategoryManagerOpen}
+                onClose={() => setIsCategoryManagerOpen(false)}
+                expenseCategories={expenseCategories}
+                incomeCategories={incomeCategories}
+                pinnedCategories={pinnedCategories || []}
+                onTogglePin={(cat) => onTogglePinCategory && onTogglePinCategory(cat)}
+                onAddCategory={onAddCategory}
+                onEditCategory={onEditCategory}
+                onDeleteCategory={onDeleteCategory}
+                lang={lang}
+            />
+
+            {/* Recurring Transactions Modal (Subscriptions, Monthly Fixed Expenses) */}
+            <RecurringTransactionsModal
+                isOpen={isRecurringModalOpen}
+                onClose={() => {
+                    setIsRecurringModalOpen(false);
+                    fetchRecurring();
+                }}
+                userId={state.profile?.id || 'guest'}
+                wallets={state.wallets}
+                expenseCategories={expenseCategories}
+                incomeCategories={incomeCategories}
+                pinnedCategories={pinnedCategories || []}
+                transactions={state.transactions}
+                currentMonth={selectedMonth}
+                currentYear={selectedYear}
+                onApplyRecurringToMonth={async (txList, recurringIds) => {
+                    if (onBatchAddTransactions) {
+                        await onBatchAddTransactions(txList);
+                    } else {
+                        txList.forEach(t => onAddTransaction(t));
+                    }
+                    await fetchRecurring();
+                }}
+                onAddCategory={onAddCategory}
+                onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
+                lang={lang}
+            />
+
+            {/* Chart Detail History Modal (Pop-up khi ấn 2 lần vào danh mục / cột tháng) */}
+            {isChartDetailModalOpen && chartDetailInfo && (() => {
+                const list = chartDetailInfo.type === 'category'
+                    ? transactions.filter(t => 
+                        t.type === TransactionType.EXPENSE &&
+                        t.category === chartDetailInfo.category &&
+                        t.date.startsWith(chartDetailInfo.monthKey)
+                    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    : transactions.filter(t =>
+                        t.category !== 'Điều chỉnh số dư' &&
+                        t.date.startsWith(chartDetailInfo.monthKey)
+                    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                const totalExpense = list
+                    .filter(t => t.type === TransactionType.EXPENSE)
+                    .reduce((sum, t) => sum + t.amount, 0);
+                const totalIncome = list
+                    .filter(t => t.type === TransactionType.INCOME)
+                    .reduce((sum, t) => sum + t.amount, 0);
+
+                return (
+                    <div className="fixed inset-0 bg-black/50 z-[75] flex items-center justify-center p-3 md:p-6 backdrop-blur-xs">
+                        <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col border border-gray-200">
+                            {/* Header */}
+                            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+                                <div className="min-w-0 flex-1 pr-2">
+                                    <h3 className="text-sm font-bold text-gray-800 truncate">{chartDetailInfo.title}</h3>
+                                    <p className="text-[11px] text-gray-400 mt-0.5 font-medium truncate">
+                                        {chartDetailInfo.subtitle} • {list.length} giao dịch
+                                    </p>
+                                </div>
                                 <button
-                                    onClick={() => { setIsModalOpen(false); setEditingTransaction(null); }}
-                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors shadow-sm"
+                                    onClick={() => setIsChartDetailModalOpen(false)}
+                                    className="w-7 h-7 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 flex items-center justify-center transition-colors shrink-0"
                                 >
-                                    <X size={20} />
+                                    <X size={16} />
                                 </button>
                             </div>
 
-                            {/* Body */}
-                            <div className="overflow-y-auto px-6 pt-12 pb-8 custom-scrollbar flex-1">
-                                <form onSubmit={handleAddSubmit} className="space-y-6">
-
-                                    {/* Type Switcher */}
-                                    <div className="bg-teal-50/40 p-1.5 rounded-2xl flex relative border border-teal-100/50">
-                                        <button
-                                            type="button"
-                                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-extrabold transition-all duration-300 relative z-10 flex items-center justify-center gap-2
-                                                ${type === TransactionType.EXPENSE ? 'text-rose-600 shadow-sm bg-white' : 'text-gray-400 hover:text-gray-600'}`}
-                                            onClick={() => {
-                                                setType(TransactionType.EXPENSE);
-                                                if (!editingTransaction) setCategory(expenseCategories[0] || EXPENSE_CATEGORIES[0]);
-                                            }}
-                                        >
-                                            <TrendingDown size={16} /> Chi tiêu
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`flex-1 py-3 px-4 rounded-xl text-sm font-extrabold transition-all duration-300 relative z-10 flex items-center justify-center gap-2
-                                                ${type === TransactionType.INCOME ? 'text-emerald-600 shadow-sm bg-white' : 'text-gray-400 hover:text-gray-600'}`}
-                                            onClick={() => {
-                                                setType(TransactionType.INCOME);
-                                                if (!editingTransaction) setCategory(incomeCategories[0] || INCOME_CATEGORIES[0]);
-                                            }}
-                                        >
-                                            <TrendingUp size={16} /> Thu nhập
-                                        </button>
+                            {/* Summary Strip */}
+                            <div className="px-4 py-2 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between text-xs shrink-0">
+                                {chartDetailInfo.type === 'category' ? (
+                                    <div className="flex items-center justify-between w-full">
+                                        <span className="text-gray-500 font-medium">Tổng chi tiêu:</span>
+                                        <span className="font-bold text-rose-600">{formatCurrency(totalExpense, lang)}</span>
                                     </div>
-
-                                    {/* Amount Input */}
-                                    <div>
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Số tiền giao dịch</label>
-                                        <div className="relative group">
-                                            <input
-                                                type="text"
-                                                required
-                                                value={amount}
-                                                onChange={(e) => setAmount(e.target.value)}
-                                                className={`w-full p-4 pb-4 bg-gray-50/50 border-2 rounded-2xl outline-none text-3xl font-extrabold text-center pr-12 pl-6 transition-all
-                                                    ${type === TransactionType.EXPENSE
-                                                        ? 'text-rose-600 border-transparent focus:border-rose-100 focus:bg-white focus:ring-4 focus:ring-rose-50/50'
-                                                        : 'text-emerald-600 border-transparent focus:border-emerald-100 focus:bg-white focus:ring-4 focus:ring-emerald-50/50'}
-                                                    placeholder-gray-300
-                                                `}
-                                                placeholder="0"
-                                                autoFocus
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowCalculator(!showCalculator)}
-                                                className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all
-                                                    ${showCalculator ? 'bg-sky-100 text-sky-600 shadow-inner' : 'text-gray-300 hover:text-sky-500 hover:bg-sky-50'}`}
-                                                title="Máy tính"
-                                            >
-                                                <CalculatorIcon size={20} />
-                                            </button>
-                                        </div>
-
-                                        {/* Dynamic Math Evaluated Live Preview */}
-                                        {(() => {
-                                            const parsed = parseMathExpression(amount);
-                                            if (parsed === null) return null;
-                                            return (
-                                                <div className="flex justify-center mt-3 animate-fade-in">
-                                                    <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-sm flex items-center gap-1.5 border
-                                                        ${type === TransactionType.EXPENSE
-                                                            ? 'bg-rose-50/80 border-rose-100 text-rose-600 shadow-rose-50/30'
-                                                            : 'bg-emerald-50/80 border-emerald-100 text-emerald-600 shadow-emerald-50/30'}`}>
-                                                        <span className="opacity-60">=</span>
-                                                        <span>{formatCurrency(parsed, lang)}</span>
-                                                    </span>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-
-                                    {/* Category Select Grid */}
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Chọn danh mục</label>
-                                        <div className="grid grid-cols-2 gap-2 max-h-[220px] overflow-y-auto px-2 py-2 -mx-2 custom-scrollbar">
-                                            {(type === TransactionType.INCOME ? incomeCategories : expenseCategories).map(c => {
-                                                const catStyles = getCategoryStyles(c);
-                                                const IconComponent = catStyles.icon;
-                                                const isSelected = category === c && !isAddingNewCategory;
-
-                                                let cardClass = "";
-                                                if (isSelected) {
-                                                    if (type === TransactionType.EXPENSE) {
-                                                        cardClass = "bg-rose-500 border-rose-600 text-white shadow-md shadow-rose-200/50 scale-[1.02]";
-                                                    } else {
-                                                        cardClass = "bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-200/50 scale-[1.02]";
-                                                    }
-                                                } else {
-                                                    cardClass = "bg-white border-gray-100 hover:border-gray-200 text-gray-600 hover:bg-gray-50/60";
-                                                }
-
-                                                return (
-                                                    <button
-                                                        key={c}
-                                                        type="button"
-                                                        onClick={() => { setCategory(c); setIsAddingNewCategory(false); }}
-                                                        className={`p-3 rounded-2xl text-xs md:text-sm font-extrabold transition-all border-2 text-left truncate flex items-center gap-2 duration-200 active:scale-95 ${cardClass}`}
-                                                    >
-                                                        <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200
-                                                            ${isSelected ? 'bg-white/20 text-white' : catStyles.bgClass}`}>
-                                                            {catStyles.emoji ? (
-                                                                <span className="text-sm">{catStyles.emoji}</span>
-                                                            ) : (
-                                                                <IconComponent size={14} />
-                                                            )}
-                                                        </div>
-                                                        <span className="truncate">{cleanCategoryName(c)}</span>
-                                                    </button>
-                                                );
-                                            })}
-                                            <button
-                                                type="button"
-                                                onClick={() => { setCategory(''); setIsAddingNewCategory(true); }}
-                                                className={`p-3 rounded-2xl text-xs md:text-sm font-extrabold transition-all border-2 border-dashed flex items-center justify-center gap-1.5 duration-200 active:scale-95
-                                                    ${isAddingNewCategory
-                                                        ? 'border-sky-400 bg-sky-500 text-white shadow-md shadow-sky-200/50 scale-[1.02]'
-                                                        : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-500 bg-white'
-                                                    }
-                                                `}
-                                            >
-                                                <Plus size={16} />
-                                                <span>Khác</span>
-                                            </button>
-                                        </div>
-
-                                        {isAddingNewCategory && (
-                                            <div className="animate-in fade-in slide-in-from-top-2 pt-1">
-                                                <input
-                                                    placeholder="Nhập tên danh mục mới..."
-                                                    value={newCategoryName}
-                                                    onChange={(e) => setNewCategoryName(e.target.value)}
-                                                    className="w-full p-3.5 bg-sky-50/30 border border-sky-200 text-sky-700 rounded-2xl outline-none font-bold placeholder-sky-300 focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-50 transition-all"
-                                                    autoFocus
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Wallet Selection for Transaction */}
-                                    <div>
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block ml-1">Tài khoản / Ví thanh toán</label>
-                                        <div className="relative flex items-center">
-                                            <WalletIcon size={16} className="absolute left-4 text-gray-400 pointer-events-none" />
-                                            <select
-                                                value={selectedWalletId}
-                                                onChange={(e) => setSelectedWalletId(e.target.value)}
-                                                className="w-full pl-11 pr-4 py-3 bg-gray-50/60 border border-gray-200 rounded-2xl outline-none text-gray-700 font-extrabold text-xs focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-50 transition-all appearance-none cursor-pointer"
-                                            >
-                                                <option value="">-- Không liên kết ví (Không đổi số dư) --</option>
-                                                {state.wallets.map(w => (
-                                                    <option key={w.id} value={w.id}>
-                                                        {w.name} ({w.type === 'fund' ? 'Quỹ' : 'Ví'} - {formatCurrency(w.balance, lang)})
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown size={14} className="absolute right-4 text-gray-400 pointer-events-none" />
-                                        </div>
-                                    </div>
-
-                                    {/* Date & Note Grid */}
-                                    <div className="grid grid-cols-2 gap-4">
+                                ) : (
+                                    <div className="flex items-center justify-between w-full">
                                         <div>
-                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block ml-1">Ngày</label>
-                                            <div className="relative flex items-center">
-                                                <CalendarDays size={16} className="absolute left-4 text-gray-400 pointer-events-none" />
-                                                <input
-                                                    type="date"
-                                                    required
-                                                    value={date}
-                                                    onChange={(e) => setDate(e.target.value)}
-                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50/60 border border-gray-200 rounded-2xl outline-none text-gray-700 font-extrabold text-xs focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-50 transition-all"
-                                                />
-                                            </div>
+                                            <span className="text-gray-400 text-[10px] uppercase font-bold block">Thu nhập</span>
+                                            <span className="font-bold text-emerald-600">+{formatCurrency(totalIncome, lang)}</span>
                                         </div>
-                                        <div>
-                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block ml-1">Ghi chú</label>
-                                            <div className="relative flex items-center">
-                                                <StickyNote size={16} className="absolute left-4 text-gray-400 pointer-events-none" />
-                                                <input
-                                                    placeholder="Mua sắm, ăn trưa..."
-                                                    value={desc}
-                                                    onChange={(e) => setDesc(e.target.value)}
-                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50/60 border border-gray-200 rounded-2xl outline-none text-gray-700 font-bold text-xs focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-50 transition-all placeholder-gray-300"
-                                                />
-                                            </div>
+                                        <div className="text-right">
+                                            <span className="text-gray-400 text-[10px] uppercase font-bold block">Chi tiêu</span>
+                                            <span className="font-bold text-rose-600">-{formatCurrency(totalExpense, lang)}</span>
                                         </div>
                                     </div>
-
-                                    {/* Submit Button & Confirmation Text */}
-                                    <div className="space-y-3 pt-2">
-                                        <button
-                                            type="submit"
-                                            className={`w-full py-4 rounded-2xl font-extrabold text-white shadow-xl transform active:scale-[0.98] transition-all flex items-center justify-center gap-2
-                                                ${type === TransactionType.EXPENSE
-                                                    ? 'bg-gradient-to-r from-rose-500 to-red-600 shadow-rose-200/50 hover:from-rose-600 hover:to-red-700'
-                                                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-200/50 hover:from-emerald-600 hover:to-teal-700'}
-                                            `}
-                                        >
-                                            {editingTransaction ? <Edit2 size={18} /> : <Plus size={18} />}
-                                            {editingTransaction ? 'Cập nhật giao dịch' : 'Lưu giao dịch'}
-                                        </button>
-
-                                        {(() => {
-                                            const parsed = parseMathExpression(amount);
-                                            if (!parsed || parsed <= 0) return null;
-                                            const displayCat = isAddingNewCategory ? (newCategoryName || 'Danh mục mới') : category;
-                                            return (
-                                                <p className="text-center text-[10px] md:text-xs font-bold text-gray-400 animate-fade-in tracking-wide">
-                                                    {type === TransactionType.EXPENSE ? 'Chi tiêu' : 'Thu nhập'}:{' '}
-                                                    <span className={type === TransactionType.EXPENSE ? 'text-rose-500 font-extrabold' : 'text-emerald-500 font-extrabold'}>
-                                                        {formatCurrency(parsed, lang)}
-                                                    </span>{' '}
-                                                    • {displayCat || 'Chưa chọn danh mục'}
-                                                </p>
-                                            );
-                                        })()}
-                                    </div>
-                                </form>
+                                )}
                             </div>
 
-                            {/* Custom Sliding Keypad Drawer Overlay */}
-                            {showCalculator && (
-                                <div className="absolute inset-x-0 bottom-0 bg-white/98 backdrop-blur-md border-t border-gray-100 rounded-t-[32px] shadow-[0_-12px_40px_rgba(0,0,0,0.14)] p-5 animate-in slide-in-from-bottom duration-300 z-30 flex flex-col">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Bàn phím máy tính</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCalculator(false)}
-                                            className="text-xs font-extrabold text-sky-600 bg-sky-50 hover:bg-sky-100 px-3.5 py-1.5 rounded-full transition-all"
-                                        >
-                                            Xong
-                                        </button>
+                            {/* Transactions List */}
+                            <div className="p-3 overflow-y-auto flex-1 space-y-2 custom-scrollbar">
+                                {list.length === 0 ? (
+                                    <div className="p-8 text-center text-xs text-gray-400">
+                                        Không có giao dịch nào trong mục này.
                                     </div>
-
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {keypadKeys.map((k) => (
-                                            <button
-                                                key={k.label}
-                                                type="button"
-                                                onClick={() => handleKeypadPress(k.value)}
-                                                className={`py-3.5 rounded-2xl text-base font-bold transition-all duration-100 active:scale-90 flex items-center justify-center ${k.bg}`}
+                                ) : (
+                                    list.map(t => {
+                                        const wallet = state.wallets.find(w => w.id === t.wallet_id);
+                                        const isExpense = t.type === TransactionType.EXPENSE;
+                                        return (
+                                            <div
+                                                key={t.id}
+                                                className="p-2.5 rounded-xl border border-gray-200 bg-white flex items-center justify-between gap-2.5 text-xs hover:bg-gray-50/50 transition-colors"
                                             >
-                                                {k.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="font-bold text-gray-800 truncate">
+                                                            {t.category}
+                                                        </span>
+                                                        {wallet && (
+                                                            <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-gray-100 text-gray-600 font-medium truncate">
+                                                                {wallet.name}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                                        <span>{t.date}</span>
+                                                        {t.description && (
+                                                            <>
+                                                                <span>•</span>
+                                                                <span className="truncate text-gray-600">{t.description}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <span className={`font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                        {isExpense ? '-' : '+'}{formatCurrency(t.amount, lang)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="p-3 border-t border-gray-100 flex justify-end bg-gray-50/40 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsChartDetailModalOpen(false)}
+                                    className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                    Đóng
+                                </button>
+                            </div>
                         </div>
                     </div>
-                )
-            }
+                );
+            })()}
 
             {/* Edit Balance Modal */}
             {
