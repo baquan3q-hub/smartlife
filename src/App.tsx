@@ -1783,6 +1783,40 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     };
 
+    const handleDeleteMultipleTodos = async (ids: string[]) => {
+        if (!ids || ids.length === 0) return;
+        const idSet = new Set(ids);
+        const targets = appState.todos.filter(t => idSet.has(t.id));
+
+        if (isGoogleTasksConnected()) {
+            targets.forEach(target => {
+                syncTodoMutationToGoogle(target, 'delete').catch(e => console.warn('[AutoSync] Delete task from Google error:', e));
+            });
+        }
+
+        const prevTodos = [...appState.todos];
+        setAppState((prev: AppState) => ({ ...prev, todos: prev.todos.filter(t => !idSet.has(t.id)) }));
+
+        if (user) {
+            ids.forEach(id => deleteTaskLinkBookmark(user.id, id));
+        }
+
+        ids.forEach(id => deleteTaskAttachments(id).catch(() => {}));
+
+        try {
+            const { error } = await supabase.from('todos').delete().in('id', ids);
+            if (error) throw error;
+        } catch (error: any) {
+            console.error('[SmartLife] handleDeleteMultipleTodos error:', error);
+            if (isNetworkError(error)) {
+                console.warn('[SmartLife] Lỗi mạng tạm thời khi xóa nhiều việc — sẽ tự đồng bộ lại sau.');
+            } else {
+                alert("Lỗi xóa việc: " + error.message);
+                setAppState((prev: AppState) => ({ ...prev, todos: prevTodos }));
+            }
+        }
+    };
+
     // Batch reorder todos after drag-drop (optimistic + persist)
     const handleReorderTodos = React.useCallback(async (reorderedTodos: Todo[]) => {
         lastReorderTimeRef.current = Date.now();
@@ -2291,7 +2325,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             state={{ ...appState, todos: filteredTodos, calendarEvents, timer, onOpenMusic: () => setActiveTab('music') } as any}
                             onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal}
                             onAddTimetable={handleAddTimetable} onUpdateTimetable={handleUpdateTimetable} onDeleteTimetable={handleDeleteTimetable}
-                            onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onReorderTodos={handleReorderTodos}
+                            onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo} onDeleteMultipleTodos={handleDeleteMultipleTodos} onReorderTodos={handleReorderTodos}
                             onMoveTodoStatus={handleMoveTodoStatus}
                             initialFocusMode={startInFocusMode}
                             onResetFocusMode={handleResetFocusMode}

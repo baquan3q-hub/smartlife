@@ -53,13 +53,16 @@ import {
   getFileIcon,
   isPreviewable
 } from '../../services/taskAttachmentService';
+import { DoneCleanupModal } from './DoneCleanupModal';
 
 interface KanbanBoardProps {
   todos: Todo[];
+  userId?: string;
   onMoveTodoStatus?: (id: string, status: TodoStatus) => void;
   onReorderTodos: (reordered: Todo[]) => void;
   onEditTodo: (todo: Todo) => void;
   onDeleteTodo: (id: string) => void;
+  onDeleteMultipleTodos?: (ids: string[]) => void;
   onQuickAddTodo: (status: TodoStatus) => void;
 }
 
@@ -115,16 +118,19 @@ const hasSameBoardState = (a: Todo[], b: Todo[]) => {
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   todos,
+  userId,
   onMoveTodoStatus,
   onReorderTodos,
   onEditTodo,
   onDeleteTodo,
+  onDeleteMultipleTodos,
   onQuickAddTodo,
 }) => {
   const sortedTodos = useMemo(() => sortTodosForBoard(todos), [todos]);
   const [localTodos, setLocalTodos] = useState<Todo[]>(() => sortedTodos);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeWidth, setActiveWidth] = useState<number | null>(null);
+  const [isCleanupModalOpen, setIsCleanupModalOpen] = useState(false);
   const activeTodoRef = useRef<Todo | null>(null);
   const localTodosRef = useRef<Todo[]>(sortedTodos);
   const isDraggingRef = useRef(false);
@@ -477,14 +483,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               <span className="text-[11px] font-bold text-foreground truncate">Tiến độ bảng</span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <div className="w-20 sm:w-28 bg-secondary h-2 rounded-full overflow-hidden border border-border/40">
+              <button
+                type="button"
+                onClick={() => setIsCleanupModalOpen(true)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-secondary transition-colors cursor-pointer active:scale-95"
+                title="Dọn dẹp các việc đã xong"
+              >
+                <Trash2 size={13} />
+              </button>
+              <div className="w-14 sm:w-20 bg-secondary h-2 rounded-full overflow-hidden border border-border/40">
                 <div
                   className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300 rounded-full"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
               <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                {doneTasksCount}/{totalTasksCount} ({progressPercent}%)
+                {doneTasksCount}/{totalTasksCount}
               </span>
             </div>
           </div>
@@ -561,6 +575,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 col={col}
                 count={colTodos.length}
                 onQuickAdd={() => onQuickAddTodo(col.id)}
+                onOpenCleanup={col.id === 'done' ? () => setIsCleanupModalOpen(true) : undefined}
               >
                 <SortableContext
                   items={colTodos.map((todo) => todo.id)}
@@ -605,6 +620,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <TaskCardShell todo={activeTodoRef.current} width={activeWidth || undefined} isOverlay />
         ) : null}
       </DragOverlay>
+
+      {/* DONE TASKS CLEANUP MODAL */}
+      <DoneCleanupModal
+        isOpen={isCleanupModalOpen}
+        onClose={() => setIsCleanupModalOpen(false)}
+        doneTodos={localTodos.filter((t) => getEffectiveStatus(t) === 'done')}
+        onDeleteTodo={onDeleteTodo}
+        onDeleteMultipleTodos={onDeleteMultipleTodos || ((ids) => ids.forEach((id) => onDeleteTodo(id)))}
+        userId={userId}
+      />
     </DndContext>
   );
 };
@@ -613,6 +638,7 @@ interface ColumnContainerProps {
   col: typeof COLUMNS[number];
   count: number;
   onQuickAdd: () => void;
+  onOpenCleanup?: () => void;
   colRef?: (el: HTMLDivElement | null) => void;
   children: React.ReactNode;
 }
@@ -621,6 +647,7 @@ const ColumnContainer: React.FC<ColumnContainerProps> = ({
   col,
   count,
   onQuickAdd,
+  onOpenCleanup,
   colRef,
   children,
 }) => {
@@ -643,10 +670,25 @@ const ColumnContainer: React.FC<ColumnContainerProps> = ({
           <span className={`w-2.5 h-2.5 md:w-2 md:h-2 rounded-full ${col.dot}`} />
           <h4 className="font-bold text-foreground text-xs">{col.label}</h4>
         </div>
-        <span className="text-[10px] font-bold px-2 py-0.5 bg-secondary text-muted-foreground rounded-full">
-          <span className="md:hidden">{count} việc</span>
-          <span className="hidden md:inline">{count}</span>
-        </span>
+        <div className="flex items-center gap-1.5">
+          {col.id === 'done' && onOpenCleanup && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenCleanup();
+              }}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-secondary transition-colors cursor-pointer active:scale-95"
+              title="Dọn dẹp các việc đã xong"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+          <span className="text-[10px] font-bold px-2 py-0.5 bg-secondary text-muted-foreground rounded-full">
+            <span className="md:hidden">{count} việc</span>
+            <span className="hidden md:inline">{count}</span>
+          </span>
+        </div>
       </div>
 
       <div className="flex-1">{children}</div>
@@ -1270,15 +1312,19 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({
       )}
 
       {/* QUICK STATUS TRANSITION & ACTIONS BAR - MOBILE ONLY (md:hidden) */}
-      {!isOverlay && onMoveStatus && (
+      {!isOverlay && (onMoveStatus || onDelete) && (
         <div
           className="md:hidden flex items-center justify-between gap-1.5 pt-1 mt-0.5 border-t border-border/40"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Smart Next Status Step Button */}
-          {nextAction && (
+          {nextAction && onMoveStatus && (
             <button
               type="button"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 onMoveStatus(todo.id, nextAction.target);
@@ -1291,56 +1337,77 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({
             </button>
           )}
 
-          {/* Quick Status Menu Button */}
-          <div className="relative ml-auto">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowStatusMenu(!showStatusMenu);
-              }}
-              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
-              title="Đổi cột trạng thái"
-            >
-              <MoreHorizontal size={12} />
-            </button>
-
-            {/* Dropdown Popover for All Statuses */}
-            {showStatusMenu && (
-              <div
-                className="absolute right-0 bottom-full mb-1.5 w-32 bg-white dark:bg-card border border-border rounded-xl shadow-xl p-1 z-30 animate-in zoom-in-95 duration-100 flex flex-col gap-0.5"
-                onClick={(e) => e.stopPropagation()}
+          <div className="flex items-center gap-1 ml-auto">
+            {/* Quick Delete button on Mobile */}
+            {onDelete && (
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(todo.id);
+                }}
+                className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 active:text-rose-600 transition-colors cursor-pointer"
+                title="Xóa nhiệm vụ"
               >
-                <div className="px-2 py-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider border-b border-border/50">
-                  Chuyển cột
-                </div>
-                {COLUMNS.map((c) => {
-                  const isCurrent = currentStatus === c.id;
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowStatusMenu(false);
-                        if (!isCurrent) {
-                          onMoveStatus(todo.id, c.id);
-                        }
-                      }}
-                      className={`w-full flex items-center justify-between px-2 py-1 text-[11px] rounded-lg font-medium transition-colors cursor-pointer ${
-                        isCurrent
-                          ? 'bg-secondary font-bold text-foreground'
-                          : 'hover:bg-secondary/70 text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-                        {c.label}
-                      </span>
-                      {isCurrent && <Check size={10} className="text-emerald-500 stroke-[3]" />}
-                    </button>
-                  );
-                })}
+                <Trash2 size={12} />
+              </button>
+            )}
+
+            {/* Quick Status Menu Button */}
+            {onMoveStatus && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowStatusMenu(!showStatusMenu);
+                  }}
+                  className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                  title="Đổi cột trạng thái"
+                >
+                  <MoreHorizontal size={12} />
+                </button>
+
+                {/* Dropdown Popover for All Statuses */}
+                {showStatusMenu && (
+                  <div
+                    className="absolute right-0 bottom-full mb-1.5 w-32 bg-white dark:bg-card border border-border rounded-xl shadow-xl p-1 z-30 animate-in zoom-in-95 duration-100 flex flex-col gap-0.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="px-2 py-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider border-b border-border/50">
+                      Chuyển cột
+                    </div>
+                    {COLUMNS.map((c) => {
+                      const isCurrent = currentStatus === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowStatusMenu(false);
+                            if (!isCurrent) {
+                              onMoveStatus(todo.id, c.id);
+                            }
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1 text-[11px] rounded-lg font-medium transition-colors cursor-pointer ${
+                            isCurrent
+                              ? 'bg-secondary font-bold text-foreground'
+                              : 'hover:bg-secondary/70 text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+                            {c.label}
+                          </span>
+                          {isCurrent && <Check size={10} className="text-emerald-500 stroke-[3]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1463,18 +1530,25 @@ const TaskCardShell = React.memo<TaskCardShellProps>(({
 
       {!isOverlay && onDelete && (
         <div
-          className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 backdrop-blur-sm px-1 py-0.5 rounded-lg border border-border z-20"
+          className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-card/95 backdrop-blur-sm px-1 py-0.5 rounded-lg border border-border z-20 shadow-xs"
+          onPointerDown={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+          onTouchStart={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
         >
           <button
+            type="button"
+            onPointerDown={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+            onTouchStart={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
               onDelete(todo.id);
             }}
-            className="p-1 hover:bg-secondary text-muted-foreground hover:text-rose-600 rounded transition-colors cursor-pointer"
-            title="Xóa"
+            className="p-1 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-muted-foreground hover:text-rose-600 rounded transition-colors cursor-pointer"
+            title="Xóa nhiệm vụ"
           >
-            <Trash2 size={11} />
+            <Trash2 size={12} />
           </button>
         </div>
       )}
