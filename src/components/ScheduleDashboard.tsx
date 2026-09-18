@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AppState, TimetableEvent, Goal, Todo, TodoStatus, TaskLink, parseTaskLinks, encodeTaskLinks } from '../types';
-import { Calendar, Clock, Target, Plus, Trash2, Edit2, X, MapPin, Star, ChevronDown, ChevronUp, Download, CheckCircle, RefreshCw, BarChart2, ListTodo, LayoutGrid, Settings, Paperclip, Upload, Eye, ExternalLink, Link2 } from 'lucide-react';
+import { Calendar, Clock, Target, Plus, Trash2, Edit2, X, MapPin, Star, ChevronDown, ChevronUp, Download, CheckCircle, RefreshCw, BarChart2, ListTodo, LayoutGrid, Settings, Paperclip, Upload, Eye, ExternalLink, Link2, Sparkles } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import MusicSpace from './MusicSpace';
 import { TaskAttachment, saveAttachment, getAttachments, deleteAttachment, downloadAttachment, formatFileSize, getFileIcon, isPreviewable } from '../services/taskAttachmentService';
@@ -18,6 +18,7 @@ import { GoogleCalendarHub } from './tracker/GoogleCalendarHub';
 import { isGoogleTasksConnected, syncTaskStatusAndDueToGoogle, updateGoogleTask, deleteGoogleTask, completeGoogleTask, uncompleteGoogleTask, syncGoogleTasksWithKanban, isAutoSyncEnabled } from '../services/googleTasksService';
 import ConfirmModal from './ConfirmModal';
 import { ReminderTimeSelector } from './common/ReminderTimeSelector';
+import { getDoneCleanupSetting, getEligibleDoneTasksForCleanup } from '../services/doneTasksCleanupService';
 
 const formatBeforeMinutes = (minutes?: number) => {
   if (minutes === undefined || minutes === null || minutes <= 0) return 'Đúng giờ';
@@ -44,6 +45,7 @@ interface ScheduleDashboardProps {
   onAddTodo: (content: string, priority: any, deadline?: string, status?: TodoStatus, description?: string, subtasks?: any[], emailNotify?: boolean, emailNotifyBeforeMinutes?: number, attachLink?: string, customId?: string, googleTaskId?: string, googleListId?: string) => void;
   onUpdateTodo: (t: any) => void;
   onDeleteTodo: (id: string) => void;
+  onDeleteMultipleTodos?: (ids: string[]) => void;
   onReorderTodos: (reordered: Todo[]) => void;
   onMoveTodoStatus: (id: string, status: TodoStatus) => void;
   initialFocusMode?: boolean;
@@ -75,7 +77,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   state,
   userId,
   onAddGoal, onUpdateGoal, onDeleteGoal,
-  onAddTodo, onUpdateTodo, onDeleteTodo, onReorderTodos, onMoveTodoStatus,
+  onAddTodo, onUpdateTodo, onDeleteTodo, onDeleteMultipleTodos, onReorderTodos, onMoveTodoStatus,
   initialFocusMode = false, onResetFocusMode,
   onAddTimetable, onUpdateTimetable, onDeleteTimetable,
   activeTaskId = null,
@@ -154,6 +156,40 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
       clearInterval(interval);
     };
   }, [handleSilentGTasksSync]);
+
+  // Auto-cleanup for completed tasks in the Done column
+  const [autoCleanToast, setAutoCleanToast] = useState<string | null>(null);
+  const lastAutoCleanCheckRef = useRef<number>(0);
+
+  useEffect(() => {
+    const runAutoCleanup = () => {
+      const now = Date.now();
+      if (now - lastAutoCleanCheckRef.current < 5000) return;
+      lastAutoCleanCheckRef.current = now;
+
+      const setting = getDoneCleanupSetting(effectiveUserId);
+      if (setting.schedule === 'never') return;
+
+      const eligible = getEligibleDoneTasksForCleanup(todos, setting.schedule);
+      if (eligible.length > 0) {
+        const ids = eligible.map((t) => t.id);
+        if (onDeleteMultipleTodos) {
+          onDeleteMultipleTodos(ids);
+        } else {
+          ids.forEach((id) => onDeleteTodo(id));
+        }
+
+        if (setting.notifyOnClean) {
+          setAutoCleanToast(`Đã tự động dọn dẹp ${eligible.length} việc hoàn thành theo cài đặt.`);
+          setTimeout(() => setAutoCleanToast(null), 4500);
+        }
+      }
+    };
+
+    runAutoCleanup();
+    window.addEventListener('done_cleanup_setting_changed', runAutoCleanup);
+    return () => window.removeEventListener('done_cleanup_setting_changed', runAutoCleanup);
+  }, [todos, effectiveUserId, onDeleteMultipleTodos, onDeleteTodo]);
 
   // Unified Task creation/edit modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -737,10 +773,12 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             {todoView === 'board' ? (
               <KanbanBoard
                 todos={todos}
+                userId={effectiveUserId}
                 onMoveTodoStatus={onMoveTodoStatus}
                 onReorderTodos={onReorderTodos}
                 onEditTodo={handleOpenEditModal}
                 onDeleteTodo={(id) => setTodoToDeleteId(id)}
+                onDeleteMultipleTodos={onDeleteMultipleTodos || ((ids) => ids.forEach((id) => onDeleteTodo(id)))}
                 onQuickAddTodo={(status) => handleOpenCreateModal(status)}
               />
             ) : (
@@ -1599,11 +1637,26 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-3 border-t border-slate-100 mt-2 select-none">
+              <div className="flex items-center gap-2.5 pt-3 border-t border-slate-100 dark:border-border/60 mt-2 select-none">
+                {modalMode === 'edit' && selectedTodo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const todoId = selectedTodo.id;
+                      setIsModalOpen(false);
+                      setTodoToDeleteId(todoId);
+                    }}
+                    className="py-3 px-3.5 rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/80 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95 shrink-0"
+                    title="Xóa nhiệm vụ này"
+                  >
+                    <Trash2 size={14} />
+                    <span>Xóa</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold text-xs rounded-2xl hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-3 border border-slate-200 dark:border-border text-slate-600 dark:text-muted-foreground font-bold text-xs rounded-2xl hover:bg-slate-50 dark:hover:bg-secondary transition-colors cursor-pointer"
                 >
                   Hủy
                 </button>
@@ -1611,7 +1664,7 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                   type="button"
                   onClick={handleModalSave}
                   disabled={!modalContent.trim()}
-                  className="flex-1 py-3 bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground font-bold text-xs rounded-2xl transition-all shadow-md active:scale-95 disabled:opacity-50"
+                  className="flex-1 py-3 bg-black hover:bg-slate-900 text-white dark:bg-primary dark:hover:bg-primary/95 dark:text-primary-foreground font-bold text-xs rounded-2xl transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {modalMode === 'create' ? 'Thêm task' : 'Lưu thay đổi'}
                 </button>
@@ -1787,6 +1840,21 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
           onUpdateTodo,
         }}
       />
+
+      {/* Auto-clean Toast Notification */}
+      {autoCleanToast && (
+        <div className="fixed bottom-6 right-6 z-[99999] bg-slate-900 text-white dark:bg-card dark:text-foreground px-4 py-3 rounded-2xl shadow-2xl border border-border flex items-center gap-2.5 text-xs font-semibold animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <Sparkles size={16} className="text-emerald-400 shrink-0" />
+          <span>{autoCleanToast}</span>
+          <button
+            type="button"
+            onClick={() => setAutoCleanToast(null)}
+            className="ml-2 p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
