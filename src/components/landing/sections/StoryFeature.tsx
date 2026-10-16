@@ -6,6 +6,7 @@ import { LandingCopy } from '../i18n';
 import { StoryDef } from '../data';
 import { Reveal, Stagger, StaggerItem } from '../motion/Reveal';
 import { TiltCard } from '../motion/TiltCard';
+import { ResponsiveImage } from '../motion/Media';
 
 interface StoryFeatureProps {
     c: LandingCopy;
@@ -63,12 +64,10 @@ export const StoryFeature: React.FC<StoryFeatureProps> = ({ c, story, index, tot
                             max={3}
                             className="group relative overflow-hidden rounded-[22px] border border-zinc-900/[0.08] bg-white p-1.5 shadow-[0_30px_80px_-30px_rgba(9,9,11,0.25)]"
                         >
-                            <img
-                                src={story.main.src}
+                            <ResponsiveImage
+                                img={story.main}
                                 alt={s.eyebrow}
-                                width={story.main.w}
-                                height={story.main.h}
-                                loading="lazy"
+                                sizes="(min-width: 1152px) 660px, (min-width: 768px) 58vw, 100vw"
                                 className="h-auto w-full rounded-[16px] transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.015]"
                             />
                             <div className="l-spotlight pointer-events-none absolute inset-0" />
@@ -80,12 +79,10 @@ export const StoryFeature: React.FC<StoryFeatureProps> = ({ c, story, index, tot
                             style={{ y: subY }}
                             className={`absolute -bottom-8 w-[42%] ${reverse ? '-left-3 sm:-left-6' : '-right-3 sm:-right-6'}`}
                         >
-                            <img
-                                src={story.sub.src}
+                            <ResponsiveImage
+                                img={story.sub}
                                 alt=""
-                                width={story.sub.w}
-                                height={story.sub.h}
-                                loading="lazy"
+                                sizes="(min-width: 768px) 280px, 42vw"
                                 className="h-auto w-full rounded-2xl border border-zinc-900/[0.08] bg-white p-1 shadow-[0_24px_60px_-20px_rgba(9,9,11,0.35)]"
                             />
                         </motion.div>

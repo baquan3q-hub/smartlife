@@ -4,6 +4,9 @@ import { ArrowRight } from 'lucide-react';
 import { LandingCopy } from '../i18n';
 import { EASE } from '../motion/Reveal';
 import { MagneticButton } from '../motion/MagneticButton';
+import { LoopVideo, ResponsiveImage } from '../motion/Media';
+import { PhoneFrame } from '../motion/PhoneFrame';
+import { images, phoneVideo } from '../media.gen';
 
 interface HeroProps {
     c: LandingCopy;
@@ -37,6 +40,7 @@ export const Hero: React.FC<HeroProps> = ({ c, onLogin, scrollTo }) => {
     const rotateX = useTransform(progress, [0, 1], [22, 0]);
     const scale = useTransform(progress, [0, 1], [0.9, 1]);
     const y = useTransform(progress, [0, 1], [40, 0]);
+    const phoneY = useTransform(progress, [0, 1], [110, 0]);
 
     return (
         <section id="top" className="relative overflow-hidden pt-32 sm:pt-40">
@@ -80,13 +84,19 @@ export const Hero: React.FC<HeroProps> = ({ c, onLogin, scrollTo }) => {
                 </motion.div>
             </div>
 
-            <div id="dashboard-preview" ref={mockRef} className="relative mx-auto mt-16 max-w-6xl px-4 sm:mt-20 sm:px-6" style={{ perspective: 1400 }}>
+            <div
+                id="dashboard-preview"
+                ref={mockRef}
+                className="relative mx-auto mt-14 max-w-6xl px-4 pb-16 sm:mt-20 sm:px-6 sm:pb-20"
+                style={{ perspective: 1400 }}
+            >
+                {/* Desktop screenshot; phones get the screen recording alone */}
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 1, ease: EASE, delay: 0.5 }}
                     style={{ rotateX, scale, y, transformOrigin: 'center top' }}
-                    className="rounded-[22px] border border-zinc-900/[0.08] bg-white/80 p-1.5 shadow-[0_40px_100px_-30px_rgba(9,9,11,0.35)] backdrop-blur sm:rounded-[28px] sm:p-2"
+                    className="hidden rounded-[22px] border border-zinc-900/[0.08] bg-white/80 p-1.5 shadow-[0_40px_100px_-30px_rgba(9,9,11,0.35)] backdrop-blur sm:block sm:rounded-[28px] sm:p-2"
                 >
                     <div className="flex items-center justify-between px-3 py-2 sm:px-4">
                         <div className="flex gap-1.5">
@@ -96,15 +106,28 @@ export const Hero: React.FC<HeroProps> = ({ c, onLogin, scrollTo }) => {
                         </div>
                         <span className="text-[11px] font-medium text-zinc-400">{c.previewBadge}</span>
                     </div>
-                    <img
-                        src="/landingpage.png"
+                    <ResponsiveImage
+                        img={images['hero-dashboard']}
                         alt="SmartLife"
-                        width={1774}
-                        height={887}
+                        sizes="(min-width: 1152px) 1120px, 100vw"
                         className="h-auto w-full rounded-[16px] sm:rounded-[22px]"
-                        loading="eager"
-                        fetchPriority="high"
+                        priority
                     />
+                </motion.div>
+
+                <motion.div
+                    style={{ y: phoneY }}
+                    className="relative mx-auto w-[64%] max-w-[270px] sm:absolute sm:bottom-0 sm:right-10 sm:mx-0 sm:w-[23%] sm:max-w-[250px] lg:right-14"
+                >
+                    <motion.div
+                        initial={{ opacity: 0, y: 40 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 1.1, ease: EASE, delay: 0.8 }}
+                    >
+                        <PhoneFrame>
+                            <LoopVideo {...phoneVideo} label="SmartLife mobile" />
+                        </PhoneFrame>
+                    </motion.div>
                 </motion.div>
             </div>
         </section>

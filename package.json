@@ -51,6 +51,8 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^9.2.1",
+    "ffmpeg-static": "^5.3.0",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4.3.1",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",

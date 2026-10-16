@@ -4,6 +4,7 @@ import { LandingCopy } from '../i18n';
 import { bento } from '../data';
 import { Reveal, Stagger, StaggerItem } from '../motion/Reveal';
 import { TiltCard } from '../motion/TiltCard';
+import { ResponsiveImage } from '../motion/Media';
 
 interface BentoGridProps {
     c: LandingCopy;
@@ -56,12 +57,10 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ c, onLogin }) => (
                                 )}
 
                                 <div className="relative -mx-6 -mb-6 mt-6 flex flex-1 items-end pl-6">
-                                    <img
-                                        src={item.img.src}
+                                    <ResponsiveImage
+                                        img={item.img}
                                         alt={copy.title}
-                                        width={item.img.w}
-                                        height={item.img.h}
-                                        loading="lazy"
+                                        sizes={item.span === 'md:col-span-4' ? '(min-width: 768px) 720px, 100vw' : '(min-width: 768px) 360px, 100vw'}
                                         className={`h-auto w-full translate-y-2 rounded-tl-xl border-l border-t object-cover object-left-top transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-y-0 group-hover:scale-[1.02] ${
                                             dark ? 'border-white/10' : 'border-zinc-900/[0.08]'
                                         } ${item.span === 'md:col-span-4' ? 'max-h-[340px]' : 'aspect-[16/10]'}`}
