@@ -2508,7 +2508,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     );
 };
 
-import LandingPage from './components/LandingPage';
+import LandingPage from './components/landing/LandingPage';
 import FeaturesPage from './components/FeaturesPage';
 import PricingPage from './components/PricingPage';
 import ContactPage from './components/ContactPage';
