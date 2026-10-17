@@ -744,3 +744,88 @@ html.dark .timeline-dot {
 html.dark .kanban-column {
   background-color: rgba(30, 41, 59, 0.45) !important;
 }
+/* ====================================
+   Landing page (src/components/landing)
+   ==================================== */
+.landing {
+  --l-bg: #fafafa;
+  --l-surface: #ffffff;
+  --l-border: rgba(24, 24, 27, 0.08);
+  --l-text: #09090b;
+  --l-muted: #52525b;
+  --l-subtle: #71717a;
+  --l-accent: #0284c7;
+  --l-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  font-family: 'Inter', 'Roboto', system-ui, sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+  background: var(--l-bg);
+  color: var(--l-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.landing .l-h1 {
+  font-size: clamp(2.5rem, 6vw, 4.75rem);
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  font-weight: 600;
+}
+
+.landing .l-h2 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+}
+
+.landing .l-h3 {
+  font-size: 1.125rem;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+}
+
+.landing .l-eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--l-accent);
+}
+
+.landing .l-dots {
+  background-image: radial-gradient(rgba(24, 24, 27, 0.09) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+}
+
+.landing .l-mask-x {
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+/* Spotlight that follows the cursor on bento cards (vars set by TiltCard) */
+.landing .l-spotlight {
+  background: radial-gradient(420px circle at var(--x, 50%) var(--y, 50%), rgba(2, 132, 199, 0.08), transparent 45%);
+  opacity: 0;
+  transition: opacity 0.3s var(--l-ease);
+}
+
+.landing .group:hover .l-spotlight {
+  opacity: 1;
+}
+
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing .animate-marquee {
+    animation: none;
+  }
+}
