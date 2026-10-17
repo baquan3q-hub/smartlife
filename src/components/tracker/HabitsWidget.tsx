@@ -3,6 +3,7 @@ import { supabase } from '../../services/supabase';
 import { Habit, HabitLog, DayOfWeek } from '../../types';
 import { Flame, Plus, CheckCircle, Circle, Loader2, Repeat } from 'lucide-react';
 import { processCheckin, reverseCheckinStars } from '../../services/starBrainService';
+import { lucideIcon, TINTS } from '../habits/icons';
 
 interface HabitsWidgetProps {
   userId: string;
@@ -12,12 +13,8 @@ interface HabitsWidgetProps {
 const ALL_DAYS: DayOfWeek[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS: Record<DayOfWeek, string> = { mon: 'T2', tue: 'T3', wed: 'T4', thu: 'T5', fri: 'T6', sat: 'T7', sun: 'CN' };
 
-const COLOR_PRESETS = [
-  { name: 'sunrise', bg: 'bg-gradient-to-br from-orange-400 to-rose-500', light: 'bg-orange-50 text-orange-600 border-orange-200' },
-  { name: 'cosmic', bg: 'bg-gradient-to-br from-indigo-500 to-purple-600', light: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  { name: 'nature', bg: 'bg-gradient-to-br from-emerald-400 to-teal-500', light: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { name: 'ocean', bg: 'bg-gradient-to-br from-blue-500 to-cyan-500', light: 'bg-blue-50 text-blue-700 border-blue-200' },
-];
+// Quick-added habits get one of these icons and a random tint; both can be changed on the Habits screen.
+const QUICK_ICONS = ['footprints', 'book-open', 'droplets', 'apple', 'flower', 'brain', 'moon', 'clock', 'sprout', 'coffee'];
 
 const today = () => {
   const d = new Date();
@@ -191,15 +188,13 @@ export const HabitsWidget: React.FC<HabitsWidgetProps> = ({ userId, onNavigateTo
 
     setIsSaving(true);
     try {
-      const randomEmojis = ['🏃‍♂️', '📚', '💧', '🍎', '🧘‍♀️', '🧠', '💤', '⏰', '🪴', '☕'];
-      const randomColors = ['sunrise', 'cosmic', 'nature', 'ocean'];
-      const emoji = randomEmojis[Math.floor(Math.random() * randomEmojis.length)];
-      const color = randomColors[Math.floor(Math.random() * randomColors.length)];
+      const icon = lucideIcon(QUICK_ICONS[Math.floor(Math.random() * QUICK_ICONS.length)]);
+      const color = TINTS[Math.floor(Math.random() * (TINTS.length - 1))].id; // skip grey
 
       const newHabit = {
         user_id: userId,
         title: newTitle.trim(),
-        icon: emoji,
+        icon,
         color_theme: color,
         frequency: 'daily',
         active_days: ALL_DAYS,
@@ -221,10 +216,6 @@ export const HabitsWidget: React.FC<HabitsWidgetProps> = ({ userId, onNavigateTo
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const getThemeConfig = (theme: string) => {
-    return COLOR_PRESETS.find((c) => c.name === theme) || COLOR_PRESETS[0];
   };
 
   return (

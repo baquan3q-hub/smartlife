@@ -11,6 +11,9 @@ import {
 import { GRADE_SCALE, SEMESTER_TYPE_LABELS } from '../constants';
 import { supabase } from './supabase';
 
+// Habit/event icons are either an emoji or "lucide:<key>" (rendered in the UI only); keep emoji in the AI context.
+const iconText = (icon?: string | null) => (icon && !icon.startsWith('lucide:') ? `${icon} ` : '');
+
 // ────────────────────────────────────────
 // API Configuration
 // ────────────────────────────────────────
@@ -371,7 +374,7 @@ export async function buildHabitContext(): Promise<string> {
                 }
             }
 
-            ctx += `\n  - ${h.icon} ${h.title}: Streak ${currentStreak} ngày | Tỷ lệ: ${completionRate}% | Hôm nay: ${todayLog?.completed ? '✅' : '⬜'} | Tần suất: ${h.frequency} | Bắt đầu: ${h.start_date}`;
+            ctx += `\n  - ${iconText(h.icon)}${h.title}: Streak ${currentStreak} ngày | Tỷ lệ: ${completionRate}% | Hôm nay: ${todayLog?.completed ? '✅' : '⬜'} | Tần suất: ${h.frequency} | Bắt đầu: ${h.start_date}`;
         });
 
         return ctx;
@@ -408,7 +411,7 @@ export async function buildCountdownContext(): Promise<string> {
                 target.setHours(0, 0, 0, 0);
                 const daysLeft = Math.ceil((target.getTime() - today.getTime()) / (1000 * 3600 * 24));
                 const status = daysLeft > 0 ? `còn ${daysLeft} ngày` : daysLeft === 0 ? 'HÔM NAY!' : `đã qua ${Math.abs(daysLeft)} ngày`;
-                ctx += `\n  - ${c.icon} ${c.title}: ${status} (${c.target_date})`;
+                ctx += `\n  - ${iconText(c.icon)}${c.title}: ${status} (${c.target_date})`;
             });
         }
 
@@ -418,7 +421,7 @@ export async function buildCountdownContext(): Promise<string> {
                 const start = new Date(c.start_date);
                 start.setHours(0, 0, 0, 0);
                 const daysPassed = Math.floor((today.getTime() - start.getTime()) / (1000 * 3600 * 24));
-                ctx += `\n  - ${c.icon} ${c.title}: ${daysPassed} ngày (từ ${c.start_date})`;
+                ctx += `\n  - ${iconText(c.icon)}${c.title}: ${daysPassed} ngày (từ ${c.start_date})`;
             });
         }
 
