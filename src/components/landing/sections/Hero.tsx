@@ -4,9 +4,9 @@ import { ArrowRight } from 'lucide-react';
 import { LandingCopy } from '../i18n';
 import { EASE } from '../motion/Reveal';
 import { MagneticButton } from '../motion/MagneticButton';
-import { LoopVideo, ResponsiveImage } from '../motion/Media';
+import { ResponsiveImage } from '../motion/Media';
 import { PhoneFrame } from '../motion/PhoneFrame';
-import { images, phoneVideo } from '../media.gen';
+import { images } from '../media.gen';
 
 interface HeroProps {
     c: LandingCopy;
@@ -90,7 +90,7 @@ export const Hero: React.FC<HeroProps> = ({ c, onLogin, scrollTo }) => {
                 className="relative mx-auto mt-14 max-w-6xl px-4 pb-16 sm:mt-20 sm:px-6 sm:pb-20"
                 style={{ perspective: 1400 }}
             >
-                {/* Desktop screenshot; phones get the screen recording alone */}
+                {/* Desktop screenshot; small screens get the phone screenshot alone */}
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -125,7 +125,7 @@ export const Hero: React.FC<HeroProps> = ({ c, onLogin, scrollTo }) => {
                         transition={{ duration: 1.1, ease: EASE, delay: 0.8 }}
                     >
                         <PhoneFrame>
-                            <LoopVideo {...phoneVideo} label="SmartLife mobile" />
+                            <ResponsiveImage img={images['hero-phone']} alt="SmartLife mobile" sizes="(min-width: 640px) 250px, 64vw" priority />
                         </PhoneFrame>
                     </motion.div>
                 </motion.div>
