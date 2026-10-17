@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { Lock, ShieldAlert, Key, RefreshCw, Delete, AlertCircle, Sparkles } from 'lucide-react';
+import { Delete, KeyRound, Loader2, Lock, RefreshCw, ShieldAlert } from 'lucide-react';
 
 interface JournalPinGuardProps {
   userId: string;
@@ -241,171 +241,136 @@ export const JournalPinGuard: React.FC<JournalPinGuardProps> = ({ userId, childr
     return <>{children}</>;
   }
 
+  const title = !pinExists ? (setupStep === 'create' ? 'Tạo mã PIN' : 'Nhập lại mã PIN') : 'Nhập mã PIN';
+  const hint = !pinExists
+    ? setupStep === 'create'
+      ? 'Mã 4 số giúp giữ nhật ký của bạn riêng tư.'
+      : 'Nhập lại để xác nhận.'
+    : 'Nhật ký của bạn đang được khóa.';
+  const keyClass =
+    'flex h-16 w-16 items-center justify-center rounded-full font-medium tabular-nums text-zinc-900 transition-colors disabled:opacity-40';
+
   return (
-    <div className="w-full max-w-md mx-auto my-8 bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden p-6 md:p-8 flex flex-col items-center">
-      {loading ? (
-        <div className="py-20 flex flex-col items-center gap-3">
-          <RefreshCw className="animate-spin text-emerald-500" size={36} />
-          <p className="text-sm text-gray-500 font-bold">Đang tải cấu hình bảo mật...</p>
-        </div>
-      ) : isLocked ? (
-        // ── GIAO DIỆN KHÓA TÀI KHOẢN ──
-        <div className="w-full text-center py-8 space-y-6 animate-in zoom-in-95 duration-200">
-          <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto border border-red-100 shadow-inner">
-            <ShieldAlert size={40} className="animate-bounce" />
+    <div className="ui-zinc flex min-h-[70vh] w-full items-center justify-center px-4 py-8">
+      <div className="w-full max-w-sm rounded-[24px] border border-zinc-900/[0.08] bg-white px-6 py-8 text-zinc-900">
+        {loading ? (
+          <div className="flex flex-col items-center gap-3 py-16 text-[13px] text-zinc-500">
+            <Loader2 size={22} className="animate-spin text-zinc-400" aria-hidden />
+            Đang kiểm tra…
           </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-black text-gray-800">Mục Nhật ký bị Khóa</h2>
-            <p className="text-sm text-gray-500 leading-relaxed">
-              Vì lý do bảo mật, mục Nhật ký đã bị tạm khóa sau **5 lần** nhập sai mã PIN liên tiếp.
+        ) : isLocked ? (
+          // ── GIAO DIỆN KHÓA TÀI KHOẢN ──
+          <div className="text-center">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-700">
+              <ShieldAlert size={22} strokeWidth={1.75} aria-hidden />
+            </span>
+            <h2 className="mt-4 text-[19px] font-semibold tracking-tight text-zinc-950">Nhật ký đang bị khóa</h2>
+            <p className="mt-1.5 text-[14px] leading-relaxed text-zinc-600">
+              Mã PIN đã bị nhập sai 5 lần liên tiếp. Liên hệ quản trị viên để đặt lại mã PIN.
             </p>
+            <div className="mt-5 rounded-2xl bg-zinc-50 p-4 text-left text-[13px] leading-relaxed text-zinc-600">
+              <p className="mb-1.5 font-medium text-zinc-800">Nếu bạn là quản trị viên</p>
+              <ol className="list-decimal space-y-0.5 pl-4">
+                <li>Mở Admin Panel, tab Người dùng.</li>
+                <li>Tìm tài khoản và chọn Reset PIN Nhật ký.</li>
+                <li>Quay lại đây để tạo mã PIN mới.</li>
+              </ol>
+            </div>
+            <button
+              type="button"
+              onClick={loadPinStatus}
+              className="mt-5 inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-zinc-900/[0.1] bg-white text-[14px] font-medium text-zinc-800 transition-colors hover:bg-zinc-50"
+            >
+              <RefreshCw size={16} aria-hidden /> Kiểm tra lại
+            </button>
           </div>
+        ) : (
+          // ── GIAO DIỆN NHẬP / CÀI ĐẶT PIN ──
+          <div className="flex flex-col items-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700">
+              {pinExists ? <Lock size={22} strokeWidth={1.75} aria-hidden /> : <KeyRound size={22} strokeWidth={1.75} aria-hidden />}
+            </span>
+            <h2 className="mt-4 text-[19px] font-semibold tracking-tight text-zinc-950">{title}</h2>
+            <p className="mt-1 text-center text-[14px] text-zinc-500">{hint}</p>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left space-y-2">
-            <h4 className="text-xs font-black text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
-              <AlertCircle size={14} /> Hướng dẫn khôi phục:
-            </h4>
-            <p className="text-xs text-amber-700 leading-relaxed font-medium">
-              Bạn đang là Admin hệ thống. Để khôi phục mã PIN:
-              <br />
-              1. Bấm vào phần **Admin Panel** ở menu bên trái (hoặc đường dẫn `/admin`).
-              <br />
-              2. Chuyển sang tab **Người dùng**.
-              <br />
-              3. Tìm tài khoản của bạn và nhấn nút **Reset PIN Nhật ký**.
-              <br />
-              4. Quay lại đây thiết lập mã PIN mới và sử dụng bình thường.
-            </p>
-          </div>
-
-          <button
-            onClick={loadPinStatus}
-            className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 py-3 rounded-2xl font-bold text-sm transition-all active:scale-95"
-          >
-            <RefreshCw size={16} /> Kiểm tra lại trạng thái khóa
-          </button>
-        </div>
-      ) : (
-        // ── GIAO DIỆN NHẬP / CÀI ĐẶT PIN ──
-        <div className="w-full flex flex-col items-center space-y-6">
-          <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center shadow-inner border border-emerald-100">
-            {pinExists ? <Lock size={28} /> : <Sparkles size={28} className="animate-pulse" />}
-          </div>
-
-          <div className="text-center space-y-1">
-            <h2 className="text-xl font-black text-gray-800">
-              {!pinExists 
-                ? (setupStep === 'create' ? 'Tạo mã PIN Bảo mật' : 'Xác nhận mã PIN') 
-                : 'Mã PIN Nhật ký'}
-            </h2>
-            <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">
-              {!pinExists 
-                ? 'Nhật ký cá nhân cần khóa bảo vệ' 
-                : 'Nhập mã PIN để xem và viết nhật ký'}
-            </p>
-          </div>
-
-          {/* Dấu chấm tròn thể hiện độ dài PIN */}
-          <div 
-            className={`flex items-center justify-center gap-4 py-4 ${isShake ? 'animate-shake' : ''}`}
-            style={{
-              animation: isShake ? 'shake 0.5s ease-in-out' : undefined
-            }}
-          >
-            {[0, 1, 2, 3].map((index) => {
-              const isActive = inputPin.length > index;
-              return (
-                <div
+            {/* Dấu chấm tròn thể hiện độ dài PIN */}
+            <div
+              className={`my-6 flex items-center gap-4 ${isShake ? 'ui-shake' : ''}`}
+              role="img"
+              aria-label={`Đã nhập ${inputPin.length} trên 4 số`}
+            >
+              {[0, 1, 2, 3].map(index => (
+                <span
                   key={index}
-                  className={`w-4.5 h-4.5 rounded-full border-2 transition-all duration-150 ${
-                    isActive 
-                      ? 'bg-emerald-500 border-emerald-500 scale-110 shadow-sm shadow-emerald-200' 
-                      : 'bg-gray-50 border-gray-300'
+                  className={`h-3.5 w-3.5 rounded-full transition-colors duration-150 ${
+                    inputPin.length > index ? 'bg-zinc-950' : 'bg-zinc-200'
                   }`}
                 />
-              );
-            })}
-          </div>
-
-          {/* Thông báo trạng thái */}
-          {message.text && (
-            <div className={`text-center text-xs font-bold px-4 py-2.5 rounded-xl border w-full flex items-center justify-center gap-1.5 ${
-              message.type === 'error' ? 'bg-red-50 text-red-600 border-red-100' :
-              message.type === 'success' ? 'bg-green-50 text-green-700 border-green-100' :
-              'bg-blue-50 text-blue-700 border-blue-100'
-            }`}>
-              {message.type === 'error' && <AlertCircle size={14} />}
-              <span>{message.text}</span>
+              ))}
             </div>
-          )}
 
-          {/* Bàn phím số cảm ứng đẹp mắt */}
-          <div className="grid grid-cols-3 gap-3.5 w-full max-w-[280px]">
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+            {/* Thông báo trạng thái */}
+            <div className="mb-4 min-h-[20px] text-center text-[13px]" aria-live="polite">
+              {message.text && (
+                <span
+                  className={
+                    message.type === 'error' ? 'text-red-700' : message.type === 'success' ? 'text-emerald-700' : 'text-zinc-600'
+                  }
+                >
+                  {message.text}
+                </span>
+              )}
+            </div>
+
+            {/* Bàn phím số */}
+            <div className="grid grid-cols-3 gap-x-5 gap-y-3">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => handleNumberPress(num)}
+                  disabled={isSaving}
+                  className={`${keyClass} bg-zinc-100 text-[24px] hover:bg-zinc-200 active:bg-zinc-200`}
+                >
+                  {num}
+                </button>
+              ))}
               <button
-                key={num}
                 type="button"
-                onClick={() => handleNumberPress(num)}
-                disabled={isSaving}
-                className="w-16 h-16 rounded-full bg-gray-50 hover:bg-gray-100 active:bg-gray-200 border border-gray-100 font-mono text-xl font-bold text-gray-800 flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-sm disabled:opacity-50"
+                onClick={() => setInputPin('')}
+                disabled={isSaving || !inputPin}
+                className={`${keyClass} whitespace-nowrap text-[13px] text-zinc-500 hover:bg-zinc-100`}
               >
-                {num}
+                Xóa hết
               </button>
-            ))}
-            
-            {/* Phím Clear/Trống */}
-            <button
-              type="button"
-              onClick={() => setInputPin('')}
-              disabled={isSaving || !inputPin}
-              className="w-16 h-16 rounded-full font-sans text-xs font-bold text-gray-400 hover:text-gray-600 flex items-center justify-center transition-all cursor-pointer disabled:opacity-30"
-            >
-              Xóa hết
-            </button>
-
-            {/* Phím 0 */}
-            <button
-              type="button"
-              onClick={() => handleNumberPress('0')}
-              disabled={isSaving}
-              className="w-16 h-16 rounded-full bg-gray-50 hover:bg-gray-100 active:bg-gray-200 border border-gray-100 font-mono text-xl font-bold text-gray-800 flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-sm disabled:opacity-50"
-            >
-              0
-            </button>
-
-            {/* Phím Xóa chữ cuối (Backspace) */}
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={isSaving || !inputPin}
-              className="w-16 h-16 rounded-full bg-gray-50 hover:bg-gray-100 active:bg-gray-200 border border-gray-100 text-gray-500 flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-sm disabled:opacity-50"
-              title="Xóa ký tự cuối"
-            >
-              <Delete size={20} />
-            </button>
-          </div>
-
-          {!pinExists && (
-            <div className="text-[10px] text-gray-400 text-center leading-relaxed">
-              Mã PIN này sẽ bảo vệ mọi nội dung viết hoặc đọc nhật ký của bạn.
-              <br />
-              Hãy nhớ kỹ và không chia sẻ cho người khác.
+              <button
+                type="button"
+                onClick={() => handleNumberPress('0')}
+                disabled={isSaving}
+                className={`${keyClass} bg-zinc-100 text-[24px] hover:bg-zinc-200 active:bg-zinc-200`}
+              >
+                0
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isSaving || !inputPin}
+                aria-label="Xóa số cuối"
+                title="Xóa số cuối"
+                className={`${keyClass} text-zinc-500 hover:bg-zinc-100`}
+              >
+                <Delete size={22} strokeWidth={1.75} />
+              </button>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* Shake Keyframe Animation Inject */}
-      <style>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          20%, 60% { transform: translateX(-6px); }
-          40%, 80% { transform: translateX(6px); }
-        }
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
-        }
-      `}</style>
+            {!pinExists && (
+              <p className="mt-6 text-center text-[12px] leading-relaxed text-zinc-500">
+                Hãy ghi nhớ mã PIN và không chia sẻ cho người khác.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
