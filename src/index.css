@@ -829,3 +829,34 @@ html.lenis, html.lenis body {
     animation: none;
   }
 }
+
+/* Overview screen (VisualBoard) in dark mode: maps its zinc/sky palette onto the dark tokens. */
+html.dark .overview .text-zinc-950,
+html.dark .overview .text-zinc-900 { color: var(--foreground) !important; }
+html.dark .overview .text-zinc-800,
+html.dark .overview .text-zinc-700 { color: #E2E8F0 !important; }
+html.dark .overview .text-zinc-600,
+html.dark .overview .text-zinc-500 { color: var(--muted-foreground) !important; }
+html.dark .overview .text-zinc-400 { color: #64748B !important; }
+html.dark .overview .bg-zinc-50,
+html.dark .overview .bg-zinc-100 { background-color: var(--secondary) !important; }
+html.dark .overview .bg-zinc-200 { background-color: var(--border) !important; }
+html.dark .overview .hover\:bg-zinc-50:hover,
+html.dark .overview .hover\:bg-zinc-100:hover { background-color: rgba(148, 163, 184, 0.12) !important; }
+html.dark .overview [class*="border-zinc-900/"],
+html.dark .overview .border-zinc-200 { border-color: var(--border) !important; }
+html.dark .overview [class*="hover:border-zinc-900/"]:hover { border-color: rgba(148, 163, 184, 0.45) !important; }
+html.dark .overview .bg-zinc-950 { background-color: var(--foreground) !important; color: var(--background) !important; }
+html.dark .overview .hover\:bg-zinc-800:hover { background-color: #E2E8F0 !important; }
+html.dark .overview .bg-sky-50,
+html.dark .overview .bg-sky-50\/70 { background-color: rgba(56, 189, 248, 0.12) !important; }
+html.dark .overview .ring-sky-100 { --tw-ring-color: rgba(56, 189, 248, 0.25); }
+html.dark .overview .text-sky-700,
+html.dark .overview .text-sky-900 { color: #7DD3FC !important; }
+html.dark .overview .bg-amber-50 { background-color: rgba(245, 158, 11, 0.12) !important; }
+html.dark .overview .border-amber-200 { border-color: rgba(245, 158, 11, 0.3) !important; }
+html.dark .overview .text-amber-800,
+html.dark .overview .text-amber-900 { color: #FCD34D !important; }
+html.dark .overview .bg-red-50 { background-color: rgba(239, 68, 68, 0.12) !important; }
+html.dark .overview .text-red-700 { color: #FCA5A5 !important; }
+html.dark .overview .text-emerald-700 { color: #6EE7B7 !important; }
