@@ -11,6 +11,7 @@ import { processJournalReward } from '../services/starBrainService';
 import { getCachedCalendarEvents, syncGoogleCalendar, isGoogleCalendarConnected, CalendarEventLocal } from '../services/googleCalendarService';
 import { getLocalDateStr, getEventLocalDateStr, getEventLocalTimeStr, getHolidayVietnameseNote } from './tracker/GoogleCalendarHub';
 import { Card, CardHeader, EventRow, EventState, LinkButton, Metric, OverviewEvent, Progress, Segmented } from './overview/parts';
+import { HabitIcon, isLucideIcon } from './habits/icons';
 
 interface VisualBoardProps {
     appState: AppState;
@@ -617,7 +618,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            className="overview relative min-h-screen w-full overflow-x-hidden px-3 pt-4 text-zinc-900 md:px-8 md:pt-8"
+            className="overview ui-zinc relative min-h-screen w-full overflow-x-hidden px-3 pt-4 text-zinc-900 md:px-8 md:pt-8"
         >
             {/* Pull to Refresh Spinner */}
             <div
@@ -928,7 +929,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                                             className={`flex h-10 max-w-[220px] items-center gap-2 rounded-full border pl-1.5 pr-3 text-[13px] transition-colors ${done ? 'border-sky-600/20 bg-sky-50 text-sky-900' : 'border-zinc-900/[0.08] bg-white text-zinc-800 hover:border-zinc-900/[0.16]'}`}
                                         >
                                             <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${done ? 'bg-sky-600 text-white' : 'bg-zinc-100'}`}>
-                                                {done ? <Check size={14} strokeWidth={3} /> : <span className="text-[14px]">{habit.icon}</span>}
+                                                {done ? <Check size={14} strokeWidth={3} /> : <HabitIcon icon={habit.icon} size={14} className="text-zinc-600" />}
                                             </span>
                                             <span className="truncate font-medium">{habit.title}</span>
                                             {streak > 0 && (
@@ -967,7 +968,11 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             {upcoming.ahead.map(item => (
                                 <li key={item.key} className="flex items-center gap-3 border-b border-zinc-900/[0.06] py-2.5 last:border-b-0">
                                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-50 text-[12px] font-medium tabular-nums text-zinc-600">
-                                        <span className={item.lead.length > 2 && /\d/.test(item.lead) ? '' : 'text-[18px]'}>{item.lead}</span>
+                                        {isLucideIcon(item.lead) ? (
+                                            <HabitIcon icon={item.lead} size={17} />
+                                        ) : (
+                                            <span className={item.lead.length > 2 && /\d/.test(item.lead) ? '' : 'text-[18px]'}>{item.lead}</span>
+                                        )}
                                     </span>
                                     <span className="min-w-0 flex-1">
                                         <span className="block truncate text-[14px] font-medium text-zinc-900">{item.title}</span>
@@ -984,7 +989,7 @@ const VisualBoard: React.FC<VisualBoardProps> = ({ appState, userName, userId, u
                             )}
                             {upcoming.since.map(item => (
                                 <li key={item.key} className="flex items-center gap-3 border-b border-zinc-900/[0.06] py-2.5 last:border-b-0">
-                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-50 text-[18px]">{item.lead}</span>
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-50 text-zinc-600"><HabitIcon icon={item.lead} size={17} /></span>
                                     <span className="min-w-0 flex-1">
                                         <span className="block truncate text-[14px] font-medium text-zinc-900">{item.title}</span>
                                         <span className="block text-[12px] text-zinc-500">{item.date}</span>

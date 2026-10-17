@@ -1,53 +1,50 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CountdownItem, CountUpItem, Habit, HabitLog, DayOfWeek, CheckinReward } from '../types';
 import { supabase } from '../services/supabase';
-import { processCheckin, reverseCheckinStars, fetchStarStats, getLevelFromStars, getNextLevel, LEVELS } from '../services/starBrainService';
+import { processCheckin, reverseCheckinStars, fetchStarStats, getLevelFromStars } from '../services/starBrainService';
 import StarBrainDashboard from './StarBrainDashboard';
-import { Plus, X, Flame, Timer, TrendingUp, Trash2, Edit3, ChevronDown, RotateCcw, Award, CheckCircle2, Circle, Calendar, BarChart3, ChevronLeft, ChevronRight, Star, Sparkles, Zap, Gift, ListChecks, Crown } from 'lucide-react';
+import { Award, Check, ChevronLeft, ChevronRight, Flame, Flag, Minus, Pencil, Plus, Repeat, Sparkles, Star, Timer, Trash2, X } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
+import { Button, Card, EmptyState, FieldLabel, IconButton, Progress, Segmented, SectionLabel, Sheet, inputClass } from './ui/parts';
+import { DEFAULT_ICON, IconPicker, IconTile, TintPicker, getTint } from './habits/icons';
 
 const DAY_LABELS: Record<DayOfWeek, string> = { mon:'T2', tue:'T3', wed:'T4', thu:'T5', fri:'T6', sat:'T7', sun:'CN' };
 const ALL_DAYS: DayOfWeek[] = ['mon','tue','wed','thu','fri','sat','sun'];
 const getDayKey = (d: Date): DayOfWeek => ALL_DAYS[d.getDay() === 0 ? 6 : d.getDay() - 1];
 
-// ── Preset Data (Phase 3 Gradients) ──
-const COLOR_PRESETS = [
-  { name: 'sunrise', bg: 'bg-gradient-to-br from-orange-400 to-rose-500', light: 'bg-orange-50 text-orange-600 border-orange-200' },
-  { name: 'cosmic', bg: 'bg-gradient-to-br from-indigo-500 to-purple-600', light: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  { name: 'nature', bg: 'bg-gradient-to-br from-emerald-400 to-teal-500', light: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { name: 'ocean', bg: 'bg-gradient-to-br from-blue-500 to-cyan-500', light: 'bg-blue-50 text-blue-700 border-blue-200' },
-  { name: 'peach', bg: 'bg-gradient-to-br from-pink-400 to-orange-400', light: 'bg-pink-50 text-pink-600 border-pink-200' },
-  { name: 'midnight', bg: 'bg-gradient-to-br from-slate-700 to-slate-900', light: 'bg-slate-100 text-slate-800 border-slate-300' },
-  { name: 'lava', bg: 'bg-gradient-to-br from-red-500 to-orange-500', light: 'bg-red-50 text-red-600 border-red-200' },
-  { name: 'royal', bg: 'bg-gradient-to-br from-violet-600 to-fuchsia-600', light: 'bg-violet-50 text-violet-700 border-violet-200' },
-];
-
-const EMOJI_PRESETS = [
-  // Health & Fitness
-  '🏃‍♂️','🏋️‍♀️','🚴‍♂️','🧘‍♀️','🏊‍♂️','⚽','🏸','💧','🍎','🥗','💊','💤','🩺','☀️',
-  // Work & Study
-  '📚','💻','🎓','📈','🧠','📝','💼','🏆','🚀','⏰','📱','💸',
-  // Hobbies & Life
-  '🎨','🎵','🎮','✈️','🪴','📸','🎬','🐶','🐱','🚗','🏖️','☕','🧹',
-  // Social & Others
-  '💑','👪','🎉','❤️','🌟','🔥','💪','🎯','🎂','🚭','👍','🤝'
-];
-
-const getColorClasses = (theme: string) => COLOR_PRESETS.find(c => c.name === theme) || COLOR_PRESETS[0];
 const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const diffDays = (target: string) => Math.ceil((new Date(target).getTime() - new Date(today()).getTime()) / 86400000);
+const formatDate = (s: string, opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' }) =>
+  new Date(s).toLocaleDateString('vi-VN', opts);
+
+// "Hằng ngày", "T2, T4, T6", "3 lần/tuần"...
+const frequencyLabel = (h: Habit) => {
+  if (h.frequency === 'weekly') return `${h.target_per_period || 1} lần/tuần`;
+  if (h.frequency === 'monthly') return `${h.target_per_period || 1} lần/tháng`;
+  if (h.frequency === 'daily' || h.active_days.length === 7) return 'Hằng ngày';
+  return ALL_DAYS.filter(d => h.active_days.includes(d)).map(d => DAY_LABELS[d]).join(', ');
+};
+const streakUnit = (h: Habit) => (h.frequency === 'weekly' ? 'tuần' : h.frequency === 'monthly' ? 'tháng' : 'ngày');
 
 const FREE_HABIT_LIMIT = 3;
+
+type SubTab = 'habits' | 'countdown' | 'countup' | 'stars';
+const TABS: { id: SubTab; label: string }[] = [
+  { id: 'habits', label: 'Thói quen' },
+  { id: 'countdown', label: 'Đếm ngược' },
+  { id: 'countup', label: 'Đếm ngày' },
+  { id: 'stars', label: 'Sao' },
+];
 
 interface Props { userId: string; onNavigateToSchedule?: () => void; isPro?: boolean; onUpgrade?: () => void; }
 
 // ── Main Component ──
-const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule, isPro = false, onUpgrade }) => {
-  const [subTab, setSubTab] = useState<'habits' | 'countdown' | 'countup' | 'stars'>('habits');
+const HabitDashboard: React.FC<Props> = ({ userId, isPro = false, onUpgrade }) => {
+  const [subTab, setSubTab] = useState<SubTab>('habits');
   const [countdowns, setCountdowns] = useState<CountdownItem[]>([]);
   const [countups, setCountups] = useState<CountUpItem[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -374,7 +371,7 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule, isPro =
     const d = new Date();
     for (let i = 29; i >= 0; i--) {
       const cursor = new Date(d); cursor.setDate(cursor.getDate() - i);
-      const ds = cursor.toISOString().split('T')[0];
+      const ds = toLocalDateStr(cursor);
       const scheduled = habit.frequency === 'weekly' || habit.frequency === 'monthly' ? true : habit.active_days.includes(getDayKey(cursor));
       const done = completedLogsSet.has(`${habit.id}_${ds}`);
       bars.push({ date: ds, done, scheduled });
@@ -454,331 +451,294 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule, isPro =
     return milestones.find(m => m > elapsed) || null;
   };
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" /></div>;
 
-  return (
-    <div className="w-full px-3 md:px-8 pt-4 md:pt-8 space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Flame className="text-orange-500" size={28} /> Thói quen & Sự kiện
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">Theo dõi sự kiện, mốc thời gian và thói quen hàng ngày</p>
-        </div>
-        {/* ── StarBrain Balance Widget ── */}
-        <div className="flex items-stretch gap-2 w-full">
-          <div className="flex-1 bg-gradient-to-r from-amber-50/70 to-yellow-50/60 border border-amber-100 rounded-xl px-2 md:px-3 py-1.5 md:py-2 flex items-center justify-center gap-1.5 shadow-sm">
-            <div className="w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-amber-300 to-yellow-400 rounded-lg flex items-center justify-center shadow-sm shrink-0">
-              <Star size={14} className="text-white fill-white" />
-            </div>
-            <div>
-              <div className="text-sm md:text-base font-black text-amber-600/80 leading-tight">{starStats.current_balance.toLocaleString()}</div>
-              <div className="text-[9px] md:text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-                {getLevelFromStars(starStats.total_earned).icon} {getLevelFromStars(starStats.total_earned).name}
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => setSubTab('stars')}
-            className="flex-1 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/60 rounded-xl px-2 md:px-3 py-1.5 md:py-2 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
-          >
-            <div className="w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-orange-300 to-rose-400 rounded-lg flex items-center justify-center shadow-sm shrink-0">
-              <Gift size={14} className="text-white" />
-            </div>
-            <span className="text-[11px] md:text-sm font-bold text-orange-500">Đổi quà</span>
-          </button>
-          <button
-            onClick={() => onNavigateToSchedule?.()}
-            className="flex-1 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 rounded-xl px-2 md:px-3 py-1.5 md:py-2 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
-          >
-            <div className="w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg flex items-center justify-center shadow-sm shrink-0">
-              <ListChecks size={14} className="text-white" />
-            </div>
-            <span className="text-[11px] md:text-sm font-bold text-blue-500">Todo</span>
-          </button>
-        </div>
-      </div>
+  // Completions in the current week/month, for weekly and monthly habits.
+  const periodDone = (h: Habit) => {
+    const getKey = h.frequency === 'weekly' ? getWeekKey : getMonthKey;
+    const key = getKey(new Date(today()));
+    return (logsByHabitId.get(h.id) || []).filter(l => l.completed && getKey(new Date(l.log_date)) === key).length;
+  };
+  const isDoneToday = (h: Habit) => completedLogsSet.has(`${h.id}_${today()}`);
+  const otherHabits = habits.filter(h => !todaysHabits.includes(h));
+  const atFreeLimit = !isPro && habits.length >= FREE_HABIT_LIMIT;
+  const level = getLevelFromStars(starStats.total_earned);
+  const todayLabel = new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' });
 
-      {/* Sub-tabs */}
-      <div className="flex w-full md:w-fit gap-1 md:gap-2 bg-gray-100 p-1 md:p-1.5 rounded-xl md:rounded-2xl">
-        {([
-          { key: 'habits', label: '🔥 Habits', icon: Flame },
-          { key: 'countdown', label: '⏳ Countdown', icon: Timer },
-          { key: 'countup', label: '⬆️ Count-Up', icon: TrendingUp },
-          { key: 'stars', label: '⭐ Stars', icon: Star },
-        ] as const).map(t => (
-          <button key={t.key} onClick={() => setSubTab(t.key)}
-            className={`flex-1 md:flex-initial text-center px-1.5 md:px-4 py-1.5 md:py-2.5 rounded-lg md:rounded-xl text-[11px] md:text-sm font-semibold transition-all ${subTab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+  const openForm = (type: 'countdown' | 'countup' | 'habit', item: any = null) => { setEditItem(item); setShowForm(type); };
 
-      {/* ── HABITS TAB ── */}
-      {subTab === 'habits' && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold text-gray-900">Today's Habits</h2>
-              {!isPro && (
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                  habits.length >= FREE_HABIT_LIMIT 
-                    ? 'bg-red-50 text-red-600 border-red-200' 
-                    : 'bg-gray-100 text-gray-500 border-gray-200'
-                }`}>
-                  {habits.length}/{FREE_HABIT_LIMIT} Free
+  const renderHabitRow = (h: Habit, checkable: boolean) => {
+    const done = isDoneToday(h);
+    const stats = getHabitStats(h);
+    const tint = getTint(h.color_theme);
+    const bar = getStreakBar(h).slice(-14);
+    const periodic = h.frequency === 'weekly' || h.frequency === 'monthly';
+    return (
+      <li key={h.id} className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
+        <button
+          type="button"
+          onClick={() => setDetailHabit(h)}
+          className="-mx-1 flex min-w-0 flex-1 items-center gap-3 rounded-xl px-1 py-1 text-left transition-colors hover:bg-zinc-50"
+        >
+          <IconTile icon={h.icon} theme={h.color_theme} />
+          <span className="min-w-0">
+            <span className={`block truncate text-[15px] font-medium ${done ? 'text-zinc-500' : 'text-zinc-950'}`}>{h.title}</span>
+            <span className="mt-0.5 flex items-center gap-2 text-[12px] text-zinc-500">
+              <span className="truncate">{periodic ? `${Math.min(periodDone(h), h.target_per_period || 1)}/${h.target_per_period || 1} ${h.frequency === 'weekly' ? 'tuần này' : 'tháng này'}` : frequencyLabel(h)}</span>
+              {stats.currentStreak > 0 && (
+                <span className="inline-flex shrink-0 items-center gap-0.5 tabular-nums text-amber-700" title={`Chuỗi ${stats.currentStreak} ${streakUnit(h)}`}>
+                  <Flame size={12} aria-hidden /> {stats.currentStreak} {streakUnit(h)}
                 </span>
               )}
-              {isPro && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">∞ Pro</span>
+            </span>
+          </span>
+        </button>
+        <span className="hidden shrink-0 items-center gap-[3px] md:flex" aria-hidden title="14 ngày gần nhất">
+          {bar.map(b => (
+            <span key={b.date} className={`h-5 w-1.5 rounded-full ${b.done ? tint.solid : b.scheduled ? 'bg-zinc-100' : 'bg-transparent'}`} />
+          ))}
+        </span>
+        {checkable && (
+          <button
+            type="button"
+            onClick={() => toggleCheckIn(h.id)}
+            aria-pressed={done}
+            aria-label={done ? `Bỏ đánh dấu "${h.title}"` : `Đánh dấu "${h.title}" đã xong`}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${done ? `${tint.solid} border-transparent text-white` : 'border-zinc-900/[0.12] text-zinc-300 hover:border-zinc-900/[0.3] hover:text-zinc-500'}`}
+          >
+            <Check size={18} strokeWidth={2.5} />
+          </button>
+        )}
+      </li>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center" role="status" aria-label="Đang tải">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-500" />
+      </div>
+    );
+  }
+
+  const todayPct = todaysHabits.length ? (todayDone / todaysHabits.length) * 100 : 0;
+  const allDone = todaysHabits.length > 0 && todayDone === todaysHabits.length;
+
+  return (
+    <div className="habits ui-zinc w-full px-3 pb-24 pt-4 text-zinc-900 md:px-8 md:pt-8">
+      <div className="mx-auto max-w-4xl space-y-5">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[13px] text-zinc-500 first-letter:uppercase">{todayLabel}</p>
+            <h1 className="mt-0.5 text-[26px] font-semibold tracking-tight text-zinc-950 md:text-[30px]">Thói quen</h1>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSubTab('stars')}
+            className="mt-1 flex h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-900/[0.1] bg-white px-3.5 text-[14px] transition-colors hover:bg-zinc-50"
+            aria-label={`${starStats.current_balance.toLocaleString()} sao, cấp ${level.name}. Mở Sao`}
+          >
+            <Star size={15} className="fill-amber-400 text-amber-400" aria-hidden />
+            <span className="font-semibold tabular-nums text-zinc-950">{starStats.current_balance.toLocaleString()}</span>
+            <span className="hidden text-zinc-500 sm:inline">· {level.name}</span>
+          </button>
+        </div>
+
+        <Segmented<SubTab> value={subTab} options={TABS} onChange={setSubTab} label="Mục" size="md" className="flex w-full sm:inline-flex sm:w-auto" />
+
+        {/* ── HABITS TAB ── */}
+        {subTab === 'habits' && (
+          <div className="space-y-5">
+            {habits.length > 0 && (
+              <Card className="p-4 sm:p-5">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-[13px] text-zinc-500">Hôm nay</div>
+                    <div className="mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums text-zinc-950">
+                      {todayDone}<span className="text-[18px] font-medium text-zinc-400"> / {todaysHabits.length}</span>
+                    </div>
+                  </div>
+                  <div className="text-right text-[13px] text-zinc-500">
+                    {todaysHabits.length === 0 ? 'Không có lịch hôm nay' : allDone ? 'Đã xong tất cả' : `Còn ${todaysHabits.length - todayDone} thói quen`}
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <Progress value={todayPct} className={allDone ? 'bg-emerald-500' : 'bg-sky-600'} />
+                </div>
+              </Card>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[13px] tabular-nums text-zinc-500">
+                {isPro ? `${habits.length} thói quen` : `${habits.length}/${FREE_HABIT_LIMIT} thói quen miễn phí`}
+              </p>
+              {atFreeLimit ? (
+                <Button variant="primary" onClick={() => onUpgrade?.()}>
+                  <Sparkles size={15} /> Nâng cấp Pro
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={() => openForm('habit')}>
+                  <Plus size={16} /> Thêm thói quen
+                </Button>
               )}
             </div>
-            {!isPro && habits.length >= FREE_HABIT_LIMIT ? (
-              <button onClick={() => onUpgrade?.()}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold text-sm shadow-lg shadow-indigo-200 hover:-translate-y-0.5 transition-all">
-                <Crown size={16} className="text-yellow-300" /> Nâng cấp Pro
-              </button>
+
+            {habits.length === 0 ? (
+              <EmptyState
+                icon={<Flame size={20} />}
+                title="Chưa có thói quen nào"
+                hint="Bắt đầu với một việc nhỏ bạn muốn làm mỗi ngày, ví dụ uống đủ nước hoặc đọc 10 trang sách."
+                action={<Button variant="secondary" onClick={() => openForm('habit')}><Plus size={16} /> Tạo thói quen đầu tiên</Button>}
+              />
             ) : (
-              <button onClick={() => { setEditItem(null); setShowForm('habit'); }}
-                className="flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-orange-200 hover:-translate-y-0.5 transition-all">
-                <Plus size={18} /> Thêm thói quen
-              </button>
+              <>
+                {todaysHabits.length > 0 && (
+                  <section>
+                    <SectionLabel meta={todaysHabits.length}>Lịch hôm nay</SectionLabel>
+                    <Card className="overflow-hidden">
+                      <ul className="divide-y divide-zinc-900/[0.06]">{todaysHabits.map(h => renderHabitRow(h, true))}</ul>
+                    </Card>
+                  </section>
+                )}
+                {otherHabits.length > 0 && (
+                  <section>
+                    <SectionLabel meta={otherHabits.length}>Không có lịch hôm nay</SectionLabel>
+                    <Card className="overflow-hidden">
+                      <ul className="divide-y divide-zinc-900/[0.06]">{otherHabits.map(h => renderHabitRow(h, false))}</ul>
+                    </Card>
+                  </section>
+                )}
+              </>
             )}
           </div>
+        )}
 
-          {/* Today Panel */}
-          <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-6 overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full -z-0"></div>
-            <div className="relative z-10 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-gray-500 font-bold uppercase tracking-wider text-xs">Tiến độ hôm nay</h3>
-                  <div className="text-3xl font-black text-gray-900 mt-1">{todayDone} <span className="text-lg text-gray-400 font-medium">/ {todaysHabits.length}</span></div>
-                </div>
-                <div className="w-16 h-16 rounded-full border-4 border-orange-100 flex items-center justify-center">
-                  <Flame size={32} className={todayDone === todaysHabits.length && todaysHabits.length > 0 ? 'text-orange-500 animate-pulse' : 'text-gray-300'} />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {todaysHabits.map(h => {
-                  const done = habitLogs.some(l => l.habit_id === h.id && l.log_date === today() && l.completed);
-                  const color = getColorClasses(h.color_theme);
-                  return (
-                    <button key={h.id} onClick={() => toggleCheckIn(h.id)}
-                      className={`flex items-center p-3 rounded-xl border text-left transition-all ${done ? color.light + ' ring-2 ring-offset-1 ' + color.bg.replace('bg-', 'ring-') : 'bg-gray-50 border-gray-100 hover:bg-gray-100'}`}>
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0 mr-3 ${done ? color.bg + ' text-white shadow-sm' : 'bg-white text-gray-400 shadow-sm'}`}>
-                        {h.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className={`font-bold truncate ${done ? 'text-gray-900' : 'text-gray-600'}`}>{h.title}</div>
-                        <div className="text-[10px] text-gray-400 font-medium flex items-center gap-1 mt-0.5">
-                          <Flame size={10} className={done ? 'text-orange-400' : ''} /> {getHabitStats(h).currentStreak} streak
-                        </div>
-                      </div>
-                      <div className="shrink-0 ml-2 text-gray-300">
-                        {done ? <CheckCircle2 size={20} className={color.bg.replace('bg-', 'text-')} /> : <Circle size={20} />}
-                      </div>
-                    </button>
-                  );
-                })}
-                {todaysHabits.length === 0 && (
-                  <div className="col-span-full py-4 text-center text-gray-400 text-sm">Không có thói quen nào được lên lịch cho hôm nay.</div>
-                )}
-              </div>
+        {/* ── COUNTDOWN TAB ── */}
+        {subTab === 'countdown' && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[13px] text-zinc-500">Đếm số ngày tới những dịp quan trọng</p>
+              <Button variant="primary" onClick={() => openForm('countdown')}>
+                <Plus size={16} /> Thêm sự kiện
+              </Button>
             </div>
+
+            {countdowns.length === 0 ? (
+              <EmptyState icon={<Timer size={20} />} title="Chưa có sự kiện nào" hint="Thêm kỳ thi, sinh nhật hay chuyến đi để biết còn bao nhiêu ngày." />
+            ) : (
+              ([
+                { label: 'Hôm nay', items: todayEvents },
+                { label: 'Sắp tới', items: upcoming },
+                { label: 'Đã qua', items: past },
+              ]).filter(g => g.items.length > 0).map(g => (
+                <section key={g.label}>
+                  <SectionLabel meta={g.items.length}>{g.label}</SectionLabel>
+                  <Card className="overflow-hidden">
+                    <ul className="divide-y divide-zinc-900/[0.06]">
+                      {g.items.map(c => <CountdownRow key={c.id} item={c} onOpen={() => openForm('countdown', c)} />)}
+                    </ul>
+                  </Card>
+                </section>
+              ))
+            )}
           </div>
+        )}
 
-          {/* All Habits List */}
-          <div>
-            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 mt-8">Tất cả thói quen</h3>
-            <div className="space-y-3">
-              {habits.map(h => {
-                const stats = getHabitStats(h);
-                const bar = getStreakBar(h);
-                const color = getColorClasses(h.color_theme);
-                return (
-                  <div key={h.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-all group flex flex-col sm:flex-row gap-4 items-start sm:items-center cursor-pointer" onClick={() => setDetailHabit(h)}>
-                    <div className="flex items-center gap-4 flex-1 w-full">
-                      <div className={`w-12 h-12 ${color.bg} text-white rounded-xl flex items-center justify-center text-2xl shadow-sm shrink-0`}>
-                        {h.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-gray-900 truncate text-lg">{h.title}</h4>
-                        <div className="flex items-center gap-3 text-xs font-medium mt-1">
-                          <span className="flex items-center gap-1 text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md"><Flame size={12} /> {stats.currentStreak}</span>
-                          <span className="flex items-center gap-1 text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md"><Award size={12} /> {stats.bestStreak} max</span>
-                          <span className="text-gray-400 hidden sm:inline">{stats.completionRate}% completion</span>
-                        </div>
-                      </div>
-                    </div>
-                    {/* 30-day timeline bar */}
-                    <div className="w-full sm:w-48 shrink-0 flex items-center justify-between sm:justify-end gap-0.5 h-6">
-                      {bar.map((b, i) => (
-                        <div key={i} title={b.date} className={`flex-1 h-full max-w-[6px] rounded-sm transition-colors ${b.done ? color.bg : (b.scheduled ? 'bg-gray-100' : 'bg-transparent')}`} />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-              {habits.length === 0 && (
-                <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center">
-                  <Flame size={48} className="mx-auto text-gray-300 mb-4" />
-                  <p className="text-gray-500 font-medium">Chưa có thói quen nào</p>
-                  <p className="text-gray-400 text-sm mt-1">Tạo thói quen để bắt đầu theo dõi tiến độ</p>
-                </div>
-              )}
+        {/* ── COUNT-UP TAB ── */}
+        {subTab === 'countup' && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[13px] text-zinc-500">Đếm số ngày kể từ một mốc</p>
+              <Button variant="primary" onClick={() => openForm('countup')}>
+                <Plus size={16} /> Thêm mốc
+              </Button>
             </div>
+
+            {countups.length === 0 ? (
+              <EmptyState icon={<Flag size={20} />} title="Chưa có mốc nào" hint="Ví dụ: ngày bắt đầu đi làm, ngày bỏ thuốc, ngày quen nhau." />
+            ) : (
+              <Card className="overflow-hidden">
+                <ul className="divide-y divide-zinc-900/[0.06]">
+                  {countups.map(c => {
+                    const elapsed = -diffDays(c.start_date);
+                    const reached = getReachedMilestones(c.start_date, c.milestones);
+                    const next = getNextMilestone(c.start_date, c.milestones);
+                    const prev = reached.length ? reached[reached.length - 1] : 0;
+                    const pct = next ? ((elapsed - prev) / (next - prev)) * 100 : 100;
+                    return (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => openForm('countup', c)}
+                          className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-zinc-50 sm:px-4"
+                        >
+                          <IconTile icon={c.icon} theme={c.color_theme} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[15px] font-medium text-zinc-950">{c.title}</span>
+                            <span className="mt-0.5 block truncate text-[12px] text-zinc-500">
+                              Từ {formatDate(c.start_date)}{next ? ` · mốc tiếp ${next.toLocaleString()} ngày` : ''}
+                            </span>
+                            <span className="mt-2 block max-w-[220px]">
+                              <Progress value={pct} className={getTint(c.color_theme).solid} />
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-right">
+                            <span className="block text-[22px] font-semibold leading-none tracking-tight tabular-nums text-zinc-950">{Math.max(0, elapsed).toLocaleString()}</span>
+                            <span className="mt-1 block text-[12px] text-zinc-500">ngày</span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── COUNTDOWN TAB ── */}
-      {subTab === 'countdown' && (
-        <div className="space-y-6">
-          <div className="flex justify-end">
-            <button onClick={() => { setEditItem(null); setShowForm('countdown'); }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-sm shadow-lg shadow-indigo-200 hover:-translate-y-0.5 transition-all">
-              <Plus size={18} /> Thêm sự kiện
-            </button>
-          </div>
+        {/* ── STARS TAB ── */}
+        {subTab === 'stars' && <StarBrainDashboard userId={userId} />}
+      </div>
 
-          {/* Today */}
-          {todayEvents.length > 0 && (
-            <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">🎉 Hôm nay</h3>
-              <div className="space-y-3">
-                {todayEvents.map(c => <CountdownCard key={c.id} item={c} onEdit={() => { setEditItem(c); setShowForm('countdown'); }} onDelete={() => deleteCountdown(c.id)} />)}
-              </div>
-            </div>
-          )}
-
-          {/* Upcoming */}
-          {upcoming.length > 0 && (
-            <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">⏳ Sắp tới ({upcoming.length})</h3>
-              <div className="space-y-3">
-                {upcoming.map(c => <CountdownCard key={c.id} item={c} onEdit={() => { setEditItem(c); setShowForm('countdown'); }} onDelete={() => deleteCountdown(c.id)} />)}
-              </div>
-            </div>
-          )}
-
-          {/* Past */}
-          {past.length > 0 && (
-            <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">📌 Đã qua ({past.length})</h3>
-              <div className="space-y-3">
-                {past.map(c => <CountdownCard key={c.id} item={c} onEdit={() => { setEditItem(c); setShowForm('countdown'); }} onDelete={() => deleteCountdown(c.id)} />)}
-              </div>
-            </div>
-          )}
-
-          {countdowns.length === 0 && (
-            <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center">
-              <Timer size={48} className="mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500 font-medium">Chưa có sự kiện nào</p>
-              <p className="text-gray-400 text-sm mt-1">Nhấn "Thêm sự kiện" để bắt đầu đếm ngược</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── COUNT-UP TAB ── */}
-      {subTab === 'countup' && (
-        <div className="space-y-6">
-          <div className="flex justify-end">
-            <button onClick={() => { setEditItem(null); setShowForm('countup'); }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm shadow-lg shadow-emerald-200 hover:-translate-y-0.5 transition-all">
-              <Plus size={18} /> Thêm mốc sự kiện
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {countups.map(c => {
-              const elapsed = -diffDays(c.start_date);
-              const reached = getReachedMilestones(c.start_date, c.milestones);
-              const next = getNextMilestone(c.start_date, c.milestones);
-              const color = getColorClasses(c.color_theme);
-              return (
-                <div key={c.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-all group">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-14 h-14 ${color.bg} rounded-2xl flex items-center justify-center text-2xl shadow-sm shrink-0`}>
-                      {c.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-gray-900 truncate">{c.title}</h4>
-                      <p className="text-gray-400 text-xs mt-0.5">Từ {new Date(c.start_date).toLocaleDateString('vi-VN')}</p>
-                      {reached.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {reached.slice(-3).map(m => (
-                            <span key={m} className="text-[10px] px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full font-bold border border-amber-100">🏅 {m} ngày</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-3xl font-black text-gray-900">{elapsed.toLocaleString()}</div>
-                      <div className="text-xs text-gray-400 font-medium">ngày</div>
-                      {next && <div className="text-[10px] text-gray-300 mt-1">Mốc tiếp: {next} ngày</div>}
-                    </div>
-                    <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => { setEditItem(c); setShowForm('countup'); }} className="p-1.5 hover:bg-gray-100 rounded-lg"><Edit3 size={14} className="text-gray-400" /></button>
-                      <button onClick={() => deleteCountup(c.id)} className="p-1.5 hover:bg-red-50 rounded-lg"><Trash2 size={14} className="text-red-400" /></button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {countups.length === 0 && (
-            <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center">
-              <TrendingUp size={48} className="mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500 font-medium">Chưa có mốc sự kiện nào</p>
-              <p className="text-gray-400 text-sm mt-1">Ghi nhận mốc sự kiện quan trọng để đếm ngày</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── STARS TAB ── */}
-      {subTab === 'stars' && (
-        <StarBrainDashboard userId={userId} />
-      )}
-
-      {/* ── FORM MODAL ── */}
+      {/* ── FORM ── */}
       {showForm && (
-        <EventFormModal
+        <EventFormSheet
           type={showForm}
           editItem={editItem}
           onClose={() => { setShowForm(null); setEditItem(null); }}
           onSaveCountdown={(item) => editItem ? updateCountdown(editItem.id, item) : addCountdown(item)}
           onSaveCountup={(item) => editItem ? updateCountup(editItem.id, item) : addCountup(item)}
           onSaveHabit={(item) => editItem ? updateHabit(editItem.id, item) : addHabit(item)}
+          onDelete={editItem && showForm !== 'habit' ? () => {
+            const id = editItem.id;
+            setShowForm(null); setEditItem(null);
+            if (showForm === 'countdown') deleteCountdown(id); else deleteCountup(id);
+          } : undefined}
         />
       )}
 
-      {/* ── HABIT DETAIL MODAL ── */}
+      {/* ── HABIT DETAIL ── */}
       {detailHabit && (
-        <HabitDetailModal
+        <HabitDetailSheet
           habit={detailHabit}
           stats={getHabitStats(detailHabit)}
-          logs={habitLogs.filter(l => l.habit_id === detailHabit.id)}
+          logs={logsByHabitId.get(detailHabit.id) || []}
           month={detailMonth}
           setMonth={setDetailMonth}
+          checkable={todaysHabits.some(h => h.id === detailHabit.id)}
+          doneToday={isDoneToday(detailHabit)}
+          onToggleToday={() => toggleCheckIn(detailHabit.id)}
           onClose={() => setDetailHabit(null)}
-          onEdit={() => { setEditItem(detailHabit); setShowForm('habit'); }}
+          onEdit={() => { const h = detailHabit; setDetailHabit(null); openForm('habit', h); }}
           onDelete={() => deleteHabit(detailHabit.id)}
         />
       )}
 
-      {/* ── STARBRAIN CHECKIN CELEBRATION ── */}
+      {/* ── STARBRAIN CHECK-IN TOAST ── */}
       {checkinResult && (
-        <CheckinCelebration result={checkinResult} onClose={() => setCheckinResult(null)} />
+        <CheckinToast result={checkinResult} onClose={() => setCheckinResult(null)} onOpenStars={() => { setCheckinResult(null); setSubTab('stars'); }} />
       )}
 
-      {/* Custom unified delete confirmation modal */}
       <ConfirmModal
         isOpen={confirmDialog.isOpen}
         title={confirmDialog.title}
@@ -792,424 +752,391 @@ const HabitDashboard: React.FC<Props> = ({ userId, onNavigateToSchedule, isPro =
   );
 };
 
-// ── Countdown Card ──
-const CountdownCard: React.FC<{ item: CountdownItem; onEdit: () => void; onDelete: () => void }> = ({ item, onEdit, onDelete }) => {
+// ── Countdown Row ──
+const CountdownRow: React.FC<{ item: CountdownItem; onOpen: () => void }> = ({ item, onOpen }) => {
   const days = diffDays(item.target_date);
   const isToday = days === 0;
   const isPast = days < 0;
-  const color = getColorClasses(item.color_theme);
-
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm p-5 hover:shadow-md transition-all group ${isToday ? 'border-yellow-200 bg-yellow-50/30 ring-2 ring-yellow-100' : 'border-gray-100'}`}>
-      <div className="flex items-center gap-4">
-        <div className={`w-14 h-14 ${color.bg} rounded-2xl flex items-center justify-center text-2xl shadow-sm shrink-0`}>
-          {item.icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h4 className="font-bold text-gray-900 truncate">{item.title}</h4>
-            {item.is_recurring && <RotateCcw size={12} className="text-indigo-400 shrink-0" />}
-          </div>
-          {item.description && <p className="text-gray-400 text-xs mt-0.5 truncate">{item.description}</p>}
-          <p className="text-gray-400 text-xs mt-0.5">{new Date(item.target_date).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
-        </div>
-        <div className="text-right shrink-0">
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`flex w-full items-center gap-3 px-3 py-3 text-left transition-colors sm:px-4 ${isToday ? 'bg-sky-50/70 hover:bg-sky-50' : 'hover:bg-zinc-50'}`}
+      >
+        <IconTile icon={item.icon} theme={item.color_theme} />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className={`truncate text-[15px] font-medium ${isPast ? 'text-zinc-500' : 'text-zinc-950'}`}>{item.title}</span>
+            {item.is_recurring && <Repeat size={13} className="shrink-0 text-zinc-400" aria-label="Lặp lại hằng năm" />}
+          </span>
+          <span className="mt-0.5 block truncate text-[12px] text-zinc-500">
+            <span className="first-letter:uppercase">{formatDate(item.target_date, { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+            {item.description ? ` · ${item.description}` : ''}
+          </span>
+        </span>
+        <span className="shrink-0 text-right">
           {isToday ? (
-            <div className="text-2xl font-black text-yellow-600">🎉 Hôm nay!</div>
-          ) : isPast ? (
-            <>
-              <div className="text-2xl font-black text-gray-400">{Math.abs(days)}</div>
-              <div className="text-xs text-gray-400">ngày trước</div>
-            </>
+            <span className="rounded-full bg-sky-600 px-2.5 py-1 text-[12px] font-medium text-white">Hôm nay</span>
           ) : (
             <>
-              <div className="text-3xl font-black text-gray-900">{days}</div>
-              <div className="text-xs text-gray-400 font-medium">ngày nữa</div>
+              <span className={`block text-[22px] font-semibold leading-none tracking-tight tabular-nums ${isPast ? 'text-zinc-400' : 'text-zinc-950'}`}>
+                {Math.abs(days).toLocaleString()}
+              </span>
+              <span className="mt-1 block text-[12px] text-zinc-500">{isPast ? 'ngày trước' : 'ngày nữa'}</span>
             </>
           )}
-        </div>
-        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={onEdit} className="p-1.5 hover:bg-gray-100 rounded-lg"><Edit3 size={14} className="text-gray-400" /></button>
-          <button onClick={onDelete} className="p-1.5 hover:bg-red-50 rounded-lg"><Trash2 size={14} className="text-red-400" /></button>
-        </div>
-      </div>
-    </div>
+        </span>
+      </button>
+    </li>
   );
 };
 
-// ── Form Modal ──
-const EventFormModal: React.FC<{
+// ── Form Sheet ──
+type Frequency = 'daily' | 'custom' | 'weekly' | 'monthly';
+const FREQUENCIES: { id: Frequency; label: string }[] = [
+  { id: 'daily', label: 'Hằng ngày' },
+  { id: 'custom', label: 'Chọn ngày' },
+  { id: 'weekly', label: 'Theo tuần' },
+  { id: 'monthly', label: 'Theo tháng' },
+];
+const FORM_TITLES = {
+  habit: ['Thói quen mới', 'Sửa thói quen'],
+  countdown: ['Sự kiện đếm ngược', 'Sửa sự kiện'],
+  countup: ['Mốc đếm ngày', 'Sửa mốc'],
+} as const;
+const DEFAULT_TINT = { habit: 'amber', countdown: 'sky', countup: 'emerald' } as const;
+
+const EventFormSheet: React.FC<{
   type: 'countdown' | 'countup' | 'habit';
   editItem: any;
   onClose: () => void;
   onSaveCountdown: (item: any) => void;
   onSaveCountup: (item: any) => void;
   onSaveHabit: (item: any) => void;
-}> = ({ type, editItem, onClose, onSaveCountdown, onSaveCountup, onSaveHabit }) => {
+  onDelete?: () => void;
+}> = ({ type, editItem, onClose, onSaveCountdown, onSaveCountup, onSaveHabit, onDelete }) => {
   const [title, setTitle] = useState(editItem?.title || '');
   const [description, setDescription] = useState(editItem?.description || '');
-  const [date, setDate] = useState(editItem?.target_date || editItem?.start_date || editItem?.start_date || today());
+  const [date, setDate] = useState(editItem?.target_date || editItem?.start_date || today());
   const [isRecurring, setIsRecurring] = useState(editItem?.is_recurring || false);
-  const [colorTheme, setColorTheme] = useState(editItem?.color_theme || (type === 'countdown' ? 'blue' : type === 'habit' ? 'orange' : 'emerald'));
-  const [icon, setIcon] = useState(editItem?.icon || (type === 'habit' ? '✅' : '📅'));
-  const [showEmojis, setShowEmojis] = useState(false);
+  const [colorTheme, setColorTheme] = useState(editItem?.color_theme ? getTint(editItem.color_theme).id : DEFAULT_TINT[type]);
+  const [icon, setIcon] = useState<string>(editItem?.icon || DEFAULT_ICON[type]);
   const [saving, setSaving] = useState(false);
-  
+
   // Habit specific
-  const [frequency, setFrequency] = useState<'daily'|'custom'|'weekly'|'monthly'>(editItem?.frequency || 'daily');
+  const [frequency, setFrequency] = useState<Frequency>(editItem?.frequency || 'daily');
   const [activeDays, setActiveDays] = useState<DayOfWeek[]>(editItem?.active_days || ALL_DAYS);
   const [targetPerPeriod, setTargetPerPeriod] = useState<number>(editItem?.target_per_period || 1);
+  const maxTarget = frequency === 'weekly' ? 7 : 31;
+
+  const invalid = !title.trim() || !date || (type === 'habit' && frequency === 'custom' && activeDays.length === 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !date) return;
+    if (invalid) return;
     setSaving(true);
     if (type === 'countdown') {
       await onSaveCountdown({ title: title.trim(), description: description.trim() || null, target_date: date, is_recurring: isRecurring, color_theme: colorTheme, icon });
     } else if (type === 'countup') {
       await onSaveCountup({ title: title.trim(), start_date: date, color_theme: colorTheme, icon, milestones: [7, 30, 100, 365, 1000] });
     } else {
-      await onSaveHabit({ 
-        title: title.trim(), description: description.trim() || null, start_date: date, 
-        color_theme: colorTheme, icon, frequency, 
+      await onSaveHabit({
+        title: title.trim(), description: description.trim() || null, start_date: date,
+        color_theme: colorTheme, icon, frequency,
         target_per_period: (frequency === 'weekly' || frequency === 'monthly') ? targetPerPeriod : undefined,
-        active_days: frequency === 'daily' ? ALL_DAYS : activeDays, 
-        is_active: true 
+        active_days: frequency === 'daily' ? ALL_DAYS : activeDays,
+        is_active: true
       });
     }
     setSaving(false);
   };
 
+  const formId = `event-form-${type}`;
+
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-[95%] max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className={`p-6 ${type === 'countdown' ? 'bg-gradient-to-br from-indigo-600 to-blue-700' : type === 'habit' ? 'bg-gradient-to-br from-orange-500 to-red-600' : 'bg-gradient-to-br from-emerald-600 to-teal-700'} text-white`}>
-          <button onClick={onClose} className="absolute top-4 right-4 p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-xl"><X size={18} /></button>
-          <h3 className="text-xl font-bold">{editItem ? 'Chỉnh sửa' : 'Thêm'} {type === 'countdown' ? 'Countdown' : type === 'habit' ? 'Thói quen' : 'Count-Up'}</h3>
+    <Sheet
+      open
+      onClose={onClose}
+      title={FORM_TITLES[type][editItem ? 1 : 0]}
+      footer={
+        <div className="flex items-center gap-2">
+          {onDelete && (
+            <Button variant="danger" onClick={onDelete} className="-ml-2 px-3">
+              <Trash2 size={16} /> Xóa
+            </Button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <Button variant="ghost" onClick={onClose}>Hủy</Button>
+            <Button variant="primary" type="submit" form={formId} disabled={saving || invalid}>
+              {saving ? 'Đang lưu…' : editItem ? 'Lưu' : 'Tạo'}
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <form id={formId} onSubmit={handleSubmit} className="space-y-5">
+        <div className="flex items-center gap-3">
+          <IconTile icon={icon} theme={colorTheme} size="lg" />
+          <div className="min-w-0 flex-1">
+            <label htmlFor={`${formId}-title`} className="sr-only">Tên</label>
+            <input
+              id={`${formId}-title`}
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder={type === 'habit' ? 'Ví dụ: Đọc sách 20 phút' : type === 'countdown' ? 'Ví dụ: Thi cuối kỳ' : 'Ví dụ: Ngày bắt đầu đi làm'}
+              required
+              autoFocus={!editItem}
+              className={inputClass}
+            />
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          {/* Icon + Title */}
-          <div className="flex gap-3">
-            <div className="relative">
-              <button type="button" onClick={() => setShowEmojis(!showEmojis)}
-                className="w-14 h-14 bg-gray-100 hover:bg-gray-200 rounded-2xl flex items-center justify-center text-2xl transition-colors border-2 border-dashed border-gray-200">
-                {icon}
-              </button>
-              {showEmojis && (
-                <div className="absolute top-full left-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-3 z-50 w-[280px] grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto custom-scrollbar">
-                  {EMOJI_PRESETS.map((e, idx) => (
-                    <button key={idx} type="button" onClick={() => { setIcon(e); setShowEmojis(false); }}
-                      className="w-10 h-10 flex items-center justify-center text-xl hover:bg-gray-100 rounded-xl transition-colors">{e}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Tên sự kiện *" required
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none" />
-          </div>
+        <div>
+          <FieldLabel>Biểu tượng</FieldLabel>
+          <IconPicker value={icon} onChange={setIcon} theme={colorTheme} defaultGroup={type === 'habit' ? 'health' : 'events'} />
+        </div>
 
-          {/* Description (countdown & habit) */}
-          {(type === 'countdown' || type === 'habit') && (
-            <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Ghi chú (tùy chọn)"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none resize-none" rows={2} />
-          )}
+        <div>
+          <FieldLabel>Màu</FieldLabel>
+          <TintPicker value={colorTheme} onChange={setColorTheme} />
+        </div>
 
-          {/* Date */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">{type === 'countdown' ? 'Ngày mục tiêu' : 'Ngày bắt đầu'}</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} required
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none" />
-          </div>
+        {type === 'habit' && (
+          <div className="space-y-3">
+            <FieldLabel>Tần suất</FieldLabel>
+            <Segmented<Frequency> value={frequency} options={FREQUENCIES} onChange={setFrequency} label="Tần suất" className="flex w-full" />
 
-          {/* Habit frequency */}
-          {type === 'habit' && (
-            <div className="space-y-3 pt-2">
-              <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Tần suất</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => setFrequency('daily')} className={`py-2 rounded-lg text-sm font-bold border transition-colors ${frequency === 'daily' ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Hàng ngày</button>
-                <button type="button" onClick={() => setFrequency('custom')} className={`py-2 rounded-lg text-sm font-bold border transition-colors ${frequency === 'custom' ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Tùy chỉnh</button>
-                <button type="button" onClick={() => setFrequency('weekly')} className={`py-2 rounded-lg text-sm font-bold border transition-colors ${frequency === 'weekly' ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Theo Tuần</button>
-                <button type="button" onClick={() => setFrequency('monthly')} className={`py-2 rounded-lg text-sm font-bold border transition-colors ${frequency === 'monthly' ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Theo Tháng</button>
-              </div>
-
-              {frequency === 'custom' && (
-                <div className="flex justify-between gap-1 mt-2">
-                  {ALL_DAYS.map(d => (
-                    <button key={d} type="button" onClick={() => setActiveDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])}
-                      className={`w-10 h-10 rounded-full text-xs font-bold transition-all ${activeDays.includes(d) ? 'bg-orange-500 text-white shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
+            {frequency === 'custom' && (
+              <div className="flex justify-between gap-1" role="group" aria-label="Ngày trong tuần">
+                {ALL_DAYS.map(d => {
+                  const on = activeDays.includes(d);
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setActiveDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])}
+                      className={`h-10 w-10 rounded-full text-[13px] font-medium transition-colors ${on ? 'bg-zinc-950 text-white' : 'bg-zinc-100 text-zinc-500 hover:text-zinc-900'}`}
+                    >
                       {DAY_LABELS[d]}
                     </button>
-                  ))}
-                </div>
-              )}
-
-              {(frequency === 'weekly' || frequency === 'monthly') && (
-                <div className="mt-3 bg-orange-50/50 p-3 rounded-xl border border-orange-100 flex items-center justify-between">
-                  <span className="text-sm font-bold text-gray-700">Mục tiêu:</span>
-                  <div className="flex items-center gap-2">
-                    <input type="number" min="1" max={frequency === 'weekly' ? 7 : 31} value={targetPerPeriod} onChange={e => setTargetPerPeriod(Number(e.target.value))}
-                      className="w-16 px-2 py-1 text-center border border-gray-300 rounded-lg font-bold text-gray-800 outline-none focus:border-orange-400" />
-                    <span className="text-sm font-medium text-gray-500">lần / {frequency === 'weekly' ? 'tuần' : 'tháng'}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Recurring (countdown only) */}
-          {type === 'countdown' && (
-            <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
-              <input type="checkbox" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)}
-                className="w-5 h-5 rounded-lg text-indigo-600 border-gray-300" />
-              <div>
-                <span className="text-sm font-medium text-gray-700">Lặp lại hàng năm</span>
-                <p className="text-xs text-gray-400">VD: Sinh nhật, kỷ niệm...</p>
+                  );
+                })}
               </div>
-            </label>
-          )}
+            )}
 
-          {/* Color */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Màu chủ đề</label>
-            <div className="flex gap-2 flex-wrap">
-              {COLOR_PRESETS.map(c => (
-                <button key={c.name} type="button" onClick={() => setColorTheme(c.name)}
-                  className={`w-9 h-9 ${c.bg} rounded-xl transition-all ${colorTheme === c.name ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'hover:scale-105'}`} />
-              ))}
-            </div>
+            {(frequency === 'weekly' || frequency === 'monthly') && (
+              <div className="flex items-center justify-between rounded-xl bg-zinc-50 py-1.5 pl-3.5 pr-1.5">
+                <span className="text-[14px] text-zinc-700">Mục tiêu</span>
+                <div className="flex items-center gap-1">
+                  <IconButton label="Giảm" onClick={() => setTargetPerPeriod(n => Math.max(1, n - 1))} disabled={targetPerPeriod <= 1}>
+                    <Minus size={16} />
+                  </IconButton>
+                  <span className="w-7 text-center text-[15px] font-semibold tabular-nums text-zinc-950">{Math.min(targetPerPeriod, maxTarget)}</span>
+                  <IconButton label="Tăng" onClick={() => setTargetPerPeriod(n => Math.min(maxTarget, n + 1))} disabled={targetPerPeriod >= maxTarget}>
+                    <Plus size={16} />
+                  </IconButton>
+                  <span className="pr-2 text-[13px] text-zinc-500">lần/{frequency === 'weekly' ? 'tuần' : 'tháng'}</span>
+                </div>
+              </div>
+            )}
           </div>
+        )}
 
-          <button type="submit" disabled={saving || !title.trim()}
-            className={`w-full py-3.5 rounded-xl font-bold text-sm text-white shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 ${type === 'countdown' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : type === 'habit' ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'}`}>
-            {saving ? 'Đang lưu...' : (editItem ? 'Cập nhật' : 'Tạo mới')}
-          </button>
-        </form>
-      </div>
-    </div>
+        <div>
+          <FieldLabel htmlFor={`${formId}-date`}>{type === 'countdown' ? 'Ngày diễn ra' : 'Ngày bắt đầu'}</FieldLabel>
+          <input id={`${formId}-date`} type="date" value={date} onChange={e => setDate(e.target.value)} required className={inputClass} />
+        </div>
+
+        {type === 'countdown' && (
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-zinc-50 px-3.5 py-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-sky-600">
+            <span>
+              <span className="block text-[14px] font-medium text-zinc-800">Lặp lại hằng năm</span>
+              <span className="block text-[12px] text-zinc-500">Sinh nhật, ngày kỷ niệm…</span>
+            </span>
+            <input type="checkbox" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)} className="sr-only" />
+            <span className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${isRecurring ? 'bg-sky-600' : 'bg-zinc-200'}`} aria-hidden>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${isRecurring ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+            </span>
+          </label>
+        )}
+
+        {(type === 'countdown' || type === 'habit') && (
+          <div>
+            <FieldLabel htmlFor={`${formId}-note`}>Ghi chú</FieldLabel>
+            <textarea
+              id={`${formId}-note`}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Không bắt buộc"
+              rows={2}
+              className={`${inputClass} resize-none`}
+            />
+          </div>
+        )}
+      </form>
+    </Sheet>
   );
 };
 
-// ── Habit Detail Modal (Dot Calendar) ──
-const HabitDetailModal: React.FC<{
-  habit: Habit; stats: any; logs: HabitLog[]; month: { year: number, month: number };
-  setMonth: (m: { year: number, month: number }) => void; onClose: () => void; onEdit: () => void; onDelete: () => void;
-}> = ({ habit, stats, logs, month, setMonth, onClose, onEdit, onDelete }) => {
-  const color = getColorClasses(habit.color_theme);
-  
+// ── Habit Detail Sheet ──
+const HabitDetailSheet: React.FC<{
+  habit: Habit; stats: { currentStreak: number; bestStreak: number; completionRate: number; totalCompleted: number };
+  logs: HabitLog[]; month: { year: number, month: number }; setMonth: (m: { year: number, month: number }) => void;
+  checkable: boolean; doneToday: boolean; onToggleToday: () => void;
+  onClose: () => void; onEdit: () => void; onDelete: () => void;
+}> = ({ habit, stats, logs, month, setMonth, checkable, doneToday, onToggleToday, onClose, onEdit, onDelete }) => {
+  const tint = getTint(habit.color_theme);
+  const periodic = habit.frequency === 'weekly' || habit.frequency === 'monthly';
+  const unit = streakUnit(habit);
+
   // Build calendar days
   const firstDay = new Date(month.year, month.month, 1);
   const lastDay = new Date(month.year, month.month + 1, 0);
   const startOffset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Mon=0
   const daysInMonth = lastDay.getDate();
-  const calendarGrid = Array(startOffset).fill(null).concat(Array.from({length: daysInMonth}, (_,i) => i+1));
+  const calendarGrid: (number | null)[] = Array(startOffset).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+  const todayStr = today();
 
   const prevMonth = () => setMonth(month.month === 0 ? { year: month.year - 1, month: 11 } : { year: month.year, month: month.month - 1 });
   const nextMonth = () => setMonth(month.month === 11 ? { year: month.year + 1, month: 0 } : { year: month.year, month: month.month + 1 });
 
+  const statTiles = [
+    { label: 'Chuỗi hiện tại', value: stats.currentStreak, suffix: unit, icon: <Flame size={14} /> },
+    { label: 'Dài nhất', value: stats.bestStreak, suffix: unit, icon: <Award size={14} /> },
+    { label: 'Đã hoàn thành', value: stats.totalCompleted, suffix: 'lần', icon: <Check size={14} /> },
+    { label: 'Tỉ lệ', value: `${stats.completionRate}%`, suffix: '', icon: <Star size={14} /> },
+  ];
+
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-        <div className={`p-6 ${color.bg} text-white flex items-center gap-4 shrink-0`}>
-          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl shadow-sm backdrop-blur-sm">{habit.icon}</div>
-          <div className="flex-1">
-            <h2 className="text-xl font-bold">{habit.title}</h2>
-            <p className="text-white/80 text-sm mt-0.5">{habit.description || 'Theo dõi thói quen'}</p>
+    <Sheet
+      open
+      onClose={onClose}
+      title={
+        <span className="flex items-center gap-3">
+          <IconTile icon={habit.icon} theme={habit.color_theme} />
+          <span className="min-w-0">
+            <span className="block truncate">{habit.title}</span>
+            <span className="block text-[13px] font-normal tracking-normal text-zinc-500">{frequencyLabel(habit)}</span>
+          </span>
+        </span>
+      }
+      footer={
+        <div className="flex items-center gap-2">
+          <IconButton label="Xóa thói quen" onClick={() => { onClose(); onDelete(); }} className="text-red-700 hover:bg-red-50 hover:text-red-700">
+            <Trash2 size={17} />
+          </IconButton>
+          <Button variant="secondary" onClick={onEdit}>
+            <Pencil size={15} /> Sửa
+          </Button>
+          {checkable && (
+            <Button variant={doneToday ? 'secondary' : 'primary'} onClick={onToggleToday} className="ml-auto">
+              {doneToday ? <><X size={15} /> Bỏ đánh dấu</> : <><Check size={16} /> Xong hôm nay</>}
+            </Button>
+          )}
+        </div>
+      }
+    >
+      {habit.description && <p className="mb-4 text-[14px] text-zinc-600">{habit.description}</p>}
+
+      <div className="grid grid-cols-2 gap-2">
+        {statTiles.map(s => (
+          <div key={s.label} className="rounded-2xl bg-zinc-50 p-3">
+            <div className="flex items-center gap-1.5 text-[12px] text-zinc-500">
+              <span className="text-zinc-400">{s.icon}</span>{s.label}
+            </div>
+            <div className="mt-1.5 text-[20px] font-semibold leading-none tracking-tight tabular-nums text-zinc-950">
+              {s.value}{s.suffix && <span className="ml-1 text-[12px] font-normal text-zinc-500">{s.suffix}</span>}
+            </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors"><X size={20} /></button>
+        ))}
+      </div>
+
+      <div className="mt-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-[15px] font-semibold tracking-tight text-zinc-950">Lịch sử</h3>
+          <div className="flex items-center gap-1">
+            <IconButton label="Tháng trước" onClick={prevMonth}><ChevronLeft size={16} /></IconButton>
+            <span className="w-24 text-center text-[13px] font-medium tabular-nums text-zinc-700">Tháng {month.month + 1}, {month.year}</span>
+            <IconButton label="Tháng sau" onClick={nextMonth}><ChevronRight size={16} /></IconButton>
+          </div>
         </div>
 
-        <div className="p-6 overflow-y-auto space-y-6">
-          {/* Stats grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-gray-50 rounded-2xl p-4 text-center border border-gray-100">
-              <Flame size={24} className="mx-auto text-orange-500 mb-1" />
-              <div className="text-2xl font-black text-gray-900">{stats.currentStreak}</div>
-              <div className="text-xs font-bold text-gray-500 uppercase">Current Streak</div>
-            </div>
-            <div className="bg-gray-50 rounded-2xl p-4 text-center border border-gray-100">
-              <Award size={24} className="mx-auto text-yellow-500 mb-1" />
-              <div className="text-2xl font-black text-gray-900">{stats.bestStreak}</div>
-              <div className="text-xs font-bold text-gray-500 uppercase">Best Streak</div>
-            </div>
-            <div className="bg-gray-50 rounded-2xl p-4 text-center border border-gray-100">
-              <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-1" />
-              <div className="text-2xl font-black text-gray-900">{stats.totalCompleted}</div>
-              <div className="text-xs font-bold text-gray-500 uppercase">Total Done</div>
-            </div>
-            <div className="bg-gray-50 rounded-2xl p-4 text-center border border-gray-100">
-              <BarChart3 size={24} className="mx-auto text-blue-500 mb-1" />
-              <div className="text-2xl font-black text-gray-900">{stats.completionRate}%</div>
-              <div className="text-xs font-bold text-gray-500 uppercase">Completion Rate</div>
-            </div>
-          </div>
+        <div className="grid grid-cols-7 gap-1 text-center">
+          {ALL_DAYS.map(d => <div key={d} className="pb-1 text-[12px] font-medium text-zinc-400">{DAY_LABELS[d]}</div>)}
+          {calendarGrid.map((d, i) => {
+            if (!d) return <div key={`e${i}`} />;
+            const dateStr = `${month.year}-${String(month.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const theDate = new Date(dateStr);
+            const started = dateStr >= habit.start_date.slice(0, 10);
+            const isScheduled = started && (periodic || habit.active_days.includes(getDayKey(theDate)));
+            const done = logs.some(l => l.log_date === dateStr && l.completed);
+            const isFuture = dateStr > todayStr;
+            const isToday = dateStr === todayStr;
 
-          {/* Calendar Heatmap */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900 flex items-center gap-2"><Calendar size={18} className="text-gray-400" /> Lịch sử</h3>
-              <div className="flex items-center gap-2">
-                <button onClick={prevMonth} className="p-1 hover:bg-gray-100 rounded-lg"><ChevronLeft size={16} /></button>
-                <span className="text-sm font-bold w-20 text-center">T{month.month + 1}, {month.year}</span>
-                <button onClick={nextMonth} className="p-1 hover:bg-gray-100 rounded-lg"><ChevronRight size={16} /></button>
+            let cls = 'text-zinc-300';
+            if (done) cls = `${tint.solid} font-medium text-white`;
+            else if (!isScheduled) cls = 'text-zinc-300';
+            else if (isFuture) cls = 'border border-dashed border-zinc-200 text-zinc-400';
+            else if (periodic) cls = 'text-zinc-500';
+            else cls = 'bg-zinc-100 text-zinc-500';
+            if (isToday && !done) cls += ' ring-1 ring-inset ring-sky-600 text-sky-700';
+
+            return (
+              <div key={dateStr} className="flex justify-center">
+                <span className={`flex h-9 w-9 items-center justify-center rounded-full text-[13px] tabular-nums ${cls}`}>{d}</span>
               </div>
-            </div>
-            
-            <div className="grid grid-cols-7 gap-y-2 text-center mb-2">
-              {['T2','T3','T4','T5','T6','T7','CN'].map(d => <div key={d} className="text-[10px] font-bold text-gray-400">{d}</div>)}
-            </div>
-            <div className="grid grid-cols-7 gap-y-2 gap-x-1">
-              {calendarGrid.map((d, i) => {
-                if (!d) return <div key={i} />;
-                const dateStr = `${month.year}-${String(month.month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                const theDate = new Date(dateStr);
-                const isScheduled = habit.active_days.includes(getDayKey(theDate)) && theDate >= new Date(habit.start_date);
-                const log = logs.find(l => l.log_date === dateStr);
-                const isFuture = theDate > new Date(today());
-                
-                let dotClass = 'bg-gray-100 text-gray-400';
-                if (!isScheduled) dotClass = 'opacity-20'; // not scheduled
-                else if (isFuture) dotClass = 'bg-gray-50 border border-dashed border-gray-200 text-gray-300';
-                else if (log?.completed) dotClass = `${color.bg} text-white shadow-sm ring-1 ring-offset-1 ${color.bg.replace('bg-', 'ring-')}`;
-                else dotClass = 'bg-red-50 text-red-400 border border-red-100'; // missed
-
-                return (
-                  <div key={i} className="flex justify-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${dotClass}`}>
-                      {d}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+            );
+          })}
         </div>
 
-        <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0">
-          <button onClick={() => { onClose(); onEdit(); }} className="flex-1 py-3 bg-white border border-gray-200 rounded-xl font-bold text-sm text-gray-700 hover:bg-gray-50 shadow-sm flex items-center justify-center gap-2"><Edit3 size={16} /> Sửa</button>
-          <button onClick={() => { onClose(); onDelete(); }} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2"><Trash2 size={16} /> Xóa</button>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-zinc-500">
+          <span className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${tint.solid}`} /> Hoàn thành</span>
+          {!periodic && <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-zinc-200" /> Chưa làm</span>}
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border border-dashed border-zinc-300" /> Sắp tới</span>
         </div>
       </div>
-    </div>
+    </Sheet>
   );
 };
 
-// ── Checkin Celebration Modal ──
-const CheckinCelebration: React.FC<{ result: CheckinReward; onClose: () => void }> = ({ result, onClose }) => {
+// ── Check-in Toast ──
+// Replaces the old full-screen celebration: a quiet card at the bottom that says what was earned.
+const CheckinToast: React.FC<{ result: CheckinReward; onClose: () => void; onOpenStars: () => void }> = ({ result, onClose, onOpenStars }) => {
+  const notes = [
+    result.milestone && `${result.milestone.label}`,
+    result.levelUp && `Lên cấp ${result.level.name}`,
+    result.isPerfectDay && 'Hoàn thành tất cả thói quen hôm nay',
+    result.isComeback && 'Chào mừng bạn quay lại',
+    result.luckyBonus && `Thưởng may mắn +${result.luckyBonus}`,
+  ].filter(Boolean) as string[];
+
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-      <div
-        className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden"
-        onClick={e => e.stopPropagation()}
-        style={{ animation: 'starSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)' }}
-      >
-        {/* Header glow */}
-        <div className={`p-6 text-center ${
-          result.luckyBonus ? 'bg-gradient-to-br from-amber-400 via-yellow-400 to-orange-400' :
-          result.milestone ? 'bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500' :
-          'bg-gradient-to-br from-amber-400 to-orange-500'
-        } text-white relative overflow-hidden`}>
-          {/* Sparkle dots */}
-          <div className="absolute inset-0 overflow-hidden">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="absolute w-1.5 h-1.5 bg-white/40 rounded-full"
-                style={{
-                  left: `${10 + i * 12}%`, top: `${20 + (i % 3) * 25}%`,
-                  animation: `starFloat ${1.5 + i * 0.2}s ease-in-out infinite alternate`,
-                  animationDelay: `${i * 0.15}s`,
-                }} />
-            ))}
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[9998] flex justify-center px-3 md:bottom-6" role="status" aria-live="polite">
+      <div className="ui-toast-in pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[20px] border border-zinc-900/[0.08] bg-white p-3.5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.25)]">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+          <Star size={18} className="fill-amber-400 text-amber-500" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[15px] font-semibold tabular-nums text-zinc-950">+{result.totalStars} sao</span>
+            <span className="text-[12px] tabular-nums text-zinc-500">Số dư {result.newBalance.toLocaleString()}</span>
           </div>
-
-          <div className="relative z-10">
-            {result.luckyBonus ? (
-              <div className="text-4xl mb-2" style={{ animation: 'starPulse 0.6s ease-in-out infinite alternate' }}>🎰</div>
-            ) : result.milestone ? (
-              <div className="text-4xl mb-2" style={{ animation: 'starPulse 0.6s ease-in-out infinite alternate' }}>{result.milestone.badge}</div>
-            ) : (
-              <Sparkles size={36} className="mx-auto mb-2" style={{ animation: 'starSpin 2s linear infinite' }} />
-            )}
-            <div className="text-5xl font-black" style={{ animation: 'starBounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)' }}>
-              +{result.totalStars} ⭐
-            </div>
-            {result.milestone && (
-              <div className="mt-2 text-sm font-bold bg-white/20 rounded-full px-4 py-1 inline-block">
-                {result.milestone.badge} {result.milestone.label}
-              </div>
-            )}
-            {result.levelUp && (
-              <div className="mt-2 text-sm font-bold bg-white/30 rounded-full px-4 py-1 inline-block">
-                🎉 Level Up! → {result.level.icon} {result.level.name}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Breakdown */}
-        <div className="p-5 space-y-2">
-          {result.breakdown.map((item, i) => (
-            <div key={i} className="flex items-center justify-between text-sm"
-              style={{ animation: `starFadeInRight 0.3s ease-out ${0.1 + i * 0.08}s both` }}>
-              <span className="text-gray-600 font-medium">{item.label}</span>
-              <span className={`font-bold ${item.amount > 0 ? 'text-amber-600' : 'text-red-400'}`}>
-                {item.amount > 0 ? '+' : ''}{item.amount} ⭐
-              </span>
-            </div>
-          ))}
-
-          <div className="border-t border-gray-100 pt-3 mt-3 flex items-center justify-between">
-            <span className="text-gray-500 text-sm font-medium">Số dư hiện tại</span>
-            <span className="text-lg font-black text-amber-600">{result.newBalance.toLocaleString()} ⭐</span>
-          </div>
-
-          {result.isPerfectDay && (
-            <div className="bg-emerald-50 text-emerald-700 rounded-xl p-3 text-center text-sm font-bold border border-emerald-100 mt-2">
-              🌈 Perfect Day! Hoàn thành tất cả thói quen!
-            </div>
+          {result.breakdown.length > 0 && (
+            <p className="mt-0.5 text-[12px] text-zinc-500">
+              {result.breakdown.map(b => `${b.label} ${b.amount > 0 ? '+' : ''}${b.amount}`).join(' · ')}
+            </p>
           )}
-          {result.isComeback && (
-            <div className="bg-blue-50 text-blue-700 rounded-xl p-3 text-center text-sm font-bold border border-blue-100 mt-2">
-              💪 Welcome Back! Chào mừng bạn quay lại!
-            </div>
-          )}
+          {notes.length > 0 && <p className="mt-1 text-[13px] font-medium text-zinc-800">{notes.join(' · ')}</p>}
+          <button type="button" onClick={onOpenStars} className="mt-1.5 text-[13px] font-medium text-sky-700 hover:underline">
+            Xem phần thưởng
+          </button>
         </div>
-
-        <button onClick={onClose}
-          className="w-full py-3.5 bg-gray-50 text-gray-500 font-bold text-sm hover:bg-gray-100 transition-colors border-t border-gray-100">
-          Tuyệt vời! ✨
-        </button>
+        <IconButton label="Đóng" onClick={onClose} className="-mr-1 -mt-1 h-8 w-8">
+          <X size={16} />
+        </IconButton>
       </div>
-
-      <style>{`
-        @keyframes starSlideUp {
-          from { opacity: 0; transform: translateY(40px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @keyframes starBounceIn {
-          from { opacity: 0; transform: scale(0.3); }
-          50% { transform: scale(1.1); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes starFloat {
-          from { opacity: 0.3; transform: translateY(0); }
-          to { opacity: 0.8; transform: translateY(-8px); }
-        }
-        @keyframes starPulse {
-          from { transform: scale(1); }
-          to { transform: scale(1.15); }
-        }
-        @keyframes starSpin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes starFadeInRight {
-          from { opacity: 0; transform: translateX(-10px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-      `}</style>
     </div>
   );
 };
