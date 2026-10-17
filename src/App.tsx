@@ -2509,9 +2509,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 };
 
 import LandingPage from './components/landing/LandingPage';
-import FeaturesPage from './components/FeaturesPage';
-import PricingPage from './components/PricingPage';
-import ContactPage from './components/ContactPage';
+import FeaturesPage from './components/landing/pages/FeaturesPage';
+import PricingPage from './components/landing/pages/PricingPage';
+import ContactPage from './components/landing/pages/ContactPage';
 
 const AppWrapper: React.FC = () => {
     useTheme();

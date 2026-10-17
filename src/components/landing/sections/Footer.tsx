@@ -6,6 +6,8 @@ import { marquee } from '../data';
 interface FooterProps {
     c: LandingCopy;
     scrollTo: (target: string | number) => void;
+    goTo: (target: string | number) => void;
+    onNavigate: (page: string) => void;
 }
 
 const CORE: MarqueeKey[] = ['google', 'kanban', 'ai', 'career', 'cv', 'finance', 'journal'];
@@ -18,7 +20,7 @@ const contacts = (c: LandingCopy) => [
     { icon: Globe, label: c.footer.profile, value: 'beacons.ai/baquan3q', href: 'https://beacons.ai/baquan3q' }
 ];
 
-export const Footer: React.FC<FooterProps> = ({ c, scrollTo }) => {
+export const Footer: React.FC<FooterProps> = ({ c, scrollTo, goTo, onNavigate }) => {
     const LinkList = ({ title, keys }: { title: string; keys: MarqueeKey[] }) => (
         <div>
             <h4 className="mb-4 text-[13px] font-medium text-zinc-950">{title}</h4>
@@ -29,7 +31,7 @@ export const Footer: React.FC<FooterProps> = ({ c, scrollTo }) => {
                         <li key={key}>
                             <button
                                 type="button"
-                                onClick={() => scrollTo(target)}
+                                onClick={() => goTo(target)}
                                 className="text-left text-sm text-zinc-600 transition-colors duration-200 hover:text-zinc-950"
                             >
                                 {c.marquee[key]}
@@ -87,6 +89,18 @@ export const Footer: React.FC<FooterProps> = ({ c, scrollTo }) => {
 
                 <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-zinc-900/[0.07] pt-8 sm:flex-row sm:items-center">
                     <p className="text-sm text-zinc-500">© 2026 SmartLife · {c.footer.built}</p>
+                    <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 sm:ml-auto sm:mr-6" aria-label="Pages">
+                        {(['features', 'pricing', 'contact'] as const).map((key) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => onNavigate(key)}
+                                className="text-sm text-zinc-600 transition-colors hover:text-zinc-950"
+                            >
+                                {c.nav[key]}
+                            </button>
+                        ))}
+                    </nav>
                     <button
                         type="button"
                         onClick={() => scrollTo(0)}

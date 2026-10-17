@@ -4,33 +4,38 @@ import { Download, Globe } from 'lucide-react';
 import { Lang } from '../../../i18n/i18n';
 import { LandingCopy } from '../i18n';
 import { useScrollSpy } from '../hooks/useScrollSpy';
+import type { Page } from '../SiteShell';
 
 interface HeaderProps {
     c: LandingCopy;
+    page: Page;
     lang: Lang;
     onToggleLang: () => void;
     onInstall: () => void;
     onLogin: () => void;
     onNavigate: (page: string) => void;
     scrollTo: (target: string | number) => void;
+    // Scrolls on the landing page, or opens it and scrolls there from a subpage.
+    goTo: (target: string | number) => void;
 }
 
 const SPY_IDS = ['top', 'dashboard-preview', 'google-ecosystem'];
 
-export const Header: React.FC<HeaderProps> = ({ c, lang, onToggleLang, onInstall, onLogin, onNavigate, scrollTo }) => {
+export const Header: React.FC<HeaderProps> = ({ c, page, lang, onToggleLang, onInstall, onLogin, onNavigate, scrollTo, goTo }) => {
     const { scrollY } = useScroll();
     const [scrolled, setScrolled] = useState(false);
-    const active = useScrollSpy(SPY_IDS);
+    const spy = useScrollSpy(SPY_IDS);
+    const active = page === 'home' ? spy : page;
 
     useMotionValueEvent(scrollY, 'change', (v) => setScrolled(v > 24));
 
     const items: { label: string; spy?: string; onClick: () => void }[] = [
-        { label: c.nav.home, spy: 'top', onClick: () => scrollTo(0) },
-        { label: c.nav.overview, spy: 'dashboard-preview', onClick: () => scrollTo('dashboard-preview') },
-        { label: c.nav.google, spy: 'google-ecosystem', onClick: () => scrollTo('google-ecosystem') },
-        { label: c.nav.features, onClick: () => onNavigate('features') },
-        { label: c.nav.pricing, onClick: () => onNavigate('pricing') },
-        { label: c.nav.contact, onClick: () => onNavigate('contact') }
+        { label: c.nav.home, spy: 'top', onClick: () => goTo(0) },
+        { label: c.nav.overview, spy: 'dashboard-preview', onClick: () => goTo('dashboard-preview') },
+        { label: c.nav.google, spy: 'google-ecosystem', onClick: () => goTo('google-ecosystem') },
+        { label: c.nav.features, spy: 'features', onClick: () => (page === 'features' ? scrollTo(0) : onNavigate('features')) },
+        { label: c.nav.pricing, spy: 'pricing', onClick: () => (page === 'pricing' ? scrollTo(0) : onNavigate('pricing')) },
+        { label: c.nav.contact, spy: 'contact', onClick: () => (page === 'contact' ? scrollTo(0) : onNavigate('contact')) }
     ];
 
     return (
@@ -44,7 +49,7 @@ export const Header: React.FC<HeaderProps> = ({ c, lang, onToggleLang, onInstall
             >
                 <button
                     type="button"
-                    onClick={() => scrollTo(0)}
+                    onClick={() => goTo(0)}
                     className="flex shrink-0 items-center gap-2.5 rounded-full pr-2"
                     aria-label="SmartLife"
                 >

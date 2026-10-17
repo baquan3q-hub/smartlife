@@ -6,12 +6,14 @@ interface MagneticButtonProps {
     className?: string;
     onClick?: () => void;
     strength?: number;
+    type?: 'button' | 'submit';
+    disabled?: boolean;
 }
 
 const spring = { stiffness: 260, damping: 18, mass: 0.5 };
 
 // Button that drifts a few pixels toward the cursor, then springs back.
-export const MagneticButton: React.FC<MagneticButtonProps> = ({ children, className, onClick, strength = 8 }) => {
+export const MagneticButton: React.FC<MagneticButtonProps> = ({ children, className, onClick, strength = 8, type = 'button', disabled }) => {
     const ref = useRef<HTMLButtonElement>(null);
     const reduce = useReducedMotion();
     const x = useSpring(useMotionValue(0), spring);
@@ -35,7 +37,8 @@ export const MagneticButton: React.FC<MagneticButtonProps> = ({ children, classN
     return (
         <motion.button
             ref={ref}
-            type="button"
+            type={type}
+            disabled={disabled}
             onClick={onClick}
             onPointerMove={onPointerMove}
             onPointerLeave={reset}

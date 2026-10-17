@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import Lenis from 'lenis';
 
-const HEADER_OFFSET = 88;
+export const HEADER_OFFSET = 88;
 
 // Inertial smooth scroll scoped to the landing page; skipped when the user prefers reduced motion.
 export const useLenis = () => {
