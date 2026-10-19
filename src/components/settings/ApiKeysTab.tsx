@@ -48,6 +48,41 @@ interface InsightRow {
 
 type KeyStatus = 'active' | 'expired' | 'revoked';
 
+type McpClient = 'claude-code' | 'claude-desktop' | 'claude-web' | 'gemini-cli';
+
+const MCP_CLIENTS: { id: McpClient; label: string }[] = [
+    { id: 'claude-desktop', label: 'Claude Desktop' },
+    { id: 'claude-code', label: 'Claude Code' },
+    { id: 'claude-web', label: 'claude.ai (web)' },
+    { id: 'gemini-cli', label: 'Gemini CLI' },
+];
+
+function mcpSnippet(client: McpClient, baseUrl: string, key: string): string {
+    const url = `${baseUrl}/api/mcp`;
+    switch (client) {
+        case 'claude-code':
+            return `claude mcp add --transport http smartlife ${url} \\\n  --header "Authorization: Bearer ${key}"`;
+        case 'claude-desktop':
+            return JSON.stringify(
+                {
+                    mcpServers: {
+                        smartlife: {
+                            command: 'npx',
+                            args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${AUTH_HEADER}'],
+                            env: { AUTH_HEADER: `Bearer ${key}` },
+                        },
+                    },
+                },
+                null,
+                2
+            );
+        case 'claude-web':
+            return `${url}?key=${key}`;
+        case 'gemini-cli':
+            return JSON.stringify({ mcpServers: { smartlife: { httpUrl: url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2);
+    }
+}
+
 const SCOPES: { id: string; vi: string; en: string; descVi: string; descEn: string }[] = [
     { id: 'read:all', vi: 'Đọc toàn bộ', en: 'Read everything', descVi: 'Context, task, tài chính, nhật ký cố vấn', descEn: 'Context, tasks, finance, insights' },
     { id: 'context:read', vi: 'Đọc context', en: 'Read context', descVi: 'Chỉ endpoint /ai/context', descEn: 'Only /ai/context' },
@@ -175,6 +210,20 @@ const ApiKeysTab: React.FC<{ lang: Lang }> = ({ lang }) => {
     const [confirm, setConfirm] = useState<{ type: 'revoke' | 'delete'; key: ApiKeyRow } | null>(null);
     const [expandedInsight, setExpandedInsight] = useState<string | null>(null);
     const [showGuide, setShowGuide] = useState(false);
+    const [mcpClient, setMcpClient] = useState<McpClient>('claude-desktop');
+
+    const mcpHint: Record<McpClient, string> = {
+        'claude-desktop': L(
+            'Claude Desktop → Settings → Developer → Edit Config, dán vào claude_desktop_config.json rồi khởi động lại Claude. Cần cài Node.js.',
+            'Claude Desktop → Settings → Developer → Edit Config, paste into claude_desktop_config.json and restart Claude. Requires Node.js.'
+        ),
+        'claude-code': L('Chạy lệnh này trong terminal, sau đó gõ /mcp trong Claude Code để kiểm tra.', 'Run this in a terminal, then type /mcp in Claude Code to verify.'),
+        'claude-web': L(
+            'claude.ai → Settings → Connectors → Add custom connector → dán URL này. Key nằm trong URL nên hãy dùng một key riêng, chỉ có quyền "Đọc toàn bộ".',
+            'claude.ai → Settings → Connectors → Add custom connector → paste this URL. The key is part of the URL, so use a dedicated read-only key.'
+        ),
+        'gemini-cli': L('Thêm vào ~/.gemini/settings.json (gộp với mcpServers đã có), rồi gõ /mcp trong Gemini CLI để kiểm tra.', 'Add to ~/.gemini/settings.json (merge with existing mcpServers), then type /mcp in Gemini CLI.'),
+    };
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -291,6 +340,31 @@ const ApiKeysTab: React.FC<{ lang: Lang }> = ({ lang }) => {
         setInsights((prev) => prev.filter((i) => i.id !== id));
         await supabase.from('ai_advisor_logs').delete().eq('id', id);
     };
+
+    const renderMcpBlock = (key: string) => (
+        <div className="space-y-2">
+            <div className="text-xs font-bold text-gray-700">Claude & Gemini (MCP)</div>
+            <div className="flex flex-wrap gap-1.5">
+                {MCP_CLIENTS.map((c) => (
+                    <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setMcpClient(c.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${mcpClient === c.id
+                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300'
+                            : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'}`}
+                    >
+                        {c.label}
+                    </button>
+                ))}
+            </div>
+            <p className="text-[11px] text-gray-500 leading-relaxed">{mcpHint[mcpClient]}</p>
+            <CodeBlock code={mcpSnippet(mcpClient, baseUrl, key)} />
+            {key.endsWith('xxxxxxxx') && (
+                <p className="text-[11px] text-gray-400">{L('Thay sl_live_xxxxxxxx bằng key của bạn.', 'Replace sl_live_xxxxxxxx with your key.')}</p>
+            )}
+        </div>
+    );
 
     const curlSample = (key = 'sl_live_xxxxxxxx') =>
         `curl -s "${baseUrl}/api/v1/ai/context" \\\n  -H "Authorization: Bearer ${key}"`;
@@ -466,6 +540,8 @@ const ApiKeysTab: React.FC<{ lang: Lang }> = ({ lang }) => {
                             <div className="text-xs font-bold text-gray-700 mb-1.5">cURL</div>
                             <CodeBlock code={curlSample()} />
                         </div>
+
+                        {renderMcpBlock('sl_live_xxxxxxxx')}
 
                         <div className="space-y-1.5">
                             <div className="text-xs font-bold text-gray-700">{L('OpenAI Custom GPT / n8n', 'OpenAI Custom GPT / n8n')}</div>
@@ -686,6 +762,8 @@ const ApiKeysTab: React.FC<{ lang: Lang }> = ({ lang }) => {
                             <div className="text-xs font-bold text-gray-700 mb-1.5">{L('Thử ngay', 'Try it')}</div>
                             <CodeBlock code={curlSample(createdKey.key)} />
                         </div>
+
+                        {renderMcpBlock(createdKey.key)}
 
                         <div className="flex items-center gap-2">
                             <button

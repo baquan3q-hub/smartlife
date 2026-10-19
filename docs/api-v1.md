@@ -62,7 +62,25 @@ Giới hạn: 120 request/phút/key, tối đa 10 key đang hoạt động, 200 
 
 Mức ưu tiên: API dùng nhãn giao diện `urgent / focus / chill / temp`, DB lưu `high / medium / low / temp`. API nhận cả hai dạng.
 
-## 5. Triển khai
+## 5. MCP server cho Claude & Gemini — `POST /api/mcp`
+
+`api/mcp.js` là MCP server chạy kiểu Streamable HTTP, stateless, trả về JSON. Nó dùng lại các hàm `api_v1_*`, nên scope và rate limit giống hệt REST API.
+
+Có 9 tool: `get_context`, `list_tasks`, `get_task`, `create_task`, `update_task`, `reorder_tasks`, `get_finance_overview`, `list_insights`, `create_insight`.
+
+| Ứng dụng | Cấu hình |
+|---|---|
+| Claude Code | `claude mcp add --transport http smartlife https://<domain>/api/mcp --header "Authorization: Bearer <key>"` |
+| Claude Desktop | `claude_desktop_config.json` → `npx -y mcp-remote https://<domain>/api/mcp --header Authorization:${AUTH_HEADER}`, với `env.AUTH_HEADER = "Bearer <key>"` (cần Node.js) |
+| claude.ai (web) | Settings → Connectors → Add custom connector → `https://<domain>/api/mcp?key=<key>`. Nên dùng một key riêng, chỉ đọc |
+| Gemini CLI | `~/.gemini/settings.json` → `mcpServers.smartlife = { httpUrl, headers: { Authorization: "Bearer <key>" } }` |
+| Gemini API / AI Studio | Tự khai báo function calling rồi gọi REST `/api/v1/*` |
+
+Ứng dụng Gemini (gemini.google.com, Gems) hiện chưa gọi được API bên ngoài.
+
+Tab **Cài đặt → AI & API** có sẵn đoạn cấu hình để copy cho từng ứng dụng.
+
+## 6. Triển khai
 
 1. Supabase SQL Editor: chạy `sql/api_v1_external_ai.sql`.
 2. Vercel env (đã có sẵn nếu `api/gemini.js` đang chạy): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Có thể thêm `PUBLIC_APP_URL=https://<domain>` để cố định `servers.url` trong openapi.json.
@@ -71,7 +89,7 @@ Mức ưu tiên: API dùng nhãn giao diện `urgent / focus / chill / temp`, DB
 
 `npm run dev` (Vite) không chạy được `/api/v1/*`. Khi chạy local, dùng `vercel dev`.
 
-## 6. Ví dụ
+## 7. Ví dụ
 
 ```bash
 KEY=sl_live_...
