@@ -106,3 +106,13 @@ curl -s -X POST "$BASE/api/v1/ai/insights" -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{"title":"Ăn uống đã dùng 92% ngân sách","severity":"warning","category":"finance","content":"Còn 9 ngày, nên giữ dưới **85.000đ/ngày**."}'
 ```
+
+## 8. Bot Telegram — `api/telegram.js`
+
+Bot cá nhân dùng Gemini (function calling) và chung bộ tool với MCP (`api/_lib/tools.js`). Bot chỉ trả lời `TELEGRAM_ALLOWED_CHAT_ID`.
+
+Biến môi trường trên Vercel: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_ALLOWED_CHAT_ID`, `SMARTLIFE_API_KEY`, cùng `GEMINI_API_KEYS` đã có sẵn.
+
+Cài webhook: mở `https://<domain>/api/telegram?setup=<TELEGRAM_WEBHOOK_SECRET>`.
+
+Lệnh: `/today`, `/finance`, `/overdue`, `/reset`, `/id`. Bot nhớ 10 tin nhắn gần nhất; bộ nhớ này mất khi function khởi động lại.

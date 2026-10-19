@@ -1,4 +1,9 @@
 {
+    "functions": {
+        "api/telegram.js": {
+            "maxDuration": 60
+        }
+    },
     "rewrites": [
         {
             "source": "/api/gemini",
