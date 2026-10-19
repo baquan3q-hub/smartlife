@@ -107,7 +107,21 @@ create index if not exists transactions_user_date_idx on public.transactions (us
 -- Danh sách scope hợp lệ
 create or replace function public._api_allowed_scopes()
 returns text[] language sql immutable set search_path = '' as $$
-    select array['read:all', 'context:read', 'tasks:read', 'tasks:write', 'finance:read', 'insights:read', 'insights:write'];
+    select array['read:all', 'context:read', 'tasks:read', 'tasks:write', 'finance:read', 'finance:write', 'insights:read', 'insights:write'];
+$$;
+
+-- Định dạng tiền kiểu Việt Nam: 1.250.000đ (giúp AI đọc đúng, không phải tự format)
+create or replace function public._api_vnd(p numeric)
+returns text language sql immutable set search_path = '' as $$
+    select case when p is null then null
+                else case when p < 0 then '-' else '' end
+                     || replace(to_char(round(abs(p)), 'FM999,999,999,999,990'), ',', '.') || 'đ' end;
+$$;
+
+-- Giao dịch "Điều chỉnh số dư" không tính vào thu/chi (giống app)
+create or replace function public._api_is_real_tx(p_category text)
+returns boolean language sql immutable set search_path = '' as $$
+    select coalesce(p_category, '') <> 'Điều chỉnh số dư';
 $$;
 
 -- Kiểm tra scope: read:all bao gồm mọi scope *:read; tasks:write bao gồm tasks:read
@@ -117,6 +131,7 @@ returns boolean language sql immutable set search_path = '' as $$
         or p_needed = any(p_scopes)
         or (p_needed like '%:read' and 'read:all' = any(p_scopes))
         or (p_needed = 'tasks:read' and 'tasks:write' = any(p_scopes))
+        or (p_needed = 'finance:read' and 'finance:write' = any(p_scopes))
         or (p_needed = 'insights:read' and 'insights:write' = any(p_scopes));
 $$;
 
@@ -460,7 +475,8 @@ begin
     select coalesce(sum(amount) filter (where type = 'expense'), 0),
            coalesce(sum(amount) filter (where type = 'income'), 0)
     into v_expense, v_income
-    from public.transactions where user_id = uid and date between v_m_start and v_m_end;
+    from public.transactions
+    where user_id = uid and date between v_m_start and v_m_end and public._api_is_real_tx(category);
 
     select sum(amount) into v_budget from public.budgets where user_id = uid and month = v_month;
     select coalesce(sum(balance), 0) into v_balance from public.wallets where user_id = uid and coalesce(include_in_total, true);
@@ -478,17 +494,24 @@ begin
     ) s;
 
     v_finance := jsonb_build_object(
+        -- Câu tóm tắt có sẵn để AI trích dẫn thẳng, tránh tính/đọc nhầm số
+        'summary', format('Tháng %s (đến ngày %s/%s): ĐÃ CHI %s, đã thu %s%s. Tổng số dư các ví: %s. Dự báo nếu giữ nhịp chi hiện tại: khoảng %s cả tháng.',
+            to_char(v_today, 'MM/YYYY'), v_day, v_days_in_month,
+            public._api_vnd(v_expense), public._api_vnd(v_income),
+            case when coalesce(v_budget, 0) > 0
+                 then format(', ngân sách %s (đã dùng %s%%)', public._api_vnd(v_budget), round(v_expense * 100 / v_budget, 1)) else '' end,
+            public._api_vnd(v_balance), public._api_vnd(v_projected)),
         'month', v_month,
         'total_balance', v_balance,
         'wallets', (select coalesce(jsonb_agg(jsonb_build_object('name', w.name, 'type', w.type, 'balance', w.balance) order by w.balance desc), '[]')
                     from public.wallets w where w.user_id = uid),
-        'month_income', v_income,
-        'month_expense', v_expense,
+        'income_so_far_this_month', v_income,
+        'expense_so_far_this_month', v_expense,
         'month_budget', v_budget,
         'budget_used_pct', case when coalesce(v_budget, 0) > 0 then round(v_expense * 100 / v_budget, 1) end,
         'day_of_month', v_day,
         'days_in_month', v_days_in_month,
-        'projected_month_expense', v_projected,
+        'forecast_full_month_expense', v_projected,
         'categories_at_risk', (select coalesce(jsonb_agg(jsonb_build_object('category', b.category, 'budget', b.amount, 'spent', s.spent,
                                                                            'used_pct', round(s.spent * 100 / b.amount, 1)) order by s.spent / b.amount desc), '[]')
             from public.budgets b
@@ -817,10 +840,10 @@ begin
 
     select coalesce(sum(amount) filter (where type = 'income'), 0), coalesce(sum(amount) filter (where type = 'expense'), 0)
     into v_income, v_expense
-    from public.transactions where user_id = uid and date between v_m_start and v_m_end;
+    from public.transactions where user_id = uid and date between v_m_start and v_m_end and public._api_is_real_tx(category);
 
     select coalesce(sum(amount), 0) into v_prev_expense
-    from public.transactions where user_id = uid and type = 'expense' and date >= v_prev_start and date < v_m_start;
+    from public.transactions where user_id = uid and type = 'expense' and date >= v_prev_start and date < v_m_start and public._api_is_real_tx(category);
 
     select sum(amount) into v_budget from public.budgets where user_id = uid and month = v_month;
     select coalesce(sum(balance), 0) into v_balance from public.wallets where user_id = uid and coalesce(include_in_total, true);
@@ -840,6 +863,11 @@ begin
     ) s;
 
     return jsonb_build_object(
+        'summary', format('Tháng %s: ĐÃ CHI %s, đã thu %s, chênh lệch %s%s. Tháng trước chi %s.',
+            to_char(v_m_start, 'MM/YYYY'), public._api_vnd(v_expense), public._api_vnd(v_income), public._api_vnd(v_income - v_expense),
+            case when coalesce(v_budget, 0) > 0
+                 then format(', ngân sách %s (đã dùng %s%%, còn %s)', public._api_vnd(v_budget), round(v_expense * 100 / v_budget, 1), public._api_vnd(v_budget - v_expense)) else '' end,
+            public._api_vnd(v_prev_expense)),
         'month', v_month,
         'currency', (select coalesce(currency, 'VND') from public.profiles where id = uid),
         'totals', jsonb_build_object(
@@ -865,23 +893,23 @@ begin
             from (
                 select coalesce(s.category, b.category) category, coalesce(s.spent, 0) spent, coalesce(s.cnt, 0) cnt, b.amount budget
                 from (select category, sum(amount) spent, count(*) cnt from public.transactions
-                      where user_id = uid and type = 'expense' and date between v_m_start and v_m_end group by category) s
+                      where user_id = uid and type = 'expense' and date between v_m_start and v_m_end and public._api_is_real_tx(category) group by category) s
                 full join (select category, sum(amount) amount from public.budgets where user_id = uid and month = v_month group by category) b
                     on b.category = s.category
             ) c),
         'income_by_category', (
             select coalesce(jsonb_agg(jsonb_build_object('category', category, 'amount', amt) order by amt desc), '[]')
             from (select category, sum(amount) amt from public.transactions
-                  where user_id = uid and type = 'income' and date between v_m_start and v_m_end group by category) i),
+                  where user_id = uid and type = 'income' and date between v_m_start and v_m_end and public._api_is_real_tx(category) group by category) i),
         'top_expenses', (
             select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object('date', t.date, 'amount', t.amount, 'category', t.category, 'description', t.description))
                    order by t.amount desc), '[]')
             from (select * from public.transactions where user_id = uid and type = 'expense'
-                  and date between v_m_start and v_m_end order by amount desc limit 5) t),
+                  and date between v_m_start and v_m_end and public._api_is_real_tx(category) order by amount desc limit 5) t),
         'weekly_expense', (
             select coalesce(jsonb_agg(jsonb_build_object('week_start', w, 'expense', amt) order by w), '[]')
             from (select date_trunc('week', date)::date w, sum(amount) amt from public.transactions
-                  where user_id = uid and type = 'expense' and date between v_m_start and v_m_end group by 1) x),
+                  where user_id = uid and type = 'expense' and date between v_m_start and v_m_end and public._api_is_real_tx(category) group by 1) x),
         'cash_flow', jsonb_build_object(
             'total_balance', v_balance,
             'recurring', v_recurring,
@@ -953,6 +981,219 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------
+-- 5b. GIAO DỊCH (thêm / xem / xóa) — hành vi giống app: cập nhật số dư ví
+-- ---------------------------------------------------------------------
+
+-- GET /api/v1/finance/options — ví + danh mục hay dùng (để AI chọn đúng khi thêm giao dịch)
+create or replace function public.api_v1_finance_options(p_key text)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+    k public.api_keys := public._api_auth(p_key, 'finance:read');
+begin
+    return jsonb_build_object(
+        'wallets', (select coalesce(jsonb_agg(jsonb_build_object('id', w.id, 'name', w.name, 'type', w.type, 'balance', w.balance) order by w.created_at), '[]')
+                    from public.wallets w where w.user_id = k.user_id),
+        'expense_categories', (select coalesce(jsonb_agg(c.category order by c.n desc), '[]') from (
+                select category, count(*) n from public.transactions
+                where user_id = k.user_id and type = 'expense' and public._api_is_real_tx(category) and category is not null
+                  and date > current_date - 365
+                group by category) c),
+        'income_categories', (select coalesce(jsonb_agg(c.category order by c.n desc), '[]') from (
+                select category, count(*) n from public.transactions
+                where user_id = k.user_id and type = 'income' and public._api_is_real_tx(category) and category is not null
+                  and date > current_date - 365
+                group by category) c),
+        'currency', (select coalesce(currency, 'VND') from public.profiles where id = k.user_id));
+end;
+$$;
+
+-- GET /api/v1/finance/transactions — danh sách + TỔNG đã tính sẵn (AI không phải tự cộng)
+create or replace function public.api_v1_list_transactions(
+    p_key text,
+    p_from date default null,
+    p_to date default null,
+    p_type text default null,
+    p_category text default null,
+    p_search text default null,
+    p_limit int default 30,
+    p_tz text default 'Asia/Ho_Chi_Minh'
+)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+    k public.api_keys := public._api_auth(p_key, 'finance:read');
+    v_today date := (now() at time zone public._api_tz(p_tz))::date;
+    v_from date := coalesce(p_from, date_trunc('month', v_today)::date);
+    v_to date := coalesce(p_to, v_today);
+    v_res jsonb;
+begin
+    if p_type is not null and p_type not in ('income', 'expense') then
+        raise exception 'type must be income or expense' using errcode = 'PT400', detail = 'invalid_type';
+    end if;
+    if v_to < v_from then
+        raise exception 'to must be >= from' using errcode = 'PT400', detail = 'invalid_range';
+    end if;
+    p_limit := least(greatest(coalesce(p_limit, 30), 1), 200);
+
+    with f as (
+        select t.*, w.name as wallet_name
+        from public.transactions t
+        left join public.wallets w on w.id = t.wallet_id
+        where t.user_id = k.user_id
+          and t.date between v_from and v_to
+          and (p_type is null or t.type = p_type)
+          and (p_category is null or t.category ilike '%' || p_category || '%')
+          and (p_search is null or t.description ilike '%' || p_search || '%' or t.category ilike '%' || p_search || '%')
+    )
+    select jsonb_build_object(
+        'from', v_from, 'to', v_to,
+        'summary', format('Từ %s đến %s: chi %s, thu %s (%s giao dịch, không tính "Điều chỉnh số dư").',
+            to_char(v_from, 'DD/MM/YYYY'), to_char(v_to, 'DD/MM/YYYY'),
+            public._api_vnd(coalesce(sum(amount) filter (where type = 'expense' and public._api_is_real_tx(category)), 0)),
+            public._api_vnd(coalesce(sum(amount) filter (where type = 'income' and public._api_is_real_tx(category)), 0)),
+            count(*) filter (where public._api_is_real_tx(category))),
+        'total_expense', coalesce(sum(amount) filter (where type = 'expense' and public._api_is_real_tx(category)), 0),
+        'total_income', coalesce(sum(amount) filter (where type = 'income' and public._api_is_real_tx(category)), 0),
+        'count', count(*),
+        'items', (select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+                    'id', x.id, 'date', x.date, 'type', x.type, 'amount', x.amount, 'category', x.category,
+                    'description', nullif(x.description, ''), 'wallet', x.wallet_name,
+                    'is_balance_adjustment', case when not public._api_is_real_tx(x.category) then true end))
+                    order by x.date desc, x.created_at desc), '[]')
+                  from (select * from f order by date desc, created_at desc limit p_limit) x))
+    into v_res
+    from f;
+
+    return v_res;
+end;
+$$;
+
+-- POST /api/v1/finance/transactions
+create or replace function public.api_v1_create_transaction(p_key text, p_tx jsonb, p_tz text default 'Asia/Ho_Chi_Minh')
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+    k public.api_keys := public._api_auth(p_key, 'finance:write');
+    v_type text := lower(coalesce(p_tx->>'type', 'expense'));
+    v_amount numeric;
+    v_category text := btrim(coalesce(p_tx->>'category', ''));
+    v_date date;
+    v_wallet public.wallets;
+    v_wallet_count int;
+    v_tx public.transactions;
+begin
+    if p_tx is null or jsonb_typeof(p_tx) <> 'object' then
+        raise exception 'Body must be a JSON object' using errcode = 'PT400', detail = 'invalid_body';
+    end if;
+    if v_type not in ('income', 'expense') then
+        raise exception 'type must be income or expense' using errcode = 'PT400', detail = 'invalid_type';
+    end if;
+    begin
+        v_amount := (p_tx->>'amount')::numeric;
+    exception when others then
+        v_amount := null;
+    end;
+    if v_amount is null or v_amount <= 0 or v_amount > 100000000000 then
+        raise exception 'amount must be a positive number (VND, no separators), e.g. 45000' using errcode = 'PT400', detail = 'invalid_amount';
+    end if;
+    if char_length(v_category) < 1 or char_length(v_category) > 100 then
+        raise exception 'category is required (use get_finance_options to see existing categories)' using errcode = 'PT400', detail = 'invalid_category';
+    end if;
+    if v_category = 'Điều chỉnh số dư' then
+        raise exception 'Balance adjustments must be done in the app' using errcode = 'PT400', detail = 'invalid_category';
+    end if;
+    v_date := coalesce((p_tx->>'date')::date, (now() at time zone public._api_tz(p_tz))::date);
+    if v_date > (now() at time zone public._api_tz(p_tz))::date + 366 then
+        raise exception 'date is too far in the future' using errcode = 'PT400', detail = 'invalid_date';
+    end if;
+    if (select count(*) from public.transactions where user_id = k.user_id and created_at > now() - interval '1 hour') >= 100 then
+        raise exception 'Too many transactions created in the last hour' using errcode = 'PT429', detail = 'rate_limited';
+    end if;
+
+    -- Chọn ví: theo id, theo tên, hoặc tự chọn nếu người dùng chỉ có 1 ví
+    if coalesce(p_tx->>'wallet_id', '') <> '' then
+        select * into v_wallet from public.wallets where id = (p_tx->>'wallet_id')::uuid and user_id = k.user_id for update;
+        if not found then
+            raise exception 'Wallet not found' using errcode = 'PT400', detail = 'invalid_wallet';
+        end if;
+    elsif coalesce(p_tx->>'wallet', '') <> '' then
+        select * into v_wallet from public.wallets
+        where user_id = k.user_id and lower(name) = lower(btrim(p_tx->>'wallet')) for update;
+        if not found then
+            raise exception 'Wallet "%" not found. Available: %', p_tx->>'wallet',
+                (select string_agg(name, ', ') from public.wallets where user_id = k.user_id)
+                using errcode = 'PT400', detail = 'invalid_wallet';
+        end if;
+    else
+        select count(*) into v_wallet_count from public.wallets where user_id = k.user_id;
+        if v_wallet_count = 1 then
+            select * into v_wallet from public.wallets where user_id = k.user_id for update;
+        elsif v_wallet_count > 1 then
+            raise exception 'User has several wallets, ask which one: %',
+                (select string_agg(name, ', ') from public.wallets where user_id = k.user_id)
+                using errcode = 'PT400', detail = 'wallet_required';
+        end if;
+    end if;
+
+    insert into public.transactions (user_id, amount, type, category, description, date, wallet_id)
+    values (k.user_id, v_amount, v_type, v_category, coalesce(nullif(btrim(p_tx->>'description'), ''), ''), v_date, v_wallet.id)
+    returning * into v_tx;
+
+    if v_wallet.id is not null then
+        update public.wallets
+        set balance = coalesce(balance, 0) + case when v_type = 'income' then v_amount else -v_amount end
+        where id = v_wallet.id
+        returning * into v_wallet;
+    end if;
+
+    return jsonb_build_object(
+        'id', v_tx.id, 'date', v_tx.date, 'type', v_tx.type, 'amount', v_tx.amount,
+        'category', v_tx.category, 'description', v_tx.description,
+        'wallet', v_wallet.name, 'wallet_balance_after', v_wallet.balance,
+        'summary', format('Đã thêm %s %s (%s) ngày %s%s.',
+            case when v_type = 'expense' then 'khoản chi' else 'khoản thu' end,
+            public._api_vnd(v_amount), v_category, to_char(v_tx.date, 'DD/MM/YYYY'),
+            case when v_wallet.id is not null then format(', ví %s còn %s', v_wallet.name, public._api_vnd(v_wallet.balance)) else '' end));
+end;
+$$;
+
+-- DELETE /api/v1/finance/transactions/:id — hoàn tác số dư ví giống app
+create or replace function public.api_v1_delete_transaction(p_key text, p_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+    k public.api_keys := public._api_auth(p_key, 'finance:write');
+    v_tx public.transactions;
+    v_wallet public.wallets;
+begin
+    select * into v_tx from public.transactions where id = p_id and user_id = k.user_id for update;
+    if not found then
+        raise exception 'Transaction not found' using errcode = 'PT404', detail = 'not_found';
+    end if;
+    if v_tx.debt_id is not null then
+        raise exception 'This transaction belongs to a debt record; delete it in the app' using errcode = 'PT409', detail = 'linked_to_debt';
+    end if;
+
+    if v_tx.wallet_id is not null then
+        update public.wallets
+        set balance = coalesce(balance, 0) + case when v_tx.type = 'income' then -v_tx.amount else v_tx.amount end
+        where id = v_tx.wallet_id and user_id = k.user_id
+        returning * into v_wallet;
+    end if;
+
+    delete from public.transactions where id = v_tx.id;
+
+    return jsonb_build_object(
+        'deleted', v_tx.id,
+        'summary', format('Đã xóa %s %s (%s) ngày %s%s.',
+            case when v_tx.type = 'expense' then 'khoản chi' else 'khoản thu' end,
+            public._api_vnd(v_tx.amount), v_tx.category, to_char(v_tx.date, 'DD/MM/YYYY'),
+            case when v_wallet.id is not null then format(', ví %s còn %s', v_wallet.name, public._api_vnd(v_wallet.balance)) else '' end));
+end;
+$$;
+
+-- ---------------------------------------------------------------------
 -- 6. PHÂN QUYỀN EXECUTE
 -- ---------------------------------------------------------------------
 -- Hàm nội bộ: không ai gọi trực tiếp được qua REST
@@ -996,3 +1237,15 @@ grant execute on function public.api_v1_reorder_tasks(text, uuid[], text) to ano
 grant execute on function public.api_v1_finance_overview(text, text, text) to anon, authenticated;
 grant execute on function public.api_v1_create_insight(text, jsonb) to anon, authenticated;
 grant execute on function public.api_v1_list_insights(text, int, text) to anon, authenticated;
+
+-- Bổ sung (giao dịch)
+revoke execute on function public._api_vnd(numeric) from public, anon, authenticated;
+revoke execute on function public._api_is_real_tx(text) from public, anon, authenticated;
+revoke execute on function public.api_v1_finance_options(text) from public;
+revoke execute on function public.api_v1_list_transactions(text, date, date, text, text, text, int, text) from public;
+revoke execute on function public.api_v1_create_transaction(text, jsonb, text) from public;
+revoke execute on function public.api_v1_delete_transaction(text, uuid) from public;
+grant execute on function public.api_v1_finance_options(text) to anon, authenticated;
+grant execute on function public.api_v1_list_transactions(text, date, date, text, text, text, int, text) to anon, authenticated;
+grant execute on function public.api_v1_create_transaction(text, jsonb, text) to anon, authenticated;
+grant execute on function public.api_v1_delete_transaction(text, uuid) to anon, authenticated;

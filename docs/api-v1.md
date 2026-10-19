@@ -40,7 +40,8 @@ Lý do chọn thiết kế này:
 | `context:read` | `GET /ai/context` |
 | `tasks:read` | `GET /tasks`, `GET /tasks/:id` |
 | `tasks:write` | Tạo, sửa, sắp xếp task (bao gồm cả `tasks:read`) |
-| `finance:read` | `GET /finance/overview` |
+| `finance:read` | `GET /finance/overview`, `/finance/options`, `/finance/transactions` |
+| `finance:write` | Thêm / xóa giao dịch, tự cập nhật số dư ví (bao gồm cả `finance:read`) |
 | `insights:write` | `POST /ai/insights` (bao gồm cả `insights:read`) |
 
 Giới hạn: 120 request/phút/key, tối đa 10 key đang hoạt động, 200 task tạo mới/giờ, 200 insight/ngày.
@@ -56,6 +57,10 @@ Giới hạn: 120 request/phút/key, tối đa 10 key đang hoạt động, 200 
 | PATCH | `/api/v1/tasks/:id` | Chỉ các trường gửi lên. `status: "done"` sẽ ghi `completed_at` |
 | POST | `/api/v1/tasks/reorder` | `{ ids: [...], status? }`. Phần tử đầu nằm trên cùng. Task khác trong cùng cột xếp phía sau, giữ thứ tự cũ |
 | GET | `/api/v1/finance/overview?month=YYYY-MM` | Chi theo danh mục kèm `status` (ok/warning/over/no_budget), so với tháng trước, dự báo, `safe_daily_spend`, dòng tiền định kỳ |
+| GET | `/api/v1/finance/options` | Ví (id, tên, số dư) và các danh mục hay dùng |
+| GET | `/api/v1/finance/transactions?from=&to=&type=&category=&q=` | Có sẵn `total_expense`, `total_income`, `summary` |
+| POST | `/api/v1/finance/transactions` | `{ amount, category, type?=expense, description?, date?, wallet? }` — cập nhật số dư ví như app |
+| DELETE | `/api/v1/finance/transactions/:id` | Hoàn lại số dư ví; không xóa được giao dịch gắn với sổ nợ |
 | GET/POST | `/api/v1/ai/insights` | `{ title, content, category?, severity?, data? }` |
 | GET | `/api/v1/me` | Kiểm tra key |
 | GET | `/api/v1/openapi.json` | Công khai, dùng để import vào GPT Actions / n8n |
@@ -66,7 +71,7 @@ Mức ưu tiên: API dùng nhãn giao diện `urgent / focus / chill / temp`, DB
 
 `api/mcp.js` là MCP server chạy kiểu Streamable HTTP, stateless, trả về JSON. Nó dùng lại các hàm `api_v1_*`, nên scope và rate limit giống hệt REST API.
 
-Có 9 tool: `get_context`, `list_tasks`, `get_task`, `create_task`, `update_task`, `reorder_tasks`, `get_finance_overview`, `list_insights`, `create_insight`.
+Có 13 tool: `get_context`, `list_tasks`, `get_task`, `create_task`, `update_task`, `reorder_tasks`, `get_finance_overview`, `list_transactions`, `get_finance_options`, `add_transaction`, `delete_transaction`, `list_insights`, `create_insight`.
 
 | Ứng dụng | Cấu hình |
 |---|---|
@@ -115,4 +120,6 @@ Biến môi trường trên Vercel: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECR
 
 Cài webhook: mở `https://<domain>/api/telegram?setup=<TELEGRAM_WEBHOOK_SECRET>`.
 
-Lệnh: `/today`, `/finance`, `/overdue`, `/reset`, `/id`. Bot nhớ 10 tin nhắn gần nhất; bộ nhớ này mất khi function khởi động lại.
+Lệnh: `/today`, `/finance`, `/overdue`, `/spend 45k ăn trưa`, `/debug` (hiện các tool đã gọi), `/reset`, `/id`. Bot nhớ 10 tin nhắn gần nhất; bộ nhớ này mất khi function khởi động lại.
+
+Thu/chi luôn bỏ qua danh mục "Điều chỉnh số dư" (giống app). Các kết quả tài chính đều có trường `summary` đã định dạng sẵn, để AI trích dẫn thay vì tự tính.

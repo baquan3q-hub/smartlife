@@ -24,6 +24,7 @@ const SMARTLIFE_KEY = process.env.SMARTLIFE_API_KEY;
 const MAX_TOOL_ROUNDS = 6;
 const HISTORY_TURNS = 10;          // số tin nhắn gần nhất được nhớ (mất khi function khởi động lại)
 const history = new Map();         // chatId -> [{ role, parts }]
+const debugChats = new Set();      // chat bật /debug: hiện các tool đã gọi
 const seenUpdates = new Set();     // chống xử lý trùng khi Telegram gửi lại
 
 // ---------------------------------------------------------------------------
@@ -104,10 +105,11 @@ function toGeminiSchema(s) {
     return out;
 }
 
+// Tool không có tham số → bỏ "parameters" (Gemini không nhận OBJECT rỗng)
 const FUNCTION_DECLARATIONS = TOOLS.map((t) => ({
     name: t.name,
     description: t.description,
-    parameters: toGeminiSchema(t.inputSchema),
+    ...(Object.keys(t.inputSchema?.properties || {}).length ? { parameters: toGeminiSchema(t.inputSchema) } : {}),
 }));
 
 function geminiKeys() {
@@ -143,21 +145,26 @@ function systemPrompt() {
         `Bây giờ là ${now} (giờ Việt Nam).`,
         'Bạn đang trò chuyện qua Telegram với chính chủ tài khoản SmartLife.',
         'Trả lời bằng ngôn ngữ người dùng dùng, ngắn gọn, dễ đọc trên điện thoại: câu ngắn, gạch đầu dòng, **in đậm** con số quan trọng. Không dùng bảng.',
-        'Định dạng tiền kiểu 1.250.000đ. Không bịa số liệu: luôn lấy từ tool.',
+        'Định dạng tiền kiểu 1.250.000đ. Không bịa số liệu: luôn gọi tool để lấy số MỚI NHẤT, kể cả khi đã trả lời câu tương tự trước đó.',
+        'Không bao giờ hiển thị phần [Ghi chú nội bộ] cho người dùng.',
         'Trước khi tạo, sửa hoặc sắp xếp lại task, nói rõ bạn sẽ làm gì và chờ người dùng đồng ý (trừ khi họ đã yêu cầu rõ ràng).',
     ].join('\n');
 }
 
+const WRITE_TOOLS = new Set(['add_transaction', 'delete_transaction', 'create_task', 'update_task', 'reorder_tasks', 'create_insight']);
+
 async function runAgent(chatId, userText) {
     const past = history.get(chatId) || [];
     const contents = [...past, { role: 'user', parts: [{ text: userText }] }];
+    const toolsUsed = [];
+    const memo = [];   // id + kết quả các thao tác ghi, lưu vào lịch sử để "hoàn tác" ở tin sau vẫn làm được
 
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
         const data = await callGemini({
             systemInstruction: { parts: [{ text: systemPrompt() }] },
             contents,
             tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
-            generationConfig: { temperature: 0.4 },
+            generationConfig: { temperature: 0.2 },
         });
 
         const content = data?.candidates?.[0]?.content;
@@ -166,9 +173,10 @@ async function runAgent(chatId, userText) {
 
         if (calls.length === 0 || round === MAX_TOOL_ROUNDS) {
             const text = parts.map((p) => p.text || '').join('').trim() || 'Mình chưa có câu trả lời, bạn hỏi lại giúp mình nhé.';
-            const updated = [...past, { role: 'user', parts: [{ text: userText }] }, { role: 'model', parts: [{ text }] }];
+            const remembered = memo.length ? `${text}\n\n[Ghi chú nội bộ, không hiển thị: ${memo.join(' | ')}]` : text;
+            const updated = [...past, { role: 'user', parts: [{ text: userText }] }, { role: 'model', parts: [{ text: remembered }] }];
             history.set(chatId, updated.slice(-HISTORY_TURNS));
-            return text;
+            return { text, toolsUsed };
         }
 
         // Giữ nguyên content của model (gồm cả thought signature) rồi trả kết quả tool
@@ -180,11 +188,18 @@ async function runAgent(chatId, userText) {
             let response;
             try {
                 if (!tool) throw new ApiError(400, 'unknown_tool', `Không có tool ${functionCall.name}`);
-                response = { result: await tool.run(SMARTLIFE_KEY, functionCall.args || {}) };
+                const result = await tool.run(SMARTLIFE_KEY, functionCall.args || {});
+                response = { result };
+                toolsUsed.push(`✅ ${functionCall.name}`);
+                if (WRITE_TOOLS.has(functionCall.name)) {
+                    memo.push(`${functionCall.name} → id=${result?.id ?? result?.deleted ?? '?'}${result?.summary ? ` (${result.summary})` : ''}`);
+                }
             } catch (err) {
                 response = { error: err instanceof ApiError ? `[${err.status} ${err.code}] ${err.message}` : 'Lỗi máy chủ' };
+                toolsUsed.push(`⚠️ ${functionCall.name}: ${response.error}`);
                 if (!(err instanceof ApiError)) console.error('[telegram] tool error', err);
             }
+            console.log('[telegram] tool', functionCall.name, JSON.stringify(functionCall.args || {}), response.error || 'ok');
             return { functionResponse: { name: functionCall.name, response } };
         }));
         contents.push({ role: 'user', parts: responses });
@@ -211,7 +226,9 @@ async function setup(req, res) {
             { command: 'today', description: 'Hôm nay tôi nên làm gì?' },
             { command: 'finance', description: 'Tình hình chi tiêu tháng này' },
             { command: 'overdue', description: 'Task quá hạn' },
+            { command: 'spend', description: 'Ghi nhanh khoản chi, vd /spend 45k ăn trưa' },
             { command: 'reset', description: 'Bắt đầu cuộc trò chuyện mới' },
+            { command: 'debug', description: 'Bật/tắt hiện công cụ bot đã dùng' },
             { command: 'id', description: 'Xem chat id của bạn' },
         ],
     });
@@ -284,6 +301,12 @@ export default async function handler(req, res) {
             await sendReply(chatId, 'Chào bạn 👋 Mình là trợ lý SmartLife. Hỏi mình về **task, lịch, chi tiêu, thói quen** — ví dụ: "Hôm nay tôi nên làm gì trước?" hoặc dùng menu lệnh /today, /finance, /overdue.');
             return res.status(200).end();
         }
+        if (command === '/debug') {
+            const on = !debugChats.has(chatId);
+            if (on) debugChats.add(chatId); else debugChats.delete(chatId);
+            await tg('sendMessage', { chat_id: chatId, text: on ? 'Đã BẬT chế độ debug: mỗi câu trả lời sẽ kèm danh sách công cụ đã dùng.' : 'Đã TẮT chế độ debug.' });
+            return res.status(200).end();
+        }
         if (command === '/reset') {
             history.delete(chatId);
             await tg('sendMessage', { chat_id: chatId, text: 'Đã bắt đầu cuộc trò chuyện mới.' });
@@ -291,8 +314,16 @@ export default async function handler(req, res) {
         }
 
         await tg('sendChatAction', { chat_id: chatId, action: 'typing' });
-        const answer = await runAgent(chatId, SHORTCUTS[command] || text);
-        await sendReply(chatId, answer);
+        let prompt = SHORTCUTS[command] || text;
+        if (command === '/spend') {
+            const rest = text.replace(/^\/spend(@\S+)?\s*/i, '');
+            prompt = rest ? `Ghi khoản chi: ${rest}` : 'Tôi muốn ghi một khoản chi, hãy hỏi tôi số tiền và nội dung.';
+        }
+        const { text: answer, toolsUsed } = await runAgent(chatId, prompt);
+        const debugLine = debugChats.has(chatId)
+            ? `\n\n🔧 ${toolsUsed.length ? toolsUsed.join('\n🔧 ') : '(không gọi công cụ nào)'}`
+            : '';
+        await sendReply(chatId, answer + debugLine);
     } catch (err) {
         console.error('[telegram] error', err);
         await tg('sendMessage', { chat_id: chatId, text: 'Xin lỗi, mình đang gặp lỗi. Bạn thử lại sau ít phút nhé.' });

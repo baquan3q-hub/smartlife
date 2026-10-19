@@ -158,6 +158,60 @@ export function buildOpenApiSpec(baseUrl) {
                     },
                 },
             },
+            '/api/v1/finance/options': {
+                get: {
+                    operationId: 'getFinanceOptions',
+                    summary: 'Ví và danh mục thu/chi hay dùng',
+                    description: 'Gọi trước khi thêm giao dịch để chọn đúng danh mục và ví. Scope: finance:read.',
+                    responses: { 200: { description: 'Ví & danh mục', content: json({ type: 'object', additionalProperties: true }) }, ...commonErrors },
+                },
+            },
+            '/api/v1/finance/transactions': {
+                get: {
+                    operationId: 'listTransactions',
+                    summary: 'Danh sách giao dịch kèm tổng đã tính sẵn',
+                    description: 'Mặc định từ đầu tháng đến hôm nay. Dùng total_expense / total_income / summary, không tự cộng. Không tính "Điều chỉnh số dư". Scope: finance:read.',
+                    parameters: [
+                        { name: 'from', in: 'query', schema: { type: 'string', format: 'date' } },
+                        { name: 'to', in: 'query', schema: { type: 'string', format: 'date' } },
+                        { name: 'type', in: 'query', schema: { type: 'string', enum: ['income', 'expense'] } },
+                        { name: 'category', in: 'query', schema: { type: 'string' } },
+                        { name: 'q', in: 'query', schema: { type: 'string' } },
+                        { name: 'limit', in: 'query', schema: { type: 'integer', default: 30, minimum: 1, maximum: 200 } },
+                    ],
+                    responses: { 200: { description: 'Giao dịch', content: json({ type: 'object', additionalProperties: true }) }, ...commonErrors },
+                },
+                post: {
+                    operationId: 'addTransaction',
+                    summary: 'Thêm khoản chi / thu (tự cập nhật số dư ví)',
+                    description: 'amount là số VND nguyên ("45k" → 45000). Nếu người dùng có nhiều ví, truyền wallet. Scope: finance:write.',
+                    requestBody: {
+                        required: true,
+                        content: json({
+                            type: 'object',
+                            required: ['amount', 'category'],
+                            properties: {
+                                type: { type: 'string', enum: ['expense', 'income'], default: 'expense' },
+                                amount: { type: 'number' },
+                                category: { type: 'string' },
+                                description: { type: 'string' },
+                                date: { type: 'string', format: 'date' },
+                                wallet: { type: 'string', description: 'Tên ví' },
+                            },
+                        }),
+                    },
+                    responses: { 201: { description: 'Đã thêm', content: json({ type: 'object', additionalProperties: true }) }, ...commonErrors },
+                },
+            },
+            '/api/v1/finance/transactions/{id}': {
+                delete: {
+                    operationId: 'deleteTransaction',
+                    summary: 'Xóa giao dịch (hoàn lại số dư ví)',
+                    description: 'Xác nhận với người dùng trước khi xóa. Scope: finance:write.',
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+                    responses: { 200: { description: 'Đã xóa', content: json({ type: 'object', additionalProperties: true }) }, 404: errorResponse('Không tìm thấy'), ...commonErrors },
+                },
+            },
             '/api/v1/ai/insights': {
                 get: {
                     operationId: 'listInsights',
