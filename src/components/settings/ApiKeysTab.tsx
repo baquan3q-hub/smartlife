@@ -89,6 +89,7 @@ const SCOPES: { id: string; vi: string; en: string; descVi: string; descEn: stri
     { id: 'tasks:read', vi: 'Đọc task', en: 'Read tasks', descVi: 'Xem danh sách & chi tiết task', descEn: 'List and view tasks' },
     { id: 'tasks:write', vi: 'Ghi task', en: 'Write tasks', descVi: 'Tạo, sửa, sắp xếp lại Kanban', descEn: 'Create, edit, reorder Kanban' },
     { id: 'finance:read', vi: 'Đọc tài chính', en: 'Read finance', descVi: 'Chi tiêu, ngân sách, dòng tiền', descEn: 'Spending, budgets, cash flow' },
+    { id: 'finance:write', vi: 'Ghi giao dịch', en: 'Write transactions', descVi: 'Thêm / xóa giao dịch thu chi, cập nhật số dư ví', descEn: 'Add / delete transactions, update wallet balances' },
     { id: 'insights:write', vi: 'Ghi lời khuyên', en: 'Write insights', descVi: 'Lưu phân tích vào nhật ký cố vấn', descEn: 'Save analyses to the advisor log' },
 ];
 
@@ -264,7 +265,7 @@ const ApiKeysTab: React.FC<{ lang: Lang }> = ({ lang }) => {
         setFormScopes((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
 
     const applyPreset = (preset: 'readonly' | 'full') =>
-        setFormScopes(preset === 'readonly' ? ['read:all'] : ['read:all', 'tasks:write', 'insights:write']);
+        setFormScopes(preset === 'readonly' ? ['read:all'] : ['read:all', 'tasks:write', 'finance:write', 'insights:write']);
 
     const handleCreate = async () => {
         if (!formName.trim()) {

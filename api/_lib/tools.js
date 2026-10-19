@@ -10,7 +10,11 @@ export const INSTRUCTIONS =
     'SmartLife là trợ lý cá nhân của người dùng (task Kanban, lịch, tài chính, thói quen). ' +
     'Luôn gọi get_context trước để nắm toàn cảnh. Ưu tiên task: urgent > focus > chill > temp. ' +
     'Cột Kanban: backlog, todo, doing, done. Tiền tệ theo user.currency (thường là VND). ' +
-    'Hỏi người dùng trước khi sắp xếp lại hoặc sửa nhiều task. Ghi kết luận quan trọng bằng create_insight.';
+    'Hỏi người dùng trước khi sắp xếp lại hoặc sửa nhiều task. Ghi kết luận quan trọng bằng create_insight. ' +
+    'QUY TẮC SỐ LIỆU: mọi con số phải lấy từ kết quả tool trong lượt hiện tại, không dùng lại số từ tin nhắn cũ, không tự cộng/ước lượng. ' +
+    'Ưu tiên trích trường "summary" và các tổng đã tính sẵn (expense_so_far_this_month, total_expense...). ' +
+    '"forecast_full_month_expense" chỉ là DỰ BÁO, không phải số đã chi. ' +
+    'Hỏi về chi tiêu theo khoảng ngày / danh mục → dùng list_transactions. Ghi chi tiêu / thu nhập → add_transaction (không cần hỏi lại nếu đủ số tiền và rõ danh mục).';
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -147,6 +151,70 @@ export const TOOLS = [
         },
         annotations: READ,
         run: (key, a) => callRpc('api_v1_finance_overview', { p_key: key, p_month: a.month ?? null, p_tz: a.tz || 'Asia/Ho_Chi_Minh' }),
+    },
+    {
+        name: 'list_transactions',
+        title: 'Danh sách giao dịch',
+        description:
+            'Liệt kê giao dịch thu/chi trong khoảng ngày (mặc định từ đầu tháng đến hôm nay), lọc theo loại, danh mục, từ khóa. Kết quả có sẵn total_expense / total_income và summary đã tính đúng — dùng các số này, KHÔNG tự cộng. Dùng cho câu hỏi kiểu "tuần này tiêu ăn uống bao nhiêu", "hôm qua chi gì".',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                from: { type: 'string', format: 'date', description: 'YYYY-MM-DD' },
+                to: { type: 'string', format: 'date', description: 'YYYY-MM-DD (bao gồm ngày này)' },
+                type: { type: 'string', enum: ['income', 'expense'] },
+                category: { type: 'string', description: 'Một phần tên danh mục, vd "Ăn uống"' },
+                q: { type: 'string', description: 'Tìm trong mô tả / danh mục' },
+                limit: { type: 'integer', minimum: 1, maximum: 200, default: 30 },
+            },
+        },
+        annotations: READ,
+        run: (key, a) =>
+            callRpc('api_v1_list_transactions', {
+                p_key: key,
+                p_from: a.from ?? null,
+                p_to: a.to ?? null,
+                p_type: a.type ?? null,
+                p_category: a.category ?? null,
+                p_search: a.q ?? null,
+                p_limit: a.limit ?? 30,
+            }),
+    },
+    {
+        name: 'get_finance_options',
+        title: 'Ví & danh mục',
+        description: 'Danh sách ví (id, tên, số dư) và các danh mục thu/chi người dùng hay dùng. Gọi trước khi thêm giao dịch để chọn đúng danh mục và ví.',
+        inputSchema: { type: 'object', properties: {} },
+        annotations: READ,
+        run: (key) => callRpc('api_v1_finance_options', { p_key: key }),
+    },
+    {
+        name: 'add_transaction',
+        title: 'Thêm giao dịch',
+        description:
+            'Ghi một khoản chi hoặc thu và tự cập nhật số dư ví (giống app). amount là số VND nguyên, vd "45k" → 45000, "1tr2" → 1200000. Chọn category trùng với danh mục đã có (get_finance_options). Nếu người dùng có nhiều ví mà không nói ví nào, hỏi lại. Sau khi thêm, báo lại theo summary.',
+        inputSchema: {
+            type: 'object',
+            required: ['amount', 'category'],
+            properties: {
+                type: { type: 'string', enum: ['expense', 'income'], default: 'expense' },
+                amount: { type: 'number', description: 'Số tiền VND, số dương' },
+                category: { type: 'string' },
+                description: { type: 'string', description: 'Ghi chú ngắn, vd "Phở bò trưa"' },
+                date: { type: 'string', format: 'date', description: 'YYYY-MM-DD, mặc định hôm nay' },
+                wallet: { type: 'string', description: 'Tên ví (nếu có nhiều ví)' },
+            },
+        },
+        annotations: WRITE,
+        run: (key, a) => callRpc('api_v1_create_transaction', { p_key: key, p_tx: a }),
+    },
+    {
+        name: 'delete_transaction',
+        title: 'Xóa giao dịch',
+        description: 'Xóa một giao dịch (vd khi người dùng nói "hoàn tác" / "nhập nhầm") và hoàn lại số dư ví. Cần id lấy từ add_transaction hoặc list_transactions. Xác nhận với người dùng trước khi xóa, trừ khi họ vừa yêu cầu hoàn tác.',
+        inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        run: (key, a) => callRpc('api_v1_delete_transaction', { p_key: key, p_id: uuid(a.id) }),
     },
     {
         name: 'list_insights',

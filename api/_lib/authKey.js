@@ -111,7 +111,7 @@ export function qList(req, name) {
 
 function setCommonHeaders(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, X-API-Key, Content-Type');
     res.setHeader('Access-Control-Max-Age', '86400');
     res.setHeader('Cache-Control', 'no-store');

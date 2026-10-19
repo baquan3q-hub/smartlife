@@ -30,6 +30,18 @@
             "destination": "/api/v1/finance"
         },
         {
+            "source": "/api/v1/finance/options",
+            "destination": "/api/v1/finance?action=options"
+        },
+        {
+            "source": "/api/v1/finance/transactions/:id",
+            "destination": "/api/v1/finance?action=transactions&id=:id"
+        },
+        {
+            "source": "/api/v1/finance/transactions",
+            "destination": "/api/v1/finance?action=transactions"
+        },
+        {
             "source": "/api/v1/openapi.json",
             "destination": "/api/v1/openapi"
         },
