@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Save, Loader2, Bell, Calendar, Clock, Target, Moon, Zap, Sparkles, LogOut, Smartphone, Lock, Camera, QrCode, CreditCard, Contact, Trash2, Music, Flame, Plus, Eye, Sun, Monitor } from 'lucide-react';
+import { X, User, Save, Loader2, Bell, Calendar, Clock, Target, Moon, Zap, Sparkles, LogOut, Smartphone, Lock, Camera, QrCode, CreditCard, Contact, Trash2, Music, Flame, Plus, Eye, Sun, Monitor, KeyRound } from 'lucide-react';
+import ApiKeysTab from './settings/ApiKeysTab';
 import { supabase } from '../services/supabase';
 import { Profile } from '../types';
 import { Lang, t } from '../i18n/i18n';
@@ -66,7 +67,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     headerShortcuts,
     onUpdateHeaderShortcuts
 }) => {
-    const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'navigation'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'navigation' | 'developer'>('profile');
     const [profile, setProfile] = useState<Profile | null>(null);
     const [notiSettings, setNotiSettings] = useState(DEFAULT_NOTI_SETTINGS);
     const [tempHeaderShortcuts, setTempHeaderShortcuts] = useState<{ spotify: boolean; habit: boolean }>({ spotify: true, habit: true });
@@ -374,6 +375,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     >
                         <Smartphone size={16} />
                         {activeTab === 'navigation' && <span className="animate-in fade-in zoom-in-95 duration-200 truncate">{t('settings.navbar', lang)}</span>}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('developer')}
+                        className={`py-2.5 rounded-xl text-xs md:text-sm font-extrabold flex items-center justify-center gap-2 transition-all duration-300 shrink-0
+                            ${activeTab === 'developer'
+                                ? 'flex-[1.5] bg-white text-violet-600 shadow-sm px-4'
+                                : 'flex-1 text-gray-400 hover:text-gray-600 hover:bg-white/40 px-2'}`}
+                    >
+                        <KeyRound size={16} />
+                        {activeTab === 'developer' && <span className="animate-in fade-in zoom-in-95 duration-200 truncate">AI & API</span>}
                     </button>
                 </div>
 
@@ -1074,6 +1086,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             </div>
                         </div>
                     )}
+
+                    {/* DEVELOPER TAB — API keys cho AI bên ngoài */}
+                    {activeTab === 'developer' && <ApiKeysTab lang={lang} />}
                 </div>
 
                 {/* Footer */}

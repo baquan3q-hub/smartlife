@@ -13,6 +13,34 @@
             "destination": "/api/cron-check-emails.js"
         },
         {
+            "source": "/api/v1/ai/context",
+            "destination": "/api/v1/context"
+        },
+        {
+            "source": "/api/v1/ai/insights",
+            "destination": "/api/v1/insights"
+        },
+        {
+            "source": "/api/v1/finance/overview",
+            "destination": "/api/v1/finance"
+        },
+        {
+            "source": "/api/v1/openapi.json",
+            "destination": "/api/v1/openapi"
+        },
+        {
+            "source": "/api/v1/tasks/reorder",
+            "destination": "/api/v1/tasks?action=reorder"
+        },
+        {
+            "source": "/api/v1/tasks/:id",
+            "destination": "/api/v1/tasks?id=:id"
+        },
+        {
+            "source": "/api/v1/(.*)",
+            "destination": "/api/v1/not-found"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }
