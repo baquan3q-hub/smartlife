@@ -120,17 +120,22 @@ Biến môi trường trên Vercel: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECR
 
 Cài webhook: mở `https://<domain>/api/telegram?setup=<TELEGRAM_WEBHOOK_SECRET>`.
 
-Lệnh: `/today`, `/finance`, `/overdue`, `/spend 45k ăn trưa`, `/debug` (hiện các tool đã gọi), `/reset`, `/id`. Bot nhớ 10 tin nhắn gần nhất; bộ nhớ này mất khi function khởi động lại.
+Tính năng:
+- **Nhận diện giọng nói (Voice Multimodal)**: Giữ mic nói giao dịch chi tiêu (vd: *"Trưa nay ăn bún chả 45 ngàn"*), Gemini nhận diện số tiền & phân loại danh mục, gửi lại thẻ giao diện hiện đại kèm 2 nút bấm tương tác: **✨ Xác nhận ghi sổ** hoặc **❌ Hủy bỏ**.
+- **Hỏi đáp qua Voice**: Nếu gửi voice câu hỏi thông thường (vd: *"Hôm nay tôi có bao nhiêu tiền?"*), bot tự động chuyển text và trả lời ngay.
+- Lệnh: `/today`, `/finance`, `/overdue`, `/spend 45k ăn trưa`, `/debug` (hiện các tool đã gọi), `/reset`, `/id`. Bot nhớ 10 tin nhắn gần nhất.
 
 ## 9. Tự động thông báo & Nhắc việc qua Telegram — `api/cron-telegram.js`
 
 Endpoint tự động hóa gửi thông báo lịch trình, task và tổng kết ngày qua Telegram bot:
 - **8h00 Sáng**: Gửi Morning Briefing (lịch học/sự kiện hôm nay, task ưu tiên, task quá hạn, số dư ví, tiến độ thói quen).
+- **14h00 Chiều**: Gửi Afternoon Check-in (nhắc nhở các task đến hạn & sắp đến hạn trong 48h, task quá hạn, lịch học/sự kiện buổi chiều, gợi ý mục tiêu cho ca chiều).
 - **22h00 Tối**: Gửi Evening Review (tiến độ task đã xong, nhắc nhở ghi chép chi tiêu bằng `/spend`).
 - **Cảnh báo hạn chót**: Tự động lọc các task sắp đến hạn trong 48h và task quá hạn.
 
 Kích hoạt hoặc test thủ công:
 - Test tin nhắn sáng: `https://<domain>/api/cron-telegram?key=smartlife2026&type=morning`
+- Test tin nhắn chiều (14h): `https://<domain>/api/cron-telegram?key=smartlife2026&type=afternoon`
 - Test tin nhắn tối: `https://<domain>/api/cron-telegram?key=smartlife2026&type=evening`
 - Tự động: Vercel Cron chạy theo cấu hình trong `vercel.json` hoặc thiết lập qua dịch vụ cron định kỳ.
 

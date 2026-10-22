@@ -2,6 +2,7 @@
 // Một function cho nhóm /finance (vercel.json rewrite gắn ?action= / ?id=):
 //   GET    /api/v1/finance/overview?month=YYYY-MM&tz=   → tổng quan tháng
 //   GET    /api/v1/finance/options                      → ví + danh mục hay dùng
+//   GET    /api/v1/finance/balance?days=30              → số dư khả dụng + ví + điều chỉnh N ngày
 //   GET    /api/v1/finance/transactions?from=&to=&type=&category=&q=&limit=
 //   POST   /api/v1/finance/transactions                 → thêm giao dịch (cập nhật số dư ví)
 //   DELETE /api/v1/finance/transactions/:id             → xóa, hoàn lại số dư ví
@@ -15,6 +16,17 @@ export default apiHandler({
         const action = q(req, 'action') || 'overview';
         if (action === 'options') {
             return callRpc('api_v1_finance_options', { p_key: key });
+        }
+        if (action === 'balance') {
+            const days = q(req, 'days');
+            if (days !== undefined && !Number.isInteger(Number(days))) {
+                throw new ApiError(400, 'invalid_input', 'days phải là số nguyên.');
+            }
+            return callRpc('api_v1_balance', {
+                p_key: key,
+                p_days: days === undefined ? 30 : Number(days),
+                p_tz: q(req, 'tz') || 'Asia/Ho_Chi_Minh',
+            });
         }
         if (action === 'transactions') {
             const limit = q(req, 'limit');

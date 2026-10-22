@@ -14,7 +14,11 @@ export const INSTRUCTIONS =
     'QUY TẮC SỐ LIỆU: mọi con số phải lấy từ kết quả tool trong lượt hiện tại, không dùng lại số từ tin nhắn cũ, không tự cộng/ước lượng. ' +
     'Ưu tiên trích trường "summary" và các tổng đã tính sẵn (expense_so_far_this_month, total_expense...). ' +
     '"forecast_full_month_expense" chỉ là DỰ BÁO, không phải số đã chi. ' +
-    'Hỏi về chi tiêu theo khoảng ngày / danh mục → dùng list_transactions. Ghi chi tiêu / thu nhập → add_transaction (không cần hỏi lại nếu đủ số tiền và rõ danh mục).';
+    'Hỏi về chi tiêu theo khoảng ngày / danh mục → dùng list_transactions. Ghi chi tiêu / thu nhập → add_transaction (không cần hỏi lại nếu đủ số tiền và rõ danh mục). ' +
+    'QUY TẮC SỐ DƯ: có 2 con số khác nhau, KHÔNG được lẫn. ' +
+    '(1) "Số dư khả dụng" = current_balance — đây là tổng tiền hiện tại, khớp màn hình Tài chính của app; dùng khi hỏi "còn bao nhiêu tiền", "số dư", "tổng tiền". ' +
+    '(2) Tiền trong từng ví (wallets[].balance, wallets_total) — chỉ dùng khi người dùng hỏi riêng về một ví (vd "tiền mặt trong ví Cash"). Số ví có thể lệch số dư khả dụng vì nhiều giao dịch và các lần điều chỉnh không gắn ví; khi nêu số ví thì nói rõ đó là số riêng của ví. ' +
+    'Hỏi về số dư, biến động hay điều chỉnh số dư gần đây → gọi get_balance (mặc định 30 ngày) và kể các lần điều chỉnh trong balance_adjustments kèm ngày.';
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -29,7 +33,7 @@ export const TOOLS = [
         name: 'get_context',
         title: 'Bức tranh toàn cảnh',
         description:
-            'Tổng hợp hồ sơ, mục tiêu, số task theo cột, task quá hạn / sắp đến hạn / ưu tiên cao, lịch hôm nay, số dư ví, chi tiêu tháng so với ngân sách, hóa đơn định kỳ 7 ngày tới, rủi ro tài chính, streak thói quen, thời gian tập trung. Gọi đầu tiên.',
+            'Tổng hợp hồ sơ, mục tiêu, số task theo cột, task quá hạn / sắp đến hạn / ưu tiên cao, lịch hôm nay, số dư khả dụng + tiền từng ví + điều chỉnh số dư 30 ngày (finance.balance), chi tiêu tháng so với ngân sách, hóa đơn định kỳ 7 ngày tới, rủi ro tài chính, streak thói quen, thời gian tập trung. Gọi đầu tiên.',
         inputSchema: { type: 'object', properties: { tz: { type: 'string', description: 'IANA timezone, mặc định Asia/Ho_Chi_Minh' } } },
         annotations: READ,
         run: (key, a) => callRpc('api_v1_context', { p_key: key, p_tz: a.tz || 'Asia/Ho_Chi_Minh' }),
@@ -151,6 +155,18 @@ export const TOOLS = [
         },
         annotations: READ,
         run: (key, a) => callRpc('api_v1_finance_overview', { p_key: key, p_month: a.month ?? null, p_tz: a.tz || 'Asia/Ho_Chi_Minh' }),
+    },
+    {
+        name: 'get_balance',
+        title: 'Số dư & biến động gần đây',
+        description:
+            'Số dư khả dụng hiện tại (current_balance, khớp app) — đây là số trả lời cho "tôi còn bao nhiêu tiền". Kèm tiền riêng từng ví, và N ngày gần nhất (mặc định 30): số dư đầu kỳ, thay đổi, tổng thu/chi, các lần "Điều chỉnh số dư" (balance_adjustments) và các giao dịch vừa nhập (latest_entries). Trích trường "summary".',
+        inputSchema: {
+            type: 'object',
+            properties: { days: { type: 'integer', minimum: 1, maximum: 365, default: 30, description: 'Số ngày gần nhất cần xem' } },
+        },
+        annotations: READ,
+        run: (key, a) => callRpc('api_v1_balance', { p_key: key, p_days: a.days ?? 30, p_tz: 'Asia/Ho_Chi_Minh' }),
     },
     {
         name: 'list_transactions',
