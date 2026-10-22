@@ -13,6 +13,10 @@
             "schedule": "0 1 * * *"
         },
         {
+            "path": "/api/cron-telegram?type=afternoon",
+            "schedule": "0 7 * * *"
+        },
+        {
             "path": "/api/cron-telegram?type=evening",
             "schedule": "0 15 * * *"
         }

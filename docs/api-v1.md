@@ -126,11 +126,13 @@ Lệnh: `/today`, `/finance`, `/overdue`, `/spend 45k ăn trưa`, `/debug` (hi�
 
 Endpoint tự động hóa gửi thông báo lịch trình, task và tổng kết ngày qua Telegram bot:
 - **8h00 Sáng**: Gửi Morning Briefing (lịch học/sự kiện hôm nay, task ưu tiên, task quá hạn, số dư ví, tiến độ thói quen).
+- **14h00 Chiều**: Gửi Afternoon Check-in (nhắc nhở các task đến hạn & sắp đến hạn trong 48h, task quá hạn, lịch học/sự kiện buổi chiều, gợi ý mục tiêu cho ca chiều).
 - **22h00 Tối**: Gửi Evening Review (tiến độ task đã xong, nhắc nhở ghi chép chi tiêu bằng `/spend`).
 - **Cảnh báo hạn chót**: Tự động lọc các task sắp đến hạn trong 48h và task quá hạn.
 
 Kích hoạt hoặc test thủ công:
 - Test tin nhắn sáng: `https://<domain>/api/cron-telegram?key=smartlife2026&type=morning`
+- Test tin nhắn chiều (14h): `https://<domain>/api/cron-telegram?key=smartlife2026&type=afternoon`
 - Test tin nhắn tối: `https://<domain>/api/cron-telegram?key=smartlife2026&type=evening`
 - Tự động: Vercel Cron chạy theo cấu hình trong `vercel.json` hoặc thiết lập qua dịch vụ cron định kỳ.
 

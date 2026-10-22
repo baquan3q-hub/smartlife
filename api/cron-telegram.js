@@ -5,6 +5,7 @@
 // 1. Tự động qua Vercel Cron (cấu hình trong vercel.json)
 // 2. Hoặc gọi thủ công để test / dùng cron-job.org:
 //    GET https://<domain>/api/cron-telegram?key=smartlife2026&type=morning
+//    GET https://<domain>/api/cron-telegram?key=smartlife2026&type=afternoon
 //    GET https://<domain>/api/cron-telegram?key=smartlife2026&type=evening
 //    GET https://<domain>/api/cron-telegram?key=smartlife2026&type=alert
 
@@ -116,6 +117,78 @@ function buildMorningMessage(context) {
     }
 
     lines.push('\n<i>Chúc bạn một ngày làm việc và học tập hiệu quả! 🚀</i>');
+    return lines.join('\n');
+}
+
+function buildAfternoonMessage(context) {
+    const user = context?.user || {};
+    const tasks = context?.tasks || {};
+    const dueSoon = tasks.due_next_48h || [];
+    const overdue = tasks.overdue || [];
+    const topTasks = tasks.top_priority || [];
+    const timetable = tasks.today_timetable || [];
+    const events = tasks.today_events || [];
+
+    const name = escapeHtml(user.name || 'bạn');
+    const lines = [
+        `☀️ <b>Chào buổi chiều, ${name}!</b>`,
+        '<i>Khởi động lại năng lượng cho ca chiều làm việc hiệu quả nhé.</i>\n',
+    ];
+
+    // 1. Task đến hạn hoặc sắp đến hạn trong 48h
+    lines.push('⏰ <b>Task đến hạn & Sắp đến hạn:</b>');
+    if (dueSoon.length === 0 && overdue.length === 0) {
+        lines.push('• <i>Không có task nào sắp đến hạn hôm nay. Tiến độ rất an toàn! 🎉</i>');
+    } else {
+        if (dueSoon.length > 0) {
+            dueSoon.slice(0, 4).forEach((t) => {
+                const deadlineStr = t.deadline
+                    ? new Date(t.deadline).toLocaleString('vi-VN', {
+                          timeZone: 'Asia/Ho_Chi_Minh',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          day: '2-digit',
+                          month: '2-digit',
+                      })
+                    : 'Hôm nay';
+                const priorityBadge = t.priority === 'urgent' ? '🔴' : '🟡';
+                lines.push(`• ${priorityBadge} <b>${escapeHtml(t.title)}</b> (Hạn: ${deadlineStr})`);
+            });
+        }
+        if (overdue.length > 0) {
+            lines.push(`• ⚠️ <i>Bạn còn <b>${overdue.length} task quá hạn</b> chưa xử lý (xem /overdue).</i>`);
+        }
+    }
+    lines.push('');
+
+    // 2. Lịch trình chiều & tối (từ 12:00 trở đi)
+    const afternoonTimetable = timetable.filter((item) => (item.start_time || '') >= '12:00');
+    const afternoonEvents = events.filter((item) => (item.time || '') >= '12:00');
+
+    if (afternoonTimetable.length > 0 || afternoonEvents.length > 0) {
+        lines.push('📅 <b>Lịch trình chiều & tối:</b>');
+        afternoonTimetable.forEach((item) => {
+            const time = item.start_time ? item.start_time.slice(0, 5) : '';
+            lines.push(`• 🏫 <b>${time}</b>: ${escapeHtml(item.subject || item.title || 'Lịch học')} ${item.room ? `(Phòng ${escapeHtml(item.room)})` : ''}`);
+        });
+        afternoonEvents.forEach((item) => {
+            const time = item.time ? item.time.slice(0, 5) : '';
+            lines.push(`• 📌 <b>${time}</b>: ${escapeHtml(item.title || 'Sự kiện')}`);
+        });
+        lines.push('');
+    }
+
+    // 3. Task ưu tiên gợi ý làm trong chiều nay
+    const pendingPriority = topTasks.filter((t) => t.status !== 'done').slice(0, 3);
+    if (pendingPriority.length > 0) {
+        lines.push('🎯 <b>Mục tiêu gợi ý cho ca chiều:</b>');
+        pendingPriority.forEach((t) => {
+            lines.push(`• 📌 ${escapeHtml(t.title)}`);
+        });
+        lines.push('');
+    }
+
+    lines.push('💧 <i>Nhớ uống thêm nước và giữ tư thế ngồi thẳng lưng nhé! 🚀</i>');
     return lines.join('\n');
 }
 
@@ -255,6 +328,8 @@ export default async function handler(req, res) {
 
         if (hour >= 6 && hour <= 9) {
             type = 'morning';
+        } else if (hour >= 13 && hour <= 15) {
+            type = 'afternoon';
         } else if (hour >= 21 && hour <= 23) {
             type = 'evening';
         } else {
@@ -266,6 +341,8 @@ export default async function handler(req, res) {
     let messageText = null;
     if (type === 'morning') {
         messageText = buildMorningMessage(context);
+    } else if (type === 'afternoon') {
+        messageText = buildAfternoonMessage(context);
     } else if (type === 'evening') {
         messageText = buildEveningMessage(context);
     } else {
