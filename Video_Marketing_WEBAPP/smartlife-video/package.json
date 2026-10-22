@@ -1,0 +1,25 @@
+{
+  "name": "smartlife-video",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio",
+    "sfx": "node scripts/gen-sfx.mjs",
+    "beats": "node scripts/analyze-beats.mjs",
+    "render": "remotion render SmartLifeLaunch ../output/SmartLife_Launch_1080p.mp4 --codec=h264 --crf=16 --pixel-format=yuv420p --audio-bitrate=320k"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.536",
+    "@remotion/google-fonts": "4.0.536",
+    "@remotion/media-utils": "4.0.536",
+    "@remotion/transitions": "4.0.536",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.536"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "typescript": "5.8.3"
+  }
+}

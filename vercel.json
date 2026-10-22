@@ -2,9 +2,30 @@
     "functions": {
         "api/telegram.js": {
             "maxDuration": 60
+        },
+        "api/cron-telegram.js": {
+            "maxDuration": 60
         }
     },
+    "crons": [
+        {
+            "path": "/api/cron-telegram?type=morning",
+            "schedule": "0 1 * * *"
+        },
+        {
+            "path": "/api/cron-telegram?type=evening",
+            "schedule": "0 15 * * *"
+        }
+    ],
     "rewrites": [
+        {
+            "source": "/api/telegram",
+            "destination": "/api/telegram.js"
+        },
+        {
+            "source": "/api/cron-telegram",
+            "destination": "/api/cron-telegram.js"
+        },
         {
             "source": "/api/gemini",
             "destination": "/api/gemini.js"
