@@ -110,15 +110,164 @@ function chunk(text, size = 3900) {
     return parts;
 }
 
-async function sendReply(chatId, markdown) {
-    for (const part of chunk(markdown)) {
-        const r = await tg('sendMessage', {
+// Bàn phím tác vụ nhanh ghim thường trực dưới đáy màn hình chat (ReplyKeyboardMarkup)
+const MAIN_KEYBOARD = {
+    keyboard: [
+        [{ text: '📅 Lịch trình hôm nay' }, { text: '🎯 Top việc cần làm' }],
+        [{ text: '💰 Số dư & Chi tiêu' }, { text: '⚡ Thói quen hôm nay' }],
+        [{ text: '🌅 Khởi động ngày' }, { text: '🌙 Tổng kết cuối ngày' }],
+    ],
+    resize_keyboard: true,
+    is_persistent: true,
+};
+
+// Ánh xạ prompt chi tiết theo từng nút bấm
+const BUTTON_ACTIONS = {
+    '📅 Lịch trình hôm nay': {
+        prompt: 'Kiểm tra và tóm tắt chi tiết lịch trình hôm nay của tôi (bao gồm thời khóa biểu học tập, môn học, ca học, phòng học, giảng viên và các sự kiện/cuộc hẹn). Nếu không có lịch cố định, hãy thông báo ngắn gọn.',
+        category: 'schedule',
+    },
+    '🎯 Top việc cần làm': {
+        prompt: 'Kiểm tra danh sách công việc (Kanban tasks) của tôi. Liệt kê các task có độ ưu tiên cao nhất (urgent/focus), task có hạn chót hôm nay hoặc đang quá hạn. Đề xuất thứ tự ưu tiên xử lý trong ngày.',
+        category: 'tasks',
+    },
+    '💰 Số dư & Chi tiêu': {
+        prompt: 'Báo cáo tài chính cho tôi: Số dư khả dụng hiện tại là bao nhiêu? Chi tiêu tháng này so với ngân sách thế nào? Có danh mục nào đang chi vượt hạn mức hoặc các hóa đơn định kỳ sắp tới trong 7 ngày không?',
+        category: 'finance',
+    },
+    '⚡ Thói quen hôm nay': {
+        prompt: 'Kiểm tra tình hình rèn luyện thói quen (habits) của tôi trong SmartLife hôm nay: những thói quen nào đã hoàn thành, những thói quen nào chưa làm, streak (chuỗi ngày liên tục) của từng thói quen. Hãy nhắc nhở và động viên tôi hoàn thành!',
+        category: 'habits',
+    },
+    '🌅 Khởi động ngày': {
+        prompt: 'Chào buổi sáng! Hãy tổng hợp bức tranh toàn cảnh khởi động ngày mới cho tôi: lịch trình hôm nay, 3 việc quan trọng nhất cần giải quyết, hạn mức chi tiêu an toàn cho ngày hôm nay và một câu truyền cảm hứng ngắn gọn.',
+        category: 'morning',
+    },
+    '🌙 Tổng kết cuối ngày': {
+        prompt: 'Tổng kết cuối ngày cho tôi: hôm nay tôi đã hoàn thành những task nào, chi tiêu bao nhiêu tiền, thói quen duy trì ra sao? Đánh giá ngắn gọn năng suất làm việc hôm nay và gợi ý 1-2 việc cần lưu ý cho ngày mai.',
+        category: 'night',
+    },
+
+    // Các action phụ / follow-up chips
+    '⚠️ Task quá hạn': {
+        prompt: 'Liệt kê chi tiết các task đang quá hạn (overdue) của tôi kèm deadline cũ và gợi ý giải pháp xử lý nhanh từng việc.',
+        category: 'tasks',
+    },
+    '🍅 Khung giờ Pomodoro': {
+        prompt: 'Dựa vào lịch trình và danh sách task cần làm hôm nay, hãy gợi ý cho tôi 2-3 khung giờ vàng để bật Pomodoro tập trung sâu (Deep Work).',
+        category: 'tasks',
+    },
+    '🧾 Hóa đơn 7 ngày tới': {
+        prompt: 'Kiểm tra các hóa đơn định kỳ, tiền nhà, tiền dịch vụ hoặc các khoản nợ cần thanh toán trong 7 ngày tới.',
+        category: 'finance',
+    },
+    '📊 Biến động 30 ngày': {
+        prompt: 'Kiểm tra biến động số dư và các lần điều chỉnh số dư trong 30 ngày qua.',
+        category: 'finance',
+    },
+};
+
+// Ánh xạ lệnh gõ (/slash) sang prompt tương ứng
+const COMMAND_ACTIONS = {
+    '/today': { prompt: BUTTON_ACTIONS['🎯 Top việc cần làm'].prompt, category: 'tasks' },
+    '/schedule': { prompt: BUTTON_ACTIONS['📅 Lịch trình hôm nay'].prompt, category: 'schedule' },
+    '/finance': { prompt: BUTTON_ACTIONS['💰 Số dư & Chi tiêu'].prompt, category: 'finance' },
+    '/overdue': { prompt: BUTTON_ACTIONS['⚠️ Task quá hạn'].prompt, category: 'tasks' },
+    '/habits': { prompt: BUTTON_ACTIONS['⚡ Thói quen hôm nay'].prompt, category: 'habits' },
+    '/morning': { prompt: BUTTON_ACTIONS['🌅 Khởi động ngày'].prompt, category: 'morning' },
+    '/review': { prompt: BUTTON_ACTIONS['🌙 Tổng kết cuối ngày'].prompt, category: 'night' },
+    '/pomodoro': { prompt: BUTTON_ACTIONS['🍅 Khung giờ Pomodoro'].prompt, category: 'tasks' },
+};
+
+// Tạo các nút gợi ý câu hỏi tiếp theo (Contextual Prompt Chips) gắn liền dưới câu trả lời của AI
+function buildContextualChips(category) {
+    if (category === 'schedule') {
+        return {
+            inline_keyboard: [
+                [
+                    { text: '🎯 Top việc cần làm', callback_data: 'cq:tasks' },
+                    { text: '🍅 Khung giờ Pomodoro', callback_data: 'cq:pomodoro' },
+                ],
+            ],
+        };
+    }
+    if (category === 'tasks') {
+        return {
+            inline_keyboard: [
+                [
+                    { text: '⚠️ Task quá hạn', callback_data: 'cq:overdue' },
+                    { text: '🍅 Khung giờ Pomodoro', callback_data: 'cq:pomodoro' },
+                ],
+                [
+                    { text: '📅 Xem lịch trình', callback_data: 'cq:schedule' },
+                ],
+            ],
+        };
+    }
+    if (category === 'finance') {
+        return {
+            inline_keyboard: [
+                [
+                    { text: '🧾 Hóa đơn 7 ngày tới', callback_data: 'cq:bills' },
+                    { text: '📊 Biến động 30 ngày', callback_data: 'cq:balance30' },
+                ],
+            ],
+        };
+    }
+    if (category === 'habits') {
+        return {
+            inline_keyboard: [
+                [
+                    { text: '🎯 Top việc cần làm', callback_data: 'cq:tasks' },
+                    { text: '🌙 Tổng kết ngày', callback_data: 'cq:night' },
+                ],
+            ],
+        };
+    }
+    if (category === 'morning') {
+        return {
+            inline_keyboard: [
+                [
+                    { text: '🎯 Top việc cần làm', callback_data: 'cq:tasks' },
+                    { text: '📅 Lịch trình', callback_data: 'cq:schedule' },
+                ],
+            ],
+        };
+    }
+    if (category === 'night') {
+        return {
+            inline_keyboard: [
+                [
+                    { text: '⚡ Thói quen', callback_data: 'cq:habits' },
+                    { text: '💰 Số dư ví', callback_data: 'cq:finance' },
+                ],
+            ],
+        };
+    }
+    return null;
+}
+
+async function sendReply(chatId, markdown, replyMarkup = null) {
+    const markupToSend = replyMarkup !== undefined && replyMarkup !== null ? replyMarkup : MAIN_KEYBOARD;
+    const parts = chunk(markdown);
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const isLast = i === parts.length - 1;
+        const payload = {
             chat_id: chatId,
             text: markdownToTelegramHtml(part),
             parse_mode: 'HTML',
             link_preview_options: { is_disabled: true },
-        });
-        if (!r.ok) await tg('sendMessage', { chat_id: chatId, text: part });
+        };
+        if (isLast && markupToSend) {
+            payload.reply_markup = markupToSend;
+        }
+        const r = await tg('sendMessage', payload);
+        if (!r.ok) {
+            const fallbackPayload = { chat_id: chatId, text: part };
+            if (isLast && markupToSend) fallbackPayload.reply_markup = markupToSend;
+            await tg('sendMessage', fallbackPayload);
+        }
     }
 }
 
@@ -387,7 +536,13 @@ async function handleVoiceMessage(chatId, voice) {
             const debugLine = debugChats.has(chatId)
                 ? `\n\n🔧 ${toolsUsed.length ? toolsUsed.join('\n🔧 ') : '(không gọi công cụ nào)'}`
                 : '';
-            await sendReply(chatId, answer + debugLine);
+            const lower = transcript.toLowerCase();
+            let cat = null;
+            if (/task|việc|công việc|deadline|kanban/i.test(lower)) cat = 'tasks';
+            else if (/tiền|chi tiêu|số dư|ngân sách|chi phí|ví|giao dịch/i.test(lower)) cat = 'finance';
+            else if (/lịch|thời khóa biểu|tkb|tiết học|phòng học/i.test(lower)) cat = 'schedule';
+            else if (/thói quen|habit|streak/i.test(lower)) cat = 'habits';
+            await sendReply(chatId, answer + debugLine, buildContextualChips(cat));
         }
     } catch (err) {
         console.error('[telegram] voice processing error:', err);
@@ -412,6 +567,40 @@ async function handleCallbackQuery(query) {
             text: 'Bạn không có quyền thao tác trên bot này.',
             show_alert: true,
         });
+        return;
+    }
+
+    // Xử lý nút bấm gợi ý hành động tiếp theo (Contextual Prompt Chips)
+    if (callbackData.startsWith('cq:')) {
+        const action = callbackData.replace('cq:', '');
+        await tg('answerCallbackQuery', {
+            callback_query_id: query.id,
+            text: '⚡ Đang lấy dữ liệu...',
+        });
+
+        const actionMap = {
+            tasks: { prompt: BUTTON_ACTIONS['🎯 Top việc cần làm'].prompt, cat: 'tasks' },
+            schedule: { prompt: BUTTON_ACTIONS['📅 Lịch trình hôm nay'].prompt, cat: 'schedule' },
+            finance: { prompt: BUTTON_ACTIONS['💰 Số dư & Chi tiêu'].prompt, cat: 'finance' },
+            habits: { prompt: BUTTON_ACTIONS['⚡ Thói quen hôm nay'].prompt, cat: 'habits' },
+            morning: { prompt: BUTTON_ACTIONS['🌅 Khởi động ngày'].prompt, cat: 'morning' },
+            night: { prompt: BUTTON_ACTIONS['🌙 Tổng kết cuối ngày'].prompt, cat: 'night' },
+            overdue: { prompt: BUTTON_ACTIONS['⚠️ Task quá hạn'].prompt, cat: 'tasks' },
+            pomodoro: { prompt: BUTTON_ACTIONS['🍅 Khung giờ Pomodoro'].prompt, cat: 'tasks' },
+            bills: { prompt: BUTTON_ACTIONS['🧾 Hóa đơn 7 ngày tới'].prompt, cat: 'finance' },
+            balance30: { prompt: BUTTON_ACTIONS['📊 Biến động 30 ngày'].prompt, cat: 'finance' },
+        };
+
+        const target = actionMap[action];
+        if (!target) return;
+
+        await tg('sendChatAction', { chat_id: chatId, action: 'typing' });
+        const { text: answer, toolsUsed } = await runAgent(chatId, target.prompt);
+        const debugLine = debugChats.has(chatId)
+            ? `\n\n🔧 ${toolsUsed.length ? toolsUsed.join('\n🔧 ') : '(không gọi công cụ nào)'}`
+            : '';
+        const chips = buildContextualChips(target.cat);
+        await sendReply(chatId, answer + debugLine, chips);
         return;
     }
 
@@ -522,9 +711,13 @@ async function setup(req, res) {
     });
     const commands = await tg('setMyCommands', {
         commands: [
-            { command: 'today', description: 'Hôm nay tôi nên làm gì?' },
-            { command: 'finance', description: 'Tình hình chi tiêu tháng này' },
-            { command: 'overdue', description: 'Task quá hạn' },
+            { command: 'menu', description: 'Hiện bảng điều khiển & nút tác vụ nhanh' },
+            { command: 'today', description: 'Top việc cần làm hôm nay' },
+            { command: 'schedule', description: 'Lịch trình, thời khóa biểu hôm nay' },
+            { command: 'finance', description: 'Tình hình tài chính & số dư' },
+            { command: 'overdue', description: 'Danh sách task quá hạn' },
+            { command: 'habits', description: 'Tiến độ thói quen hôm nay' },
+            { command: 'review', description: 'Tổng kết ngày' },
             { command: 'spend', description: 'Ghi nhanh khoản chi, vd /spend 45k ăn trưa' },
             { command: 'reset', description: 'Bắt đầu cuộc trò chuyện mới' },
             { command: 'debug', description: 'Bật/tắt hiện công cụ bot đã dùng' },
@@ -542,12 +735,6 @@ async function setup(req, res) {
         smartlife_key: SMARTLIFE_KEY ? 'đã cấu hình' : 'THIẾU SMARTLIFE_API_KEY',
     });
 }
-
-const SHORTCUTS = {
-    '/today': 'Xem tình hình của tôi hôm nay: lịch cố định, task quá hạn, task ưu tiên. Gợi ý tôi nên làm gì trước.',
-    '/finance': 'Tình hình chi tiêu tháng này so với ngân sách thế nào? Có danh mục nào sắp vượt hạn mức hay hóa đơn sắp đến hạn không?',
-    '/overdue': 'Liệt kê các task đang quá hạn và gợi ý cách xử lý từng task.',
-};
 
 // ---------------------------------------------------------------------------
 // Main Webhook Handler
@@ -617,18 +804,22 @@ export default async function handler(req, res) {
         const text = msg.text.trim();
         const command = text.split(/\s|@/)[0].toLowerCase();
 
-        if (command === '/start') {
+        if (command === '/start' || command === '/menu') {
             await sendReply(
                 chatId,
                 'Chào bạn 👋 Mình là trợ lý SmartLife.\n\n' +
-                '🎙️ <b>Bạn có thể gửi tin nhắn thoại (Voice):</b>\n' +
-                '• Nói: <i>"Trưa nay ăn bún chả 45k"</i> → Bot nhận diện và hiện nút xác nhận ghi sổ.\n' +
-                '• Hỏi tự do: <i>"Hôm nay tôi có task nào cần làm?"</i> → Bot nghe và trả lời ngay.\n\n' +
-                '💬 <b>Hoặc nhắn tin gõ chữ & dùng lệnh nhanh:</b>\n' +
-                '• /today: Xem hôm nay nên làm gì trước.\n' +
-                '• /finance: Tình hình tài chính tháng này.\n' +
-                '• /overdue: Danh sách task quá hạn.\n' +
-                '• /spend: Ghi nhanh chi tiêu, ví dụ: <code>/spend 35k cafe</code>'
+                '🎯 <b>Chạm nhanh vào các nút ở bàn phím bên dưới để xem ngay:</b>\n' +
+                '• 📅 <b>Lịch trình hôm nay:</b> Lịch học, ca học, sự kiện.\n' +
+                '• 🎯 <b>Top việc cần làm:</b> Task ưu tiên, deadline gần nhất.\n' +
+                '• 💰 <b>Số dư & Chi tiêu:</b> Số dư khả dụng, hạn mức tháng.\n' +
+                '• ⚡ <b>Thói quen hôm nay:</b> Tiến độ & streak thói quen.\n' +
+                '• 🌅 <b>Khởi động ngày:</b> Bức tranh toàn cảnh buổi sáng.\n' +
+                '• 🌙 <b>Tổng kết cuối ngày:</b> Review năng suất & chi tiêu.\n\n' +
+                '🎙️ <b>Gửi tin nhắn thoại (Voice):</b>\n' +
+                '• <i>"Trưa nay ăn bún chả 45k"</i> → Nhận diện và hiện nút xác nhận ghi sổ.\n' +
+                '• <i>"Hôm nay tôi rảnh lúc nào?"</i> → Phân tích và trả lời ngay.\n\n' +
+                '💬 <i>Hoặc cứ nhắn tin tự do bất cứ điều gì bạn muốn hỏi!</i>',
+                MAIN_KEYBOARD
             );
             return res.status(200).end();
         }
@@ -650,16 +841,35 @@ export default async function handler(req, res) {
         }
 
         await tg('sendChatAction', { chat_id: chatId, action: 'typing' });
-        let prompt = SHORTCUTS[command] || text;
-        if (command === '/spend') {
+
+        let prompt = text;
+        let category = null;
+
+        if (BUTTON_ACTIONS[text]) {
+            prompt = BUTTON_ACTIONS[text].prompt;
+            category = BUTTON_ACTIONS[text].category;
+        } else if (COMMAND_ACTIONS[command]) {
+            prompt = COMMAND_ACTIONS[command].prompt;
+            category = COMMAND_ACTIONS[command].category;
+        } else if (command === '/spend') {
             const rest = text.replace(/^\/spend(@\S+)?\s*/i, '');
             prompt = rest ? `Ghi khoản chi: ${rest}` : 'Tôi muốn ghi một khoản chi, hãy hỏi tôi số tiền và nội dung.';
+            category = 'finance';
+        } else {
+            // Nhận diện category tự động từ câu hỏi tự do
+            const lower = text.toLowerCase();
+            if (/task|việc|công việc|deadline|kanban/i.test(lower)) category = 'tasks';
+            else if (/tiền|chi tiêu|số dư|ngân sách|chi phí|ví|giao dịch/i.test(lower)) category = 'finance';
+            else if (/lịch|thời khóa biểu|tkb|tiết học|phòng học/i.test(lower)) category = 'schedule';
+            else if (/thói quen|habit|streak/i.test(lower)) category = 'habits';
         }
+
         const { text: answer, toolsUsed } = await runAgent(chatId, prompt);
         const debugLine = debugChats.has(chatId)
             ? `\n\n🔧 ${toolsUsed.length ? toolsUsed.join('\n🔧 ') : '(không gọi công cụ nào)'}`
             : '';
-        await sendReply(chatId, answer + debugLine);
+        const chips = buildContextualChips(category);
+        await sendReply(chatId, answer + debugLine, chips);
     } catch (err) {
         console.error('[telegram] error', err);
         await tg('sendMessage', { chat_id: chatId, text: 'Xin lỗi, mình đang gặp lỗi. Bạn thử lại sau ít phút nhé.' });

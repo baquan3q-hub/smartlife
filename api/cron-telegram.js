@@ -16,6 +16,16 @@ const ALLOWED_CHAT_ID = (process.env.TELEGRAM_ALLOWED_CHAT_ID || '').trim();
 const SMARTLIFE_KEY = process.env.SMARTLIFE_API_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
 
+const MAIN_KEYBOARD = {
+    keyboard: [
+        [{ text: '📅 Lịch trình hôm nay' }, { text: '🎯 Top việc cần làm' }],
+        [{ text: '💰 Số dư & Chi tiêu' }, { text: '⚡ Thói quen hôm nay' }],
+        [{ text: '🌅 Khởi động ngày' }, { text: '🌙 Tổng kết cuối ngày' }],
+    ],
+    resize_keyboard: true,
+    is_persistent: true,
+};
+
 async function sendTelegram(method, payload) {
     const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
         method: 'POST',
@@ -364,6 +374,7 @@ export default async function handler(req, res) {
         text: messageText,
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
+        reply_markup: MAIN_KEYBOARD,
     });
 
     if (!tgRes.ok) {
@@ -372,6 +383,7 @@ export default async function handler(req, res) {
         await sendTelegram('sendMessage', {
             chat_id: ALLOWED_CHAT_ID,
             text: plainText,
+            reply_markup: MAIN_KEYBOARD,
         });
     }
 
