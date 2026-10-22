@@ -142,10 +142,14 @@ async function tgCall(method, payload) {
     }
 }
 
-// Bỏ trường "style" (màu nút) nếu client/API cũ không nhận
+// Bỏ màu nút + icon 3D nếu Telegram không nhận → trả lại emoji thường ở đầu chữ
 function stripButtonStyles(markup) {
     if (!markup) return markup;
-    const clean = (rows) => rows.map((row) => row.map(({ style, ...btn }) => btn));
+    const clean = (rows) => rows.map((row) => row.map(({ style, icon_custom_emoji_id: iconId, ...btn }) => {
+        if (!iconId) return btn;
+        const emoji = ICON_EMOJI_BY_ID.get(iconId);
+        return { ...btn, text: emoji ? `${emoji} ${btn.text}` : btn.text };
+    }));
     if (markup.inline_keyboard) return { ...markup, inline_keyboard: clean(markup.inline_keyboard) };
     if (markup.keyboard) return { ...markup, keyboard: clean(markup.keyboard) };
     return markup;
@@ -153,8 +157,8 @@ function stripButtonStyles(markup) {
 
 async function tg(method, payload) {
     let r = await tgCall(method, payload);
-    // Hiệu ứng tin nhắn / màu nút không được hỗ trợ → gửi lại bản đơn giản
-    if (!r.ok && /effect|button|markup|keyboard/i.test(r.description || '')) {
+    // Hiệu ứng tin nhắn / màu nút / icon nút không được hỗ trợ → gửi lại bản đơn giản
+    if (!r.ok && /effect|button|markup|keyboard|emoji|style|icon/i.test(r.description || '')) {
         const fallback = { ...payload };
         delete fallback.message_effect_id;
         if (fallback.reply_markup) fallback.reply_markup = stripButtonStyles(fallback.reply_markup);
@@ -207,17 +211,156 @@ async function editHtml(chatId, messageId, html, replyMarkup) {
 // ---------------------------------------------------------------------------
 // Bàn phím & nút bấm
 // ---------------------------------------------------------------------------
+// ---- Icon 3D động cho nút (custom emoji) ----------------------------------
+// Telegram cho phép gắn custom emoji làm icon nút (icon_custom_emoji_id) và tô màu nút (style).
+// Bot tự tải bộ emoji 3D theo tên pack rồi khớp theo emoji gốc của từng nút:
+//   TELEGRAM_EMOJI_PACK  tên 1 hoặc nhiều pack, cách nhau dấu phẩy (phần cuối link t.me/addemoji/<tên>)
+//   TELEGRAM_BUTTON_ICONS (tuỳ chọn) JSON ghi đè thủ công, vd {"📅":"5368324170671202286"}
+// Thử nhanh 1 pack trong chat: /icons <tên pack hoặc link>
+const ICON_EMOJI_BY_ID = new Map();   // custom_emoji_id -> emoji gốc (để quay về emoji thường khi lỗi)
+const ICON_CACHE_TTL = 6 * 60 * 60 * 1000;
+let iconCache = { packs: '', at: 0, map: new Map() };
+let iconPackOverride = null;          // pack thử bằng /icons (chỉ sống đến khi function khởi động lại)
+
+const normEmoji = (e) => String(e || '').replace(/️/g, '');
+
+function parsePackNames(input) {
+    return String(input || '')
+        .split(',')
+        .map((s) => s.trim().replace(/^https?:\/\/t\.me\/(addemoji|addstickers)\//i, '').replace(/[/?#].*$/, ''))
+        .filter(Boolean);
+}
+
+async function loadPackIcons(packName) {
+    const r = await tgCall('getStickerSet', { name: packName });
+    if (!r.ok) return { ok: false, error: r.description || 'Không tải được pack', map: new Map() };
+    const map = new Map();
+    for (const s of r.result?.stickers || []) {
+        if (!s.custom_emoji_id) continue;
+        for (const ch of Array.from(normEmoji(s.emoji))) {
+            if (!map.has(ch)) map.set(ch, s.custom_emoji_id);
+        }
+        const whole = normEmoji(s.emoji);
+        if (whole && !map.has(whole)) map.set(whole, s.custom_emoji_id);
+    }
+    return { ok: true, title: r.result?.title, isCustomEmoji: r.result?.sticker_type === 'custom_emoji', map };
+}
+
+async function getIconMap() {
+    const packs = iconPackOverride ?? (process.env.TELEGRAM_EMOJI_PACK || '');
+    if (iconCache.packs === packs && Date.now() - iconCache.at < ICON_CACHE_TTL) return iconCache.map;
+    const map = new Map();
+    for (const name of parsePackNames(packs)) {
+        const { map: m } = await loadPackIcons(name);
+        for (const [k, v] of m) if (!map.has(k)) map.set(k, v);
+    }
+    try {
+        const manual = JSON.parse(process.env.TELEGRAM_BUTTON_ICONS || '{}');
+        for (const [k, v] of Object.entries(manual)) if (v) map.set(normEmoji(k), String(v));
+    } catch {
+        console.warn('[telegram] TELEGRAM_BUTTON_ICONS không phải JSON hợp lệ');
+    }
+    for (const [k, v] of map) ICON_EMOJI_BY_ID.set(v, k);
+    iconCache = { packs, at: Date.now(), map };
+    return map;
+}
+
+// Tạo 1 nút: có icon 3D thì dùng icon + chữ, không thì emoji thường + chữ
+function makeButton(emoji, label, icons, extra = {}) {
+    const iconId = icons?.get(normEmoji(emoji));
+    return iconId
+        ? { text: label, icon_custom_emoji_id: iconId, ...extra }
+        : { text: `${emoji} ${label}`, ...extra };
+}
+
 // Bàn phím tác vụ nhanh ghim thường trực dưới đáy màn hình chat (ReplyKeyboardMarkup)
-const MAIN_KEYBOARD = {
-    keyboard: [
-        [{ text: '📅 Lịch trình hôm nay' }, { text: '🎯 Top việc cần làm' }],
-        [{ text: '💰 Số dư & Chi tiêu' }, { text: '⚡ Thói quen hôm nay' }],
-        [{ text: '🌅 Khởi động ngày' }, { text: '🌙 Tổng kết cuối ngày' }],
-    ],
-    resize_keyboard: true,
-    is_persistent: true,
-    input_field_placeholder: 'Hỏi SmartLife hoặc gửi voice 🎙️',
-};
+// style: primary = xanh dương, success = xanh lá, danger = đỏ
+const MAIN_LAYOUT = [
+    [['schedule', 'primary'], ['tasks', 'danger']],
+    [['finance', 'success'], ['habits', 'primary']],
+    [['morning', 'success'], ['night', 'primary']],
+];
+
+async function getMainKeyboard() {
+    const icons = await getIconMap();
+    return {
+        keyboard: MAIN_LAYOUT.map((row) => row.map(([id, style]) => {
+            const a = ACTIONS[id];
+            return makeButton(a.emoji, a.label, icons, { style });
+        })),
+        resize_keyboard: true,
+        is_persistent: true,
+        input_field_placeholder: 'Hỏi SmartLife hoặc gửi voice 🎙️',
+    };
+}
+
+// /icons            → xem trạng thái icon 3D
+// /icons <pack>     → thử 1 bộ emoji (tên hoặc link t.me/addemoji/...), hiện ngay bàn phím mới
+// /icons off        → quay về emoji thường
+async function handleIconsCommand(chatId, arg) {
+    const needed = [...new Set([
+        ...Object.values(ACTIONS).flatMap((a) => [a.emoji, a.chipEmoji]),
+        '🔄',
+    ].map(normEmoji))];
+    const report = (map) => needed.map((e) => `${map.has(e) ? '✅' : '▫️'} ${e}`).join('  ');
+
+    if (!arg) {
+        const map = await getIconMap();
+        const packs = iconPackOverride ?? (process.env.TELEGRAM_EMOJI_PACK || '');
+        const matched = needed.filter((e) => map.has(e)).length;
+        await sendHtml(chatId, [
+            '✨ <b>ICON 3D CHO NÚT BẤM</b>',
+            `Pack đang dùng: ${packs ? `<code>${escapeHtml(packs)}</code>` : '<i>(chưa có — đang dùng emoji thường)</i>'}`,
+            `Khớp: <b>${matched}/${needed.length}</b> icon`,
+            report(map),
+            '',
+            '🧪 <b>Thử 1 bộ emoji 3D:</b>',
+            '1. Mở 1 bộ emoji động bất kỳ trên Telegram → Chia sẻ → Copy link (dạng <code>t.me/addemoji/TenPack</code>).',
+            '2. Gửi: <code>/icons t.me/addemoji/TenPack</code>',
+            '3. Ưng ý thì đặt biến <code>TELEGRAM_EMOJI_PACK=TenPack</code> trên Vercel để dùng lâu dài.',
+            '',
+            '↩️ <code>/icons off</code> để quay lại emoji thường.',
+        ].join('\n'));
+        return;
+    }
+
+    if (/^(off|tắt|tat)$/i.test(arg)) {
+        iconPackOverride = '';
+        await sendHtml(chatId, '↩️ Đã quay về emoji thường.', { reply_markup: await getMainKeyboard() });
+        return;
+    }
+
+    const names = parsePackNames(arg);
+    const results = await Promise.all(names.map(async (n) => ({ name: n, ...(await loadPackIcons(n)) })));
+    const failed = results.filter((r) => !r.ok || !r.isCustomEmoji);
+    const merged = new Map();
+    for (const r of results) if (r.ok && r.isCustomEmoji) for (const [k, v] of r.map) if (!merged.has(k)) merged.set(k, v);
+    const matched = needed.filter((e) => merged.has(e)).length;
+
+    if (matched === 0) {
+        await sendHtml(chatId, [
+            '⚠️ <b>Pack này không dùng được cho nút.</b>',
+            ...failed.map((r) => `• <code>${escapeHtml(r.name)}</code>: ${escapeHtml(r.ok ? 'đây là bộ sticker, cần bộ emoji (link t.me/addemoji/...)' : r.error)}`),
+            results.some((r) => r.ok && r.isCustomEmoji) ? '• Pack không có emoji nào trùng với các nút (📅 🎯 💰 ⚡ 🌅 🌙…).' : '',
+        ].filter(Boolean).join('\n'));
+        return;
+    }
+
+    iconPackOverride = names.join(',');
+    iconCache.at = 0; // tải lại theo pack mới
+    const keyboard = await getMainKeyboard();
+    await sendHtml(chatId, [
+        `✨ <b>Đã áp dụng thử pack:</b> ${results.filter((r) => r.ok).map((r) => escapeHtml(r.title || r.name)).join(', ')}`,
+        `Khớp <b>${matched}/${needed.length}</b> icon: ${report(merged)}`,
+        '',
+        '👇 Xem bàn phím mới bên dưới. Ưng ý thì đặt trên Vercel:',
+        `<code>TELEGRAM_EMOJI_PACK=${escapeHtml(names.join(','))}</code>`,
+        '<i>(Bản thử chỉ giữ đến lần bot khởi động lại.)</i>',
+    ].join('\n'), { reply_markup: keyboard });
+}
+
+// So khớp chữ trên nút bấm (có hoặc không có emoji ở đầu)
+const normLabel = (s) => String(s || '').replace(/^[^\p{L}\p{N}]+/u, '').trim().toLowerCase();
 
 // Dữ liệu nạp sẵn theo từng loại câu hỏi (chạy song song trước khi gọi Gemini)
 const PREFETCH = {
@@ -313,7 +456,18 @@ const ACTIONS = {
     },
 };
 
-const BUTTON_TO_ACTION = Object.fromEntries(Object.entries(ACTIONS).map(([id, a]) => [a.button, id]));
+// Tách emoji ở đầu và phần chữ để có thể thay emoji bằng icon 3D
+const splitEmoji = (s) => {
+    const [emoji, ...rest] = s.split(' ');
+    return [emoji, rest.join(' ')];
+};
+for (const a of Object.values(ACTIONS)) {
+    [a.emoji, a.label] = splitEmoji(a.button);
+    [a.chipEmoji, a.chipLabel] = splitEmoji(a.chip);
+}
+
+// Khi có icon 3D, nút gửi lên chỉ còn phần chữ → so khớp theo chữ đã chuẩn hoá
+const BUTTON_TO_ACTION = Object.fromEntries(Object.entries(ACTIONS).map(([id, a]) => [normLabel(a.button), id]));
 
 const COMMAND_TO_ACTION = {
     '/today': 'tasks',
@@ -337,13 +491,15 @@ const CHIPS_BY_CATEGORY = {
     night: ['habits', 'finance'],
 };
 
-function buildChips(category, actionId = null) {
+async function buildChips(category, actionId = null) {
     const ids = (CHIPS_BY_CATEGORY[category] || []).filter((id) => id !== actionId).slice(0, 4);
+    if (!ids.length && !actionId) return null;
+    const icons = await getIconMap();
     const rows = [];
     for (let i = 0; i < ids.length; i += 2) {
-        rows.push(ids.slice(i, i + 2).map((id) => ({ text: ACTIONS[id].chip, callback_data: `cq:${id}` })));
+        rows.push(ids.slice(i, i + 2).map((id) => makeButton(ACTIONS[id].chipEmoji, ACTIONS[id].chipLabel, icons, { callback_data: `cq:${id}` })));
     }
-    if (actionId) rows.push([{ text: '🔄 Làm mới số liệu', callback_data: `rf:${actionId}`, style: 'primary' }]);
+    if (actionId) rows.push([makeButton('🔄', 'Làm mới số liệu', icons, { callback_data: `rf:${actionId}`, style: 'primary' })]);
     return rows.length ? { inline_keyboard: rows } : null;
 }
 
@@ -671,7 +827,7 @@ async function respond(chatId, {
             : '';
         const seconds = ((Date.now() - started) / 1000).toFixed(1);
         const footer = `\n\n*🕒 Cập nhật ${vnTime()} · ${seconds}s*`;
-        await progress.finish(text + debugLine + footer, buildChips(category || ACTIONS[actionId]?.cat, actionId));
+        await progress.finish(text + debugLine + footer, await buildChips(category || ACTIONS[actionId]?.cat, actionId));
         return true;
     } catch (err) {
         console.error('[telegram] respond error', err);
@@ -1077,7 +1233,12 @@ async function handleMessage(msg) {
     if (!text) return;
 
     if (command === '/start' || command === '/menu') {
-        await sendHtml(chatId, WELCOME_HTML, { reply_markup: MAIN_KEYBOARD, message_effect_id: '5046509860389126442' }); // 🎉
+        await sendHtml(chatId, WELCOME_HTML, { reply_markup: await getMainKeyboard(), message_effect_id: '5046509860389126442' }); // 🎉
+        return;
+    }
+
+    if (command === '/icons') {
+        await handleIconsCommand(chatId, text.replace(/^\/icons(@\S+)?\s*/i, '').trim());
         return;
     }
 
@@ -1091,7 +1252,7 @@ async function handleMessage(msg) {
     if (command === '/reset') {
         history.delete(chatId);
         toolCache.clear();
-        await sendHtml(chatId, '🧹 Đã bắt đầu cuộc trò chuyện mới.', { reply_markup: MAIN_KEYBOARD });
+        await sendHtml(chatId, '🧹 Đã bắt đầu cuộc trò chuyện mới.', { reply_markup: await getMainKeyboard() });
         return;
     }
 
@@ -1102,7 +1263,7 @@ async function handleMessage(msg) {
 
     react(chatId, msg.message_id, '👀');
     let ok;
-    const actionId = BUTTON_TO_ACTION[text] || COMMAND_TO_ACTION[command];
+    const actionId = BUTTON_TO_ACTION[normLabel(text)] || COMMAND_TO_ACTION[command];
     if (actionId) {
         ok = await respondAction(chatId, actionId);
     } else if (command === '/spend') {
@@ -1148,6 +1309,7 @@ async function setup(req, res) {
             { command: 'review', description: 'Tổng kết ngày' },
             { command: 'spend', description: 'Ghi nhanh khoản chi, vd /spend 45k ăn trưa' },
             { command: 'reset', description: 'Bắt đầu cuộc trò chuyện mới' },
+            { command: 'icons', description: 'Đổi icon 3D động cho các nút bấm' },
             { command: 'debug', description: 'Bật/tắt hiện công cụ bot đã dùng' },
             { command: 'id', description: 'Xem chat id của bạn' },
         ],
