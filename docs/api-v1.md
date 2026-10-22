@@ -120,7 +120,10 @@ Biến môi trường trên Vercel: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECR
 
 Cài webhook: mở `https://<domain>/api/telegram?setup=<TELEGRAM_WEBHOOK_SECRET>`.
 
-Lệnh: `/today`, `/finance`, `/overdue`, `/spend 45k ăn trưa`, `/debug` (hiện các tool đã gọi), `/reset`, `/id`. Bot nhớ 10 tin nhắn gần nhất; bộ nhớ này mất khi function khởi động lại.
+Tính năng:
+- **Nhận diện giọng nói (Voice Multimodal)**: Giữ mic nói giao dịch chi tiêu (vd: *"Trưa nay ăn bún chả 45 ngàn"*), Gemini nhận diện số tiền & phân loại danh mục, gửi lại thẻ giao diện hiện đại kèm 2 nút bấm tương tác: **✨ Xác nhận ghi sổ** hoặc **❌ Hủy bỏ**.
+- **Hỏi đáp qua Voice**: Nếu gửi voice câu hỏi thông thường (vd: *"Hôm nay tôi có bao nhiêu tiền?"*), bot tự động chuyển text và trả lời ngay.
+- Lệnh: `/today`, `/finance`, `/overdue`, `/spend 45k ăn trưa`, `/debug` (hiện các tool đã gọi), `/reset`, `/id`. Bot nhớ 10 tin nhắn gần nhất.
 
 ## 9. Tự động thông báo & Nhắc việc qua Telegram — `api/cron-telegram.js`
 

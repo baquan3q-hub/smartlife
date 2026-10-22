@@ -102,7 +102,7 @@ function buildMorningMessage(context) {
 
     // 4. Tài chính
     lines.push('💰 <b>Tình hình tài chính:</b>');
-    lines.push(`• Số dư ví hiện tại: <b>${formatVnd(finance.total_balance)}</b>`);
+    lines.push(`• Số dư khả dụng: <b>${formatVnd(finance.current_balance)}</b>`);
     if (finance.categories_at_risk && finance.categories_at_risk.length > 0) {
         const atRisk = finance.categories_at_risk[0];
         lines.push(`• ⚠️ <i>Danh mục "${escapeHtml(atRisk.category)}" đã dùng ${atRisk.used_pct}% ngân sách</i>`);
@@ -213,7 +213,7 @@ function buildEveningMessage(context) {
 
     // Nhắc ghi chi tiêu
     lines.push('💰 <b>Sổ tay chi tiêu:</b>');
-    lines.push(`• Số dư ví: <b>${formatVnd(finance.total_balance)}</b>`);
+    lines.push(`• Số dư khả dụng: <b>${formatVnd(finance.current_balance)}</b>`);
     lines.push('• 💡 <i>Hôm nay bạn có khoản chi nào chưa ghi chép không? Nhắn tin cho mình theo cú pháp:</i>');
     lines.push('<code>/spend [số tiền] [nội dung]</code>');
     lines.push('<i>Ví dụ: /spend 45k ăn tối</i>\n');

@@ -59,6 +59,10 @@
             "destination": "/api/v1/finance?action=options"
         },
         {
+            "source": "/api/v1/finance/balance",
+            "destination": "/api/v1/finance?action=balance"
+        },
+        {
             "source": "/api/v1/finance/transactions/:id",
             "destination": "/api/v1/finance?action=transactions&id=:id"
         },

@@ -124,6 +124,82 @@ returns boolean language sql immutable set search_path = '' as $$
     select coalesce(p_category, '') <> 'Điều chỉnh số dư';
 $$;
 
+-- Tiền có dấu: +1.000đ / -1.000đ
+create or replace function public._api_vnd_signed(p numeric)
+returns text language sql immutable set search_path = '' as $$
+    select case when p > 0 then '+' else '' end || public._api_vnd(p);
+$$;
+
+-- Số dư + biến động N ngày gần nhất.
+-- "Số dư khả dụng" = tổng thu − tổng chi của MỌI giao dịch (kể cả "Điều chỉnh số dư"),
+-- đúng như ô "Số dư khả dụng" trên màn hình Tài chính của app.
+-- Số dư từng ví được lưu riêng và chỉ đổi khi giao dịch có gắn ví, nên có thể khác số dư khả dụng.
+create or replace function public._api_balance_snapshot(p_uid uuid, p_today date, p_days int default 30)
+returns jsonb language plpgsql stable set search_path = '' as $$
+declare
+    v_days int := least(greatest(coalesce(p_days, 30), 1), 365);
+    v_from date := p_today - (v_days - 1);
+    v_current numeric; v_before numeric; v_income numeric; v_expense numeric;
+    v_adj_net numeric; v_adj_count int; v_wallets_total numeric; v_wallets_text text;
+begin
+    select coalesce(sum(case t.type when 'income' then t.amount when 'expense' then -t.amount else 0 end), 0),
+           coalesce(sum(case t.type when 'income' then t.amount when 'expense' then -t.amount else 0 end) filter (where t.date < v_from), 0),
+           coalesce(sum(t.amount) filter (where t.type = 'income' and t.date >= v_from and public._api_is_real_tx(t.category)), 0),
+           coalesce(sum(t.amount) filter (where t.type = 'expense' and t.date >= v_from and public._api_is_real_tx(t.category)), 0),
+           coalesce(sum(case t.type when 'income' then t.amount else -t.amount end) filter (where t.date >= v_from and not public._api_is_real_tx(t.category)), 0),
+           count(*) filter (where t.date >= v_from and not public._api_is_real_tx(t.category))
+    into v_current, v_before, v_income, v_expense, v_adj_net, v_adj_count
+    from public.transactions t where t.user_id = p_uid;
+
+    select coalesce(sum(w.balance) filter (where coalesce(w.include_in_total, true)), 0),
+           string_agg(format('%s %s', w.name, public._api_vnd(w.balance)), ', ' order by w.balance desc)
+    into v_wallets_total, v_wallets_text
+    from public.wallets w where w.user_id = p_uid;
+
+    return jsonb_build_object(
+        'summary', format(
+            'SỐ DƯ KHẢ DỤNG HIỆN TẠI (khớp ô "Số dư khả dụng" trong app): %s. '
+            '%s ngày qua (%s–%s): thu %s, chi %s, điều chỉnh số dư %s lần (ròng %s); số dư %s ngày trước là %s, thay đổi %s. '
+            'Tiền trong ví: %s — đây là số dư riêng từng ví, KHÔNG phải số dư khả dụng.',
+            public._api_vnd(v_current),
+            v_days, to_char(v_from, 'DD/MM'), to_char(p_today, 'DD/MM/YYYY'),
+            public._api_vnd(v_income), public._api_vnd(v_expense), v_adj_count, public._api_vnd_signed(v_adj_net),
+            v_days, public._api_vnd(v_before), public._api_vnd_signed(v_current - v_before),
+            coalesce(v_wallets_text, 'chưa có ví')),
+        'current_balance', v_current,
+        'wallets_total', v_wallets_total,
+        'wallets', (select coalesce(jsonb_agg(jsonb_build_object('name', w.name, 'type', w.type, 'balance', w.balance,
+                                                                 'in_total', coalesce(w.include_in_total, true)) order by w.balance desc), '[]')
+                    from public.wallets w where w.user_id = p_uid),
+        'last_n_days', jsonb_build_object(
+            'days', v_days, 'from', v_from, 'to', p_today,
+            'balance_at_start', v_before,
+            'balance_change', v_current - v_before,
+            'income', v_income,
+            'expense', v_expense,
+            'adjustment_count', v_adj_count,
+            'adjustment_net', v_adj_net,
+            -- Các lần người dùng bấm "Điều chỉnh số dư" trong app
+            'balance_adjustments', (select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+                    'date', a.date,
+                    'change', case when a.type = 'income' then a.amount else -a.amount end,
+                    'change_text', public._api_vnd_signed(case when a.type = 'income' then a.amount else -a.amount end),
+                    'note', nullif(a.description, '')))
+                    order by a.date desc, a.created_at desc), '[]')
+                from (select * from public.transactions where user_id = p_uid and date >= v_from
+                      and not public._api_is_real_tx(category) order by date desc, created_at desc limit 20) a),
+            -- Giao dịch được nhập/cập nhật gần nhất (theo thời điểm tạo)
+            'latest_entries', (select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+                    'id', r.id, 'date', r.date, 'type', r.type, 'amount', r.amount, 'category', r.category,
+                    'description', nullif(r.description, ''),
+                    'is_balance_adjustment', case when not public._api_is_real_tx(r.category) then true end))
+                    order by r.created_at desc), '[]')
+                from (select * from public.transactions where user_id = p_uid
+                      and (date >= v_from or created_at >= p_today - v_days)
+                      order by created_at desc limit 10) r)));
+end;
+$$;
+
 -- Kiểm tra scope: read:all bao gồm mọi scope *:read; tasks:write bao gồm tasks:read
 create or replace function public._api_has_scope(p_scopes text[], p_needed text)
 returns boolean language sql immutable set search_path = '' as $$
@@ -416,7 +492,7 @@ declare
     v_days_in_month int := extract(day from v_m_end)::int;
     v_day int := extract(day from v_today)::int;
     v_expense numeric; v_income numeric; v_budget numeric; v_balance numeric; v_projected numeric;
-    v_upcoming jsonb; v_upcoming_expense numeric;
+    v_upcoming jsonb; v_upcoming_expense numeric; v_snapshot jsonb;
     v_user jsonb; v_tasks jsonb; v_finance jsonb; v_productivity jsonb;
 begin
     -- USER SUMMARY ------------------------------------------------------
@@ -479,7 +555,8 @@ begin
     where user_id = uid and date between v_m_start and v_m_end and public._api_is_real_tx(category);
 
     select sum(amount) into v_budget from public.budgets where user_id = uid and month = v_month;
-    select coalesce(sum(balance), 0) into v_balance from public.wallets where user_id = uid and coalesce(include_in_total, true);
+    v_snapshot := public._api_balance_snapshot(uid, v_today, 30);
+    v_balance := (v_snapshot->>'current_balance')::numeric;
     v_projected := round(v_expense / greatest(v_day, 1) * v_days_in_month);
 
     select coalesce(jsonb_agg(x order by x->>'due_date'), '[]'),
@@ -495,16 +572,19 @@ begin
 
     v_finance := jsonb_build_object(
         -- Câu tóm tắt có sẵn để AI trích dẫn thẳng, tránh tính/đọc nhầm số
-        'summary', format('Tháng %s (đến ngày %s/%s): ĐÃ CHI %s, đã thu %s%s. Tổng số dư các ví: %s. Dự báo nếu giữ nhịp chi hiện tại: khoảng %s cả tháng.',
+        'summary', format('Số dư khả dụng hiện tại: %s. Tháng %s (đến ngày %s/%s): ĐÃ CHI %s, đã thu %s%s. Dự báo nếu giữ nhịp chi hiện tại: khoảng %s cả tháng.',
+            public._api_vnd(v_balance),
             to_char(v_today, 'MM/YYYY'), v_day, v_days_in_month,
             public._api_vnd(v_expense), public._api_vnd(v_income),
             case when coalesce(v_budget, 0) > 0
                  then format(', ngân sách %s (đã dùng %s%%)', public._api_vnd(v_budget), round(v_expense * 100 / v_budget, 1)) else '' end,
-            public._api_vnd(v_balance), public._api_vnd(v_projected)),
+            public._api_vnd(v_projected)),
         'month', v_month,
-        'total_balance', v_balance,
-        'wallets', (select coalesce(jsonb_agg(jsonb_build_object('name', w.name, 'type', w.type, 'balance', w.balance) order by w.balance desc), '[]')
-                    from public.wallets w where w.user_id = uid),
+        -- Số dư khả dụng (khớp app) + tiền từng ví + biến động / điều chỉnh 30 ngày gần nhất
+        'balance', v_snapshot,
+        'current_balance', v_balance,
+        'wallets_total', v_snapshot->'wallets_total',
+        'wallets', v_snapshot->'wallets',
         'income_so_far_this_month', v_income,
         'expense_so_far_this_month', v_expense,
         'month_budget', v_budget,
@@ -824,7 +904,7 @@ declare
     v_is_current boolean;
     v_days_in_month int; v_days_elapsed int;
     v_income numeric; v_expense numeric; v_prev_expense numeric; v_budget numeric; v_balance numeric;
-    v_recurring jsonb; v_rec_in numeric; v_rec_out numeric;
+    v_recurring jsonb; v_rec_in numeric; v_rec_out numeric; v_snapshot jsonb;
 begin
     v_month := coalesce(nullif(p_month, ''), to_char(v_today, 'YYYY-MM'));
     if v_month !~ '^\d{4}-(0[1-9]|1[0-2])$' then
@@ -846,7 +926,8 @@ begin
     from public.transactions where user_id = uid and type = 'expense' and date >= v_prev_start and date < v_m_start and public._api_is_real_tx(category);
 
     select sum(amount) into v_budget from public.budgets where user_id = uid and month = v_month;
-    select coalesce(sum(balance), 0) into v_balance from public.wallets where user_id = uid and coalesce(include_in_total, true);
+    v_snapshot := public._api_balance_snapshot(uid, v_today, 30);
+    v_balance := (v_snapshot->>'current_balance')::numeric;
 
     -- Giao dịch định kỳ còn lại đến cuối tháng hiện tại (chỉ tính cho tháng hiện tại)
     select coalesce(jsonb_agg(x order by x->>'next_due'), '[]'),
@@ -863,11 +944,12 @@ begin
     ) s;
 
     return jsonb_build_object(
-        'summary', format('Tháng %s: ĐÃ CHI %s, đã thu %s, chênh lệch %s%s. Tháng trước chi %s.',
+        'summary', format('Tháng %s: ĐÃ CHI %s, đã thu %s, chênh lệch %s%s. Tháng trước chi %s. Số dư khả dụng hiện tại: %s.',
             to_char(v_m_start, 'MM/YYYY'), public._api_vnd(v_expense), public._api_vnd(v_income), public._api_vnd(v_income - v_expense),
             case when coalesce(v_budget, 0) > 0
                  then format(', ngân sách %s (đã dùng %s%%, còn %s)', public._api_vnd(v_budget), round(v_expense * 100 / v_budget, 1), public._api_vnd(v_budget - v_expense)) else '' end,
-            public._api_vnd(v_prev_expense)),
+            public._api_vnd(v_prev_expense), public._api_vnd(v_balance)),
+        'balance', v_snapshot,
         'month', v_month,
         'currency', (select coalesce(currency, 'VND') from public.profiles where id = uid),
         'totals', jsonb_build_object(
@@ -911,13 +993,12 @@ begin
             from (select date_trunc('week', date)::date w, sum(amount) amt from public.transactions
                   where user_id = uid and type = 'expense' and date between v_m_start and v_m_end and public._api_is_real_tx(category) group by 1) x),
         'cash_flow', jsonb_build_object(
-            'total_balance', v_balance,
+            'current_balance', v_balance,
             'recurring', v_recurring,
             'remaining_recurring_income_this_month', case when v_is_current then v_rec_in end,
             'remaining_recurring_expense_this_month', case when v_is_current then v_rec_out end,
             'projected_balance_end_of_month', case when v_is_current then v_balance + v_rec_in - v_rec_out end),
-        'wallets', (select coalesce(jsonb_agg(jsonb_build_object('name', name, 'type', type, 'balance', balance, 'in_total', coalesce(include_in_total, true)) order by balance desc), '[]')
-                    from public.wallets where user_id = uid),
+        'wallets', v_snapshot->'wallets',
         'debts', (select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object('partner', partner_name, 'type', type, 'amount', amount,
                           'remaining', remaining_amount, 'due_date', due_date, 'status', status)) order by due_date nulls last), '[]')
                   from public.debts where user_id = uid and status <> 'paid'));
@@ -1008,6 +1089,17 @@ begin
 end;
 $$;
 
+-- Số dư khả dụng hiện tại + tiền từng ví + biến động / điều chỉnh số dư N ngày gần nhất
+create or replace function public.api_v1_balance(p_key text, p_days int default 30, p_tz text default 'Asia/Ho_Chi_Minh')
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+    k public.api_keys := public._api_auth(p_key, 'finance:read');
+begin
+    return public._api_balance_snapshot(k.user_id, (now() at time zone public._api_tz(p_tz))::date, p_days);
+end;
+$$;
+
 -- GET /api/v1/finance/transactions — danh sách + TỔNG đã tính sẵn (AI không phải tự cộng)
 create or replace function public.api_v1_list_transactions(
     p_key text,
@@ -1082,6 +1174,7 @@ declare
     v_wallet public.wallets;
     v_wallet_count int;
     v_tx public.transactions;
+    v_balance numeric;
 begin
     if p_tx is null or jsonb_typeof(p_tx) <> 'object' then
         raise exception 'Body must be a JSON object' using errcode = 'PT400', detail = 'invalid_body';
@@ -1147,14 +1240,19 @@ begin
         returning * into v_wallet;
     end if;
 
+    select coalesce(sum(case type when 'income' then amount when 'expense' then -amount else 0 end), 0)
+    into v_balance from public.transactions where user_id = k.user_id;
+
     return jsonb_build_object(
         'id', v_tx.id, 'date', v_tx.date, 'type', v_tx.type, 'amount', v_tx.amount,
         'category', v_tx.category, 'description', v_tx.description,
         'wallet', v_wallet.name, 'wallet_balance_after', v_wallet.balance,
-        'summary', format('Đã thêm %s %s (%s) ngày %s%s.',
+        'current_balance_after', v_balance,
+        'summary', format('Đã thêm %s %s (%s) ngày %s. Số dư khả dụng còn %s%s.',
             case when v_type = 'expense' then 'khoản chi' else 'khoản thu' end,
             public._api_vnd(v_amount), v_category, to_char(v_tx.date, 'DD/MM/YYYY'),
-            case when v_wallet.id is not null then format(', ví %s còn %s', v_wallet.name, public._api_vnd(v_wallet.balance)) else '' end));
+            public._api_vnd(v_balance),
+            case when v_wallet.id is not null then format(' (riêng ví %s: %s)', v_wallet.name, public._api_vnd(v_wallet.balance)) else '' end));
 end;
 $$;
 
@@ -1166,6 +1264,7 @@ declare
     k public.api_keys := public._api_auth(p_key, 'finance:write');
     v_tx public.transactions;
     v_wallet public.wallets;
+    v_balance numeric;
 begin
     select * into v_tx from public.transactions where id = p_id and user_id = k.user_id for update;
     if not found then
@@ -1184,12 +1283,17 @@ begin
 
     delete from public.transactions where id = v_tx.id;
 
+    select coalesce(sum(case type when 'income' then amount when 'expense' then -amount else 0 end), 0)
+    into v_balance from public.transactions where user_id = k.user_id;
+
     return jsonb_build_object(
         'deleted', v_tx.id,
-        'summary', format('Đã xóa %s %s (%s) ngày %s%s.',
+        'current_balance_after', v_balance,
+        'summary', format('Đã xóa %s %s (%s) ngày %s. Số dư khả dụng còn %s%s.',
             case when v_tx.type = 'expense' then 'khoản chi' else 'khoản thu' end,
             public._api_vnd(v_tx.amount), v_tx.category, to_char(v_tx.date, 'DD/MM/YYYY'),
-            case when v_wallet.id is not null then format(', ví %s còn %s', v_wallet.name, public._api_vnd(v_wallet.balance)) else '' end));
+            public._api_vnd(v_balance),
+            case when v_wallet.id is not null then format(' (riêng ví %s: %s)', v_wallet.name, public._api_vnd(v_wallet.balance)) else '' end));
 end;
 $$;
 
@@ -1249,3 +1353,9 @@ grant execute on function public.api_v1_finance_options(text) to anon, authentic
 grant execute on function public.api_v1_list_transactions(text, date, date, text, text, text, int, text) to anon, authenticated;
 grant execute on function public.api_v1_create_transaction(text, jsonb, text) to anon, authenticated;
 grant execute on function public.api_v1_delete_transaction(text, uuid) to anon, authenticated;
+
+-- Bổ sung (số dư)
+revoke execute on function public._api_vnd_signed(numeric) from public, anon, authenticated;
+revoke execute on function public._api_balance_snapshot(uuid, date, int) from public, anon, authenticated;
+revoke execute on function public.api_v1_balance(text, int, text) from public;
+grant execute on function public.api_v1_balance(text, int, text) to anon, authenticated;
