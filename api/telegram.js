@@ -42,7 +42,15 @@ const debugChats = new Set();      // chat bật /debug: hiện các tool đã g
 const seenUpdates = new Set();     // chống xử lý trùng khi Telegram gửi lại
 const pendingTx = new Map();       // id -> { description, transcript, createdAt }
 const lockedTx = new Set();        // id giao dịch đang/đã ghi → chống bấm xác nhận 2 lần
-const busyChats = new Set();       // chat đang chờ câu trả lời → chống spam nút
+const busyChats = new Map();       // chatId -> thời điểm bắt đầu trả lời (chống spam nút)
+const BUSY_TTL = 55_000;           // khóa tự hết hạn: nếu function bị dừng giữa chừng, khóa không kẹt mãi
+const RESPOND_BUDGET = 48_000;     // tổng thời gian cho 1 câu trả lời (Vercel cắt ở 60s)
+const isBusy = (chatId) => {
+    const at = busyChats.get(chatId);
+    if (at && Date.now() - at < BUSY_TTL) return true;
+    busyChats.delete(chatId);
+    return false;
+};
 const toolCache = new Map();       // key -> { at, promise }
 
 const EXPENSE_CATEGORIES = [
@@ -95,15 +103,96 @@ function vnToday() {
     return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date()); // YYYY-MM-DD
 }
 
+// ---- Bảng: Telegram không có <table> → vẽ bảng chữ đều (monospace) trong <pre> ----
+const TABLE_MAX_WIDTH = 34; // vừa 1 dòng trên màn hình điện thoại
+
+const charWidth = (ch) => (/[\p{M}‍️]/u.test(ch) ? 0 : /\p{Extended_Pictographic}/u.test(ch) ? 2 : 1);
+const textWidth = (s) => Array.from(s).reduce((w, ch) => w + charWidth(ch), 0);
+const padCell = (s, w, right) => {
+    const gap = ' '.repeat(Math.max(0, w - textWidth(s)));
+    return right ? gap + s : s + gap;
+};
+function truncateCell(s, max) {
+    if (textWidth(s) <= max) return s;
+    let out = '';
+    for (const ch of Array.from(s)) {
+        if (textWidth(out + ch) > max - 1) break;
+        out += ch;
+    }
+    return `${out}…`;
+}
+
+const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line);
+const isTableDivider = (line) => /^[\s|:\-]+$/.test(line) && line.includes('-');
+const isNumericCell = (s) => /^[-+]?\s?[\d.,]+\s*(đ|₫|k|tr|triệu|%)?$/i.test(s);
+
+function renderTable(lines) {
+    const rows = lines
+        .filter((l) => !isTableDivider(l))
+        .map((l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|')
+            .map((c) => c.trim().replace(/\*\*|__|`|\*/g, '').replace(/<\/?[a-z][^>]*>/gi, '')));
+    if (rows.length === 0) return '';
+    const cols = Math.max(...rows.map((r) => r.length));
+    rows.forEach((r) => { while (r.length < cols) r.push(''); });
+
+    const body = rows.slice(1);
+    const numeric = Array.from({ length: cols }, (_, c) => body.length > 0
+        && body.every((r) => !r[c] || isNumericCell(r[c])) && body.some((r) => r[c]));
+    const widths = Array.from({ length: cols }, (_, c) => Math.max(...rows.map((r) => textWidth(r[c]))));
+
+    // Quá rộng → thu hẹp cột chữ rộng nhất (giữ nguyên cột số)
+    const total = () => widths.reduce((a, b) => a + b, 0) + 2 * (cols - 1);
+    while (total() > TABLE_MAX_WIDTH) {
+        let widest = -1;
+        widths.forEach((w, c) => { if (!numeric[c] && w > 6 && (widest < 0 || w > widths[widest])) widest = c; });
+        if (widest < 0) break;
+        widths[widest]--;
+    }
+
+    const line = (r) => r.map((cell, c) => padCell(truncateCell(cell, widths[c]), widths[c], numeric[c])).join('  ').trimEnd();
+    const rule = '─'.repeat(total());
+    const out = [line(rows[0]), rule];
+    body.forEach((r, i) => {
+        if (i === body.length - 1 && body.length > 1 && /^t[ổo]ng/i.test(r[0])) out.push(rule);
+        out.push(line(r));
+    });
+    return `<pre>${escapeHtml(out.join('\n'))}</pre>`;
+}
+
+// Thay mỗi bảng Markdown bằng 1 mã giữ chỗ, vẽ xong mới gắn lại (tránh bị các bước định dạng khác làm hỏng)
+function extractTables(md, store) {
+    const lines = md.split('\n');
+    const out = [];
+    for (let i = 0; i < lines.length;) {
+        if (!isTableRow(lines[i])) {
+            out.push(lines[i++]);
+            continue;
+        }
+        let j = i;
+        while (j < lines.length && isTableRow(lines[j])) j++;
+        const block = lines.slice(i, j);
+        if (block.length >= 2) {
+            store.push(renderTable(block));
+            out.push(`\u0000${store.length - 1}\u0000`);
+        } else {
+            out.push(...block);
+        }
+        i = j;
+    }
+    return out.join('\n');
+}
+
 // Markdown đơn giản (từ Gemini) → HTML mà Telegram hỗ trợ
 function markdownToTelegramHtml(md) {
-    let s = escapeHtml(md);
+    const tables = [];
+    let s = escapeHtml(extractTables(String(md || ''), tables));
     s = s.replace(/```(?:\w+)?\n?([\s\S]*?)```/g, (_, code) => `<pre>${code}</pre>`);
     s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
     s = s.replace(/^#{1,6}\s+(.+)$/gm, '<b>$1</b>');
     s = s.replace(/^\s*[-*]\s+/gm, '• ');
     s = s.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
     s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>');
+    s = s.replace(/\u0000(\d+)\u0000/g, (_, n) => tables[Number(n)] || '');
     return s;
 }
 
@@ -118,6 +207,13 @@ function chunk(text, size = 3900) {
     while (rest.length > size) {
         let cut = rest.lastIndexOf('\n', size);
         if (cut < size / 2) cut = size;
+        // Không cắt giữa bảng: lùi về trước dòng đầu của bảng
+        let tableStart = cut;
+        while (tableStart > 0 && isTableRow(rest.slice(rest.lastIndexOf('\n', tableStart - 1) + 1, tableStart))
+            && isTableRow(rest.slice(cut + 1).split('\n')[0] || '')) {
+            tableStart = rest.lastIndexOf('\n', tableStart - 1);
+        }
+        if (tableStart !== cut && tableStart > size / 4) cut = tableStart;
         parts.push(rest.slice(0, cut));
         rest = rest.slice(cut).replace(/^\n/, '');
     }
@@ -443,8 +539,9 @@ const ACTIONS = {
         chip: '🧾 Hóa đơn 7 ngày',
         loading: 'Đang kiểm tra hóa đơn sắp tới',
         cat: 'finance',
-        prefetch: ['context', 'finance'],
-        prompt: 'Kiểm tra các hóa đơn định kỳ, tiền nhà, tiền dịch vụ hoặc các khoản nợ cần thanh toán trong 7 ngày tới.',
+        // Chỉ cần dữ liệu tài chính tháng (đã có hóa đơn định kỳ, nợ) → gửi Gemini ít dữ liệu hơn, trả lời nhanh hơn
+        prefetch: ['finance'],
+        prompt: 'Kiểm tra các hóa đơn định kỳ, tiền nhà, tiền dịch vụ hoặc các khoản nợ cần thanh toán trong 7 ngày tới. Trình bày bằng bảng 3 cột: Khoản | Hạn | Số tiền, dòng cuối là Tổng. Nếu không có khoản nào, nói ngắn gọn là không có.',
     },
     balance30: {
         button: '📊 Biến động 30 ngày',
@@ -452,7 +549,7 @@ const ACTIONS = {
         loading: 'Đang xem biến động số dư',
         cat: 'finance',
         prefetch: ['balance30'],
-        prompt: 'Kiểm tra biến động số dư và các lần điều chỉnh số dư trong 30 ngày qua.',
+        prompt: 'Kiểm tra biến động số dư 30 ngày qua: số dư đầu kỳ, hiện tại, tổng thu, tổng chi. Trình bày các lần điều chỉnh số dư và giao dịch lớn gần đây bằng bảng 3 cột: Ngày | Nội dung | Số tiền (dấu + / -).',
     },
 };
 
@@ -579,14 +676,14 @@ function createProgress(chatId, { messageId = null, title = 'Đang suy nghĩ', p
                 await sendHtml(chatId, html, markup ? { reply_markup: markup } : {});
             }
         },
-        async fail(html) {
+        async fail(html, replyMarkup = null) {
             stopTyping();
             await queue;
             if (msgId) {
-                const r = await editHtml(chatId, msgId, prefixHtml + html);
+                const r = await editHtml(chatId, msgId, prefixHtml + html, replyMarkup || undefined);
                 if (r.ok) return;
             }
-            await sendHtml(chatId, prefixHtml + html);
+            await sendHtml(chatId, prefixHtml + html, replyMarkup ? { reply_markup: replyMarkup } : {});
         },
     };
 }
@@ -617,7 +714,14 @@ async function runTool(name, args = {}) {
     const hit = toolCache.get(key);
     if (hit && Date.now() - hit.at < TOOL_CACHE_TTL) return hit.promise;
 
-    const promise = tool.run(SMARTLIFE_KEY, args);
+    // Truy vấn đọc bị treo quá 12s → báo lỗi để Gemini/người dùng biết, không chờ mãi
+    let timer;
+    const promise = Promise.race([
+        tool.run(SMARTLIFE_KEY, args),
+        new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new ApiError(504, 'timeout', `${name} quá 12 giây không phản hồi`)), 12_000);
+        }),
+    ]).finally(() => clearTimeout(timer));
     toolCache.set(key, { at: Date.now(), promise });
     promise.catch(() => toolCache.delete(key));
     if (toolCache.size > 50) {
@@ -690,12 +794,17 @@ function generationConfig(base, thinkingBudget) {
     return cfg;
 }
 
+// Hết thời gian cho phép (function Vercel tối đa 60s) → báo người dùng thay vì im lặng
+class TimeBudgetError extends Error {}
+
 let keyIndex = 0;
-async function callGemini(body) {
+async function callGemini(body, deadline = Date.now() + 45_000) {
     const keys = geminiKeys();
     if (keys.length === 0) throw new Error('GEMINI_API_KEYS chưa được cấu hình.');
     let lastError;
     for (let attempt = 0; attempt < Math.max(2, keys.length); attempt++) {
+        const remaining = deadline - Date.now();
+        if (remaining < 3_000) throw new TimeBudgetError(lastError || 'Hết thời gian chờ Gemini');
         const key = keys[keyIndex % keys.length];
         let res;
         try {
@@ -703,7 +812,7 @@ async function callGemini(body) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
-                signal: AbortSignal.timeout(30_000),
+                signal: AbortSignal.timeout(Math.min(25_000, remaining)),
             });
         } catch (err) {
             lastError = `Gemini timeout/network: ${err?.message || err}`;
@@ -716,6 +825,7 @@ async function callGemini(body) {
         keyIndex++;
         await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
     }
+    if (deadline - Date.now() < 3_000) throw new TimeBudgetError(lastError || 'Hết thời gian chờ Gemini');
     throw new Error(lastError);
 }
 
@@ -725,7 +835,8 @@ function systemPrompt() {
         INSTRUCTIONS,
         `Bây giờ là ${now} (giờ Việt Nam).`,
         'Bạn đang trò chuyện qua Telegram với chính chủ tài khoản SmartLife.',
-        'Trả lời bằng ngôn ngữ người dùng dùng, ngắn gọn, dễ đọc trên điện thoại: câu ngắn, gạch đầu dòng, **in đậm** con số quan trọng, mở đầu mỗi nhóm ý bằng 1 emoji phù hợp. Không dùng bảng.',
+        'Trả lời bằng ngôn ngữ người dùng dùng, ngắn gọn, dễ đọc trên điện thoại: câu ngắn, gạch đầu dòng, **in đậm** con số quan trọng, mở đầu mỗi nhóm ý bằng 1 emoji phù hợp.',
+        'BẢNG: khi có từ 3 dòng số liệu cùng loại trở lên (hóa đơn, giao dịch, chi tiêu theo danh mục, biến động/điều chỉnh số dư, task kèm hạn) → trình bày bằng bảng Markdown dạng | Cột 1 | Cột 2 | Cột 3 |, có dòng |---|. Tối đa 3 cột, tối đa 12 dòng; ô thật ngắn (≤ 14 ký tự), KHÔNG emoji và KHÔNG ** trong bảng; ngày dạng 25/10; tiền dạng 1.250.000đ (hoặc rút gọn 1,25tr / 450k nếu dài). Dòng tổng (nếu có) đặt cuối bảng. Sau bảng thêm 1-3 gạch đầu dòng nhận xét ngắn.',
         'Định dạng tiền kiểu 1.250.000đ. Không bịa số liệu: luôn dùng số MỚI NHẤT từ tool, kể cả khi đã trả lời câu tương tự trước đó.',
         'Nếu tin nhắn người dùng có khối <smartlife_data>, đó là kết quả tool vừa lấy trong CHÍNH lượt này (số liệu mới nhất): dùng trực tiếp, KHÔNG gọi lại các tool đó; chỉ gọi thêm tool khi khối này thiếu dữ liệu cần thiết. Không nhắc tới khối này với người dùng.',
         'Không bao giờ hiển thị phần [Ghi chú nội bộ] cho người dùng.',
@@ -739,7 +850,7 @@ function rememberTurn(chatId, userText, modelText) {
     history.set(chatId, updated.slice(-HISTORY_TURNS));
 }
 
-async function runAgent(chatId, userText, { prefetch = [], fresh = false, onProgress = () => {} } = {}) {
+async function runAgent(chatId, userText, { prefetch = [], fresh = false, onProgress = () => {}, deadline = Date.now() + 45_000 } = {}) {
     if (fresh) toolCache.clear();
     const past = history.get(chatId) || [];
     const toolsUsed = [];
@@ -762,7 +873,7 @@ async function runAgent(chatId, userText, { prefetch = [], fresh = false, onProg
             contents,
             tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
             generationConfig: generationConfig({ temperature: 0.2 }, AGENT_THINKING_BUDGET),
-        });
+        }, deadline);
 
         const content = data?.candidates?.[0]?.content;
         const parts = content?.parts || [];
@@ -814,12 +925,13 @@ async function respond(chatId, {
     fresh = false,
 }) {
     const started = Date.now();
-    busyChats.add(chatId);
+    busyChats.set(chatId, started);
     const progress = createProgress(chatId, { messageId: editMessageId, title: loading, prefixHtml });
     try {
         const { text, toolsUsed } = await runAgent(chatId, prompt, {
             prefetch,
             fresh,
+            deadline: started + RESPOND_BUDGET,
             onProgress: (step, line) => progress.update(step, line),
         });
         const debugLine = debugChats.has(chatId)
@@ -831,7 +943,15 @@ async function respond(chatId, {
         return true;
     } catch (err) {
         console.error('[telegram] respond error', err);
-        await progress.fail('⚠️ <b>Mình đang gặp lỗi khi lấy dữ liệu.</b>\n<i>Bạn thử lại sau ít phút nhé.</i>');
+        const retry = actionId
+            ? { inline_keyboard: [[{ text: '🔁 Thử lại', callback_data: `rf:${actionId}`, style: 'primary' }]] }
+            : null;
+        await progress.fail(
+            err instanceof TimeBudgetError
+                ? '⏱️ <b>AI phản hồi chậm quá nên mình dừng lại.</b>\n<i>Bấm Thử lại hoặc hỏi ngắn hơn nhé.</i>'
+                : '⚠️ <b>Mình đang gặp lỗi khi lấy dữ liệu.</b>\n<i>Bạn thử lại sau ít phút nhé.</i>',
+            retry,
+        );
         return false;
     } finally {
         busyChats.delete(chatId);
@@ -1129,7 +1249,7 @@ async function handleCallbackQuery(query) {
     if (kind === 'cq' || kind === 'rf') {
         const actionId = rest[0];
         if (!ACTIONS[actionId]) return answer();
-        if (busyChats.has(chatId)) return answer('⏳ Mình đang trả lời câu trước, chờ chút nhé…');
+        if (isBusy(chatId)) return answer('⏳ Mình đang trả lời câu trước, chờ vài giây rồi bấm lại nhé.', true);
         const isRefresh = kind === 'rf';
         await answer(isRefresh ? '🔄 Đang làm mới…' : `⚡ ${ACTIONS[actionId].chip}`);
         if (isRefresh) {
@@ -1256,7 +1376,7 @@ async function handleMessage(msg) {
         return;
     }
 
-    if (busyChats.has(chatId)) {
+    if (isBusy(chatId)) {
         await sendHtml(chatId, '⏳ <i>Mình đang trả lời câu trước, bạn chờ chút rồi gửi lại nhé.</i>');
         return;
     }
