@@ -31,8 +31,11 @@ const TZ = 'Asia/Ho_Chi_Minh';
 
 const rawBudget = process.env.TELEGRAM_THINKING_BUDGET;
 const AGENT_THINKING_BUDGET = rawBudget === undefined || rawBudget === '' ? 1024 : Number(rawBudget);
+// Nút bấm có sẵn dữ liệu chỉ cần tóm tắt → tắt "suy nghĩ" để nhanh gấp nhiều lần
+const rawActionBudget = process.env.TELEGRAM_ACTION_THINKING_BUDGET;
+const ACTION_THINKING_BUDGET = rawActionBudget === undefined || rawActionBudget === '' ? 0 : Number(rawActionBudget);
 
-const MAX_TOOL_ROUNDS = 6;
+const MAX_TOOL_ROUNDS = 4;            // câu hỏi tự do: tối đa 4 vòng gọi tool (mỗi vòng Gemini ~5-12s)
 const HISTORY_TURNS = 10;          // số tin nhắn gần nhất được nhớ
 const TOOL_CACHE_TTL = 20_000;     // cache kết quả tool đọc trong 20s (xóa ngay khi có thao tác ghi)
 const MAX_VOICE_SECONDS = 300;
@@ -43,6 +46,7 @@ const seenUpdates = new Set();     // chống xử lý trùng khi Telegram gửi
 const pendingTx = new Map();       // id -> { description, transcript, createdAt }
 const lockedTx = new Set();        // id giao dịch đang/đã ghi → chống bấm xác nhận 2 lần
 const busyChats = new Map();       // chatId -> thời điểm bắt đầu trả lời (chống spam nút)
+const lastRequests = new Map();    // chatId -> câu hỏi tự do gần nhất (cho nút Thử lại)
 const BUSY_TTL = 55_000;           // khóa tự hết hạn: nếu function bị dừng giữa chừng, khóa không kẹt mãi
 const RESPOND_BUDGET = 48_000;     // tổng thời gian cho 1 câu trả lời (Vercel cắt ở 60s)
 const isBusy = (chatId) => {
@@ -476,7 +480,7 @@ const ACTIONS = {
         loading: 'Đang mở lịch trình hôm nay',
         cat: 'schedule',
         prefetch: ['context'],
-        prompt: 'Kiểm tra và tóm tắt chi tiết lịch trình hôm nay của tôi (bao gồm thời khóa biểu học tập, môn học, ca học, phòng học, giảng viên và các sự kiện/cuộc hẹn). Nếu không có lịch cố định, hãy thông báo ngắn gọn.',
+        prompt: 'Kiểm tra và tóm tắt chi tiết lịch trình hôm nay của tôi (bao gồm thời khóa biểu học tập, môn học, ca học, phòng học, giảng viên và các sự kiện/cuộc hẹn). Nếu có từ 2 mục trở lên, trình bày bảng: Giờ | Môn/Sự kiện | Phòng. Nếu không có lịch cố định, hãy thông báo ngắn gọn.',
     },
     tasks: {
         button: '🎯 Top việc cần làm',
@@ -484,7 +488,7 @@ const ACTIONS = {
         loading: 'Đang xếp hạng việc cần làm',
         cat: 'tasks',
         prefetch: ['context'],
-        prompt: 'Kiểm tra danh sách công việc (Kanban tasks) của tôi. Liệt kê các task có độ ưu tiên cao nhất (urgent/focus), task có hạn chót hôm nay hoặc đang quá hạn. Đề xuất thứ tự ưu tiên xử lý trong ngày.',
+        prompt: 'Kiểm tra danh sách công việc (Kanban tasks) của tôi. Liệt kê các task có độ ưu tiên cao nhất (urgent/focus), task có hạn chót hôm nay hoặc đang quá hạn. Trình bày bảng: Task | Hạn | Ưu tiên (tối đa 8 dòng, sắp theo thứ tự nên làm), sau đó đề xuất ngắn thứ tự xử lý trong ngày.',
     },
     finance: {
         button: '💰 Số dư & Chi tiêu',
@@ -500,14 +504,15 @@ const ACTIONS = {
         loading: 'Đang xem streak thói quen',
         cat: 'habits',
         prefetch: ['context'],
-        prompt: 'Kiểm tra tình hình rèn luyện thói quen (habits) của tôi trong SmartLife hôm nay: những thói quen nào đã hoàn thành, những thói quen nào chưa làm, streak (chuỗi ngày liên tục) của từng thói quen. Hãy nhắc nhở và động viên tôi hoàn thành!',
+        prompt: 'Kiểm tra tình hình rèn luyện thói quen (habits) của tôi trong SmartLife hôm nay: những thói quen nào đã hoàn thành, những thói quen nào chưa làm, streak (chuỗi ngày liên tục) của từng thói quen. Trình bày bảng: Thói quen | Hôm nay | Streak (Hôm nay ghi Xong / Chưa). Sau đó nhắc nhở và động viên tôi hoàn thành!',
     },
     morning: {
         button: '🌅 Khởi động ngày',
         chip: '🌅 Khởi động ngày',
         loading: 'Đang chuẩn bị bản tin buổi sáng',
         cat: 'morning',
-        prefetch: ['context'],
+        // Cần cả tài chính tháng để có "hạn mức chi an toàn mỗi ngày" (thiếu thì Gemini tốn thêm 1 vòng ~10s)
+        prefetch: ['context', 'finance'],
         prompt: 'Chào buổi sáng! Hãy tổng hợp bức tranh toàn cảnh khởi động ngày mới cho tôi: lịch trình hôm nay, 3 việc quan trọng nhất cần giải quyết, hạn mức chi tiêu an toàn cho ngày hôm nay và một câu truyền cảm hứng ngắn gọn.',
     },
     night: {
@@ -524,7 +529,7 @@ const ACTIONS = {
         loading: 'Đang lục task quá hạn',
         cat: 'tasks',
         prefetch: ['overdue'],
-        prompt: 'Liệt kê chi tiết các task đang quá hạn (overdue) của tôi kèm deadline cũ và gợi ý giải pháp xử lý nhanh từng việc.',
+        prompt: 'Liệt kê chi tiết các task đang quá hạn (overdue) của tôi Trình bày bảng: Task | Hạn cũ | Trễ (số ngày), sau đó gợi ý giải pháp xử lý nhanh cho 3 việc quan trọng nhất.',
     },
     pomodoro: {
         button: '🍅 Khung giờ Pomodoro',
@@ -532,7 +537,7 @@ const ACTIONS = {
         loading: 'Đang tìm khung giờ vàng',
         cat: 'tasks',
         prefetch: ['context'],
-        prompt: 'Dựa vào lịch trình và danh sách task cần làm hôm nay, hãy gợi ý cho tôi 2-3 khung giờ vàng để bật Pomodoro tập trung sâu (Deep Work).',
+        prompt: 'Dựa vào lịch trình và danh sách task cần làm hôm nay, hãy gợi ý cho tôi 2-3 khung giờ vàng để bật Pomodoro tập trung sâu (Deep Work). Trình bày bảng: Khung giờ | Việc | Số phiên.',
     },
     bills: {
         button: '🧾 Hóa đơn 7 ngày tới',
@@ -797,36 +802,89 @@ function generationConfig(base, thinkingBudget) {
 // Hết thời gian cho phép (function Vercel tối đa 60s) → báo người dùng thay vì im lặng
 class TimeBudgetError extends Error {}
 
+// Lỗi từ Gemini, giữ lại mã HTTP để báo đúng nguyên nhân cho người dùng
+class GeminiError extends Error {
+    constructor(status, message, retryAfterSec = null) {
+        super(message);
+        this.status = status;
+        this.retryAfterSec = retryAfterSec;
+    }
+}
+
+// Model dự phòng có hạn mức riêng: dùng khi model chính bị 429 (hết lượt) / quá tải / quá chậm
+const FALLBACK_MODEL = process.env.TELEGRAM_GEMINI_FALLBACK_MODEL ?? 'gemini-2.5-flash-lite';
+const RETRYABLE = new Set([429, 500, 503, 504]);
+const modelCooldown = new Map();   // model -> thời điểm được gọi lại sau khi bị 429
+
 let keyIndex = 0;
 async function callGemini(body, deadline = Date.now() + 45_000) {
     const keys = geminiKeys();
-    if (keys.length === 0) throw new Error('GEMINI_API_KEYS chưa được cấu hình.');
-    let lastError;
-    for (let attempt = 0; attempt < Math.max(2, keys.length); attempt++) {
+    if (keys.length === 0) throw new GeminiError(0, 'GEMINI_API_KEYS chưa được cấu hình.');
+
+    // Thử lần lượt: model chính với từng key → model dự phòng với từng key.
+    // Model vừa bị 429 được "nghỉ" một lúc để không phí lượt gọi ở các vòng sau.
+    const all = [MODEL, ...(FALLBACK_MODEL && FALLBACK_MODEL !== MODEL ? [FALLBACK_MODEL] : [])];
+    const ready = all.filter((m) => (modelCooldown.get(m) || 0) < Date.now());
+    const models = ready.length ? ready : all;
+    const plan = models.flatMap((model) => keys.map((_, i) => ({ model, key: keys[(keyIndex + i) % keys.length] })));
+
+    let lastError = null;
+    for (const { model, key } of plan) {
         const remaining = deadline - Date.now();
-        if (remaining < 3_000) throw new TimeBudgetError(lastError || 'Hết thời gian chờ Gemini');
-        const key = keys[keyIndex % keys.length];
+        if (remaining < 3_000) break;
         let res;
         try {
-            res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
+            res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
-                signal: AbortSignal.timeout(Math.min(25_000, remaining)),
+                // Model chính không được ăn hết thời gian → chừa chỗ cho model dự phòng
+                signal: AbortSignal.timeout(Math.min(model === MODEL && models.length > 1 ? 20_000 : 25_000, remaining)),
             });
         } catch (err) {
-            lastError = `Gemini timeout/network: ${err?.message || err}`;
+            lastError = new GeminiError(504, `${model}: quá thời gian chờ (${err?.name || 'network'})`);
             keyIndex++;
             continue;
         }
-        if (res.ok) return res.json();
-        lastError = `Gemini HTTP ${res.status}`;
-        if (![429, 500, 503, 504].includes(res.status)) break;
+        if (res.ok) {
+            if (model !== MODEL) console.warn('[telegram] dùng model dự phòng', model);
+            return res.json();
+        }
+        const errBody = await res.json().catch(() => ({}));
+        const retryDelay = errBody?.error?.details?.find((d) => d.retryDelay)?.retryDelay;
+        lastError = new GeminiError(
+            res.status,
+            `${model}: ${errBody?.error?.status || 'HTTP'} ${res.status}${errBody?.error?.message ? ` — ${String(errBody.error.message).slice(0, 160)}` : ''}`,
+            retryDelay ? parseInt(retryDelay, 10) : null,
+        );
+        console.warn('[telegram] gemini error', lastError.message);
+        if (res.status === 429) modelCooldown.set(model, Date.now() + Math.min(120, lastError.retryAfterSec || 60) * 1000);
+        if (!RETRYABLE.has(res.status)) throw lastError; // sai key / request lỗi → thử tiếp vô ích
         keyIndex++;
-        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
     }
-    if (deadline - Date.now() < 3_000) throw new TimeBudgetError(lastError || 'Hết thời gian chờ Gemini');
-    throw new Error(lastError);
+    if (deadline - Date.now() < 3_000) throw new TimeBudgetError(lastError?.message || 'Hết thời gian chờ Gemini');
+    throw lastError || new GeminiError(0, 'Gemini không phản hồi');
+}
+
+// Chuyển lỗi kỹ thuật thành câu dễ hiểu + mã lỗi ngắn để dễ báo lại
+function describeError(err) {
+    if (err instanceof TimeBudgetError) {
+        return { title: '⏱️ AI phản hồi chậm quá nên mình dừng lại.', hint: 'Bấm Thử lại hoặc hỏi ngắn hơn nhé.', code: 'TIMEOUT' };
+    }
+    if (err instanceof GeminiError) {
+        if (err.status === 429) {
+            const wait = err.retryAfterSec ? `khoảng ${err.retryAfterSec} giây` : 'khoảng 1 phút';
+            return { title: '🚦 AI đang hết lượt gọi (giới hạn miễn phí của Gemini).', hint: `Chờ ${wait} rồi bấm Thử lại nhé.`, code: 'GEMINI_429' };
+        }
+        if ([400, 401, 403, 404].includes(err.status)) {
+            return { title: '🔑 Cấu hình Gemini có vấn đề (key hoặc tên model).', hint: 'Kiểm tra GEMINI_API_KEYS / TELEGRAM_GEMINI_MODEL trên Vercel.', code: `GEMINI_${err.status}` };
+        }
+        return { title: '🌩️ Máy chủ Gemini đang quá tải.', hint: 'Thử lại sau ít phút nhé.', code: `GEMINI_${err.status || 'NET'}` };
+    }
+    if (err instanceof ApiError) {
+        return { title: '🗄️ Không lấy được dữ liệu SmartLife.', hint: 'Thử lại sau ít phút nhé.', code: `DB_${err.status}_${err.code}` };
+    }
+    return { title: '⚠️ Mình đang gặp lỗi khi xử lý.', hint: 'Bạn thử lại sau ít phút nhé.', code: 'INTERNAL' };
 }
 
 function systemPrompt() {
@@ -846,11 +904,21 @@ function systemPrompt() {
 
 function rememberTurn(chatId, userText, modelText) {
     const past = history.get(chatId) || [];
-    const updated = [...past, { role: 'user', parts: [{ text: userText }] }, { role: 'model', parts: [{ text: modelText }] }];
+    // Rút gọn câu trả lời dài khi lưu lịch sử (giữ ghi chú nội bộ ở cuối) → mỗi lượt gửi Gemini ít token hơn
+    const note = modelText.match(/\n\n\[Ghi chú nội bộ[\s\S]*$/)?.[0] || '';
+    const body = note ? modelText.slice(0, -note.length) : modelText;
+    const short = body.length > 1200 ? `${body.slice(0, 1200)}…` : body;
+    const updated = [...past, { role: 'user', parts: [{ text: userText }] }, { role: 'model', parts: [{ text: short + note }] }];
     history.set(chatId, updated.slice(-HISTORY_TURNS));
 }
 
-async function runAgent(chatId, userText, { prefetch = [], fresh = false, onProgress = () => {}, deadline = Date.now() + 45_000 } = {}) {
+async function runAgent(chatId, userText, {
+    prefetch = [],
+    fresh = false,
+    fast = false,                  // tác vụ nút bấm: dữ liệu đã nạp sẵn → trả lời nhanh
+    onProgress = () => {},
+    deadline = Date.now() + 45_000,
+} = {}) {
     if (fresh) toolCache.clear();
     const past = history.get(chatId) || [];
     const toolsUsed = [];
@@ -858,28 +926,38 @@ async function runAgent(chatId, userText, { prefetch = [], fresh = false, onProg
 
     // Nạp sẵn dữ liệu → gắn vào lượt hỏi hiện tại (không lưu vào lịch sử để history gọn)
     let turnText = userText;
+    let prefetched = false;
     if (prefetch.length) {
         const fetched = await prefetchData(prefetch);
         fetched.forEach((f) => toolsUsed.push(`⚡ ${f.tool} (nạp sẵn)`));
         if (fetched.length) turnText += buildDataBlock(fetched);
+        prefetched = fetched.length === new Set(prefetch).size;
         onProgress(3, '🧠 <i>Đang phân tích dữ liệu…</i>');
     }
 
+    // Chế độ nhanh: đủ dữ liệu → không "suy nghĩ" dài, tối đa 1 vòng gọi thêm tool
+    const quick = fast && prefetched;
+    const maxRounds = quick ? 1 : MAX_TOOL_ROUNDS;
+    const thinking = quick ? ACTION_THINKING_BUDGET : AGENT_THINKING_BUDGET;
+
     const contents = [...past, { role: 'user', parts: [{ text: turnText }] }];
 
-    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+    for (let round = 0; round <= maxRounds; round++) {
+        // Vòng cuối hoặc sắp hết giờ → bắt Gemini trả lời bằng chữ, không gọi tool nữa
+        const mustAnswer = round === maxRounds || deadline - Date.now() < 15_000;
         const data = await callGemini({
             systemInstruction: { parts: [{ text: systemPrompt() }] },
             contents,
             tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
-            generationConfig: generationConfig({ temperature: 0.2 }, AGENT_THINKING_BUDGET),
+            ...(mustAnswer ? { toolConfig: { functionCallingConfig: { mode: 'NONE' } } } : {}),
+            generationConfig: generationConfig({ temperature: 0.2 }, thinking),
         }, deadline);
 
         const content = data?.candidates?.[0]?.content;
         const parts = content?.parts || [];
         const calls = parts.filter((p) => p.functionCall);
 
-        if (calls.length === 0 || round === MAX_TOOL_ROUNDS) {
+        if (calls.length === 0 || mustAnswer) {
             const text = parts.filter((p) => !p.thought).map((p) => p.text || '').join('').trim()
                 || 'Mình chưa có câu trả lời, bạn hỏi lại giúp mình nhé.';
             const remembered = memo.length ? `${text}\n\n[Ghi chú nội bộ, không hiển thị: ${memo.join(' | ')}]` : text;
@@ -926,11 +1004,14 @@ async function respond(chatId, {
 }) {
     const started = Date.now();
     busyChats.set(chatId, started);
+    // Nhớ yêu cầu gần nhất để nút "Thử lại" dùng được cả với câu hỏi tự do
+    if (!actionId) lastRequests.set(chatId, { prompt, prefetch, category, loading });
     const progress = createProgress(chatId, { messageId: editMessageId, title: loading, prefixHtml });
     try {
         const { text, toolsUsed } = await runAgent(chatId, prompt, {
             prefetch,
             fresh,
+            fast: Boolean(actionId),
             deadline: started + RESPOND_BUDGET,
             onProgress: (step, line) => progress.update(step, line),
         });
@@ -943,15 +1024,10 @@ async function respond(chatId, {
         return true;
     } catch (err) {
         console.error('[telegram] respond error', err);
-        const retry = actionId
-            ? { inline_keyboard: [[{ text: '🔁 Thử lại', callback_data: `rf:${actionId}`, style: 'primary' }]] }
-            : null;
-        await progress.fail(
-            err instanceof TimeBudgetError
-                ? '⏱️ <b>AI phản hồi chậm quá nên mình dừng lại.</b>\n<i>Bấm Thử lại hoặc hỏi ngắn hơn nhé.</i>'
-                : '⚠️ <b>Mình đang gặp lỗi khi lấy dữ liệu.</b>\n<i>Bạn thử lại sau ít phút nhé.</i>',
-            retry,
-        );
+        const { title, hint, code } = describeError(err);
+        const retry = { inline_keyboard: [[{ text: '🔁 Thử lại', callback_data: actionId ? `rf:${actionId}` : 'rq:last', style: 'primary' }]] };
+        const detail = debugChats.has(chatId) ? `\n<code>${escapeHtml(String(err?.message || err).slice(0, 300))}</code>` : '';
+        await progress.fail(`<b>${title}</b>\n<i>${hint}</i>\n<code>Mã lỗi: ${escapeHtml(code)}</code>${detail}`, retry);
         return false;
     } finally {
         busyChats.delete(chatId);
@@ -1259,6 +1335,16 @@ async function handleCallbackQuery(query) {
             if (messageId) tgCall('editMessageReplyMarkup', { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } });
             await respondAction(chatId, actionId);
         }
+        return;
+    }
+
+    // Thử lại câu hỏi tự do gần nhất (sửa ngay trên tin báo lỗi)
+    if (kind === 'rq') {
+        const last = lastRequests.get(chatId);
+        if (!last) return answer('Không còn câu hỏi trước đó, bạn gửi lại giúp mình nhé.', true);
+        if (isBusy(chatId)) return answer('⏳ Mình đang trả lời câu trước, chờ vài giây rồi bấm lại nhé.', true);
+        await answer('🔁 Đang thử lại…');
+        await respond(chatId, { ...last, editMessageId: messageId });
         return;
     }
 
