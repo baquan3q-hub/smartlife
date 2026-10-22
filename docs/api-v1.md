@@ -122,4 +122,16 @@ Cài webhook: mở `https://<domain>/api/telegram?setup=<TELEGRAM_WEBHOOK_SECRET
 
 Lệnh: `/today`, `/finance`, `/overdue`, `/spend 45k ăn trưa`, `/debug` (hiện các tool đã gọi), `/reset`, `/id`. Bot nhớ 10 tin nhắn gần nhất; bộ nhớ này mất khi function khởi động lại.
 
+## 9. Tự động thông báo & Nhắc việc qua Telegram — `api/cron-telegram.js`
+
+Endpoint tự động hóa gửi thông báo lịch trình, task và tổng kết ngày qua Telegram bot:
+- **8h00 Sáng**: Gửi Morning Briefing (lịch học/sự kiện hôm nay, task ưu tiên, task quá hạn, số dư ví, tiến độ thói quen).
+- **22h00 Tối**: Gửi Evening Review (tiến độ task đã xong, nhắc nhở ghi chép chi tiêu bằng `/spend`).
+- **Cảnh báo hạn chót**: Tự động lọc các task sắp đến hạn trong 48h và task quá hạn.
+
+Kích hoạt hoặc test thủ công:
+- Test tin nhắn sáng: `https://<domain>/api/cron-telegram?key=smartlife2026&type=morning`
+- Test tin nhắn tối: `https://<domain>/api/cron-telegram?key=smartlife2026&type=evening`
+- Tự động: Vercel Cron chạy theo cấu hình trong `vercel.json` hoặc thiết lập qua dịch vụ cron định kỳ.
+
 Thu/chi luôn bỏ qua danh mục "Điều chỉnh số dư" (giống app). Các kết quả tài chính đều có trường `summary` đã định dạng sẵn, để AI trích dẫn thay vì tự tính.
