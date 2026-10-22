@@ -24,6 +24,25 @@ const MAIN_KEYBOARD = {
     ],
     resize_keyboard: true,
     is_persistent: true,
+    input_field_placeholder: 'Hỏi SmartLife hoặc gửi voice 🎙️',
+};
+
+// Nút gợi ý gắn dưới mỗi tin nhắc tự động → bấm là bot (api/telegram.js) trả lời ngay
+const CHIPS_BY_TYPE = {
+    morning: [
+        [{ text: '🎯 Top việc', callback_data: 'cq:tasks' }, { text: '📅 Lịch trình', callback_data: 'cq:schedule' }],
+        [{ text: '🍅 Khung giờ Pomodoro', callback_data: 'cq:pomodoro' }],
+    ],
+    afternoon: [
+        [{ text: '⚠️ Task quá hạn', callback_data: 'cq:overdue' }, { text: '🍅 Pomodoro', callback_data: 'cq:pomodoro' }],
+    ],
+    evening: [
+        [{ text: '🌙 Tổng kết AI', callback_data: 'cq:night' }, { text: '⚡ Thói quen', callback_data: 'cq:habits' }],
+        [{ text: '💰 Số dư & chi tiêu', callback_data: 'cq:finance' }],
+    ],
+    alert: [
+        [{ text: '⚠️ Task quá hạn', callback_data: 'cq:overdue' }, { text: '🎯 Top việc', callback_data: 'cq:tasks' }],
+    ],
 };
 
 async function sendTelegram(method, payload) {
@@ -368,13 +387,14 @@ export default async function handler(req, res) {
         });
     }
 
-    // 6. Gửi qua Telegram
+    // 6. Gửi qua Telegram (kèm nút gợi ý theo loại tin; bàn phím chính đã được ghim sẵn)
+    const replyMarkup = CHIPS_BY_TYPE[type] ? { inline_keyboard: CHIPS_BY_TYPE[type] } : MAIN_KEYBOARD;
     const tgRes = await sendTelegram('sendMessage', {
         chat_id: ALLOWED_CHAT_ID,
         text: messageText,
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
-        reply_markup: MAIN_KEYBOARD,
+        reply_markup: replyMarkup,
     });
 
     if (!tgRes.ok) {
@@ -383,7 +403,7 @@ export default async function handler(req, res) {
         await sendTelegram('sendMessage', {
             chat_id: ALLOWED_CHAT_ID,
             text: plainText,
-            reply_markup: MAIN_KEYBOARD,
+            reply_markup: replyMarkup,
         });
     }
 
