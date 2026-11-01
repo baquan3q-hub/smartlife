@@ -1,5 +1,6 @@
 # Build SmartLife cho Windows (Tauri v2)
 # - Push tag `desktop-v*` (vd desktop-v0.1.0) → build .exe/.msi và phát hành GitHub Release
+# - Chạy tay (Actions → Run workflow) với release_version = X.Y.Z → tự tạo tag desktop-vX.Y.Z + Release
 # - Push thay đổi liên quan Sticky Notes / desktop → build kiểm tra + tải file cài ở mục Artifacts
 name: Desktop (Windows)
 
@@ -16,6 +17,11 @@ on:
       - 'src/hooks/useStickyNotes.ts'
       - '.github/workflows/desktop-windows.yml'
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Phiên bản phát hành, dạng X.Y.Z (vd 0.1.0). Để trống = chỉ build thử'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -56,15 +62,27 @@ jobs:
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli@^2
 
-      # Nhận phiên bản từ tag desktop-vX.Y.Z
-      - name: Set version from tag
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
+      # Phiên bản phát hành: từ tag desktop-vX.Y.Z hoặc từ ô nhập khi chạy tay
+      - name: Resolve release version
+        id: release
         shell: pwsh
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+          INPUT_VERSION: ${{ inputs.release_version }}
         run: |
-          $version = "${{ github.ref_name }}".Replace('desktop-v', '')
-          $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
-          $conf.version = $version
-          $conf | ConvertTo-Json -Depth 20 | Set-Content src-tauri/tauri.conf.json -Encoding utf8
+          $version = ''
+          if ($env:IS_TAG -eq 'true') { $version = $env:REF_NAME.Replace('desktop-v', '') }
+          elseif ($env:INPUT_VERSION) { $version = $env:INPUT_VERSION.Trim() }
+          if ($version -and $version -notmatch '^\d+\.\d+\.\d+$') {
+            Write-Error "Phiên bản '$version' không hợp lệ (cần dạng X.Y.Z)"; exit 1
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          if ($version) {
+            $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+            $conf.version = $version
+            $conf | ConvertTo-Json -Depth 20 | Set-Content src-tauri/tauri.conf.json -Encoding utf8
+          }
 
       - name: Build
         working-directory: src-tauri
@@ -78,12 +96,16 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: error
 
+      # Tạo tag (nếu chưa có) + Release công khai
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        if: steps.release.outputs.version != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: desktop-v${{ steps.release.outputs.version }}
+          target_commitish: ${{ github.sha }}
           draft: false
-          name: SmartLife Desktop ${{ github.ref_name }}
+          make_latest: true
+          name: SmartLife Desktop v${{ steps.release.outputs.version }}
           body: |
             ## SmartLife cho Windows
             - Sticky Notes nổi trên màn hình, luôn nằm trên cùng

@@ -13,9 +13,12 @@
 
 ## 3. Windows (Tauri)
 ### Build tự động (khuyên dùng)
+**Cách 1 — trên GitHub (không cần máy tính):** Actions → **Desktop (Windows)** → **Run workflow** → nhập `release_version` (vd `0.1.1`) → Run.
+
+**Cách 2 — bằng git:**
 ```bash
-git tag desktop-v0.1.0
-git push origin desktop-v0.1.0
+git tag desktop-v0.1.1
+git push origin desktop-v0.1.1
 ```
 GitHub Actions (`.github/workflows/desktop-windows.yml`) build trên máy Windows và phát hành **GitHub Release** công khai kèm file `.exe` / `.msi`.
 
