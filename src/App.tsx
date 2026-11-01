@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, CalendarDays, Wallet as WalletIcon, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target, Grid2X2 } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Wallet as WalletIcon, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target, Grid2X2, StickyNote as StickyNoteIcon } from 'lucide-react';
 import { NotificationPopupModal } from './components/NotificationPopupModal';
 import { getUnreadCount, getUserNotifications } from './services/adminNotificationService';
 
@@ -22,6 +22,8 @@ import PricingModal from './components/PricingModal';
 import InvoiceModal from './components/InvoiceModal';
 import MySpotify from './components/MySpotify';
 import ExpandSection from './components/ExpandSection';
+import StickyNotesDashboard from './components/sticky/StickyNotesDashboard';
+import { desktopBridge } from './services/desktopBridge';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import ProGateOverlay from './components/ProGateOverlay';
 import { GlobalLoader } from './components/GlobalLoader';
@@ -201,10 +203,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         };
     });
 
-    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals' | 'expand'>(() => {
+    const [activeTab, setActiveTab] = useState<'visual' | 'finance' | 'schedule' | 'music' | 'cashflow' | 'ai-advisor' | 'gpa' | 'admin' | 'habit' | 'journal' | 'goals' | 'expand' | 'sticky'>(() => {
         const hash = window.location.hash;
         const cleanHash = hash.replace(/^#\/?/, '');
-        const validTabs = ['visual', 'finance', 'schedule', 'music', 'cashflow', 'ai-advisor', 'gpa', 'admin', 'habit', 'journal', 'goals', 'expand'];
+        const validTabs = ['visual', 'finance', 'schedule', 'music', 'cashflow', 'ai-advisor', 'gpa', 'admin', 'habit', 'journal', 'goals', 'expand', 'sticky'];
         if (validTabs.includes(cleanHash)) {
             if (cleanHash === 'music') {
                 return 'schedule';
@@ -218,7 +220,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         const handleHashChange = () => {
             const hash = window.location.hash;
             const cleanHash = hash.replace(/^#\/?/, '');
-            const validTabs = ['visual', 'finance', 'schedule', 'music', 'cashflow', 'ai-advisor', 'gpa', 'admin', 'habit', 'journal', 'goals', 'expand'];
+            const validTabs = ['visual', 'finance', 'schedule', 'music', 'cashflow', 'ai-advisor', 'gpa', 'admin', 'habit', 'journal', 'goals', 'expand', 'sticky'];
             if (cleanHash === 'music') {
                 setStartInFocusMode(true);
                 setActiveTab('schedule');
@@ -236,6 +238,18 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
             window.location.hash = targetHash;
         }
     }, [activeTab]);
+
+    // Windows desktop (Tauri): mở lại các note nổi lần trước + nhận lệnh điều hướng từ khay hệ thống
+    useEffect(() => {
+        if (!user?.id || !desktopBridge.isDesktop()) return;
+        desktopBridge.restoreOpenWindows();
+        let unlisten: (() => void) | undefined;
+        let disposed = false;
+        desktopBridge.onNavigate((tab) => setActiveTab(tab as any)).then(fn => {
+            if (disposed) fn?.(); else unlisten = fn;
+        });
+        return () => { disposed = true; unlisten?.(); };
+    }, [user?.id]);
 
     const deferredTab = React.useDeferredValue(activeTab);
 
@@ -2136,6 +2150,9 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     <button onClick={() => setActiveTab('goals')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'goals' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Mục tiêu' : ''}>
                         <Target size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Mục tiêu</span>}
                     </button>
+                    <button onClick={() => setActiveTab('sticky')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'sticky' ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Sticky Notes' : ''}>
+                        <StickyNoteIcon size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Sticky Notes</span>}
+                    </button>
 
                     {/* Admin Panel Toggle */}
                     {user?.email === 'baquan3q@gmail.com' && (
@@ -2193,7 +2210,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             <div className="flex flex-col">
                                 <span className="font-black text-slate-850 dark:text-slate-100 text-sm tracking-tight leading-tight">SmartLife</span>
                                 <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 leading-tight">
-                                    {activeTab === 'visual' ? 'Tổng quan' : activeTab === 'schedule' ? 'Lịch trình' : activeTab === 'finance' ? 'Tài chính' : activeTab === 'goals' ? 'Mục tiêu' : activeTab === 'habit' ? 'Thói quen' : activeTab === 'journal' ? 'Nhật ký' : activeTab === 'gpa' ? 'GPA' : activeTab}
+                                    {activeTab === 'visual' ? 'Tổng quan' : activeTab === 'schedule' ? 'Lịch trình' : activeTab === 'finance' ? 'Tài chính' : activeTab === 'goals' ? 'Mục tiêu' : activeTab === 'habit' ? 'Thói quen' : activeTab === 'journal' ? 'Nhật ký' : activeTab === 'gpa' ? 'GPA' : activeTab === 'sticky' ? 'Sticky Notes' : activeTab}
                                 </span>
                             </div>
                         </div>
@@ -2392,6 +2409,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         ) : (
                             <ProGateOverlay featureName="Nhật ký cá nhân" onUpgrade={handleOpenPricing} isGracePeriod={proAccess.isInGracePeriod} />
                         )
+                    )}
+                    {deferredTab === 'sticky' && user && (
+                        <StickyNotesDashboard
+                            userId={user.id}
+                            hasAIAccess={proAccess.hasAccess}
+                            onUpgrade={handleOpenPricing}
+                            onAddTodo={(content, priority, deadline) => handleAddTodo(content, priority, deadline, 'todo')}
+                        />
                     )}
                     {deferredTab === 'expand' && (
                         <ExpandSection
