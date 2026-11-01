@@ -8,7 +8,9 @@
     "dev:frontend": "vite",
     "dev:backend": "uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "desktop:dev": "cd src-tauri && npx --yes @tauri-apps/cli@2 dev",
+    "desktop:build": "cd src-tauri && npx --yes @tauri-apps/cli@2 build"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",

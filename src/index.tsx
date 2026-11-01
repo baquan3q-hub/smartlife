@@ -2,6 +2,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import StickyWindowApp, { isStickyWindowRoute } from './components/sticky/StickyWindowApp'
 import './index.css' // Quan trọng: Import CSS để có giao diện đẹp (Tailwind)
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null; errorInfo: ErrorInfo | null }> {
@@ -50,7 +51,8 @@ if (!rootElement) {
 ReactDOM.createRoot(rootElement as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      {/* Cửa sổ note nổi của bản Windows (Tauri) chỉ render phần ghi chú, không tải toàn bộ App */}
+      {isStickyWindowRoute() ? <StickyWindowApp /> : <App />}
     </ErrorBoundary>
   </React.StrictMode>,
 )

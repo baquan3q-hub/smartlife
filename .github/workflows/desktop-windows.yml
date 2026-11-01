@@ -1,0 +1,97 @@
+# Build SmartLife cho Windows (Tauri v2)
+# - Push tag `desktop-v*` (vd desktop-v0.1.0) → build .exe/.msi và tạo bản nháp GitHub Release
+# - Push thay đổi liên quan Sticky Notes / desktop → build kiểm tra + tải file cài ở mục Artifacts
+name: Desktop (Windows)
+
+on:
+  push:
+    # Tag: luôn chạy (GitHub không xét `paths` với tag). Nhánh: chỉ chạy khi đổi các file bên dưới.
+    branches: ['**']
+    tags: ['desktop-v*']
+    paths:
+      - 'src-tauri/**'
+      - 'src/components/sticky/**'
+      - 'src/services/sticky*'
+      - 'src/services/desktopBridge.ts'
+      - 'src/hooks/useStickyNotes.ts'
+      - '.github/workflows/desktop-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-check:
+    name: Web build check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@^2
+
+      # Nhận phiên bản từ tag desktop-vX.Y.Z
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".Replace('desktop-v', '')
+          $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $conf.version = $version
+          $conf | ConvertTo-Json -Depth 20 | Set-Content src-tauri/tauri.conf.json -Encoding utf8
+
+      - name: Build
+        working-directory: src-tauri
+        run: tauri build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SmartLife-Windows
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+
+      - name: Create draft release
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: SmartLife Desktop ${{ github.ref_name }}
+          body: |
+            ## SmartLife cho Windows
+            - Sticky Notes nổi trên màn hình, luôn nằm trên cùng
+            - Phím tắt toàn cục **Ctrl+Shift+N** tạo ghi chú mới
+            - Icon khay hệ thống, ghim taskbar, khởi động cùng Windows
+            - Đồng bộ realtime với web và điện thoại
+
+            **Cài đặt:** tải file `.exe` (khuyên dùng) hoặc `.msi`. Nếu Windows SmartScreen cảnh báo, chọn *More info → Run anyway* (bản chưa ký số).
+          files: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi

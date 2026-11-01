@@ -1,0 +1,24 @@
+[package]
+name = "smartlife-desktop"
+version = "0.1.0"
+description = "SmartLife cho Windows — Sticky Notes nổi, khay hệ thống, phím tắt toàn cục"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+uuid = { version = "1", features = ["v4"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-window-state = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
