@@ -51,6 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_sticky_note_versions_note
 CREATE OR REPLACE FUNCTION public.sticky_notes_before_update()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 BEGIN
   -- Không cho đổi chủ sở hữu
@@ -85,6 +86,7 @@ CREATE TRIGGER trg_sticky_notes_before_update
 CREATE OR REPLACE FUNCTION public.sticky_note_versions_trim()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 BEGIN
   DELETE FROM public.sticky_note_versions

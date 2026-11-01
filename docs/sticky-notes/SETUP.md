@@ -17,7 +17,7 @@
 git tag desktop-v0.1.0
 git push origin desktop-v0.1.0
 ```
-GitHub Actions (`.github/workflows/desktop-windows.yml`) build trên máy Windows và tạo **bản nháp Release** có file `.exe` / `.msi`. Vào GitHub → Releases → kiểm tra → **Publish**.
+GitHub Actions (`.github/workflows/desktop-windows.yml`) build trên máy Windows và phát hành **GitHub Release** công khai kèm file `.exe` / `.msi`.
 
 Mỗi lần push thay đổi trong `src-tauri/` hay code Sticky, workflow cũng build thử. File cài nằm ở mục **Artifacts** của lần chạy.
 
