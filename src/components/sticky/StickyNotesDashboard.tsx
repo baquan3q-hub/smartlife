@@ -69,6 +69,10 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
   const [historyNoteId, setHistoryNoteId] = useState<string | null>(null);
   const [aiNoteId, setAiNoteId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  /** Note vừa tạo trong phiên này, chưa rời ô nhập lần nào — bỏ trống khi rời thì tự dọn. */
+  const freshIds = useRef(new Set<string>());
+  const onAddTodoRef = useRef(onAddTodo);
+  onAddTodoRef.current = onAddTodo;
   const desktop = isTauri();
 
   const allLabels = useMemo(
@@ -111,7 +115,10 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
       labels: labelFilter ? [labelFilter] : [],
       is_pinned: view === 'pinned',
     });
-    if (note) setFocusId(note.id);
+    if (note) {
+      freshIds.current.add(note.id);
+      setFocusId(note.id);
+    }
   }, [createNote, view, colorFilter, labelFilter]);
 
   // Phím tắt: N = note mới, / = tìm kiếm
@@ -140,9 +147,11 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
 
   const handleAddTasks = useCallback(async (tasks: AISuggestedTask[]) => {
     for (const t of tasks) {
-      await onAddTodo(t.content, t.priority, t.deadline || undefined);
+      // Dùng hàm mới nhất sau mỗi lần thêm (App tính sort_order từ danh sách todo hiện tại)
+      await onAddTodoRef.current(t.content, t.priority, t.deadline || undefined);
+      await new Promise(r => setTimeout(r, 0));
     }
-  }, [onAddTodo]);
+  }, []);
 
   const historyNote = notes.find(n => n.id === historyNoteId) || null;
   const aiNote = notes.find(n => n.id === aiNoteId) || null;
@@ -290,10 +299,11 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
               onBlur={() => {
                 setEditing(null);
                 if (focusId === note.id) setFocusId(null);
-                // Note mới tạo mà bỏ trống → tự dọn, tránh rác
-                const isBlank = !note.title.trim() && !note.content.trim() && note.labels.length === 0;
-                const isFresh = Date.now() - new Date(note.created_at).getTime() < 10 * 60_000;
-                if (isBlank && isFresh && view !== 'trash') deleteForever(note.id);
+                // Note vừa tạo mà rời đi khi còn trống → tự dọn, tránh rác
+                if (freshIds.current.delete(note.id)) {
+                  const isBlank = !note.title.trim() && !note.content.trim() && note.labels.length === 0;
+                  if (isBlank) deleteForever(note.id);
+                }
               }}
               onOpenAI={() => setAiNoteId(note.id)}
               onOpenHistory={() => setHistoryNoteId(note.id)}

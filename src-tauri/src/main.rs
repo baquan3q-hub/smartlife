@@ -66,15 +66,21 @@ fn open_sticky(app: &AppHandle, note_id: &str, is_new: bool) -> Result<(), Strin
     Ok(())
 }
 
+/// Tạo cửa sổ ngoài luồng xử lý sự kiện: trên Windows, tạo WebView2 ngay trong handler
+/// của menu/phím tắt (hoặc trong command đồng bộ) có thể làm treo app.
 fn new_quick_note(app: &AppHandle) {
-    let id = uuid::Uuid::new_v4().to_string();
-    if let Err(e) = open_sticky(app, &id, true) {
-        eprintln!("[SmartLife] Không mở được note mới: {e}");
-    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let id = uuid::Uuid::new_v4().to_string();
+        if let Err(e) = open_sticky(&app, &id, true) {
+            eprintln!("[SmartLife] Không mở được note mới: {e}");
+        }
+    });
 }
 
+// Command phải là async để chạy ngoài main thread (xem ghi chú ở new_quick_note)
 #[tauri::command]
-fn open_sticky_window(app: AppHandle, note_id: String) -> Result<(), String> {
+async fn open_sticky_window(app: AppHandle, note_id: String) -> Result<(), String> {
     open_sticky(&app, &note_id, false)
 }
 

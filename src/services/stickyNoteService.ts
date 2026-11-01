@@ -51,6 +51,7 @@ interface OutboxEntry {
 const CACHE_PREFIX = 'smartlife_sticky_cache_';
 const OUTBOX_PREFIX = 'smartlife_sticky_outbox_';
 export const TRASH_RETENTION_DAYS = 30;
+const flushing = new Map<string, Promise<number>>();
 export const STICKY_COLORS: StickyColor[] = ['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal'];
 
 // ────────────────────────────────────────
@@ -80,6 +81,11 @@ export function isMissingTableError(err: unknown): boolean {
   const code = (err as any)?.code;
   const msg = String((err as any)?.message || '');
   return code === '42P01' || code === 'PGRST205' || (/sticky_note/.test(msg) && /does not exist|schema cache/i.test(msg));
+}
+
+/** UPDATE ... .single() không tìm thấy dòng (note đã bị xoá ở thiết bị khác). */
+export function isRowNotFoundError(err: unknown): boolean {
+  return (err as any)?.code === 'PGRST116';
 }
 
 function safeGet<T>(key: string, fallback: T): T {
@@ -155,11 +161,34 @@ export const stickyNoteService = {
     safeSet(`${OUTBOX_PREFIX}${userId}`, items);
   },
 
-  /** Đẩy toàn bộ outbox. Trả về số mục còn lại (lỗi mạng sẽ giữ lại). */
-  async flushOutbox(userId: string): Promise<number> {
+  /** Lấy ra (và xoá khỏi outbox) patch đang chờ của 1 note đã có trên server, để gộp vào lần lưu kế tiếp. */
+  takePatch(userId: string, id: string): StickyNotePatch | undefined {
+    const items = this.readOutbox(userId);
+    const idx = items.findIndex(i => i.id === id && !i.create && !i.hardDelete && i.patch);
+    if (idx < 0) return undefined;
+    const [entry] = items.splice(idx, 1);
+    safeSet(`${OUTBOX_PREFIX}${userId}`, items);
+    return entry.patch;
+  },
+
+  /** Lượt đẩy outbox đang chạy (nếu có). */
+  outboxFlushing(userId: string): Promise<number> | undefined {
+    return flushing.get(userId);
+  },
+
+  /** Đẩy toàn bộ outbox. Trả về số mục còn lại (lỗi mạng sẽ giữ lại). Không chạy song song. */
+  flushOutbox(userId: string): Promise<number> {
+    const running = flushing.get(userId);
+    if (running) return running;
+    const task = this._flushOutbox(userId).finally(() => flushing.delete(userId));
+    flushing.set(userId, task);
+    return task;
+  },
+
+  async _flushOutbox(userId: string): Promise<number> {
     const items = this.readOutbox(userId);
     if (items.length === 0) return 0;
-    const remaining: OutboxEntry[] = [];
+    const done: string[] = [];
     const device = detectDevice();
 
     for (const item of items) {
@@ -177,16 +206,19 @@ export const stickyNoteService = {
             .eq('id', item.id).eq('user_id', userId);
           if (error) throw error;
         }
+        done.push(JSON.stringify(item));
       } catch (err) {
-        if (isNetworkError(err)) {
-          remaining.push(item);
-        } else {
+        if (!isNetworkError(err)) {
           // Lỗi dữ liệu (vd note đã bị xoá ở thiết bị khác) → bỏ mục này để không kẹt hàng đợi
           console.warn('[StickyNotes] Bỏ mục outbox lỗi:', item.id, err);
+          done.push(JSON.stringify(item));
         }
       }
     }
 
+    // Đọc lại: trong lúc chờ mạng có thể đã có mục mới / mục bị gộp thêm → chỉ xoá đúng các mục đã xử lý
+    const doneSet = new Set(done);
+    const remaining = this.readOutbox(userId).filter(i => !doneSet.has(JSON.stringify(i)));
     safeSet(`${OUTBOX_PREFIX}${userId}`, remaining);
     return remaining.length;
   },
