@@ -202,11 +202,12 @@ fn desktop_command_handler(app: AppHandle, label: String) -> impl Fn(&tauri::Url
         let on_app_host = is_app_host(url.host_str());
         let is_command = on_app_host && url.path().starts_with(COMMAND_PREFIX);
         if !is_command {
-            // Cửa sổ note chỉ được ở trang gốc (#/sticky-window). Mọi điều hướng khác bị chặn để note
-            // không bao giờ biến thành giao diện app đầy đủ.
-            if is_sticky {
+            // Cửa sổ note chỉ được ở trang gốc (#/sticky-window) của SmartLife: chặn điều hướng sang
+            // đường dẫn khác trên cùng tên miền để note không bao giờ biến thành giao diện app đầy đủ.
+            // Tên miền khác (vd máy chủ chuyển hướng) vẫn cho đi để cửa sổ không bị trắng.
+            if is_sticky && on_app_host {
                 let path = url.path();
-                return on_app_host && (path == "/" || path == "/index.html");
+                return path == "/" || path == "/index.html";
             }
             return true;
         }
@@ -217,6 +218,16 @@ fn desktop_command_handler(app: AppHandle, label: String) -> impl Fn(&tauri::Url
         // Chạy ngoài handler điều hướng (tạo cửa sổ trong handler có thể treo trên Windows)
         tauri::async_runtime::spawn(async move {
             run_desktop_command(&app, &label, &command, &params);
+            // Báo lại cho trang là lệnh đã được nhận (desktopBridge chờ tín hiệu này)
+            let nonce: String = params
+                .get("nonce")
+                .map(|n| n.chars().filter(|c| c.is_ascii_alphanumeric()).take(32).collect())
+                .unwrap_or_default();
+            if !nonce.is_empty() {
+                if let Some(w) = app.get_webview_window(&label) {
+                    let _ = w.eval(&format!("window.__smartlifeAck && window.__smartlifeAck('{nonce}')"));
+                }
+            }
         });
         false
     }
@@ -248,12 +259,7 @@ fn run_desktop_command(app: &AppHandle, label: &str, command: &str, params: &Has
                 let _ = w.set_always_on_top(param("value") == "1");
             }
         }
-        "title" => {
-            if let Some(w) = this_window() {
-                let title: String = param("value").chars().take(80).collect();
-                let _ = w.set_title(if title.trim().is_empty() { "Ghi chú" } else { title.trim() });
-            }
-        }
+        "ping" => {}
         "close" => {
             if label.starts_with(STICKY_PREFIX) {
                 close_sticky_gracefully(app, label);

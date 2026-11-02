@@ -3,6 +3,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import StickyWindowApp, { isStickyWindowRoute } from './components/sticky/StickyWindowApp'
+import { BRIDGE_BROKEN_KEY } from './services/desktopBridge'
 import './index.css' // Quan trọng: Import CSS để có giao diện đẹp (Tailwind)
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null; errorInfo: ErrorInfo | null }> {
@@ -45,7 +46,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 // thay vì hiện cả giao diện app trong cửa sổ ghi chú.
 const isStrayDesktopCommand = window.location.pathname.startsWith('/__desktop/');
 if (isStrayDesktopCommand) {
-  try { sessionStorage.setItem('smartlife_desktop_bridge_broken', '1'); } catch { /* ignore */ }
+  try { sessionStorage.setItem(BRIDGE_BROKEN_KEY, '1'); } catch { /* ignore */ }
   if (window.history.length > 1) window.history.back();
   else window.location.replace('/');
 }

@@ -25,21 +25,43 @@ function hasCommandBridge(): boolean {
   }
 }
 
-let queue: Promise<void> = Promise.resolve();
+/** Thời gian chờ app xác nhận đã nhận lệnh. */
+const ACK_TIMEOUT_MS = 1500;
+const pendingAcks = new Map<string, () => void>();
 
+if (typeof window !== 'undefined') {
+  (window as any).__smartlifeAck = (nonce: string) => {
+    pendingAcks.get(nonce)?.();
+  };
+}
+
+let queue: Promise<unknown> = Promise.resolve();
+
+/**
+ * Gửi lệnh tới app. Trả về true chỉ khi app xác nhận (eval __smartlifeAck) — không xác nhận thì false
+ * để nơi gọi báo lỗi / dùng cách khác. Lệnh không bao giờ chứa nội dung ghi chú.
+ */
 function sendCommand(command: string, params: Record<string, string> = {}): Promise<boolean> {
   if (!hasCommandBridge()) return Promise.resolve(false);
-  const query = new URLSearchParams(params).toString();
-  const url = `${window.location.origin}${COMMAND_PATH}${command}${query ? `?${query}` : ''}`;
-  queue = queue.then(() => new Promise<void>(resolve => {
+  const nonce = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+  const query = new URLSearchParams({ ...params, nonce }).toString();
+  const url = `${window.location.origin}${COMMAND_PATH}${command}?${query}`;
+  const run = () => new Promise<boolean>(resolve => {
+    const timer = window.setTimeout(() => { pendingAcks.delete(nonce); resolve(false); }, ACK_TIMEOUT_MS);
+    pendingAcks.set(nonce, () => { window.clearTimeout(timer); pendingAcks.delete(nonce); resolve(true); });
     try {
       window.location.href = url;
     } catch (err) {
       console.warn('[SmartLife desktop] gửi lệnh thất bại:', command, err);
     }
-    setTimeout(resolve, COMMAND_GAP_MS);
-  }));
-  return queue.then(() => true);
+  }).then(async ok => {
+    // Giãn cách: gán location liên tiếp quá nhanh thì lệnh sau huỷ lệnh trước
+    await new Promise(r => setTimeout(r, COMMAND_GAP_MS));
+    return ok;
+  });
+  const result = queue.then(run, run);
+  queue = result.catch(() => false);
+  return result;
 }
 
 // ── Dự phòng cho bản desktop cũ (IPC) ──
@@ -88,9 +110,13 @@ export const desktopBridge = {
     return hasCommandBridge() ? sendCommand('on-top', { value: on ? '1' : '0' }) : withCurrentWindow(w => w.setAlwaysOnTop(on));
   },
 
-  setTitle(title: string): Promise<boolean> {
-    if (!isTauri()) return Promise.resolve(false);
-    return hasCommandBridge() ? sendCommand('title', { value: title }) : withCurrentWindow(w => w.setTitle(title));
+  /** Kênh lệnh đã bị tắt cho cửa sổ này (app chưa cập nhật / lệnh không được nhận). */
+  isBridgeBroken(): boolean {
+    try {
+      return Number((window as any).__SMARTLIFE_DESKTOP__) < 2 || sessionStorage.getItem(BRIDGE_BROKEN_KEY) === '1';
+    } catch {
+      return false;
+    }
   },
 
   /** Đóng cửa sổ note hiện tại (app lưu nốt rồi mới đóng). */
