@@ -6,7 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { supabase } from './supabase';
 
 export type StickyColor = 'yellow' | 'green' | 'pink' | 'purple' | 'blue' | 'gray' | 'charcoal';
-export type StickyDevice = 'web' | 'mobile' | 'desktop';
+export type StickyDevice = 'web' | 'mobile' | 'desktop' | 'bot';
 
 export interface StickyNote {
   id: string;
