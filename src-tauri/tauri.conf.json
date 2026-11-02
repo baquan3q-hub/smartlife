@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.smartlife.desktop",
   "build": {
-    "frontendDist": "https://smartlife.courses/"
+    "frontendDist": "https://www.smartlife.courses/"
   },
   "app": {
     "withGlobalTauri": true,

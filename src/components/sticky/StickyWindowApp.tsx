@@ -193,13 +193,12 @@ const StickyWindowInner: React.FC = () => {
     } catch { /* ignore */ }
   }, [noteId]);
 
-  // Tiêu đề cửa sổ = tiêu đề / dòng đầu của note (gửi sau khi ngừng gõ)
+  // Tiêu đề trang (không gửi nội dung note sang app — tránh lộ nội dung qua URL lệnh)
   const windowTitle = note ? noteHeading(note).slice(0, 60) : 'Ghi chú';
-  useEffect(() => {
-    document.title = windowTitle;
-    const t = window.setTimeout(() => desktopBridge.setTitle(windowTitle), 600);
-    return () => window.clearTimeout(t);
-  }, [windowTitle]);
+  useEffect(() => { document.title = windowTitle; }, [windowTitle]);
+
+  // App Windows cũ / kênh lệnh không hoạt động → các nút cần app (+, ghim, mở note) sẽ không chạy
+  const [bridgeBroken] = useState(() => desktopBridge.isDesktop() && desktopBridge.isBridgeBroken());
 
   // Rust gọi hàm này khi người dùng đóng cửa sổ (nút X) hoặc thoát app
   const handleBeforeClose = useCallback(async () => {
@@ -225,6 +224,11 @@ const StickyWindowInner: React.FC = () => {
     });
   }, [noteId]);
 
+  const newNote = useCallback(async () => {
+    const ok = await desktopBridge.newStickyWindow();
+    if (!ok) showToast('Không mở được. Hãy dùng phím tắt Ctrl+Alt+N.');
+  }, [showToast]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setPanel(p => (p === 'history' ? p : 'none'));
@@ -246,20 +250,20 @@ const StickyWindowInner: React.FC = () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('wheel', onWheel);
     };
-  });
+  }, [changeFont, saveNow, newNote]);
 
   const toggleOnTop = async () => {
     const next = !onTop;
     setOnTop(next);
     try { if (noteId) localStorage.setItem(`${ON_TOP_KEY}${noteId}`, String(next)); } catch { /* ignore */ }
     const ok = await desktopBridge.setAlwaysOnTop(next);
-    showToast(ok ? (next ? 'Đã ghim: luôn nằm trên cùng' : 'Đã bỏ ghim') : 'Hãy cập nhật SmartLife cho Windows bản mới nhất');
+    if (!ok) {
+      setOnTop(!next);
+      showToast('Chưa ghim được. Hãy cập nhật SmartLife cho Windows bản mới nhất.');
+    } else {
+      showToast(next ? 'Đã ghim: luôn nằm trên cùng' : 'Đã bỏ ghim');
+    }
   };
-
-  async function newNote() {
-    const ok = await desktopBridge.newStickyWindow();
-    if (!ok) showToast('Không mở được. Hãy dùng phím tắt Ctrl+Alt+N.');
-  }
 
   const openNote = async (id: string) => {
     setPanel('none');
@@ -381,6 +385,17 @@ const StickyWindowInner: React.FC = () => {
             />
           ))}
         </div>
+      )}
+
+      {bridgeBroken && (
+        <a
+          href="https://github.com/baquan3q-hub/smartlife/releases/latest"
+          target="_blank"
+          rel="noreferrer"
+          className="block text-[11px] leading-snug px-3 py-1.5 bg-amber-100 text-amber-900 border-b border-amber-200"
+        >
+          Bản SmartLife cho Windows này đã cũ: nút +, ghim, mở note có thể không chạy. Bấm để tải bản mới.
+        </a>
       )}
 
       <div className="relative flex-1 min-h-0 flex flex-col">

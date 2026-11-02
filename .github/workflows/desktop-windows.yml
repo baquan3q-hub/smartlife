@@ -42,6 +42,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # Ghi lại tên miền production thực tế (có chuyển hướng www hay không) để chẩn đoán app desktop
+      - name: Check production domain
+        continue-on-error: true
+        run: |
+          for u in https://smartlife.courses/ https://www.smartlife.courses/; do
+            curl -sS -o /dev/null -m 20 -w "$u -> %{http_code} %{redirect_url}\n" "$u" || true
+          done
 
   windows:
     name: Windows installer

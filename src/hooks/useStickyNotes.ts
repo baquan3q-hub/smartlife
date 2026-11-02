@@ -335,12 +335,12 @@ export function useStickyNotes(userId: string | undefined) {
         Array.from(pendingPatches.current.keys()).forEach(id => { flush(id); });
       }
     };
+    // Chỉ pagehide (trang thật sự bị huỷ). Không dùng beforeunload: app Windows gửi lệnh bằng điều hướng
+    // bị huỷ, beforeunload sẽ chạy ở mỗi lệnh. Mỗi phím gõ cũng đã được ghi vào outbox.
     window.addEventListener('pagehide', persistPending);
-    window.addEventListener('beforeunload', persistPending);
     document.addEventListener('visibilitychange', onHide);
     return () => {
       window.removeEventListener('pagehide', persistPending);
-      window.removeEventListener('beforeunload', persistPending);
       document.removeEventListener('visibilitychange', onHide);
       // Rời trang Sticky trong app: gửi nốt thay đổi (request vẫn chạy sau khi unmount)
       timers.current.forEach(t => clearTimeout(t));
