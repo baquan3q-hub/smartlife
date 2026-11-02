@@ -17,7 +17,7 @@ import { desktopBridge } from '../../services/desktopBridge';
 import { applyTheme, getSavedTheme } from '../../utils/theme';
 import { STICKY_THEME, relativeTime } from './stickyTheme';
 import { StickyHistoryModal } from './StickyHistoryModal';
-import { firstLines, markdownToPlainText } from '../../utils/stickyMarkdown';
+import { contentMatchesQuery, firstLines } from '../../utils/stickyMarkdown';
 
 const ON_TOP_KEY = 'smartlife_sticky_on_top_';
 const FONT_KEY = 'smartlife_sticky_font_';
@@ -88,7 +88,7 @@ const NotesListPanel: React.FC<{
     const q = query.trim().toLowerCase();
     return notes
       .filter(n => !n.deleted_at && !n.is_archived)
-      .filter(n => !q || n.title.toLowerCase().includes(q) || markdownToPlainText(n.content).toLowerCase().includes(q) || n.labels.some(l => l.toLowerCase().includes(q)))
+      .filter(n => !q || n.title.toLowerCase().includes(q) || contentMatchesQuery(n.content, q) || n.labels.some(l => l.toLowerCase().includes(q)))
       .sort((a, b) => (a.is_pinned !== b.is_pinned ? (a.is_pinned ? -1 : 1) : b.updated_at.localeCompare(a.updated_at)));
   }, [notes, query]);
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  extractStickyImageIds, isAllowedImageSrc, markdownToPlainText, safeFileName, sanitizeHref, stickyImageId, uniqueFileName,
+  contentMatchesQuery, extractStickyImageIds, isAllowedImageSrc, markdownToPlainText, safeFileName, sanitizeHref, stickyImageId, uniqueFileName,
 } from './stickyMarkdown';
 
 describe('sanitizeHref', () => {
@@ -69,5 +69,35 @@ describe('tên file', () => {
     expect(uniqueFileName('note', 'md', used)).toBe('note.md');
     expect(uniqueFileName('Note', 'md', used)).toBe('Note-2.md');
     expect(uniqueFileName('note', 'md', used)).toBe('note-3.md');
+  });
+});
+
+describe('sửa theo code review', () => {
+  test('host:port và localhost được thêm https://', () => {
+    expect(sanitizeHref('myserver.com:8080/dashboard')).toBe('https://myserver.com:8080/dashboard');
+    expect(sanitizeHref('localhost:5173')).toBe('https://localhost:5173/');
+    expect(sanitizeHref('javascript:alert(1)')).toBeNull();
+  });
+  test('tìm được URL trong link và chữ đã bỏ cú pháp', () => {
+    const md = '**Đậm** và [tài liệu](https://drive.google.com/abc) __init__.py';
+    expect(contentMatchesQuery(md, 'drive.google')).toBe(true);
+    expect(contentMatchesQuery(md, 'đậm và')).toBe(true);
+    expect(contentMatchesQuery(md, '__init__')).toBe(true);
+    expect(contentMatchesQuery(md, 'không có')).toBe(false);
+  });
+  test('không ghép "__" khác dòng', () => {
+    expect(markdownToPlainText('file__a\nb__c')).toBe('file__a\nb__c');
+  });
+  test('ô bảng có \\| giữ nguyên dấu |', () => {
+    expect(markdownToPlainText('| a \\| b | c |')).toBe('a | b · c');
+  });
+  test('tên thiết bị Windows kèm đuôi', () => {
+    expect(safeFileName('aux.notes')).toBe('ghi-chu');
+    expect(safeFileName('auxiliary')).toBe('auxiliary');
+  });
+  test('không dùng regex lookbehind (Safari < 16.4 lỗi cú pháp)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('./stickyMarkdown.ts', import.meta.url), 'utf8');
+    expect(src).not.toMatch(/\(\?<[!=]/);
   });
 });

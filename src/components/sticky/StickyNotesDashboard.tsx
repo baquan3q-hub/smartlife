@@ -17,7 +17,7 @@ import { StickyNoteCard, StickyView } from './StickyNoteCard';
 import { StickyHistoryModal } from './StickyHistoryModal';
 import { StickyAIPanel } from './StickyAIPanel';
 import { STICKY_THEME } from './stickyTheme';
-import { markdownToPlainText } from '../../utils/stickyMarkdown';
+import { contentMatchesQuery } from '../../utils/stickyMarkdown';
 
 export const DESKTOP_RELEASES_URL = 'https://github.com/baquan3q-hub/smartlife/releases';
 
@@ -101,7 +101,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
       })
       .filter(n => !colorFilter || n.color === colorFilter)
       .filter(n => !labelFilter || n.labels.includes(labelFilter))
-      .filter(n => !q || n.title.toLowerCase().includes(q) || markdownToPlainText(n.content).toLowerCase().includes(q) || n.labels.some(l => l.toLowerCase().includes(q)))
+      .filter(n => !q || n.title.toLowerCase().includes(q) || contentMatchesQuery(n.content, q) || n.labels.some(l => l.toLowerCase().includes(q)))
       .sort((a, b) => {
         if (view === 'trash') return (b.deleted_at || '').localeCompare(a.deleted_at || '');
         if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;

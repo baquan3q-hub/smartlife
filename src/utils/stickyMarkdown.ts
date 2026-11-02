@@ -12,8 +12,10 @@ const SAFE_LINK_PROTOCOLS = ['http:', 'https:', 'mailto:'];
 export function sanitizeHref(raw: string | null | undefined): string | null {
   const value = (raw || '').trim();
   if (!value) return null;
-  // Tự thêm https:// cho dạng "example.com/abc"
-  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : /^[\w-]+(\.[\w-]+)+/.test(value) ? `https://${value}` : null;
+  // Tự thêm https:// cho dạng "example.com/abc", "example.com:8080", "localhost:3000"
+  // (kiểm tra trước scheme vì "host:port" trông giống scheme)
+  const bareHost = /^(localhost|[\w-]+(\.[\w-]+)+)(:\d+)?([/?#]|$)/i.test(value);
+  const candidate = bareHost ? `https://${value}` : /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : null;
   if (!candidate) return null;
   try {
     const url = new URL(candidate);
@@ -73,19 +75,39 @@ export function markdownToPlainText(markdown: string): string {
       .replace(/^\s*>\s?/, '')
       .replace(/^\s*(?:[-*+]|\d+[.)])\s+\[[ xX]\]\s+/, '')
       .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')
-      .replace(/^\s*\|(.*)\|\s*$/, (_, cells: string) => cells.split(/(?<!\\)\|/).map(c => c.trim()).filter(Boolean).join(' · '))
+      .replace(/^\s*\|(.*)\|\s*$/, (_, cells: string) => cells.replace(/\\\|/g, '\u0000').split('|').map(c => c.trim().replace(/\u0000/g, '|')).filter(Boolean).join(' · '))
       .replace(/^\s*([-*_])(\s*\1){2,}\s*$/, ''))
     .join('\n')
-    .replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '$2')
+    // Chỉ trong 1 dòng — tránh ghép nhầm "__" / "**" cách xa nhau trong note văn bản thuần cũ
+    .replace(/(\*\*|__)(?=\S)([^\n]*?\S)\1/g, '$2')
     .replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?!\w)/g, '$1$2')
     .replace(/(^|[^\w_])_(?=\S)([^_\n]*?\S)_(?!\w)/g, '$1$2')
-    .replace(/~~(?=\S)([\s\S]*?\S)~~/g, '$1')
+    .replace(/~~(?=\S)([^\n]*?\S)~~/g, '$1')
     .replace(/`([^`\n]+)`/g, '$1')
     .replace(/\\([\\`*_{}[\]()#+\-.!|>~])/g, '$1')
     .replace(/&nbsp;/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+const plainCache = new Map<string, string>();
+
+/**
+ * Nội dung note có chứa `q` (đã lowercase) không — so cả chuỗi gốc (để tìm được URL trong link, `__init__`...)
+ * lẫn văn bản đã bỏ cú pháp (để "đậm và" khớp "**đậm** và"). Kết quả bỏ cú pháp được cache theo nội dung.
+ */
+export function contentMatchesQuery(markdown: string, q: string): boolean {
+  if (!q) return true;
+  if (!markdown) return false;
+  if (markdown.toLowerCase().includes(q)) return true;
+  let plain = plainCache.get(markdown);
+  if (plain === undefined) {
+    plain = markdownToPlainText(markdown).toLowerCase();
+    if (plainCache.size >= 500) plainCache.clear();
+    plainCache.set(markdown, plain);
+  }
+  return plain.includes(q);
 }
 
 /** Dòng đầu tiên có chữ (đã bỏ cú pháp) — dùng làm tiêu đề khi note không có tiêu đề. */
@@ -106,7 +128,8 @@ export function safeFileName(name: string, fallback = 'ghi-chu'): string {
     .replace(/^[-.]+|[-.]+$/g, '')
     .slice(0, 80)
     .replace(/[-.]+$/g, '');
-  const reserved = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
+  // Windows cấm cả "aux.notes", "com1.txt"...
+  const reserved = /^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i;
   return base && !reserved.test(base) ? base : fallback;
 }
 
