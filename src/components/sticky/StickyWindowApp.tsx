@@ -8,10 +8,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Palette, Pin, PinOff, Trash2, Loader2, CloudOff, Check, AlertTriangle, ZoomIn, ZoomOut,
-  List, History, MoreHorizontal, LayoutGrid, Search, X, Type, FileText, FileDown,
+  List, History, MoreHorizontal, LayoutGrid, Search, X, Type,
 } from 'lucide-react';
 import type { StickyExportFormat } from '../../services/stickyExport';
 import { isExportEnabled } from '../../utils/stickyFeatures';
+import { EXPORT_FORMATS, runStickyExport } from './stickyExportActions';
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import { useStickyNotes } from '../../hooks/useStickyNotes';
 import { STICKY_COLORS, StickyColor, StickyNote, StickyNoteVersion, stickyNoteService } from '../../services/stickyNoteService';
@@ -177,23 +178,16 @@ const StickyWindowInner: React.FC = () => {
 
   useEffect(() => { applyTheme(getSavedTheme()); }, []);
 
-  const showToast = useCallback((text: string) => {
+  const showToast = useCallback((text: string, ms = 2500) => {
     setToast(text);
-    window.setTimeout(() => setToast(t => (t === text ? null : t)), 2500);
+    window.setTimeout(() => setToast(t => (t === text ? null : t)), ms);
   }, []);
 
-  const exportCurrent = useCallback(async (format: StickyExportFormat) => {
+  const exportCurrent = useCallback((format: StickyExportFormat) => {
     const current = noteRef.current;
     if (!current) return;
-    showToast(format === 'pdf' ? 'Đang tạo PDF…' : 'Đang tạo file Markdown…');
-    try {
-      const { exportNotes } = await import('../../services/stickyExport');
-      await exportNotes([current], format);
-      showToast('Đã xuất file');
-    } catch (err) {
-      console.error('[sticky] export failed', err);
-      showToast(`Xuất file thất bại: ${(err as Error)?.message || 'lỗi không xác định'}`);
-    }
+    // Thông báo tiến trình giữ tới khi xong; kết quả hiện lâu hơn vì có thể kèm lưu ý
+    runStickyExport([current], format, (msg) => (msg.busy ? setToast(msg.text) : showToast(msg.text, 5000)));
   }, [showToast]);
 
   // ?new=1 (từ Ctrl+Alt+N / khay hệ thống / nút +): tạo note với đúng id app đã cấp
@@ -396,8 +390,9 @@ const StickyWindowInner: React.FC = () => {
             <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
             {isExportEnabled() && (
               <>
-                <button onClick={() => { setPanel('none'); exportCurrent('markdown'); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"><FileText size={13} /> Xuất Markdown</button>
-                <button onClick={() => { setPanel('none'); exportCurrent('pdf'); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"><FileDown size={13} /> Xuất PDF</button>
+                {EXPORT_FORMATS.map(({ format, label, icon: Icon }) => (
+                  <button key={format} onClick={() => { setPanel('none'); exportCurrent(format); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"><Icon size={13} /> Xuất {label}</button>
+                ))}
                 <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
               </>
             )}

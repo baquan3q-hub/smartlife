@@ -5,6 +5,8 @@
 
 import { Capacitor } from '@capacitor/core';
 
+const EXPORT_DIR = 'exports';
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -24,8 +26,10 @@ export async function saveFile(blob: Blob, filename: string): Promise<void> {
       import('@capacitor/filesystem'),
       import('@capacitor/share'),
     ]);
+    // Chỉ giữ file của lần xuất này — file cũ đã chia sẻ xong, xoá để cache không phình ra
+    await Filesystem.rmdir({ path: EXPORT_DIR, directory: Directory.Cache, recursive: true }).catch(() => {});
     const { uri } = await Filesystem.writeFile({
-      path: `exports/${filename}`,
+      path: `${EXPORT_DIR}/${filename}`,
       data: await blobToBase64(blob),
       directory: Directory.Cache,
       recursive: true,

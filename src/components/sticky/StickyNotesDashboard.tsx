@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   StickyNote as StickyIcon, Plus, Search, Loader2, Cloud, CloudOff, CheckCircle2, AlertTriangle,
-  Pin, Archive, Trash2, LayoutGrid, Monitor, X, CheckSquare, FileText, FileDown,
+  Pin, Archive, Trash2, LayoutGrid, Monitor, X, CheckSquare,
 } from 'lucide-react';
 import type { StickyExportFormat } from '../../services/stickyExport';
 import { isExportEnabled } from '../../utils/stickyFeatures';
@@ -21,6 +21,7 @@ import { StickyAIPanel } from './StickyAIPanel';
 import { STICKY_THEME } from './stickyTheme';
 import { contentMatchesQuery } from '../../utils/stickyMarkdown';
 import { preloadRichEditor } from './editor/NoteEditor';
+import { EXPORT_FORMATS, ExportMessage, runStickyExport } from './stickyExportActions';
 
 export const DESKTOP_RELEASES_URL = 'https://github.com/baquan3q-hub/smartlife/releases';
 
@@ -82,7 +83,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [exporting, setExporting] = useState<StickyExportFormat | null>(null);
-  const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
+  const [toast, setToast] = useState<ExportMessage | null>(null);
 
   const allLabels = useMemo(
     () => Array.from(new Set(notes.filter(n => !n.deleted_at).flatMap(n => n.labels))).sort((a, b) => a.localeCompare(b, 'vi')),
@@ -131,28 +132,20 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
     if (view === 'trash') setSelecting(false);
   }, [view]);
 
+  // Thông báo tiến trình (busy) giữ nguyên tới khi có kết quả
   useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), toast.error ? 6000 : 3500);
+    if (!toast || toast.busy) return;
+    const t = setTimeout(() => setToast(null), toast.error ? 6000 : 4500);
     return () => clearTimeout(t);
   }, [toast]);
 
   const runExport = useCallback(async (list: StickyNote[], format: StickyExportFormat) => {
-    if (!list.length || exporting) return;
-    setExporting(format);
-    setToast({ text: format === 'pdf' ? 'Đang tạo PDF…' : 'Đang tạo file Markdown…' });
-    try {
-      const { exportNotes } = await import('../../services/stickyExport');
-      await exportNotes(list, format);
-      setToast({ text: `Đã xuất ${list.length} ghi chú ra ${format === 'pdf' ? 'PDF' : 'Markdown'}` });
-      if (list.length > 1) exitSelecting();
-    } catch (err) {
-      console.error('[sticky] export failed', err);
-      setToast({ text: `Xuất file thất bại: ${(err as Error)?.message || 'lỗi không xác định'}`, error: true });
-    } finally {
-      setExporting(null);
-    }
-  }, [exporting, exitSelecting]);
+    const ok = await runStickyExport(list, format, (msg) => {
+      setToast(msg);
+      setExporting(msg.busy ? format : null);
+    });
+    if (ok && list.length > 1) exitSelecting();
+  }, [exitSelecting]);
 
   const handleCreate = useCallback(async () => {
     if (view === 'trash' || view === 'archived') setView('active');
@@ -356,7 +349,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
               autoFocus={focusId === note.id}
               canDetach={desktop}
               onChange={(patch, opts) => updateNote(note.id, patch, opts)}
-              onFocus={() => setEditing(note.id)}
+              onFocus={() => { if (!selecting) setEditing(note.id); }}
               onBlur={() => {
                 setEditing(null);
                 if (focusId === note.id) setFocusId(null);
@@ -416,7 +409,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
           >
             {selectedNotes.length === visible.length ? 'Bỏ chọn hết' : 'Chọn tất cả'}
           </button>
-          {([['markdown', 'Markdown', FileText], ['pdf', 'PDF', FileDown]] as const).map(([format, label, Icon]) => (
+          {EXPORT_FORMATS.map(({ format, label, icon: Icon }) => (
             <button
               key={format}
               disabled={!selectedNotes.length || !!exporting}
@@ -433,8 +426,9 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
       {toast && (
         <div
           role={toast.error ? 'alert' : 'status'}
-          className={`fixed left-1/2 -translate-x-1/2 z-50 ${selecting ? 'bottom-44 md:bottom-24' : 'bottom-24 md:bottom-6'} max-w-[calc(100%-2rem)] px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg ${toast.error ? 'bg-red-600 text-white' : 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'}`}
+          className={`fixed left-1/2 -translate-x-1/2 z-50 ${selecting ? 'bottom-44 md:bottom-24' : 'bottom-24 md:bottom-6'} max-w-[calc(100%-2rem)] inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg ${toast.error ? 'bg-red-600 text-white' : 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'}`}
         >
+          {toast.busy && <Loader2 size={15} className="animate-spin shrink-0" />}
           {toast.text}
         </div>
       )}

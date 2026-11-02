@@ -2,12 +2,13 @@
 import React, { useState } from 'react';
 import {
   Pin, PinOff, Palette, Sparkles, History, ExternalLink, Archive, ArchiveRestore,
-  Trash2, RotateCcw, X, Tag, Plus, Download, Check, FileText, FileDown,
+  Trash2, RotateCcw, X, Tag, Plus, Download, Check,
 } from 'lucide-react';
 import { StickyColor, StickyNote, StickyNotePatch, STICKY_COLORS, stickyNoteService } from '../../services/stickyNoteService';
 import { STICKY_THEME, relativeTime, DEVICE_LABEL } from './stickyTheme';
 import { NoteEditor } from './editor/NoteEditor';
 import type { StickyExportFormat } from '../../services/stickyExport';
+import { EXPORT_FORMATS } from './stickyExportActions';
 
 export type StickyView = 'active' | 'pinned' | 'archived' | 'trash';
 
@@ -150,7 +151,7 @@ export const StickyNoteCard: React.FC<StickyNoteCardProps> = ({
 
       {showExport && onExport && (
         <div className="flex flex-wrap gap-1.5 px-3 pt-1" role="group" aria-label="Xuất ghi chú">
-          {([['markdown', 'Markdown', FileText], ['pdf', 'PDF', FileDown]] as const).map(([format, label, Icon]) => (
+          {EXPORT_FORMATS.map(({ format, label, icon: Icon }) => (
             <button
               key={format}
               type="button"

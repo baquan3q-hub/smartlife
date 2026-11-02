@@ -17,6 +17,16 @@ const PAGE_MARGIN = 40;
 /** A4 rộng 595.28pt */
 export const CONTENT_WIDTH = 595.28 - PAGE_MARGIN * 2;
 const MAX_IMAGE_HEIGHT = 420;
+/** Cạnh dài nhất của ảnh nhúng (px) — đủ nét khi in ở khổ nội dung A4 */
+const MAX_IMAGE_PX = 1600;
+
+// Font Roboto không có emoji → bỏ đi thay vì in ô vuông. Giữ © ® ™ (Roboto có).
+const EMOJI_RE = /(?![©®™])\p{Extended_Pictographic}|[\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}‍️⃣]/gu;
+export const EMOJI_NOTICE = 'PDF không hiển thị được emoji nên đã lược bỏ.';
+
+export function stripEmoji(text: string): string {
+  return text.replace(EMOJI_RE, '');
+}
 const TEXT = '#1e293b';
 const MUTED = '#64748b';
 const LINK = '#4f46e5';
@@ -174,7 +184,7 @@ function block(node: RootContent | MdContent, ctx: Ctx): Content[] {
 
 /** Nội dung Markdown → khối pdfmake. */
 export function markdownToPdfContent(markdown: string, images: PdfImageMap = new Map()): Content[] {
-  const tree = parser.runSync(parser.parse(markdown || '')) as Root;
+  const tree = parser.runSync(parser.parse(stripEmoji(markdown || ''))) as Root;
   return tree.children.flatMap(n => block(n, { images, depth: 0 }));
 }
 
@@ -187,12 +197,12 @@ function formatDate(iso: string): string {
 function noteHeader(note: StickyNote): Content[] {
   const accent = noteAccent(note.color);
   const meta = [
-    note.labels.map(l => `#${l}`).join('  '),
+    note.labels.map(l => `#${stripEmoji(l)}`).join('  '),
     `Cập nhật ${formatDate(note.updated_at)}`,
   ].filter(Boolean).join('   ·   ');
   return [
     {
-      table: { widths: ['*'], body: [[{ text: noteDisplayTitle(note), bold: true, fontSize: 15, color: accent.text, fillColor: accent.fill }]] },
+      table: { widths: ['*'], body: [[{ text: stripEmoji(noteDisplayTitle(note)).trim() || 'Ghi chú', bold: true, fontSize: 15, color: accent.text, fillColor: accent.fill }]] },
       layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 12, paddingRight: () => 12, paddingTop: () => 9, paddingBottom: () => 9 },
     },
     { text: meta, fontSize: 8.5, color: MUTED, margin: [2, 5, 0, 12] },
@@ -207,7 +217,7 @@ export function buildDocDefinition(notes: StickyNote[], images: PdfImageMap = ne
   return {
     pageSize: 'A4',
     pageMargins: [PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN + 10],
-    info: { title: notes.length === 1 ? noteDisplayTitle(notes[0]) : 'Sticky Notes', creator: 'SmartLife' },
+    info: { title: notes.length === 1 ? stripEmoji(noteDisplayTitle(notes[0])) : 'Sticky Notes', creator: 'SmartLife' },
     defaultStyle: { font: 'Roboto', fontSize: 10.5, lineHeight: 1.3, color: TEXT },
     footer: (page, pages) => ({
       columns: [
@@ -221,20 +231,21 @@ export function buildDocDefinition(notes: StickyNote[], images: PdfImageMap = ne
   };
 }
 
-/** Ảnh local → JPEG nền trắng (pdfmake chỉ đọc JPEG/PNG). */
+/** Ảnh local → JPEG nền trắng (pdfmake chỉ đọc JPEG/PNG), thu nhỏ để PDF gọn và đỡ tốn bộ nhớ. */
 async function toPdfImage(blob: Blob): Promise<PdfImage | null> {
   try {
     const bmp = await createImageBitmap(blob);
     try {
+      const scale = Math.min(1, MAX_IMAGE_PX / Math.max(bmp.width, bmp.height));
       const canvas = document.createElement('canvas');
-      canvas.width = bmp.width;
-      canvas.height = bmp.height;
+      canvas.width = Math.max(1, Math.round(bmp.width * scale));
+      canvas.height = Math.max(1, Math.round(bmp.height * scale));
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(bmp, 0, 0);
-      return { dataUrl: canvas.toDataURL('image/jpeg', 0.88), width: bmp.width, height: bmp.height };
+      ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      return { dataUrl: canvas.toDataURL('image/jpeg', 0.88), width: canvas.width, height: canvas.height };
     } finally {
       bmp.close();
     }
@@ -264,5 +275,6 @@ export async function buildPdfExport(notes: StickyNote[], loadImage: ImageLoader
   }
   const pdfMake = await loadPdfMake();
   const blob = await pdfMake.createPdf(buildDocDefinition(notes, images)).getBlob();
-  return { blob, filename: `${exportBaseName(notes)}.pdf` };
+  const hasEmoji = notes.some(n => [n.title, n.content, ...n.labels].some(t => stripEmoji(t) !== t));
+  return { blob, filename: `${exportBaseName(notes)}.pdf`, ...(hasEmoji ? { notice: EMOJI_NOTICE } : {}) };
 }

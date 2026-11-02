@@ -12,7 +12,8 @@ import { saveFile } from '../utils/saveFile';
 
 export type StickyExportFormat = 'markdown' | 'pdf';
 
-export interface ExportFile { blob: Blob; filename: string }
+/** `notice` = lưu ý cho người dùng (vd. emoji không có trong PDF) */
+export interface ExportFile { blob: Blob; filename: string; notice?: string }
 
 /** Ảnh local đã đọc từ thiết bị. */
 export interface ExportImage { blob: Blob; ext: string }
@@ -34,7 +35,13 @@ export function noteDisplayTitle(note: Pick<StickyNote, 'title' | 'content'>): s
   return note.title.trim() || firstLines(note.content, 1)[0]?.slice(0, 80) || 'Ghi chú';
 }
 
-const LOCAL_IMAGE_MD_RE = /!\[([^\]]*)\]\(sticky-img:\/\/([a-zA-Z0-9-]{8,64})(?:\s+"[^"]*")?\)/g;
+// Alt có thể chứa ký tự thoát (\]), đích có thể nằm trong <…>, tiêu đề "…" hoặc '…'
+const LOCAL_IMAGE_MD_RE = /!\[((?:\\.|[^\]\\])*)\]\(\s*<?sticky-img:\/\/([a-zA-Z0-9-]{8,64})>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g;
+/** Tham chiếu sticky-img:// còn sót ngoài cú pháp ảnh (vd. link thường) */
+const LOCAL_IMAGE_REF_RE = /sticky-img:\/\/([a-zA-Z0-9-]{8,64})/g;
+
+const unescapeMd = (s: string) => s.replace(/\\(.)/g, '$1');
+const escapeMd = (s: string) => s.replace(/[\\`*_[\]<>#|]/g, '\\$&');
 
 /**
  * Markdown của 1 note: front-matter (tiêu đề, nhãn, màu, ngày) + tiêu đề + nội dung.
@@ -51,11 +58,14 @@ export function noteToMarkdown(note: StickyNote, imagePath: (id: string) => stri
     `updated: ${note.updated_at}`,
     '---',
   ].join('\n');
-  const body = (note.content || '').replace(LOCAL_IMAGE_MD_RE, (_m, alt: string, id: string) => {
-    const path = imagePath(id);
-    if (path) return `![${alt}](${path})`;
-    return `*[${alt ? `${alt} — ` : ''}${MISSING_IMAGE_TEXT}]*`;
-  });
+  const body = (note.content || '')
+    .replace(LOCAL_IMAGE_MD_RE, (_m, alt: string, id: string) => {
+      const path = imagePath(id);
+      if (path) return `![${alt}](${path})`;
+      const label = unescapeMd(alt).trim();
+      return `*[${label ? `${escapeMd(label)} — ` : ''}${MISSING_IMAGE_TEXT}]*`;
+    })
+    .replace(LOCAL_IMAGE_REF_RE, (_m, id: string) => imagePath(id) || '#anh-khong-co-tren-thiet-bi');
   return `${front}\n\n# ${title.replace(/\n/g, ' ')}\n\n${body.trim()}\n`;
 }
 
@@ -98,7 +108,7 @@ export async function buildMarkdownExport(notes: StickyNote[], loadImage: ImageL
 }
 
 /** Tạo file rồi tải về / chia sẻ (mobile). PDF tải lười để không làm nặng bundle chính. */
-export async function exportNotes(notes: StickyNote[], format: StickyExportFormat): Promise<void> {
+export async function exportNotes(notes: StickyNote[], format: StickyExportFormat): Promise<ExportFile> {
   let file: ExportFile;
   if (format === 'pdf') {
     const { buildPdfExport } = await import('./stickyPdf');
@@ -107,4 +117,5 @@ export async function exportNotes(notes: StickyNote[], format: StickyExportForma
     file = await buildMarkdownExport(notes);
   }
   await saveFile(file.blob, file.filename);
+  return file;
 }

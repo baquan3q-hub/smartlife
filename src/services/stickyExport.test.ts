@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { strFromU8, unzipSync } from 'fflate';
 import type { StickyNote } from './stickyNoteService';
 import { buildMarkdownExport, ImageLoader, noteDisplayTitle, noteToMarkdown } from './stickyExport';
-import { buildDocDefinition, markdownToPdfContent, noteAccent } from './stickyPdf';
+import { buildDocDefinition, markdownToPdfContent, noteAccent, stripEmoji } from './stickyPdf';
 
 const IMG_A = 'aaaaaaaa-1111';
 const IMG_MISSING = 'bbbbbbbb-2222';
@@ -71,6 +71,29 @@ describe('xuất Markdown', () => {
     expect(Object.keys(await unzip(file.blob)).sort()).toEqual(['Di-cho-2.md', 'Di-cho.md', 'ghi-chu.md', `images/${IMG_A}.webp`]);
   });
 
+  test('alt có ký tự thoát, đích trong <…>, tiêu đề \'…\' → vẫn đổi sang images/', () => {
+    const content = [
+      `![Hoá đơn \\[tháng 10\\]](sticky-img://${IMG_A})`,
+      `![b](<sticky-img://${IMG_A}> 'tiêu đề')`,
+      `[xem ảnh](sticky-img://${IMG_A})`,
+    ].join('\n\n');
+    const md = noteToMarkdown(note({ content }), (id) => (id === IMG_A ? `images/${id}.webp` : null));
+    expect(md).not.toContain('sticky-img://');
+    expect(md).toContain(`![Hoá đơn \\[tháng 10\\]](images/${IMG_A}.webp)`);
+    expect(md).toContain(`![b](images/${IMG_A}.webp)`);
+    expect(md).toContain(`[xem ảnh](images/${IMG_A}.webp)`);
+  });
+
+  test('ảnh không có trên máy: alt được thoát ký tự Markdown', () => {
+    const md = noteToMarkdown(note({ content: `![giá *mới* \\[1\\]](sticky-img://${IMG_MISSING})` }), () => null);
+    expect(md).toContain('*[giá \\*mới\\* \\[1\\] — Ảnh chỉ có trên thiết bị đã chèn]*');
+  });
+
+  test('tên file bỏ emoji và ký hiệu', async () => {
+    const file = await buildMarkdownExport([note({ title: '🛒 Đi chợ: rau/củ ✅' })], loader);
+    expect(file.filename).toBe('Di-cho-rau-cu.md');
+  });
+
   test('không có note → báo lỗi', async () => {
     await expect(buildMarkdownExport([], loader)).rejects.toThrow('Chưa chọn');
   });
@@ -114,6 +137,13 @@ describe('xuất PDF (bố cục)', () => {
     expect(flat(c)).toContain('x — Ảnh chỉ có trên thiết bị đã chèn');
     expect(flat(c)).not.toContain('"image":"https://');
     expect(flat(c)).toContain('"link":"https://ex.com/p.png"');
+  });
+
+  test('emoji bị lược bỏ (font không có), giữ © ® ™ và tiếng Việt', () => {
+    expect(stripEmoji('✅ Xong 🎉👍🏽 nhé © ® ™ 🇻🇳')).toBe(' Xong  nhé © ® ™ ');
+    const c = flat(markdownToPdfContent('- [x] 🛒 Đi chợ'));
+    expect(c).toContain('Đi chợ');
+    expect(c).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 
   test('HTML thô hiện thành chữ', () => {
