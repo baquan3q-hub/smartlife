@@ -307,7 +307,11 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
               }}
               onOpenAI={() => setAiNoteId(note.id)}
               onOpenHistory={() => setHistoryNoteId(note.id)}
-              onDetach={() => desktopBridge.openStickyWindow(note.id)}
+              onDetach={async () => {
+                if (!(await desktopBridge.openStickyWindow(note.id))) {
+                  alert('Không mở được cửa sổ nổi. Hãy cập nhật SmartLife cho Windows lên bản mới nhất.');
+                }
+              }}
               onDeleteForever={() => {
                 if (window.confirm('Xoá vĩnh viễn ghi chú này? Không thể hoàn tác.')) deleteForever(note.id);
               }}
@@ -325,7 +329,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
           className="hidden md:flex items-center gap-3 mt-8 p-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900"
         >
           <Monitor size={20} className="text-indigo-500 shrink-0" />
-          <span><b>SmartLife cho Windows</b> — ghim note nổi trên màn hình, icon taskbar, phím tắt <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-xs">Ctrl+Shift+N</kbd> tạo note từ bất kỳ đâu.</span>
+          <span><b>SmartLife cho Windows</b> — ghim note nổi trên màn hình, icon taskbar, phím tắt <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-xs">Ctrl+Alt+N</kbd> tạo note từ bất kỳ đâu.</span>
         </a>
       )}
 
