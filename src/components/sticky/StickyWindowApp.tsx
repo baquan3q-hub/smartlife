@@ -17,6 +17,7 @@ import { desktopBridge } from '../../services/desktopBridge';
 import { applyTheme, getSavedTheme } from '../../utils/theme';
 import { STICKY_THEME, relativeTime } from './stickyTheme';
 import { StickyHistoryModal } from './StickyHistoryModal';
+import { contentMatchesQuery, firstLines } from '../../utils/stickyMarkdown';
 
 const ON_TOP_KEY = 'smartlife_sticky_on_top_';
 const FONT_KEY = 'smartlife_sticky_font_';
@@ -51,7 +52,7 @@ function readNumber(key: string, fallback: number): number {
 }
 
 function noteHeading(n: Pick<StickyNote, 'title' | 'content'>): string {
-  return n.title.trim() || n.content.split('\n').find(l => l.trim())?.trim() || 'Ghi chú trống';
+  return n.title.trim() || firstLines(n.content, 1)[0] || 'Ghi chú trống';
 }
 
 const Centered: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
@@ -87,7 +88,7 @@ const NotesListPanel: React.FC<{
     const q = query.trim().toLowerCase();
     return notes
       .filter(n => !n.deleted_at && !n.is_archived)
-      .filter(n => !q || n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q) || n.labels.some(l => l.toLowerCase().includes(q)))
+      .filter(n => !q || n.title.toLowerCase().includes(q) || contentMatchesQuery(n.content, q) || n.labels.some(l => l.toLowerCase().includes(q)))
       .sort((a, b) => (a.is_pinned !== b.is_pinned ? (a.is_pinned ? -1 : 1) : b.updated_at.localeCompare(a.updated_at)));
   }, [notes, query]);
 
@@ -111,7 +112,7 @@ const NotesListPanel: React.FC<{
       <ul className="flex-1 overflow-y-auto sticky-scroll p-1.5 space-y-1">
         {list.length === 0 && <li className="text-center text-xs text-slate-400 py-6">Không có ghi chú phù hợp</li>}
         {list.map(n => {
-          const lines = n.content.split('\n').map(l => l.trim()).filter(Boolean);
+          const lines = firstLines(n.content, 2);
           const preview = n.title.trim() ? lines[0] : lines[1];
           return (
             <li key={n.id}>
