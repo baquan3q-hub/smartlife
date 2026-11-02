@@ -25,6 +25,15 @@ for (const proto of [Element.prototype, Range.prototype] as any[]) {
   proto.getBoundingClientRect ??= () => ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON: () => ({}) });
 }
 
+/** Đợi tới khi điều kiện đúng (IndexedDB/nén ảnh chạy bất đồng bộ — máy chậm cần lâu hơn). */
+const until = async (check: () => void) => {
+  for (const end = Date.now() + 5000; ;) {
+    // Mỗi bước act ngắn để React kịp cập nhật giao diện rồi mới kiểm tra
+    await act(() => new Promise(r => setTimeout(r, 10)));
+    try { check(); return; } catch (e) { if (Date.now() > end) throw e; }
+  }
+};
+
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 
@@ -155,7 +164,7 @@ describe('RichNoteEditor', () => {
     const md = 'Trước\n\n![](sticky-img://aaaaaaaa-1111)\n\nSau';
     const { onChange, editor, host: h } = mount(md);
     expect(editor.getMarkdown().trim()).toBe(md);
-    await act(() => new Promise(r => setTimeout(r, 30)));
+    await until(() => expect(h.textContent).toContain('Ảnh chỉ có trên thiết bị đã chèn'));
     expect(h.textContent).toContain('Ảnh chỉ có trên thiết bị đã chèn');
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -170,13 +179,13 @@ describe('RichNoteEditor', () => {
     expect(input).toBeTruthy();
     const file = new File([new Uint8Array([1, 2, 3])], 'chup.png', { type: 'image/png' });
     Object.defineProperty(input, 'files', { value: [file], configurable: true });
-    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); await new Promise(r => setTimeout(r, 50)); });
+    act(() => { input.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => expect(onChange).toHaveBeenCalled());
     const md = onChange.mock.calls.at(-1)?.[0] as string;
     const id = md.match(/sticky-img:\/\/([a-zA-Z0-9-]+)/)?.[1];
     expect(id).toBeTruthy();
     expect(await stickyImageStore.get(id!)).toMatchObject({ user_id: 'u1', note_id: 'n1', width: 4, height: 3 });
-    await act(() => new Promise(r => setTimeout(r, 30)));
-    expect(host.querySelector('.sticky-image-node img')?.getAttribute('src')).toMatch(/^blob:/);
+    await until(() => expect(host!.querySelector('.sticky-image-node img')?.getAttribute('src')).toMatch(/^blob:/));
   });
 
   test('đổi sang note khác khi ảnh đang nén → không chèn vào note mới', async () => {
@@ -196,7 +205,9 @@ describe('RichNoteEditor', () => {
     Object.defineProperty(input, 'files', { value: [new File([new Uint8Array([1])], 'a.png', { type: 'image/png' })], configurable: true });
     await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
     renderNote('B', 'Note B');
-    await act(async () => { finish(); await new Promise(r => setTimeout(r, 30)); });
+    expect(host.textContent).toContain('Đang xử lý ảnh');
+    act(() => { finish(); });
+    await until(() => expect(host!.textContent).not.toContain('Đang xử lý ảnh'));
     const editor = (host.querySelector('.ProseMirror') as any).editor as Editor;
     expect(editor.getMarkdown()).not.toContain('sticky-img://');
     expect(onChange).not.toHaveBeenCalled();
@@ -214,7 +225,8 @@ describe('RichNoteEditor', () => {
       Object.defineProperty(input, 'files', { value: [new File([new Uint8Array([1])], 'x.png', { type: 'image/png' })], configurable: true });
       input.dispatchEvent(new Event('change', { bubbles: true }));
     };
-    await act(async () => { pick(); pick(); await new Promise(r => setTimeout(r, 50)); });
+    act(() => { pick(); pick(); });
+    await until(() => expect(onChange).toHaveBeenCalled());
     const md = onChange.mock.calls.at(-1)?.[0] as string;
     expect(md.match(/sticky-img:\/\//g)).toHaveLength(MAX_IMAGES_PER_NOTE);
     expect(host.textContent).toContain(`tối đa ${MAX_IMAGES_PER_NOTE} ảnh`);
