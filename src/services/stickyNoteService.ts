@@ -249,14 +249,22 @@ export const stickyNoteService = {
   },
 
   // ── Server ───────────────────────────────
+  /** Toàn bộ note của user (gồm thùng rác). Tải theo trang — Supabase giới hạn mỗi lần trả tối đa 1000 dòng. */
   async list(userId: string): Promise<StickyNote[]> {
-    const { data, error } = await supabase
-      .from('sticky_notes')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return (data || []) as StickyNote[];
+    const PAGE = 1000;
+    const all: StickyNote[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from('sticky_notes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      all.push(...((data || []) as StickyNote[]));
+      if (!data || data.length < PAGE) return all;
+    }
   },
 
   async insert(note: StickyNote): Promise<StickyNote> {

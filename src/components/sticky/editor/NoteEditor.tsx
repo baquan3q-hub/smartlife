@@ -22,6 +22,8 @@ export interface NoteEditorProps {
   focusRef?: React.MutableRefObject<(() => void) | null>;
   /** Lần sửa đầu sẽ lưu note cũ ở dạng Markdown chuẩn hoá (khác chuỗi gốc) → cha chụp phiên bản cũ trước. */
   onLegacyRewrite?: () => void;
+  /** Cho phép chèn ảnh (lưu IndexedDB, gắn với user + note). Không truyền → không có nút/dán/thả ảnh. */
+  imageScope?: { userId: string; noteId: string };
   /** Nội bộ: id của textarea dự phòng — trình soạn thảo nhận lại focus nếu người dùng đang gõ trong đó. */
   fallbackId?: string;
 }

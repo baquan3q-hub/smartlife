@@ -135,6 +135,7 @@ export const StickyNoteCard: React.FC<StickyNoteCardProps> = ({
           autoFocus={autoFocus}
           onChange={(content) => onChange({ content })}
           onLegacyRewrite={() => { stickyNoteService.snapshot(note).catch(() => {}); }}
+          imageScope={{ userId: note.user_id, noteId: note.id }}
         />
 
         {/* Nhãn */}
