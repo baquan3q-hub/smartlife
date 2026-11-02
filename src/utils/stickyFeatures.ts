@@ -13,3 +13,8 @@ export function isRichEditorEnabled(): boolean {
     return true;
   }
 }
+
+/** Xuất note ra Markdown / PDF. Tắt khi build: VITE_STICKY_EXPORT=false */
+export function isExportEnabled(): boolean {
+  return import.meta.env.VITE_STICKY_EXPORT !== 'false';
+}

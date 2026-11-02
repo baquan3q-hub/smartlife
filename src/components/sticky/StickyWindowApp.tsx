@@ -10,6 +10,9 @@ import {
   Plus, Palette, Pin, PinOff, Trash2, Loader2, CloudOff, Check, AlertTriangle, ZoomIn, ZoomOut,
   List, History, MoreHorizontal, LayoutGrid, Search, X, Type,
 } from 'lucide-react';
+import type { StickyExportFormat } from '../../services/stickyExport';
+import { isExportEnabled } from '../../utils/stickyFeatures';
+import { EXPORT_FORMATS, runStickyExport } from './stickyExportActions';
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import { useStickyNotes } from '../../hooks/useStickyNotes';
 import { STICKY_COLORS, StickyColor, StickyNote, StickyNoteVersion, stickyNoteService } from '../../services/stickyNoteService';
@@ -175,10 +178,17 @@ const StickyWindowInner: React.FC = () => {
 
   useEffect(() => { applyTheme(getSavedTheme()); }, []);
 
-  const showToast = useCallback((text: string) => {
+  const showToast = useCallback((text: string, ms = 2500) => {
     setToast(text);
-    window.setTimeout(() => setToast(t => (t === text ? null : t)), 2500);
+    window.setTimeout(() => setToast(t => (t === text ? null : t)), ms);
   }, []);
+
+  const exportCurrent = useCallback((format: StickyExportFormat) => {
+    const current = noteRef.current;
+    if (!current) return;
+    // Thông báo tiến trình giữ tới khi xong; kết quả hiện lâu hơn vì có thể kèm lưu ý
+    runStickyExport([current], format, (msg) => (msg.busy ? setToast(msg.text) : showToast(msg.text, 5000)));
+  }, [showToast]);
 
   // ?new=1 (từ Ctrl+Alt+N / khay hệ thống / nút +): tạo note với đúng id app đã cấp
   useEffect(() => {
@@ -378,6 +388,14 @@ const StickyWindowInner: React.FC = () => {
             </div>
             <button onClick={() => { changeFont('reset'); setPanel('none'); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">Cỡ chữ mặc định (Ctrl 0)</button>
             <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+            {isExportEnabled() && (
+              <>
+                {EXPORT_FORMATS.map(({ format, label, icon: Icon }) => (
+                  <button key={format} onClick={() => { setPanel('none'); exportCurrent(format); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"><Icon size={13} /> Xuất {label}</button>
+                ))}
+                <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+              </>
+            )}
             <button onClick={() => { setPanel('none'); desktopBridge.focusMainWindow('sticky'); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"><LayoutGrid size={13} /> Mở bảng Sticky Notes</button>
             <button onClick={() => { setPanel('none'); moveToTrash(); }} className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 flex items-center gap-1.5"><Trash2 size={13} /> Chuyển vào thùng rác</button>
           </div>
