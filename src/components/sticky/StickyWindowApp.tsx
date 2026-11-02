@@ -8,8 +8,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Palette, Pin, PinOff, Trash2, Loader2, CloudOff, Check, AlertTriangle, ZoomIn, ZoomOut,
-  List, History, MoreHorizontal, LayoutGrid, Search, X, Type,
+  List, History, MoreHorizontal, LayoutGrid, Search, X, Type, FileText, FileDown,
 } from 'lucide-react';
+import type { StickyExportFormat } from '../../services/stickyExport';
+import { isExportEnabled } from '../../utils/stickyFeatures';
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import { useStickyNotes } from '../../hooks/useStickyNotes';
 import { STICKY_COLORS, StickyColor, StickyNote, StickyNoteVersion, stickyNoteService } from '../../services/stickyNoteService';
@@ -179,6 +181,20 @@ const StickyWindowInner: React.FC = () => {
     setToast(text);
     window.setTimeout(() => setToast(t => (t === text ? null : t)), 2500);
   }, []);
+
+  const exportCurrent = useCallback(async (format: StickyExportFormat) => {
+    const current = noteRef.current;
+    if (!current) return;
+    showToast(format === 'pdf' ? 'Đang tạo PDF…' : 'Đang tạo file Markdown…');
+    try {
+      const { exportNotes } = await import('../../services/stickyExport');
+      await exportNotes([current], format);
+      showToast('Đã xuất file');
+    } catch (err) {
+      console.error('[sticky] export failed', err);
+      showToast(`Xuất file thất bại: ${(err as Error)?.message || 'lỗi không xác định'}`);
+    }
+  }, [showToast]);
 
   // ?new=1 (từ Ctrl+Alt+N / khay hệ thống / nút +): tạo note với đúng id app đã cấp
   useEffect(() => {
@@ -378,6 +394,13 @@ const StickyWindowInner: React.FC = () => {
             </div>
             <button onClick={() => { changeFont('reset'); setPanel('none'); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">Cỡ chữ mặc định (Ctrl 0)</button>
             <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+            {isExportEnabled() && (
+              <>
+                <button onClick={() => { setPanel('none'); exportCurrent('markdown'); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"><FileText size={13} /> Xuất Markdown</button>
+                <button onClick={() => { setPanel('none'); exportCurrent('pdf'); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"><FileDown size={13} /> Xuất PDF</button>
+                <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+              </>
+            )}
             <button onClick={() => { setPanel('none'); desktopBridge.focusMainWindow('sticky'); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"><LayoutGrid size={13} /> Mở bảng Sticky Notes</button>
             <button onClick={() => { setPanel('none'); moveToTrash(); }} className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 flex items-center gap-1.5"><Trash2 size={13} /> Chuyển vào thùng rác</button>
           </div>

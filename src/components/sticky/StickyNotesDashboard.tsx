@@ -4,8 +4,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   StickyNote as StickyIcon, Plus, Search, Loader2, Cloud, CloudOff, CheckCircle2, AlertTriangle,
-  Pin, Archive, Trash2, LayoutGrid, Monitor, X,
+  Pin, Archive, Trash2, LayoutGrid, Monitor, X, CheckSquare, FileText, FileDown,
 } from 'lucide-react';
+import type { StickyExportFormat } from '../../services/stickyExport';
+import { isExportEnabled } from '../../utils/stickyFeatures';
 import { useStickyNotes, StickySyncStatus } from '../../hooks/useStickyNotes';
 import {
   StickyColor, StickyNote, StickyNotePatch, StickyNoteVersion, STICKY_COLORS, TRASH_RETENTION_DAYS,
@@ -76,6 +78,11 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
   const onAddTodoRef = useRef(onAddTodo);
   onAddTodoRef.current = onAddTodo;
   const desktop = isTauri();
+  const canExport = isExportEnabled();
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [exporting, setExporting] = useState<StickyExportFormat | null>(null);
+  const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
 
   const allLabels = useMemo(
     () => Array.from(new Set(notes.filter(n => !n.deleted_at).flatMap(n => n.labels))).sort((a, b) => a.localeCompare(b, 'vi')),
@@ -110,6 +117,43 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
       });
   }, [notes, view, query, colorFilter, labelFilter]);
 
+  // Chỉ xuất note đang thấy (đúng thứ tự lưới) — note bị lọc ẩn đi thì không xuất
+  const selectedNotes = useMemo(() => visible.filter(n => selectedIds.has(n.id)), [visible, selectedIds]);
+
+  const exitSelecting = useCallback(() => {
+    setSelecting(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  // Đổi tab thì bỏ chọn
+  useEffect(() => {
+    setSelectedIds(new Set());
+    if (view === 'trash') setSelecting(false);
+  }, [view]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), toast.error ? 6000 : 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const runExport = useCallback(async (list: StickyNote[], format: StickyExportFormat) => {
+    if (!list.length || exporting) return;
+    setExporting(format);
+    setToast({ text: format === 'pdf' ? 'Đang tạo PDF…' : 'Đang tạo file Markdown…' });
+    try {
+      const { exportNotes } = await import('../../services/stickyExport');
+      await exportNotes(list, format);
+      setToast({ text: `Đã xuất ${list.length} ghi chú ra ${format === 'pdf' ? 'PDF' : 'Markdown'}` });
+      if (list.length > 1) exitSelecting();
+    } catch (err) {
+      console.error('[sticky] export failed', err);
+      setToast({ text: `Xuất file thất bại: ${(err as Error)?.message || 'lỗi không xác định'}`, error: true });
+    } finally {
+      setExporting(null);
+    }
+  }, [exporting, exitSelecting]);
+
   const handleCreate = useCallback(async () => {
     if (view === 'trash' || view === 'archived') setView('active');
     const note = await createNote({
@@ -131,12 +175,14 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
       if (historyNoteId || aiNoteId) return;
+      if (e.key === 'Escape' && selecting) { exitSelecting(); return; }
+      if (selecting) return;
       if (e.key === 'n' || e.key === 'N') { e.preventDefault(); handleCreate(); }
       if (e.key === '/') { e.preventDefault(); searchRef.current?.focus(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleCreate, historyNoteId, aiNoteId]);
+  }, [handleCreate, historyNoteId, aiNoteId, selecting, exitSelecting]);
 
   const applyWithSnapshot = useCallback(async (note: StickyNote, patch: StickyNotePatch) => {
     try {
@@ -193,6 +239,16 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
               <button onClick={() => setQuery('')} aria-label="Xoá tìm kiếm" className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"><X size={14} /></button>
             )}
           </div>
+          {canExport && view !== 'trash' && visible.length > 0 && (
+            <button
+              onClick={() => (selecting ? exitSelecting() : setSelecting(true))}
+              aria-pressed={selecting}
+              title="Chọn nhiều ghi chú để xuất file"
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${selecting ? 'bg-indigo-50 border-indigo-300 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            >
+              <CheckSquare size={16} /> <span className="hidden sm:inline">{selecting ? 'Xong' : 'Chọn'}</span>
+            </button>
+          )}
           <button
             onClick={handleCreate}
             title="Ghi chú mới (N)"
@@ -321,6 +377,14 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
                 if (window.confirm('Xoá vĩnh viễn ghi chú này? Không thể hoàn tác.')) deleteForever(note.id);
               }}
               onLabelClick={(l) => setLabelFilter(l)}
+              onExport={canExport ? (format) => runExport([note], format) : undefined}
+              selecting={selecting && view !== 'trash'}
+              selected={selectedIds.has(note.id)}
+              onToggleSelect={() => setSelectedIds(prev => {
+                const next = new Set(prev);
+                if (!next.delete(note.id)) next.add(note.id);
+                return next;
+              })}
             />
           ))}
         </div>
@@ -338,11 +402,48 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
         </a>
       )}
 
+      {/* Thanh chọn nhiều → xuất file */}
+      {selecting && view !== 'trash' && visible.length > 0 && (
+        <div
+          role="toolbar"
+          aria-label="Xuất các ghi chú đã chọn"
+          className="fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-6 z-40 w-[calc(100%-1.5rem)] max-w-xl flex flex-wrap items-center gap-2 p-2 pl-4 rounded-2xl bg-slate-900 text-white shadow-xl dark:bg-slate-100 dark:text-slate-900"
+        >
+          <span className="text-sm font-semibold mr-auto">Đã chọn {selectedNotes.length}</span>
+          <button
+            onClick={() => setSelectedIds(selectedNotes.length === visible.length ? new Set() : new Set(visible.map(n => n.id)))}
+            className="text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-white/10 dark:hover:bg-black/10"
+          >
+            {selectedNotes.length === visible.length ? 'Bỏ chọn hết' : 'Chọn tất cả'}
+          </button>
+          {([['markdown', 'Markdown', FileText], ['pdf', 'PDF', FileDown]] as const).map(([format, label, Icon]) => (
+            <button
+              key={format}
+              disabled={!selectedNotes.length || !!exporting}
+              onClick={() => runExport(selectedNotes, format)}
+              className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-500 text-white hover:bg-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {exporting === format ? <Loader2 size={13} className="animate-spin" /> : <Icon size={13} />} {label}
+            </button>
+          ))}
+          <button onClick={exitSelecting} aria-label="Thoát chế độ chọn" className="p-1.5 rounded-lg hover:bg-white/10 dark:hover:bg-black/10"><X size={16} /></button>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          role={toast.error ? 'alert' : 'status'}
+          className={`fixed left-1/2 -translate-x-1/2 z-50 ${selecting ? 'bottom-44 md:bottom-24' : 'bottom-24 md:bottom-6'} max-w-[calc(100%-2rem)] px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg ${toast.error ? 'bg-red-600 text-white' : 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'}`}
+        >
+          {toast.text}
+        </div>
+      )}
+
       {/* Nút tạo nhanh trên mobile */}
       <button
         onClick={handleCreate}
         aria-label="Ghi chú mới"
-        className="md:hidden fixed right-5 bottom-28 z-40 w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-300/50 flex items-center justify-center active:scale-95 transition-transform"
+        className={`${selecting ? 'hidden' : 'flex'} md:hidden fixed right-5 bottom-28 z-40 w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-300/50 items-center justify-center active:scale-95 transition-transform`}
       >
         <Plus size={26} />
       </button>

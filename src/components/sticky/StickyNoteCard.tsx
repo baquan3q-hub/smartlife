@@ -2,11 +2,12 @@
 import React, { useState } from 'react';
 import {
   Pin, PinOff, Palette, Sparkles, History, ExternalLink, Archive, ArchiveRestore,
-  Trash2, RotateCcw, X, Tag, Plus,
+  Trash2, RotateCcw, X, Tag, Plus, Download, Check, FileText, FileDown,
 } from 'lucide-react';
 import { StickyColor, StickyNote, StickyNotePatch, STICKY_COLORS, stickyNoteService } from '../../services/stickyNoteService';
 import { STICKY_THEME, relativeTime, DEVICE_LABEL } from './stickyTheme';
 import { NoteEditor } from './editor/NoteEditor';
+import type { StickyExportFormat } from '../../services/stickyExport';
 
 export type StickyView = 'active' | 'pinned' | 'archived' | 'trash';
 
@@ -23,6 +24,12 @@ interface StickyNoteCardProps {
   onDetach?: () => void;
   onDeleteForever: () => void;
   onLabelClick?: (label: string) => void;
+  /** Có = hiện nút xuất file (Markdown / PDF) */
+  onExport?: (format: StickyExportFormat) => void;
+  /** Chế độ chọn nhiều note để xuất */
+  selecting?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 const IconBtn: React.FC<{ title: string; onClick: () => void; children: React.ReactNode; active?: boolean }> = ({ title, onClick, children, active }) => (
@@ -39,9 +46,11 @@ const IconBtn: React.FC<{ title: string; onClick: () => void; children: React.Re
 
 export const StickyNoteCard: React.FC<StickyNoteCardProps> = ({
   note, view, autoFocus, canDetach, onChange, onFocus, onBlur, onOpenAI, onOpenHistory, onDetach, onDeleteForever, onLabelClick,
+  onExport, selecting, selected, onToggleSelect,
 }) => {
   const theme = STICKY_THEME[note.color] || STICKY_THEME.yellow;
   const [showColors, setShowColors] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [labelDraft, setLabelDraft] = useState<string | null>(null);
   const readOnly = view === 'trash';
 
@@ -65,11 +74,28 @@ export const StickyNoteCard: React.FC<StickyNoteCardProps> = ({
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
           setShowColors(false);
+          setShowExport(false);
           onBlur();
         }
       }}
     >
       <div className={`h-1.5 ${theme.bar}`} />
+
+      {/* Chế độ chọn: lớp phủ bắt click để không sửa nhầm nội dung */}
+      {selecting && (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={!!selected}
+          aria-label={`Chọn ghi chú ${note.title || ''}`.trim()}
+          onClick={onToggleSelect}
+          className={`absolute inset-0 z-10 rounded-2xl transition-colors ${selected ? 'ring-[3px] ring-inset ring-indigo-500 bg-indigo-500/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+        >
+          <span className={`absolute top-2.5 right-2.5 w-6 h-6 rounded-full border-2 flex items-center justify-center ${selected ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white/80 dark:bg-slate-800/80 border-slate-400'}`}>
+            {selected && <Check size={14} strokeWidth={3} />}
+          </span>
+        </button>
+      )}
 
       {/* Thanh công cụ — hiện khi hover / focus (luôn hiện trên màn hình cảm ứng) */}
       <div className="flex items-center justify-between gap-1 px-2 pt-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity">
@@ -84,9 +110,12 @@ export const StickyNoteCard: React.FC<StickyNoteCardProps> = ({
               <IconBtn title={note.is_pinned ? 'Bỏ ghim' : 'Ghim lên đầu'} active={note.is_pinned} onClick={() => onChange({ is_pinned: !note.is_pinned }, { immediate: true })}>
                 {note.is_pinned ? <PinOff size={15} /> : <Pin size={15} />}
               </IconBtn>
-              <IconBtn title="Đổi màu" active={showColors} onClick={() => setShowColors(s => !s)}><Palette size={15} /></IconBtn>
+              <IconBtn title="Đổi màu" active={showColors} onClick={() => { setShowColors(s => !s); setShowExport(false); }}><Palette size={15} /></IconBtn>
               <IconBtn title="AI hỗ trợ" onClick={onOpenAI}><Sparkles size={15} /></IconBtn>
               <IconBtn title="Lịch sử phiên bản" onClick={onOpenHistory}><History size={15} /></IconBtn>
+              {onExport && (
+                <IconBtn title="Xuất file" active={showExport} onClick={() => { setShowExport(s => !s); setShowColors(false); }}><Download size={15} /></IconBtn>
+              )}
               {canDetach && onDetach && (
                 <IconBtn title="Mở thành cửa sổ nổi trên desktop" onClick={onDetach}><ExternalLink size={15} /></IconBtn>
               )}
@@ -115,6 +144,21 @@ export const StickyNoteCard: React.FC<StickyNoteCardProps> = ({
               onClick={() => setColor(c)}
               className={`w-6 h-6 rounded-full border-2 ${STICKY_THEME[c].dot} ${note.color === c ? 'border-indigo-500 scale-110' : 'border-white/70 dark:border-slate-700'} transition-transform`}
             />
+          ))}
+        </div>
+      )}
+
+      {showExport && onExport && (
+        <div className="flex flex-wrap gap-1.5 px-3 pt-1" role="group" aria-label="Xuất ghi chú">
+          {([['markdown', 'Markdown', FileText], ['pdf', 'PDF', FileDown]] as const).map(([format, label, Icon]) => (
+            <button
+              key={format}
+              type="button"
+              onClick={() => { setShowExport(false); onExport(format); }}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15"
+            >
+              <Icon size={12} /> {label}
+            </button>
           ))}
         </div>
       )}
