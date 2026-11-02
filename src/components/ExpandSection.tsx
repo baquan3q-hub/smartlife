@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
     GraduationCap, Target, Music, BookOpen, Flame, Settings,
-    QrCode, CreditCard, Contact, Camera, Trash2, X, Sparkles, Plus, Eye, Loader2
+    QrCode, CreditCard, Contact, Camera, Trash2, X, Sparkles, Plus, Eye, Loader2, StickyNote
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { Profile } from '../types';
@@ -16,6 +16,17 @@ interface ExpandSectionProps {
 }
 
 const EXPAND_ITEMS = [
+    {
+        id: 'sticky',
+        label: 'Sticky Notes',
+        desc: 'Ghi nhanh, đồng bộ mọi thiết bị, AI tách task',
+        icon: StickyNote,
+        gradient: 'from-amber-400 to-yellow-500',
+        bg: 'bg-amber-50',
+        iconColor: 'text-amber-600',
+        shadowColor: 'shadow-amber-200/60',
+        action: 'navigate',
+    },
     {
         id: 'gpa',
         label: 'Điểm GPA',

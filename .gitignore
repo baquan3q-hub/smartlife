@@ -45,3 +45,6 @@ venv/
 
 # Large Media Files (Avoid GitHub 100MB limit)
 public/music/chill-music.mp3
+# Tauri (bản Windows)
+src-tauri/target
+src-tauri/gen

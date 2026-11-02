@@ -1,0 +1,24 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Cho phép web app SmartLife (tải từ smartlife.courses) gọi API desktop: mở note nổi, luôn nằm trên cùng, đặt tiêu đề, đóng cửa sổ.",
+  "windows": [
+    "main",
+    "sticky-*"
+  ],
+  "remote": {
+    "urls": [
+      "https://smartlife.courses/*",
+      "https://smartlife.courses",
+      "https://*.smartlife.courses/*",
+      "https://*.smartlife.courses"
+    ]
+  },
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-title"
+  ]
+}
