@@ -863,6 +863,8 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
     // Confirm close app
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            // App Windows: đóng cửa sổ = ẩn xuống khay, và lệnh desktop dùng điều hướng → không hỏi xác nhận
+            if ((window as any).__SMARTLIFE_DESKTOP__) return;
             e.preventDefault();
             e.returnValue = '';
         };

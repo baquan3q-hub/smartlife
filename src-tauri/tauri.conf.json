@@ -8,25 +8,17 @@
   },
   "app": {
     "withGlobalTauri": true,
-    "windows": [
-      {
-        "label": "main",
-        "title": "SmartLife",
-        "url": "https://smartlife.courses/",
-        "width": 1280,
-        "height": 820,
-        "minWidth": 420,
-        "minHeight": 560,
-        "center": true
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": [
+      "nsis",
+      "msi"
+    ],
     "publisher": "SmartLife",
     "shortDescription": "SmartLife — Sticky Notes, Kanban, tài chính & AI",
     "longDescription": "SmartLife cho Windows: ghi chú dán nổi trên màn hình, đồng bộ với web và điện thoại, AI tách việc thành task.",
@@ -39,8 +31,12 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper" },
-      "nsis": { "installMode": "currentUser" }
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
     }
   }
 }

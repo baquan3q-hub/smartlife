@@ -3,12 +3,15 @@
 // - Cửa sổ note nổi: #/sticky-window?id=<uuid>. Khung cửa sổ do Windows vẽ → kéo, đổi kích thước, đóng
 //   luôn hoạt động, không phụ thuộc trang web. Mặc định luôn nằm trên cùng.
 // - Đóng note: Rust gọi window.__smartlifeSaveNow() để lưu nốt rồi mới huỷ cửa sổ.
+// - Lệnh từ trang web → app: trang "điều hướng" tới https://smartlife.courses/__desktop/<lệnh>?...,
+//   Rust chặn lượt điều hướng đó (on_navigation) và thực hiện lệnh. Không cần kênh IPC của Tauri
+//   (kênh này không hoạt động ổn định với trang tải từ web). Rust → trang dùng eval().
 // - Danh sách note đang mở lưu ở file trong thư mục dữ liệu app → mở lại khi khởi động.
 // - Khay hệ thống, phím tắt toàn cục Ctrl+Alt+N, tự khởi động, nhớ vị trí/kích thước, chỉ chạy 1 bản.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{path::PathBuf, sync::Mutex, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::Mutex, time::Duration};
 
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -22,6 +25,11 @@ use tauri_plugin_window_state::StateFlags;
 const MAIN_LABEL: &str = "main";
 const STICKY_PREFIX: &str = "sticky-";
 const APP_URL: &str = "https://smartlife.courses/";
+const APP_HOST: &str = "smartlife.courses";
+/// Tiền tố đường dẫn của "lệnh desktop" (xem desktop_command_handler).
+const COMMAND_PREFIX: &str = "/__desktop/";
+/// Đánh dấu cho trang web biết đang chạy trong app desktop có hỗ trợ lệnh /__desktop/.
+const DESKTOP_MARKER_JS: &str = "window.__SMARTLIFE_DESKTOP__ = 2;";
 const MINIMIZED_ARG: &str = "--minimized";
 const OPEN_LIST_FILE: &str = "open-sticky-notes.txt";
 /// Hàm JS lưu nốt thay đổi (StickyWindowApp.tsx). Gọi qua eval nên không cần quyền IPC.
@@ -119,18 +127,21 @@ fn open_sticky(app: &AppHandle, note_id: &str, is_new: bool) -> Result<(), Strin
     } else {
         format!("id={note_id}")
     };
-    WebviewWindowBuilder::new(app, label, WebviewUrl::External(sticky_url(&query)?))
+    WebviewWindowBuilder::new(app, label.clone(), WebviewUrl::External(sticky_url(&query)?))
         .title("Ghi chú")
         .inner_size(300.0, 320.0)
         .min_inner_size(200.0, 150.0)
-        // Khung Windows: kéo thanh tiêu đề để di chuyển, kéo mép/góc để đổi kích thước, X để đóng
+        // Khung Windows: kéo thanh tiêu đề để di chuyển, kéo mép/góc để đổi kích thước,
+        // "–" để thu nhỏ xuống taskbar (gộp chung icon SmartLife), X để đóng
         .decorations(true)
         .resizable(true)
         .maximizable(true)
-        // Note không có icon taskbar nên không cho thu nhỏ (tránh "mất" cửa sổ); ẩn/hiện qua khay hệ thống
-        .minimizable(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
+        .minimizable(true)
+        .skip_taskbar(false)
+        // Mặc định không ghim; trang tự bật lại nếu note đã được ghim trước đó
+        .always_on_top(false)
+        .initialization_script(DESKTOP_MARKER_JS)
+        .on_navigation(desktop_command_handler(app.clone(), label))
         .build()
         .map_err(|e| e.to_string())?;
     remember_open(app, note_id);
@@ -177,7 +188,88 @@ fn quit_gracefully(app: &AppHandle) {
     });
 }
 
-// ── Commands (gọi từ JS) ──────────────────────────────────────────────────────
+// ── Lệnh desktop từ trang web (qua điều hướng bị chặn) ──────────────────────────
+/// Trả về hàm xử lý điều hướng cho 1 cửa sổ. URL dạng https://smartlife.courses/__desktop/<lệnh>?<tham số>
+/// được coi là lệnh: chặn điều hướng (trang giữ nguyên) và thực hiện lệnh. URL khác cho đi bình thường.
+fn desktop_command_handler(app: AppHandle, label: String) -> impl Fn(&tauri::Url) -> bool + Send + 'static {
+    move |url: &tauri::Url| {
+        let is_command = url.host_str() == Some(APP_HOST) && url.path().starts_with(COMMAND_PREFIX);
+        if !is_command {
+            return true;
+        }
+        let command = url.path()[COMMAND_PREFIX.len()..].trim_end_matches('/').to_string();
+        let params: HashMap<String, String> = url.query_pairs().into_owned().collect();
+        let app = app.clone();
+        let label = label.clone();
+        // Chạy ngoài handler điều hướng (tạo cửa sổ trong handler có thể treo trên Windows)
+        tauri::async_runtime::spawn(async move {
+            run_desktop_command(&app, &label, &command, &params);
+        });
+        false
+    }
+}
+
+fn run_desktop_command(app: &AppHandle, label: &str, command: &str, params: &HashMap<String, String>) {
+    let param = |key: &str| params.get(key).map(String::as_str).unwrap_or("");
+    let this_window = || app.get_webview_window(label);
+    match command {
+        "new-note" => {
+            let _ = open_sticky(app, &uuid::Uuid::new_v4().to_string(), true);
+        }
+        "open-note" => {
+            if let Err(e) = open_sticky(app, param("id"), false) {
+                eprintln!("[SmartLife] open-note: {e}");
+            }
+        }
+        "show-main" => {
+            show_main(app);
+            if param("tab") == "sticky" {
+                let _ = app.emit_to(MAIN_LABEL, "smartlife://navigate", "sticky");
+                if let Some(main) = app.get_webview_window(MAIN_LABEL) {
+                    let _ = main.eval("window.location.hash = '#/sticky'");
+                }
+            }
+        }
+        "on-top" => {
+            if let Some(w) = this_window() {
+                let _ = w.set_always_on_top(param("value") == "1");
+            }
+        }
+        "title" => {
+            if let Some(w) = this_window() {
+                let title: String = param("value").chars().take(80).collect();
+                let _ = w.set_title(if title.trim().is_empty() { "Ghi chú" } else { title.trim() });
+            }
+        }
+        "close" => {
+            if label.starts_with(STICKY_PREFIX) {
+                close_sticky_gracefully(app, label);
+            }
+        }
+        "minimize" => {
+            if let Some(w) = this_window() {
+                let _ = w.minimize();
+            }
+        }
+        other => eprintln!("[SmartLife] Lệnh desktop không hỗ trợ: {other}"),
+    }
+}
+
+fn create_main_window(app: &AppHandle, visible: bool) -> tauri::Result<()> {
+    let url = tauri::Url::parse(APP_URL).expect("valid app url");
+    WebviewWindowBuilder::new(app, MAIN_LABEL, WebviewUrl::External(url))
+        .title("SmartLife")
+        .inner_size(1280.0, 820.0)
+        .min_inner_size(420.0, 560.0)
+        .center()
+        .visible(visible)
+        .initialization_script(DESKTOP_MARKER_JS)
+        .on_navigation(desktop_command_handler(app.clone(), MAIN_LABEL.to_string()))
+        .build()?;
+    Ok(())
+}
+
+// ── Commands (gọi từ JS qua IPC — giữ cho tương thích) ──────────────────────────────────────────────────────
 #[tauri::command]
 async fn open_sticky_window(app: AppHandle, note_id: String) -> Result<(), String> {
     open_sticky(&app, &note_id, false)
@@ -288,12 +380,10 @@ fn main() {
                 eprintln!("[SmartLife] Không đăng ký được Ctrl+Alt+N: {e}");
             }
 
-            // Khởi động cùng Windows → cửa sổ chính chạy ngầm dưới khay
-            if std::env::args().any(|a| a == MINIMIZED_ARG) {
-                if let Some(w) = app.get_webview_window(MAIN_LABEL) {
-                    let _ = w.hide();
-                }
-            }
+            // Cửa sổ chính (tạo bằng code để gắn bộ xử lý lệnh desktop).
+            // Khởi động cùng Windows → chạy ngầm dưới khay.
+            let start_hidden = std::env::args().any(|a| a == MINIMIZED_ARG);
+            create_main_window(app.handle(), !start_hidden)?;
 
             // Mở lại các note nổi đang mở lần trước (giống Microsoft Sticky Notes)
             let handle = app.handle().clone();

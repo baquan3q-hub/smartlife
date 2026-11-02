@@ -148,7 +148,7 @@ export const StickyNoteCard: React.FC<StickyNoteCardProps> = ({
           onKeyDown={(e) => { if (e.key === 'Escape') (e.target as HTMLTextAreaElement).blur(); }}
           placeholder="Ghi chú..."
           rows={3}
-          className="w-full bg-transparent resize-none outline-none text-sm leading-relaxed mt-1 placeholder:opacity-50"
+          className="sticky-scroll w-full bg-transparent resize-none outline-none text-sm leading-relaxed mt-1 placeholder:opacity-50"
         />
 
         {/* Nhãn */}

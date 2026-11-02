@@ -30,7 +30,9 @@ Mỗi lần push thay đổi trong `src-tauri/` hay code Sticky, workflow cũng 
 
 ### Cách hoạt động
 - App desktop **tải trực tiếp** `https://smartlife.courses`. Deploy web xong là desktop có tính năng mới, không cần cài lại.
-- **Note nổi** dùng khung cửa sổ của Windows: kéo thanh tiêu đề để di chuyển, kéo mép/góc để đổi kích thước, bấm **X** để đóng (note vẫn được lưu). Note mặc định luôn nằm trên cùng (nút ghim trên thanh công cụ để tắt). Phóng to/thu nhỏ chữ: `Ctrl` + cuộn chuột, `Ctrl +` / `Ctrl -` / `Ctrl 0`.
+- **Note nổi** dùng khung cửa sổ của Windows: kéo thanh tiêu đề để di chuyển, kéo mép/góc để đổi kích thước, **–** để thu nhỏ xuống taskbar (gộp chung icon SmartLife), **X** để đóng (note vẫn được lưu).
+- Thanh công cụ của note: **+** note mới · màu · **ghim** (luôn nằm trên cùng, mặc định tắt) · **danh sách ghi chú** (tìm & mở note khác) · **lịch sử phiên bản** (xem & khôi phục) · **⋯** (cỡ chữ, mở bảng Sticky Notes, thùng rác). Phím tắt trong note: `Ctrl+N` note mới, `Ctrl` + cuộn chuột / `Ctrl +` / `Ctrl -` / `Ctrl 0` cỡ chữ, `Ctrl+S` lưu ngay.
+- **Lệnh từ trang web → app** (mở note, ghim, đặt tiêu đề…): trang điều hướng tới `https://smartlife.courses/__desktop/<lệnh>`, app chặn lại và thực hiện (`desktop_command_handler` trong `main.rs`). Không dùng kênh IPC của Tauri vì kênh này không chạy với trang tải từ web.
 - **An toàn dữ liệu:** mỗi lần gõ phím được ghi ngay vào máy. Mất mạng, tắt app hay mất điện giữa chừng vẫn còn dữ liệu, lần mở sau tự đồng bộ lên server. Đóng note hoặc thoát app thì app chờ lưu xong mới đóng.
 - Note đang mở được nhớ (file `open-sticky-notes.txt` trong `%APPDATA%\com.smartlife.desktop`) và mở lại đúng vị trí, kích thước khi khởi động.
 - Phím tắt: **Ctrl+Alt+N** tạo note nổi mới. Khay hệ thống: tạo note, hiện/ẩn các note nổi, mở SmartLife, khởi động cùng Windows, thoát.

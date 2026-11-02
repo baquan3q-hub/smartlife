@@ -58,7 +58,8 @@ export const STICKY_COLORS: StickyColor[] = ['yellow', 'green', 'pink', 'purple'
 // Môi trường chạy
 // ────────────────────────────────────────
 export function isTauri(): boolean {
-  return typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
+  return typeof window !== 'undefined'
+    && ('__SMARTLIFE_DESKTOP__' in window || '__TAURI__' in window || '__TAURI_INTERNALS__' in window);
 }
 
 export function detectDevice(): StickyDevice {
