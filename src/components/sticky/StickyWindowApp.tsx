@@ -17,10 +17,12 @@ import { desktopBridge } from '../../services/desktopBridge';
 import { applyTheme, getSavedTheme } from '../../utils/theme';
 import { STICKY_THEME, relativeTime } from './stickyTheme';
 import { StickyHistoryModal } from './StickyHistoryModal';
+import { NoteEditor } from './editor/NoteEditor';
 import { contentMatchesQuery, firstLines } from '../../utils/stickyMarkdown';
 
 const ON_TOP_KEY = 'smartlife_sticky_on_top_';
 const FONT_KEY = 'smartlife_sticky_font_';
+const FORMAT_BAR_KEY = 'smartlife_sticky_format_bar';
 const FONT_MIN = 11;
 const FONT_MAX = 28;
 const FONT_DEFAULT = 14;
@@ -158,7 +160,14 @@ const StickyWindowInner: React.FC = () => {
   const [fontSize, setFontSize] = useState(() => (noteId ? readNumber(`${FONT_KEY}${noteId}`, FONT_DEFAULT) : FONT_DEFAULT));
   const [toast, setToast] = useState<string | null>(null);
   const creatingRef = useRef(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const focusEditorRef = useRef<(() => void) | null>(null);
+  const [showFormat, setShowFormat] = useState(() => {
+    try { return localStorage.getItem(FORMAT_BAR_KEY) === '1'; } catch { return false; }
+  });
+  const toggleFormat = () => setShowFormat(prev => {
+    try { localStorage.setItem(FORMAT_BAR_KEY, prev ? '0' : '1'); } catch { /* ignore */ }
+    return !prev;
+  });
 
   const note = notes.find(n => n.id === noteId) || null;
   const noteRef = useRef(note);
@@ -178,7 +187,7 @@ const StickyWindowInner: React.FC = () => {
     const done = () => {
       window.history.replaceState(null, '', `#/sticky-window?id=${noteId}`);
       setIsNew(false);
-      requestAnimationFrame(() => textareaRef.current?.focus());
+      requestAnimationFrame(() => focusEditorRef.current?.());
     };
     if (notes.some(n => n.id === noteId)) { done(); return; }
     createNote({}, { id: noteId }).finally(done);
@@ -349,6 +358,9 @@ const StickyWindowInner: React.FC = () => {
           </ToolBtn>
           <ToolBtn title="Danh sách ghi chú" active={panel === 'list'} onClick={() => togglePanel('list')}><List size={16} /></ToolBtn>
           <ToolBtn title="Lịch sử phiên bản" active={panel === 'history'} onClick={() => togglePanel('history')}><History size={15} /></ToolBtn>
+          <ToolBtn title={showFormat ? 'Ẩn thanh định dạng' : 'Định dạng: đậm, nghiêng, link, bảng…'} active={showFormat} onClick={toggleFormat}>
+            <span className="block w-[15px] text-center text-[12px] font-bold leading-[15px]">Aa</span>
+          </ToolBtn>
         </div>
         <div className="flex items-center gap-0.5">
           <span title={statusText} aria-label={statusText} role="status" className="p-1.5 opacity-60">{statusIcon}</span>
@@ -412,17 +424,16 @@ const StickyWindowInner: React.FC = () => {
             className="bg-transparent font-bold outline-none placeholder:opacity-40"
             style={{ fontSize: '1em' }}
           />
-          <textarea
-            ref={textareaRef}
+          <NoteEditor
+            variant="window"
             autoFocus
             value={note.content}
-            onChange={(e) => updateNote(note.id, { content: e.target.value })}
+            onChange={(content) => updateNote(note.id, { content })}
+            onLegacyRewrite={() => { stickyNoteService.snapshot(note).catch(() => {}); }}
             onFocus={() => setEditing(note.id)}
             onBlur={() => setEditing(null)}
-            placeholder="Ghi chú..."
-            spellCheck={false}
-            className="sticky-scroll flex-1 min-h-0 mt-1 bg-transparent resize-none outline-none leading-relaxed placeholder:opacity-50"
-            style={{ fontSize: '1em' }}
+            showToolbar={showFormat}
+            focusRef={focusEditorRef}
           />
           {note.labels.length > 0 && (
             <div className="flex flex-wrap gap-1 pt-1">

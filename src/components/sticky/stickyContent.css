@@ -1,0 +1,49 @@
+/* Kiểu chữ cho nội dung note (dùng chung: trình soạn thảo + chế độ xem lịch sử / AI).
+   Tailwind preflight xoá kiểu danh sách, tiêu đề... nên khai báo lại ở đây. */
+
+.sticky-md { line-height: 1.625; overflow-wrap: anywhere; }
+.sticky-md > * + * { margin-top: 0.35em; }
+/* Note văn bản thuần cũ: xuống dòng đơn vẫn hiển thị đúng (Markdown coi là cùng đoạn) */
+.sticky-md p, .sticky-md td, .sticky-md th, .sticky-md h1, .sticky-md h2, .sticky-md h3 { white-space: pre-wrap; }
+.sticky-md strong { font-weight: 700; }
+.sticky-md em { font-style: italic; }
+.sticky-md s, .sticky-md del { text-decoration: line-through; }
+.sticky-md h1 { font-size: 1.3em; font-weight: 800; }
+.sticky-md h2 { font-size: 1.15em; font-weight: 700; }
+.sticky-md h3, .sticky-md h4, .sticky-md h5, .sticky-md h6 { font-size: 1.05em; font-weight: 700; }
+.sticky-md ul { list-style: disc; padding-left: 1.25em; }
+.sticky-md ol { list-style: decimal; padding-left: 1.4em; }
+.sticky-md li > p { margin: 0; }
+.sticky-md li + li { margin-top: 0.1em; }
+.sticky-md a { color: #4f46e5; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.dark .sticky-md a { color: #a5b4fc; }
+.sticky-md blockquote { border-left: 3px solid rgb(0 0 0 / 0.2); padding-left: 0.6em; opacity: 0.85; }
+.sticky-md code { background: rgb(0 0 0 / 0.07); padding: 0 0.25em; border-radius: 0.25em; font-size: 0.9em; }
+.sticky-md pre { background: rgb(0 0 0 / 0.07); padding: 0.5em 0.7em; border-radius: 0.5em; overflow-x: auto; }
+.sticky-md pre code { background: none; padding: 0; }
+.sticky-md hr { border: 0; border-top: 1px solid rgb(0 0 0 / 0.15); margin: 0.6em 0; }
+.sticky-md img { max-width: 100%; height: auto; border-radius: 0.5em; }
+
+/* Bảng */
+.sticky-md .tableWrapper { overflow-x: auto; }
+.sticky-md table { border-collapse: collapse; width: 100%; table-layout: fixed; margin: 0.25em 0; }
+.sticky-md th, .sticky-md td { border: 1px solid rgb(0 0 0 / 0.18); padding: 0.2em 0.45em; vertical-align: top; text-align: left; min-width: 3em; }
+.sticky-md th { font-weight: 700; background: rgb(0 0 0 / 0.05); }
+.dark .sticky-md th, .dark .sticky-md td { border-color: rgb(255 255 255 / 0.2); }
+.sticky-md .selectedCell { background: rgb(99 102 241 / 0.15); }
+
+/* Checklist — Tiptap (ul[data-type=taskList]) và react-markdown/remark-gfm (ul.contains-task-list) */
+.sticky-md ul[data-type='taskList'], .sticky-md ul.contains-task-list { list-style: none; padding-left: 0.1em; }
+.sticky-md ul[data-type='taskList'] li { display: flex; gap: 0.45em; align-items: flex-start; }
+.sticky-md ul[data-type='taskList'] li > label { margin-top: 0.15em; user-select: none; }
+.sticky-md ul[data-type='taskList'] li > div { flex: 1; min-width: 0; }
+.sticky-md ul[data-type='taskList'] li[data-checked='true'] > div { text-decoration: line-through; opacity: 0.6; }
+.sticky-md li.task-list-item input { margin-right: 0.4em; vertical-align: middle; }
+.sticky-md input[type='checkbox'] { accent-color: #4f46e5; width: 0.95em; height: 0.95em; cursor: pointer; }
+
+/* Trình soạn thảo */
+.sticky-editor .ProseMirror { outline: none; min-height: 4.5em; }
+.sticky-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder); float: left; height: 0; pointer-events: none; opacity: 0.5;
+}
+.sticky-editor.sticky-editor-fill, .sticky-editor.sticky-editor-fill .ProseMirror { height: 100%; }

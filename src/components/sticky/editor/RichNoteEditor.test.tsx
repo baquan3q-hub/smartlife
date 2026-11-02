@@ -1,0 +1,150 @@
+// @vitest-environment jsdom
+// Bảo toàn dữ liệu: mở note / nhận nội dung từ ngoài không được tạo lượt lưu; sửa thật thì lưu Markdown.
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import React, { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import type { Editor } from '@tiptap/core';
+import { renderToStaticMarkup } from 'react-dom/server';
+import RichNoteEditor from './RichNoteEditor';
+import { StickyMarkdownView } from '../StickyMarkdownView';
+
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+// jsdom không có layout — ProseMirror cần khi cuộn tới con trỏ (autofocus)
+const emptyRects = () => Object.assign([], { item: () => null }) as unknown as DOMRectList;
+for (const proto of [Element.prototype, Range.prototype] as any[]) {
+  proto.getClientRects ??= emptyRects;
+  proto.getBoundingClientRect ??= () => ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON: () => ({}) });
+}
+
+let root: Root | null = null;
+let host: HTMLDivElement | null = null;
+
+function mount(value: string, onChange = vi.fn(), variant: 'card' | 'window' = 'card') {
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  const render = (v: string) => act(() => { root!.render(<RichNoteEditor variant={variant} value={v} onChange={onChange} />); });
+  render(value);
+  const editor = (host.querySelector('.ProseMirror') as any).editor as Editor;
+  return { onChange, editor, render, host };
+}
+
+afterEach(() => {
+  act(() => root?.unmount());
+  host?.remove();
+  root = null;
+  host = null;
+});
+
+describe('RichNoteEditor', () => {
+  test('mở note văn bản thuần cũ: không lưu, xuống dòng giữ nguyên', () => {
+    const legacy = 'Mua sữa\nGọi mẹ lúc 8h\n\n5 * 3 = 15\n- việc a';
+    const { onChange, editor } = mount(legacy);
+    act(() => { editor.commands.focus(); editor.commands.blur(); });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(editor.getHTML()).toContain('Mua sữa\nGọi mẹ lúc 8h');
+  });
+
+  test('cửa sổ nổi tự focus khi mở: không lưu', async () => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    const onChange = vi.fn();
+    act(() => { root!.render(<RichNoteEditor variant="window" autoFocus value={'Việc:\n- a\n\n| x | y |\n| - | - |\n| 1 | 2 |'} onChange={onChange} />); });
+    await act(() => new Promise(r => setTimeout(r, 20)));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  test('nội dung từ máy khác: nạp lại, không lưu ngược', () => {
+    const { onChange, editor, render } = mount('bản cũ');
+    render('**bản mới** từ điện thoại');
+    expect(onChange).not.toHaveBeenCalled();
+    expect(editor.getHTML()).toContain('<strong>bản mới</strong>');
+  });
+
+  test('gõ chữ → lưu Markdown', () => {
+    const { onChange, editor } = mount('Xin chào');
+    act(() => { editor.chain().focus('end').insertContent(' bạn').run(); });
+    expect(onChange).toHaveBeenLastCalledWith('Xin chào bạn');
+    act(() => { editor.chain().selectAll().toggleBold().run(); });
+    expect(onChange).toHaveBeenLastCalledWith('**Xin chào bạn**');
+  });
+
+  test('bảng + checklist ra GFM', () => {
+    const { onChange, editor } = mount('');
+    act(() => { editor.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).insertContent('A').run(); });
+    const md = onChange.mock.calls.at(-1)?.[0] as string;
+    expect(md).toMatch(/^\| A\s*\|/);
+    expect(md).toBe(md.trim());
+    expect(md).toContain('| ---');
+  });
+
+  test('note cũ có "<…>": giữ chữ, chụp phiên bản trước lần lưu đầu (1 lần)', () => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    const onChange = vi.fn();
+    const onLegacyRewrite = vi.fn();
+    act(() => { root!.render(<RichNoteEditor variant="card" value={'Gửi <Nam>\n<div>x</div>'} onChange={onChange} onLegacyRewrite={onLegacyRewrite} />); });
+    const editor = (host.querySelector('.ProseMirror') as any).editor as Editor;
+    expect(editor.getText()).toContain('Gửi <Nam>');
+    expect(editor.getText()).toContain('<div>x</div>');
+    act(() => { editor.chain().focus('end').insertContent('!').run(); });
+    act(() => { editor.chain().focus('end').insertContent('?').run(); });
+    expect(onLegacyRewrite).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls.at(-1)?.[0]).toContain('&lt;Nam&gt;');
+  });
+
+  test('note do trình soạn thảo lưu: không chụp phiên bản', () => {
+    const onLegacyRewrite = vi.fn();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => { root!.render(<RichNoteEditor variant="card" value={'**Đậm** và [a](https://a.com)'} onChange={vi.fn()} onLegacyRewrite={onLegacyRewrite} />); });
+    const editor = (host.querySelector('.ProseMirror') as any).editor as Editor;
+    act(() => { editor.chain().focus('end').insertContent('!').run(); });
+    expect(onLegacyRewrite).not.toHaveBeenCalled();
+  });
+
+  test('<br> trong ô bảng nạp lại thành xuống dòng', () => {
+    const { editor } = mount('| a |\n| - |\n| 2<br>x |');
+    expect(editor.getHTML()).not.toContain('&lt;br');
+    expect(editor.getText()).toContain('x');
+  });
+
+  test('rời ô link ra ngoài → hết trạng thái đang sửa', () => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    const outside = document.createElement('input');
+    document.body.appendChild(outside);
+    const onFocus = vi.fn();
+    const onBlur = vi.fn();
+    act(() => { root!.render(<RichNoteEditor variant="window" value="chữ" onChange={vi.fn()} onFocus={onFocus} onBlur={onBlur} />); });
+    const editor = (host.querySelector('.ProseMirror') as any).editor as Editor;
+    act(() => { (editor.view.dom as HTMLElement).focus(); });
+    act(() => { editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true })); });
+    const linkInput = host.querySelector('input[aria-label="Địa chỉ link"]') as HTMLInputElement;
+    expect(linkInput).toBeTruthy();
+    act(() => { linkInput.focus(); });
+    expect(onBlur).not.toHaveBeenCalled();
+    act(() => { outside.focus(); });
+    expect(onBlur).toHaveBeenCalledTimes(1);
+    expect(host.querySelector('input[aria-label="Địa chỉ link"]')).toBeNull();
+    outside.remove();
+  });
+
+  test('xem chỉ đọc: HTML thô hiện thành chữ, <br> thành xuống dòng', () => {
+    const html = renderToStaticMarkup(<StickyMarkdownView markdown={'Gửi <Nam> nhé\n\n<div>x</div>\n\n| a |\n| - |\n| 2<br>y |'} />);
+    expect(html).toContain('Gửi &lt;Nam&gt; nhé');
+    expect(html).toContain('&lt;div&gt;x&lt;/div&gt;');
+    expect(html).toMatch(/2<br\/?>\s*y/);
+    expect(html).not.toContain('<div>x');
+  });
+
+  test('link nguy hiểm không được tạo', () => {
+    const { editor } = mount('chữ');
+    act(() => { editor.chain().focus().selectAll().setLink({ href: 'javascript:alert(1)' }).run(); });
+    expect(editor.getHTML()).not.toContain('javascript:');
+  });
+});

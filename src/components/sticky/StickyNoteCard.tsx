@@ -1,11 +1,12 @@
 // File: src/components/sticky/StickyNoteCard.tsx
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Pin, PinOff, Palette, Sparkles, History, ExternalLink, Archive, ArchiveRestore,
   Trash2, RotateCcw, X, Tag, Plus,
 } from 'lucide-react';
-import { StickyColor, StickyNote, StickyNotePatch, STICKY_COLORS } from '../../services/stickyNoteService';
+import { StickyColor, StickyNote, StickyNotePatch, STICKY_COLORS, stickyNoteService } from '../../services/stickyNoteService';
 import { STICKY_THEME, relativeTime, DEVICE_LABEL } from './stickyTheme';
+import { NoteEditor } from './editor/NoteEditor';
 
 export type StickyView = 'active' | 'pinned' | 'archived' | 'trash';
 
@@ -40,22 +41,9 @@ export const StickyNoteCard: React.FC<StickyNoteCardProps> = ({
   note, view, autoFocus, canDetach, onChange, onFocus, onBlur, onOpenAI, onOpenHistory, onDetach, onDeleteForever, onLabelClick,
 }) => {
   const theme = STICKY_THEME[note.color] || STICKY_THEME.yellow;
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showColors, setShowColors] = useState(false);
   const [labelDraft, setLabelDraft] = useState<string | null>(null);
   const readOnly = view === 'trash';
-
-  // Tự giãn chiều cao theo nội dung
-  useLayoutEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 480)}px`;
-  }, [note.content]);
-
-  useEffect(() => {
-    if (autoFocus) textareaRef.current?.focus();
-  }, [autoFocus]);
 
   const setColor = (color: StickyColor) => {
     onChange({ color }, { immediate: true });
@@ -140,15 +128,13 @@ export const StickyNoteCard: React.FC<StickyNoteCardProps> = ({
           maxLength={120}
           className="w-full bg-transparent font-bold text-[15px] outline-none placeholder:font-semibold placeholder:opacity-40"
         />
-        <textarea
-          ref={textareaRef}
+        <NoteEditor
+          variant="card"
           value={note.content}
           readOnly={readOnly}
-          onChange={(e) => onChange({ content: e.target.value })}
-          onKeyDown={(e) => { if (e.key === 'Escape') (e.target as HTMLTextAreaElement).blur(); }}
-          placeholder="Ghi chú..."
-          rows={3}
-          className="sticky-scroll w-full bg-transparent resize-none outline-none text-sm leading-relaxed mt-1 placeholder:opacity-50"
+          autoFocus={autoFocus}
+          onChange={(content) => onChange({ content })}
+          onLegacyRewrite={() => { stickyNoteService.snapshot(note).catch(() => {}); }}
         />
 
         {/* Nhãn */}

@@ -10,6 +10,7 @@ import {
   stickyNoteAIService, AISuggestedTask, AIOrganizeSuggestion, AIRewriteMode, AITaskPriority,
 } from '../../services/stickyNoteAIService';
 import { STICKY_THEME } from './stickyTheme';
+import { StickyMarkdownView } from './StickyMarkdownView';
 
 type Tab = 'tasks' | 'organize' | 'summarize' | 'cleanup';
 
@@ -196,8 +197,8 @@ export const StickyAIPanel: React.FC<Props> = ({ note, existingLabels, hasAIAcce
 
               {/* Kết quả: Tóm tắt / Viết lại */}
               {(tab === 'summarize' || tab === 'cleanup') && rewritten[tab] !== null && (
-                <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 text-sm whitespace-pre-wrap text-slate-800 dark:text-slate-100 leading-relaxed">
-                  {rewritten[tab] || <em className="opacity-50">(AI không trả về nội dung)</em>}
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 text-sm text-slate-800 dark:text-slate-100">
+                  {rewritten[tab] ? <StickyMarkdownView markdown={rewritten[tab]!} /> : <em className="opacity-50">(AI không trả về nội dung)</em>}
                 </div>
               )}
             </>
@@ -245,7 +246,7 @@ export const StickyAIPanel: React.FC<Props> = ({ note, existingLabels, hasAIAcce
               <>
                 <button
                   onClick={() => {
-                    onApplyPatch({ content: `${note.content.trimEnd()}\n\n— ${tab === 'summarize' ? 'Tóm tắt' : 'Bản gọn'} —\n${rewritten[tab]}` }, { snapshot: true });
+                    onApplyPatch({ content: `${note.content.trimEnd()}\n\n**— ${tab === 'summarize' ? 'Tóm tắt' : 'Bản gọn'} —**\n\n${rewritten[tab]}` }, { snapshot: true });
                     setDone('Đã chèn vào cuối note.');
                     setRewritten(prev => ({ ...prev, [tab]: null }));
                   }}

@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { History, Loader2, RotateCcw, X } from 'lucide-react';
 import { StickyNote, StickyNoteVersion, stickyNoteService } from '../../services/stickyNoteService';
 import { STICKY_THEME, DEVICE_LABEL } from './stickyTheme';
+import { StickyMarkdownView } from './StickyMarkdownView';
 
 interface Props {
   note: StickyNote;
@@ -79,7 +80,9 @@ export const StickyHistoryModal: React.FC<Props> = ({ note, onClose, onRestore }
               <div className="flex-1 min-h-0 flex flex-col">
                 <div className={`flex-1 overflow-y-auto m-4 rounded-2xl p-4 ${STICKY_THEME[selected.color]?.card || STICKY_THEME.yellow.card}`}>
                   {selected.title && <h3 className="font-bold mb-2">{selected.title}</h3>}
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{selected.content || <em className="opacity-50">(trống)</em>}</p>
+                  {selected.content
+                    ? <StickyMarkdownView markdown={selected.content} className="text-sm" />
+                    : <em className="text-sm opacity-50">(trống)</em>}
                 </div>
                 <div className="flex justify-end gap-2 px-4 pb-4">
                   <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Đóng</button>
