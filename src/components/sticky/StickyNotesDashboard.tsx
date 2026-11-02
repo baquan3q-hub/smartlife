@@ -16,6 +16,8 @@ import {
 import { desktopBridge } from '../../services/desktopBridge';
 import { AISuggestedTask } from '../../services/stickyNoteAIService';
 import { StickyNoteCard, StickyView } from './StickyNoteCard';
+import { StickyNoteRow } from './StickyNoteRow';
+import { StickyMobileEditor } from './StickyMobileEditor';
 import { StickyHistoryModal } from './StickyHistoryModal';
 import { StickyAIPanel } from './StickyAIPanel';
 import { STICKY_THEME } from './stickyTheme';
@@ -55,6 +57,21 @@ const SyncBadge: React.FC<{ status: StickySyncStatus }> = ({ status }) => {
   );
 };
 
+const MOBILE_QUERY = '(max-width: 767px)';
+
+/** Màn hình điện thoại (< md): danh sách gọn + trang sửa toàn màn hình thay cho lưới thẻ. */
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY);
+    const onChange = () => setMobile(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return mobile;
+}
+
 function isTypingTarget(el: EventTarget | null): boolean {
   const t = el as HTMLElement | null;
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
@@ -84,6 +101,9 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [exporting, setExporting] = useState<StickyExportFormat | null>(null);
   const [toast, setToast] = useState<ExportMessage | null>(null);
+  const isMobile = useIsMobile();
+  /** Điện thoại: note đang mở ở trang sửa toàn màn hình */
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const allLabels = useMemo(
     () => Array.from(new Set(notes.filter(n => !n.deleted_at).flatMap(n => n.labels))).sort((a, b) => a.localeCompare(b, 'vi')),
@@ -157,8 +177,12 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
     if (note) {
       freshIds.current.add(note.id);
       setFocusId(note.id);
+      if (isMobile) {
+        setOpenId(note.id);
+        setEditing(note.id);
+      }
     }
-  }, [createNote, view, colorFilter, labelFilter]);
+  }, [createNote, view, colorFilter, labelFilter, isMobile, setEditing]);
 
   // Tải sẵn trình soạn thảo rich text (chunk riêng) để lần bấm vào note đầu tiên không phải chờ
   useEffect(() => { preloadRichEditor(); }, []);
@@ -167,7 +191,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
-      if (historyNoteId || aiNoteId) return;
+      if (historyNoteId || aiNoteId || openId) return;
       if (e.key === 'Escape' && selecting) { exitSelecting(); return; }
       if (selecting) return;
       if (e.key === 'n' || e.key === 'N') { e.preventDefault(); handleCreate(); }
@@ -175,7 +199,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleCreate, historyNoteId, aiNoteId, selecting, exitSelecting]);
+  }, [handleCreate, historyNoteId, aiNoteId, openId, selecting, exitSelecting]);
 
   const applyWithSnapshot = useCallback(async (note: StickyNote, patch: StickyNotePatch) => {
     try {
@@ -197,6 +221,40 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
     }
   }, []);
 
+  /** Rời một note (thẻ mất focus / đóng trang sửa): note vừa tạo mà còn trống thì tự dọn, tránh rác. */
+  const leaveNote = useCallback((note: StickyNote) => {
+    setEditing(null);
+    setFocusId(f => (f === note.id ? null : f));
+    if (freshIds.current.delete(note.id)) {
+      const isBlank = !note.title.trim() && !note.content.trim() && note.labels.length === 0;
+      if (isBlank) deleteForever(note.id);
+    }
+  }, [setEditing, deleteForever]);
+
+  const toggleSelected = useCallback((id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (!next.delete(id)) next.add(id);
+    return next;
+  }), []);
+
+  const openNote = openId ? notes.find(n => n.id === openId) || null : null;
+
+  const openEditor = useCallback((id: string) => {
+    setOpenId(id);
+    if (view !== 'trash') setEditing(id);
+  }, [view, setEditing]);
+
+  const closeEditor = useCallback(() => {
+    if (openNote) leaveNote(openNote);
+    else setEditing(null);
+    setOpenId(null);
+  }, [openNote, leaveNote, setEditing]);
+
+  // Note đang mở bị xoá ở thiết bị khác, hoặc xoay ngang thành màn hình rộng → đóng trang sửa
+  useEffect(() => {
+    if (openId && (!isMobile || !openNote)) closeEditor();
+  }, [openId, isMobile, openNote, closeEditor]);
+
   const historyNote = notes.find(n => n.id === historyNoteId) || null;
   const aiNote = notes.find(n => n.id === aiNoteId) || null;
   const showDesktopPromo = !desktop && detectDevice() === 'web';
@@ -211,7 +269,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
           </span>
           <div>
             <h1 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 leading-tight">Sticky Notes</h1>
-            <p className="text-xs text-slate-500">Ghi nhanh · đồng bộ Web, điện thoại và Windows</p>
+            <p className="hidden sm:block text-xs text-slate-500">Ghi nhanh · đồng bộ Web, điện thoại và Windows</p>
           </div>
           <div className="ml-1"><SyncBadge status={status} /></div>
         </div>
@@ -314,11 +372,19 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
 
       {/* Lưới ghi chú */}
       {isLoading && notes.length === 0 ? (
+        isMobile ? (
+          <div className="flex flex-col gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" style={{ height: 76 + (i % 2) * 24 }} />
+            ))}
+          </div>
+        ) : (
         <div className="columns-2 md:columns-3 xl:columns-4 gap-3">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="break-inside-avoid mb-3 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" style={{ height: 110 + (i % 3) * 50 }} />
           ))}
         </div>
+        )
       ) : visible.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-20 px-4">
           <div className="w-16 h-16 rounded-3xl bg-amber-100 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center mb-4">
@@ -339,6 +405,20 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
             </>
           )}
         </div>
+      ) : isMobile ? (
+        // Điện thoại: danh sách 1 cột chỉ xem trước, chạm để mở trang sửa toàn màn hình
+        <div className="flex flex-col gap-2">
+          {visible.map(note => (
+            <StickyNoteRow
+              key={note.id}
+              note={note}
+              onOpen={() => openEditor(note.id)}
+              selecting={selecting && view !== 'trash'}
+              selected={selectedIds.has(note.id)}
+              onToggleSelect={() => toggleSelected(note.id)}
+            />
+          ))}
+        </div>
       ) : (
         <div className="columns-2 md:columns-3 xl:columns-4 gap-3">
           {visible.map(note => (
@@ -350,15 +430,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
               canDetach={desktop}
               onChange={(patch, opts) => updateNote(note.id, patch, opts)}
               onFocus={() => { if (!selecting) setEditing(note.id); }}
-              onBlur={() => {
-                setEditing(null);
-                if (focusId === note.id) setFocusId(null);
-                // Note vừa tạo mà rời đi khi còn trống → tự dọn, tránh rác
-                if (freshIds.current.delete(note.id)) {
-                  const isBlank = !note.title.trim() && !note.content.trim() && note.labels.length === 0;
-                  if (isBlank) deleteForever(note.id);
-                }
-              }}
+              onBlur={() => leaveNote(note)}
               onOpenAI={() => setAiNoteId(note.id)}
               onOpenHistory={() => setHistoryNoteId(note.id)}
               onDetach={async () => {
@@ -373,11 +445,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
               onExport={canExport ? (format) => runExport([note], format) : undefined}
               selecting={selecting && view !== 'trash'}
               selected={selectedIds.has(note.id)}
-              onToggleSelect={() => setSelectedIds(prev => {
-                const next = new Set(prev);
-                if (!next.delete(note.id)) next.add(note.id);
-                return next;
-              })}
+              onToggleSelect={() => toggleSelected(note.id)}
             />
           ))}
         </div>
@@ -441,6 +509,26 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
       >
         <Plus size={26} />
       </button>
+
+      {isMobile && openNote && (
+        <StickyMobileEditor
+          note={openNote}
+          view={view}
+          autoFocus={focusId === openNote.id}
+          onClose={closeEditor}
+          onChange={(patch, opts) => updateNote(openNote.id, patch, opts)}
+          onOpenAI={() => setAiNoteId(openNote.id)}
+          onOpenHistory={() => setHistoryNoteId(openNote.id)}
+          onDeleteForever={() => {
+            if (window.confirm('Xoá vĩnh viễn ghi chú này? Không thể hoàn tác.')) {
+              setOpenId(null);
+              setEditing(null);
+              deleteForever(openNote.id);
+            }
+          }}
+          onExport={canExport ? (format) => runExport([openNote], format) : undefined}
+        />
+      )}
 
       {historyNote && (
         <StickyHistoryModal
