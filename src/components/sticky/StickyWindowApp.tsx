@@ -1,18 +1,22 @@
 // File: src/components/sticky/StickyWindowApp.tsx
 // Cửa sổ note nổi trên Windows (Tauri) — route: #/sticky-window?id=<uuid>[&new=1]
 //
-// Khung cửa sổ (kéo, đổi kích thước, đóng) do Windows vẽ (Rust: decorations = true) nên luôn hoạt động,
-// kể cả khi trang đang tải hay mất mạng. Trang này chỉ lo nội dung note + vài nút tiện ích.
-// Khi người dùng bấm X, Rust gọi window.__smartlifeSaveNow() để lưu nốt trước khi đóng.
+// Khung cửa sổ (kéo, đổi kích thước, thu nhỏ, đóng) do Windows vẽ nên luôn hoạt động.
+// Trang này lo nội dung note + thanh công cụ: note mới, màu, ghim, danh sách note, lịch sử phiên bản, menu ⋯.
+// Lệnh tới app (mở note, ghim, đặt tiêu đề...) đi qua desktopBridge. Khi đóng, Rust gọi window.__smartlifeSaveNow().
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, Palette, Pin, PinOff, Maximize2, Trash2, Loader2, CloudOff, Check, AlertTriangle, ZoomIn, ZoomOut } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Plus, Palette, Pin, PinOff, Trash2, Loader2, CloudOff, Check, AlertTriangle, ZoomIn, ZoomOut,
+  List, History, MoreHorizontal, LayoutGrid, Search, X, Type,
+} from 'lucide-react';
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import { useStickyNotes } from '../../hooks/useStickyNotes';
-import { STICKY_COLORS, StickyColor } from '../../services/stickyNoteService';
+import { STICKY_COLORS, StickyColor, StickyNote, StickyNoteVersion, stickyNoteService } from '../../services/stickyNoteService';
 import { desktopBridge } from '../../services/desktopBridge';
 import { applyTheme, getSavedTheme } from '../../utils/theme';
-import { STICKY_THEME } from './stickyTheme';
+import { STICKY_THEME, relativeTime } from './stickyTheme';
+import { StickyHistoryModal } from './StickyHistoryModal';
 
 const ON_TOP_KEY = 'smartlife_sticky_on_top_';
 const FONT_KEY = 'smartlife_sticky_font_';
@@ -46,9 +50,100 @@ function readNumber(key: string, fallback: number): number {
   }
 }
 
+function noteHeading(n: Pick<StickyNote, 'title' | 'content'>): string {
+  return n.title.trim() || n.content.split('\n').find(l => l.trim())?.trim() || 'Ghi chú trống';
+}
+
 const Centered: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
   <div className={`h-screen flex flex-col items-center justify-center gap-3 p-6 text-center text-sm ${className}`}>{children}</div>
 );
+
+const ToolBtn: React.FC<{
+  title: string; onClick: () => void; active?: boolean; children: React.ReactNode;
+}> = ({ title, onClick, active, children }) => (
+  <button
+    type="button"
+    title={title}
+    aria-label={title}
+    aria-pressed={active}
+    onClick={onClick}
+    className={`p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${active ? 'bg-black/10 dark:bg-white/15' : ''}`}
+  >
+    {children}
+  </button>
+);
+
+// ── Danh sách ghi chú (xem & mở note khác ngay trong cửa sổ nổi) ──
+const NotesListPanel: React.FC<{
+  notes: StickyNote[];
+  currentId: string;
+  onOpen: (id: string) => void;
+  onNew: () => void;
+  onOpenBoard: () => void;
+  onClose: () => void;
+}> = ({ notes, currentId, onOpen, onNew, onOpenBoard, onClose }) => {
+  const [query, setQuery] = useState('');
+  const list = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return notes
+      .filter(n => !n.deleted_at && !n.is_archived)
+      .filter(n => !q || n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q) || n.labels.some(l => l.toLowerCase().includes(q)))
+      .sort((a, b) => (a.is_pinned !== b.is_pinned ? (a.is_pinned ? -1 : 1) : b.updated_at.localeCompare(a.updated_at)));
+  }, [notes, query]);
+
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">
+      <div className="flex items-center gap-1.5 px-2 py-2 border-b border-slate-100 dark:border-slate-800">
+        <div className="relative flex-1">
+          <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+            placeholder="Tìm ghi chú…"
+            className="w-full pl-7 pr-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs outline-none"
+          />
+        </div>
+        <ToolBtn title="Ghi chú mới" onClick={onNew}><Plus size={15} /></ToolBtn>
+        <ToolBtn title="Đóng danh sách" onClick={onClose}><X size={15} /></ToolBtn>
+      </div>
+      <ul className="flex-1 overflow-y-auto sticky-scroll p-1.5 space-y-1">
+        {list.length === 0 && <li className="text-center text-xs text-slate-400 py-6">Không có ghi chú phù hợp</li>}
+        {list.map(n => {
+          const lines = n.content.split('\n').map(l => l.trim()).filter(Boolean);
+          const preview = n.title.trim() ? lines[0] : lines[1];
+          return (
+            <li key={n.id}>
+              <button
+                type="button"
+                onClick={() => onOpen(n.id)}
+                className={`w-full text-left flex gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 ${n.id === currentId ? 'ring-1 ring-indigo-400' : ''}`}
+              >
+                <span className={`w-1.5 shrink-0 rounded-full ${STICKY_THEME[n.color]?.dot || STICKY_THEME.yellow.dot}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1 text-xs font-semibold truncate">
+                    {n.is_pinned && <Pin size={10} className="shrink-0 opacity-60" />}
+                    <span className="truncate">{noteHeading(n)}</span>
+                  </span>
+                  {preview && <span className="block text-[11px] text-slate-500 truncate">{preview}</span>}
+                  <span className="block text-[10px] text-slate-400">{relativeTime(n.updated_at)}{n.id === currentId ? ' · đang mở' : ''}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <button
+        type="button"
+        onClick={onOpenBoard}
+        className="flex items-center justify-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300 py-2 border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+      >
+        <LayoutGrid size={13} /> Mở bảng Sticky Notes đầy đủ
+      </button>
+    </div>
+  );
+};
 
 const StickyWindowInner: React.FC = () => {
   const { user, loading } = useAuth();
@@ -57,9 +152,10 @@ const StickyWindowInner: React.FC = () => {
   } = useStickyNotes(user?.id);
   const [noteId] = useState<string | null>(() => readParams().id);
   const [isNew, setIsNew] = useState(() => readParams().isNew);
-  const [showColors, setShowColors] = useState(false);
-  const [onTop, setOnTop] = useState(true);
+  const [panel, setPanel] = useState<'none' | 'colors' | 'list' | 'history' | 'more'>('none');
+  const [onTop, setOnTop] = useState(false);
   const [fontSize, setFontSize] = useState(() => (noteId ? readNumber(`${FONT_KEY}${noteId}`, FONT_DEFAULT) : FONT_DEFAULT));
+  const [toast, setToast] = useState<string | null>(null);
   const creatingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -69,7 +165,12 @@ const StickyWindowInner: React.FC = () => {
 
   useEffect(() => { applyTheme(getSavedTheme()); }, []);
 
-  // ?new=1 (từ Ctrl+Alt+N / khay hệ thống): tạo note với đúng id Rust đã cấp
+  const showToast = useCallback((text: string) => {
+    setToast(text);
+    window.setTimeout(() => setToast(t => (t === text ? null : t)), 2500);
+  }, []);
+
+  // ?new=1 (từ Ctrl+Alt+N / khay hệ thống / nút +): tạo note với đúng id app đã cấp
   useEffect(() => {
     if (!isNew || !user || isLoading || creatingRef.current || !noteId) return;
     creatingRef.current = true;
@@ -82,25 +183,25 @@ const StickyWindowInner: React.FC = () => {
     createNote({}, { id: noteId }).finally(done);
   }, [isNew, user, isLoading, notes, noteId, createNote]);
 
-  // Luôn nằm trên cùng (mặc định bật) — nhớ theo từng note
+  // Ghim (luôn nằm trên cùng): mặc định tắt, nhớ theo từng note
   useEffect(() => {
     if (!noteId) return;
     try {
-      const saved = localStorage.getItem(`${ON_TOP_KEY}${noteId}`);
-      const value = saved === null ? true : saved === 'true';
+      const value = localStorage.getItem(`${ON_TOP_KEY}${noteId}`) === 'true';
       setOnTop(value);
-      desktopBridge.setAlwaysOnTop(value);
+      if (value) desktopBridge.setAlwaysOnTop(true);
     } catch { /* ignore */ }
   }, [noteId]);
 
-  // Tiêu đề cửa sổ = tiêu đề / dòng đầu của note
-  const windowTitle = note ? (note.title.trim() || note.content.split('\n')[0]?.trim().slice(0, 40) || 'Ghi chú') : 'Ghi chú';
+  // Tiêu đề cửa sổ = tiêu đề / dòng đầu của note (gửi sau khi ngừng gõ)
+  const windowTitle = note ? noteHeading(note).slice(0, 60) : 'Ghi chú';
   useEffect(() => {
     document.title = windowTitle;
-    desktopBridge.setTitle(windowTitle);
+    const t = window.setTimeout(() => desktopBridge.setTitle(windowTitle), 600);
+    return () => window.clearTimeout(t);
   }, [windowTitle]);
 
-  // Rust gọi hàm này khi người dùng đóng cửa sổ (nút X của Windows) hoặc thoát app
+  // Rust gọi hàm này khi người dùng đóng cửa sổ (nút X) hoặc thoát app
   const handleBeforeClose = useCallback(async () => {
     const current = noteRef.current;
     if (current && !current.title.trim() && !current.content.trim() && current.labels.length === 0 && !current.deleted_at) {
@@ -115,7 +216,7 @@ const StickyWindowInner: React.FC = () => {
     return () => { if (window.__smartlifeSaveNow === handleBeforeClose) delete window.__smartlifeSaveNow; };
   }, [handleBeforeClose]);
 
-  // Phóng to / thu nhỏ chữ: Ctrl + cuộn chuột, Ctrl + (+ / - / 0)
+  // Cỡ chữ: Ctrl + cuộn chuột, Ctrl + (+ / - / 0)
   const changeFont = useCallback((delta: number | 'reset') => {
     setFontSize(prev => {
       const next = delta === 'reset' ? FONT_DEFAULT : Math.min(FONT_MAX, Math.max(FONT_MIN, prev + delta));
@@ -126,11 +227,13 @@ const StickyWindowInner: React.FC = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPanel(p => (p === 'history' ? p : 'none'));
       if (!(e.ctrlKey || e.metaKey)) return;
       if (e.key === '=' || e.key === '+') { e.preventDefault(); changeFont(1); }
       else if (e.key === '-') { e.preventDefault(); changeFont(-1); }
       else if (e.key === '0') { e.preventDefault(); changeFont('reset'); }
       else if (e.key.toLowerCase() === 's') { e.preventDefault(); saveNow(); }
+      else if (e.key.toLowerCase() === 'n') { e.preventDefault(); newNote(); }
     };
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
@@ -143,18 +246,26 @@ const StickyWindowInner: React.FC = () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('wheel', onWheel);
     };
-  }, [changeFont, saveNow]);
+  });
 
-  const toggleOnTop = () => {
+  const toggleOnTop = async () => {
     const next = !onTop;
     setOnTop(next);
-    desktopBridge.setAlwaysOnTop(next);
     try { if (noteId) localStorage.setItem(`${ON_TOP_KEY}${noteId}`, String(next)); } catch { /* ignore */ }
+    const ok = await desktopBridge.setAlwaysOnTop(next);
+    showToast(ok ? (next ? 'Đã ghim: luôn nằm trên cùng' : 'Đã bỏ ghim') : 'Hãy cập nhật SmartLife cho Windows bản mới nhất');
   };
 
-  const newNote = async () => {
+  async function newNote() {
     const ok = await desktopBridge.newStickyWindow();
-    if (!ok) alert('Không mở được cửa sổ mới. Hãy dùng phím tắt Ctrl+Alt+N.');
+    if (!ok) showToast('Không mở được. Hãy dùng phím tắt Ctrl+Alt+N.');
+  }
+
+  const openNote = async (id: string) => {
+    setPanel('none');
+    if (id === noteId) return;
+    const ok = await desktopBridge.openStickyWindow(id);
+    if (!ok) showToast('Không mở được ghi chú này.');
   };
 
   const moveToTrash = async () => {
@@ -162,8 +273,18 @@ const StickyWindowInner: React.FC = () => {
     updateNote(note.id, { deleted_at: new Date().toISOString() });
     await saveNow();
     const closed = await desktopBridge.closeCurrentWindow();
-    if (!closed) alert('Đã chuyển vào thùng rác. Bấm X ở góc trên để đóng cửa sổ.');
+    if (!closed) showToast('Đã chuyển vào thùng rác. Bấm X để đóng cửa sổ.');
   };
+
+  const restoreVersion = async (v: StickyNoteVersion) => {
+    if (!note) return;
+    try { await stickyNoteService.snapshot(note); } catch { /* vẫn khôi phục */ }
+    updateNote(note.id, { title: v.title, content: v.content, color: v.color }, { immediate: true });
+    setPanel('none');
+    showToast('Đã khôi phục phiên bản cũ');
+  };
+
+  const togglePanel = (p: typeof panel) => setPanel(cur => (cur === p ? 'none' : p));
 
   // ── Các trạng thái đặc biệt (khung Windows vẫn cho kéo / đóng bình thường) ──
   if (loading) {
@@ -202,36 +323,51 @@ const StickyWindowInner: React.FC = () => {
     );
   }
 
-  const statusIcon = status === 'saving' ? <Loader2 size={12} className="animate-spin" />
-    : status === 'offline' ? <CloudOff size={12} />
-    : status === 'error' ? <AlertTriangle size={12} />
-    : status === 'saved' || status === 'idle' ? <Check size={12} /> : null;
+  const statusIcon = status === 'saving' ? <Loader2 size={13} className="animate-spin" />
+    : status === 'offline' ? <CloudOff size={13} />
+    : status === 'error' ? <AlertTriangle size={13} />
+    : <Check size={13} />;
   const statusText = status === 'saving' ? 'Đang lưu…'
     : status === 'offline' ? 'Offline · đã lưu trên máy, sẽ tự đồng bộ'
     : status === 'error' ? 'Lỗi đồng bộ · đã lưu trên máy'
-    : 'Đã lưu';
+    : 'Đã lưu & đồng bộ';
 
   return (
-    <div className={`h-screen flex flex-col overflow-hidden ${theme.card}`}>
+    <div className={`relative h-screen flex flex-col overflow-hidden ${theme.card}`}>
       {/* Thanh công cụ */}
-      <div className={`flex items-center justify-between px-1.5 py-1 select-none ${theme.bar}`}>
+      <div className={`relative z-30 flex items-center justify-between px-1.5 py-1 select-none ${theme.bar}`}>
         <div className="flex items-center gap-0.5">
-          <button title="Ghi chú mới (Ctrl+Alt+N)" aria-label="Ghi chú mới" onClick={newNote} className="p-1.5 rounded-md hover:bg-black/10"><Plus size={15} /></button>
-          <button title="Đổi màu" aria-label="Đổi màu" onClick={() => setShowColors(s => !s)} className={`p-1.5 rounded-md hover:bg-black/10 ${showColors ? 'bg-black/10' : ''}`}><Palette size={15} /></button>
-          <button title={onTop ? 'Đang luôn nằm trên cùng — bấm để tắt' : 'Luôn nằm trên cùng'} aria-label="Luôn nằm trên cùng" aria-pressed={onTop} onClick={toggleOnTop} className={`p-1.5 rounded-md hover:bg-black/10 ${onTop ? 'bg-black/10' : ''}`}>
+          <ToolBtn title="Ghi chú mới (Ctrl+N)" onClick={newNote}><Plus size={16} /></ToolBtn>
+          <ToolBtn title="Đổi màu" active={panel === 'colors'} onClick={() => togglePanel('colors')}><Palette size={15} /></ToolBtn>
+          <ToolBtn title={onTop ? 'Đang ghim (luôn nằm trên cùng) — bấm để bỏ ghim' : 'Ghim: luôn nằm trên cùng'} active={onTop} onClick={toggleOnTop}>
             {onTop ? <Pin size={15} /> : <PinOff size={15} />}
-          </button>
-          <button title="Thu nhỏ chữ (Ctrl -)" aria-label="Thu nhỏ chữ" onClick={() => changeFont(-1)} className="p-1.5 rounded-md hover:bg-black/10"><ZoomOut size={15} /></button>
-          <button title="Phóng to chữ (Ctrl +)" aria-label="Phóng to chữ" onClick={() => changeFont(1)} className="p-1.5 rounded-md hover:bg-black/10"><ZoomIn size={15} /></button>
+          </ToolBtn>
+          <ToolBtn title="Danh sách ghi chú" active={panel === 'list'} onClick={() => togglePanel('list')}><List size={16} /></ToolBtn>
+          <ToolBtn title="Lịch sử phiên bản" active={panel === 'history'} onClick={() => togglePanel('history')}><History size={15} /></ToolBtn>
         </div>
         <div className="flex items-center gap-0.5">
           <span title={statusText} aria-label={statusText} role="status" className="p-1.5 opacity-60">{statusIcon}</span>
-          <button title="Mở trong SmartLife" aria-label="Mở trong SmartLife" onClick={() => desktopBridge.focusMainWindow()} className="p-1.5 rounded-md hover:bg-black/10"><Maximize2 size={14} /></button>
-          <button title="Chuyển vào thùng rác" aria-label="Chuyển vào thùng rác" onClick={moveToTrash} className="p-1.5 rounded-md hover:bg-black/10"><Trash2 size={14} /></button>
+          <ToolBtn title="Thêm" active={panel === 'more'} onClick={() => togglePanel('more')}><MoreHorizontal size={16} /></ToolBtn>
         </div>
+
+        {panel === 'more' && (
+          <div className="absolute right-1.5 top-full mt-1 w-52 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 py-1 text-xs z-40">
+            <div className="flex items-center justify-between px-3 py-1.5">
+              <span className="flex items-center gap-1.5"><Type size={13} /> Cỡ chữ {fontSize}px</span>
+              <span className="flex items-center gap-0.5">
+                <button title="Thu nhỏ chữ (Ctrl -)" aria-label="Thu nhỏ chữ" onClick={() => changeFont(-1)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"><ZoomOut size={14} /></button>
+                <button title="Phóng to chữ (Ctrl +)" aria-label="Phóng to chữ" onClick={() => changeFont(1)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"><ZoomIn size={14} /></button>
+              </span>
+            </div>
+            <button onClick={() => { changeFont('reset'); setPanel('none'); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">Cỡ chữ mặc định (Ctrl 0)</button>
+            <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+            <button onClick={() => { setPanel('none'); desktopBridge.focusMainWindow('sticky'); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"><LayoutGrid size={13} /> Mở bảng Sticky Notes</button>
+            <button onClick={() => { setPanel('none'); moveToTrash(); }} className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 flex items-center gap-1.5"><Trash2 size={13} /> Chuyển vào thùng rác</button>
+          </div>
+        )}
       </div>
 
-      {showColors && (
+      {panel === 'colors' && (
         <div className="flex gap-1.5 px-2 py-1.5" role="radiogroup" aria-label="Màu ghi chú">
           {STICKY_COLORS.map((c: StickyColor) => (
             <button
@@ -240,41 +376,66 @@ const StickyWindowInner: React.FC = () => {
               aria-checked={note.color === c}
               title={STICKY_THEME[c].name}
               aria-label={STICKY_THEME[c].name}
-              onClick={() => { updateNote(note.id, { color: c }, { immediate: true }); setShowColors(false); }}
+              onClick={() => { updateNote(note.id, { color: c }, { immediate: true }); setPanel('none'); }}
               className={`w-5 h-5 rounded-full border-2 ${STICKY_THEME[c].dot} ${note.color === c ? 'border-indigo-500' : 'border-white/70'}`}
             />
           ))}
         </div>
       )}
 
-      <div className="flex-1 min-h-0 flex flex-col px-3 pt-2 pb-2" style={{ fontSize }}>
-        <input
-          value={note.title}
-          onChange={(e) => updateNote(note.id, { title: e.target.value })}
-          onFocus={() => setEditing(note.id)}
-          onBlur={() => setEditing(null)}
-          placeholder="Tiêu đề"
-          maxLength={120}
-          className="bg-transparent font-bold outline-none placeholder:opacity-40"
-          style={{ fontSize: '1em' }}
-        />
-        <textarea
-          ref={textareaRef}
-          autoFocus
-          value={note.content}
-          onChange={(e) => updateNote(note.id, { content: e.target.value })}
-          onFocus={() => setEditing(note.id)}
-          onBlur={() => setEditing(null)}
-          placeholder="Ghi chú..."
-          className="flex-1 min-h-0 mt-1 bg-transparent resize-none outline-none leading-relaxed placeholder:opacity-50"
-          style={{ fontSize: '1em' }}
-        />
-        {note.labels.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-1">
-            {note.labels.map(l => <span key={l} className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-black/5 dark:bg-white/10">#{l}</span>)}
-          </div>
+      <div className="relative flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col px-3 pt-2 pb-2" style={{ fontSize }} onClick={() => panel === 'more' && setPanel('none')}>
+          <input
+            value={note.title}
+            onChange={(e) => updateNote(note.id, { title: e.target.value })}
+            onFocus={() => setEditing(note.id)}
+            onBlur={() => setEditing(null)}
+            placeholder="Tiêu đề"
+            maxLength={120}
+            spellCheck={false}
+            className="bg-transparent font-bold outline-none placeholder:opacity-40"
+            style={{ fontSize: '1em' }}
+          />
+          <textarea
+            ref={textareaRef}
+            autoFocus
+            value={note.content}
+            onChange={(e) => updateNote(note.id, { content: e.target.value })}
+            onFocus={() => setEditing(note.id)}
+            onBlur={() => setEditing(null)}
+            placeholder="Ghi chú..."
+            spellCheck={false}
+            className="sticky-scroll flex-1 min-h-0 mt-1 bg-transparent resize-none outline-none leading-relaxed placeholder:opacity-50"
+            style={{ fontSize: '1em' }}
+          />
+          {note.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1">
+              {note.labels.map(l => <span key={l} className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-black/5 dark:bg-white/10">#{l}</span>)}
+            </div>
+          )}
+        </div>
+
+        {panel === 'list' && (
+          <NotesListPanel
+            notes={notes}
+            currentId={note.id}
+            onOpen={openNote}
+            onNew={() => { setPanel('none'); newNote(); }}
+            onOpenBoard={() => { setPanel('none'); desktopBridge.focusMainWindow('sticky'); }}
+            onClose={() => setPanel('none')}
+          />
         )}
       </div>
+
+      {panel === 'history' && (
+        <StickyHistoryModal note={note} onClose={() => setPanel('none')} onRestore={restoreVersion} />
+      )}
+
+      {toast && (
+        <div role="status" className="absolute left-2 right-2 bottom-2 z-50 rounded-lg bg-slate-900/90 text-white text-xs px-3 py-2 text-center shadow-lg">
+          {toast}
+        </div>
+      )}
     </div>
   );
 };

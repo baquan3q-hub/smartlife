@@ -914,3 +914,30 @@ html.dark .journal-prose font[color="#1F2937"] { color: inherit; }
   .ui-shake { animation: none; }
 }
 html.dark .ui-zinc .ring-zinc-900\/15 { --tw-ring-color: rgba(148, 163, 184, 0.35); }
+
+/* Sticky Notes: thanh cuộn siêu mảnh, chỉ hiện khi rê chuột vào */
+.sticky-scroll {
+  scrollbar-gutter: stable;
+}
+.sticky-scroll::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+.sticky-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.sticky-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sticky-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+.sticky-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.28);
+}
+.dark .sticky-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
