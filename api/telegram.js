@@ -21,12 +21,14 @@
 
 import { TOOLS, TOOL_MAP, INSTRUCTIONS } from './_lib/tools.js';
 import { ApiError } from './_lib/authKey.js';
+import { formatApiError, keyErrorHelp, toolErrorText } from './_lib/apiErrorText.js';
 
 const MODEL = process.env.TELEGRAM_GEMINI_MODEL || 'gemini-2.5-flash';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const ALLOWED_CHAT_ID = (process.env.TELEGRAM_ALLOWED_CHAT_ID || '').trim();
 const SMARTLIFE_KEY = process.env.SMARTLIFE_API_KEY;
+const BOT_KEY_LOCATION = 'biến SMARTLIFE_API_KEY trên Vercel rồi Redeploy';
 const TZ = 'Asia/Ho_Chi_Minh';
 
 const rawBudget = process.env.TELEGRAM_THINKING_BUDGET;
@@ -886,6 +888,10 @@ function describeError(err) {
         }
         return { title: '🌩️ Máy chủ Gemini đang quá tải.', hint: 'Thử lại sau ít phút nhé.', code: `GEMINI_${err.status || 'NET'}` };
     }
+    const keyHelp = keyErrorHelp(err, BOT_KEY_LOCATION);
+    if (keyHelp) {
+        return { title: '🔑 API key của bot không dùng được.', hint: keyHelp, code: `DB_${err.status}_${err.code}` };
+    }
     if (err instanceof ApiError) {
         return { title: '🗄️ Không lấy được dữ liệu SmartLife.', hint: 'Thử lại sau ít phút nhé.', code: `DB_${err.status}_${err.code}` };
     }
@@ -985,11 +991,11 @@ async function runAgent(chatId, userText, {
                     memo.push(`${functionCall.name} → id=${result?.id ?? result?.deleted ?? '?'}${result?.summary ? ` (${result.summary})` : ''}`);
                 }
             } catch (err) {
-                response = { error: err instanceof ApiError ? `[${err.status} ${err.code}] ${err.message}` : 'Lỗi máy chủ' };
-                toolsUsed.push(`⚠️ ${functionCall.name}: ${response.error}`);
+                response = { error: toolErrorText(err, BOT_KEY_LOCATION) };
+                toolsUsed.push(`⚠️ ${functionCall.name}: ${formatApiError(err)}`);
                 if (!(err instanceof ApiError)) console.error('[telegram] tool error', err);
             }
-            console.log('[telegram] tool', functionCall.name, JSON.stringify(functionCall.args || {}), response.error || 'ok');
+            console.log('[telegram] tool', functionCall.name, JSON.stringify(functionCall.args || {}), response.error ? toolsUsed.at(-1) : 'ok');
             return { functionResponse: { name: functionCall.name, response } };
         }));
         contents.push({ role: 'user', parts: responses });
