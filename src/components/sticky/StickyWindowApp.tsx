@@ -430,6 +430,7 @@ const StickyWindowInner: React.FC = () => {
             value={note.content}
             onChange={(content) => updateNote(note.id, { content })}
             onLegacyRewrite={() => { stickyNoteService.snapshot(note).catch(() => {}); }}
+            imageScope={{ userId: note.user_id, noteId: note.id }}
             onFocus={() => setEditing(note.id)}
             onBlur={() => setEditing(null)}
             showToolbar={showFormat}

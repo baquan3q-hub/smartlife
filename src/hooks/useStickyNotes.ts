@@ -14,11 +14,23 @@ import {
   StickyNote, StickyNotePatch, stickyNoteService, newStickyNote,
   isNetworkError, isMissingTableError, isRowNotFoundError,
 } from '../services/stickyNoteService';
+import { stickyImageStore } from '../services/stickyImageStore';
 
 export type StickySyncStatus = 'idle' | 'saving' | 'saved' | 'offline' | 'error';
 
 const SAVE_DEBOUNCE_MS = 700;
 const OUTBOX_RETRY_MS = 30_000;
+const IMAGE_GC_DELAY_MS = 15_000;
+
+/** Dọn ảnh local mồ côi 1 lần mỗi phiên/user, sau khi app đã rảnh. */
+const imageGcDone = new Set<string>();
+function scheduleImageGc(userId: string, collectContents: () => string[]) {
+  if (imageGcDone.has(userId) || typeof indexedDB === 'undefined') return;
+  imageGcDone.add(userId);
+  setTimeout(() => {
+    stickyImageStore.collectGarbage(userId, collectContents()).catch(() => { imageGcDone.delete(userId); });
+  }, IMAGE_GC_DELAY_MS);
+}
 
 export function useStickyNotes(userId: string | undefined) {
   const [notes, setNotes] = useState<StickyNote[]>(() => (userId ? stickyNoteService.readCache(userId) : []));
@@ -97,6 +109,13 @@ export function useStickyNotes(userId: string | undefined) {
         return merged;
       });
       setStatus(remaining > 0 ? (navigator.onLine ? 'saving' : 'offline') : (pendingPatches.current.size > 0 ? 'saving' : 'idle'));
+      // Chỉ dọn ảnh sau khi có danh sách đầy đủ từ server (gồm thùng rác) + mọi thay đổi chưa gửi
+      scheduleImageGc(userId, () => [
+        ...serverNotes.map(n => n.content),
+        ...notesRef.current.map(n => n.content),
+        ...Array.from(pendingPatches.current.values(), p => p.content || ''),
+        JSON.stringify(stickyNoteService.readOutbox(userId)),
+      ]);
     } catch (err) {
       handleError(err);
     } finally {

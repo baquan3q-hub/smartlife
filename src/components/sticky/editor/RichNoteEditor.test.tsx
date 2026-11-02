@@ -4,7 +4,15 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { Editor } from '@tiptap/core';
+import 'fake-indexeddb/auto';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { stickyImageStore } from '../../../services/stickyImageStore';
+
+// jsdom không có canvas → giả lập bước nén
+vi.mock('../../../utils/stickyImageCompress', async (orig) => ({
+  ...(await orig<typeof import('../../../utils/stickyImageCompress')>()),
+  compressImage: vi.fn(async (file: Blob) => ({ blob: new Blob([await file.arrayBuffer()], { type: 'image/webp' }), width: 4, height: 3 })),
+}));
 import RichNoteEditor from './RichNoteEditor';
 import { StickyMarkdownView } from '../StickyMarkdownView';
 
@@ -140,6 +148,39 @@ describe('RichNoteEditor', () => {
     expect(html).toContain('&lt;div&gt;x&lt;/div&gt;');
     expect(html).toMatch(/2<br\/?>\s*y/);
     expect(html).not.toContain('<div>x');
+  });
+
+  test('ảnh local: Markdown giữ nguyên, máy khác thấy ô thay thế, không tự lưu', async () => {
+    const md = 'Trước\n\n![](sticky-img://aaaaaaaa-1111)\n\nSau';
+    const { onChange, editor, host: h } = mount(md);
+    expect(editor.getMarkdown().trim()).toBe(md);
+    await act(() => new Promise(r => setTimeout(r, 30)));
+    expect(h.textContent).toContain('Ảnh chỉ có trên thiết bị đã chèn');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  test('chọn ảnh → lưu IndexedDB, chèn sticky-img://, hiển thị được', async () => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    const onChange = vi.fn();
+    act(() => { root!.render(<RichNoteEditor variant="window" value="Ghi chú" onChange={onChange} imageScope={{ userId: 'u1', noteId: 'n1' }} />); });
+    const input = host.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    const file = new File([new Uint8Array([1, 2, 3])], 'chup.png', { type: 'image/png' });
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); await new Promise(r => setTimeout(r, 50)); });
+    const md = onChange.mock.calls.at(-1)?.[0] as string;
+    const id = md.match(/sticky-img:\/\/([a-zA-Z0-9-]+)/)?.[1];
+    expect(id).toBeTruthy();
+    expect(await stickyImageStore.get(id!)).toMatchObject({ user_id: 'u1', note_id: 'n1', width: 4, height: 3 });
+    await act(() => new Promise(r => setTimeout(r, 30)));
+    expect(host.querySelector('.sticky-image-node img')?.getAttribute('src')).toMatch(/^blob:/);
+  });
+
+  test('không có imageScope (chỉ đọc) → không có ô chọn ảnh', () => {
+    const { host: h } = mount('x');
+    expect(h.querySelector('input[type="file"]')).toBeNull();
   });
 
   test('link nguy hiểm không được tạo', () => {

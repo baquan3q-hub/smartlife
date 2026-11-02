@@ -9,7 +9,9 @@
 // - Link chỉ nhận http/https/mailto; ảnh chỉ hiển thị nguồn hợp lệ.
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { EditorContent, Extension, useEditor, useEditorState, type Editor } from '@tiptap/react';
+import {
+  EditorContent, Extension, NodeViewWrapper, ReactNodeViewRenderer, useEditor, useEditorState, type Editor, type NodeViewProps,
+} from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
@@ -17,9 +19,12 @@ import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Placeholder } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
 import {
-  Bold, Italic, Strikethrough, List, ListOrdered, ListChecks, Link2, Table as TableIcon, ExternalLink, Unlink, Check, X,
+  Bold, Italic, Strikethrough, List, ListOrdered, ListChecks, Link2, Table as TableIcon, ExternalLink, Unlink, Check, X, ImagePlus,
 } from 'lucide-react';
 import { escapeRawHtml, isAllowedImageSrc, sanitizeHref, stickyImageId } from '../../../utils/stickyMarkdown';
+import { compressImage, MAX_IMAGES_PER_NOTE, StickyImageError } from '../../../utils/stickyImageCompress';
+import { stickyImageStore } from '../../../services/stickyImageStore';
+import { StickyImage } from '../StickyImage';
 import type { NoteEditorProps } from './NoteEditor';
 import '../stickyContent.css';
 
@@ -36,7 +41,13 @@ function openExternal(raw: string | null | undefined) {
   if (href) window.open(href, '_blank', 'noopener,noreferrer');
 }
 
-/** Ảnh: chỉ render nguồn hợp lệ. Ảnh local (sticky-img://) sẽ có NodeView riêng ở giai đoạn ảnh. */
+const ImageNodeView: React.FC<NodeViewProps> = ({ node, selected }) => (
+  <NodeViewWrapper className={`sticky-image-node${selected ? ' is-selected' : ''}`} data-drag-handle="">
+    <StickyImage src={node.attrs.src} alt={node.attrs.alt} />
+  </NodeViewWrapper>
+);
+
+/** Ảnh: hiển thị qua StickyImage (ảnh local đọc từ IndexedDB); HTML xuất ra (copy/dán) chỉ giữ nguồn hợp lệ. */
 const SafeImage = Image.extend({
   addAttributes() {
     const parent = (this.parent?.() ?? {}) as Record<string, any>;
@@ -46,12 +57,26 @@ const SafeImage = Image.extend({
         ...parent.src,
         renderHTML: (attrs: { src?: string | null }) => {
           const src = attrs.src || '';
-          return { src: isAllowedImageSrc(src) && !stickyImageId(src) ? src : '' };
+          return { src: isAllowedImageSrc(src) ? src : '' };
         },
       },
     };
   },
+  addNodeView() {
+    return ReactNodeViewRenderer(ImageNodeView);
+  },
 }).configure({ allowBase64: false });
+
+function countLocalImages(editor: Editor): number {
+  let count = 0;
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === 'image' && stickyImageId(node.attrs.src)) count++;
+  });
+  return count;
+}
+
+const imageFiles = (list: FileList | null | undefined): File[] =>
+  Array.from(list || []).filter(f => (f.type || '').startsWith('image/'));
 
 const StickyShortcuts = Extension.create<{ onLink: () => void }>({
   name: 'stickyShortcuts',
@@ -92,7 +117,7 @@ const TextBtn: React.FC<{ title: string; onClick: () => void; children: React.Re
   </button>
 );
 
-const FormatToolbar: React.FC<{ editor: Editor; onLink: () => void }> = ({ editor, onLink }) => {
+const FormatToolbar: React.FC<{ editor: Editor; onLink: () => void; onImage?: () => void }> = ({ editor, onLink, onImage }) => {
   const s = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -121,6 +146,7 @@ const FormatToolbar: React.FC<{ editor: Editor; onLink: () => void }> = ({ edito
         <span className="w-px h-4 bg-black/10 dark:bg-white/15 mx-0.5" />
         <ToolBtn title="Chèn link (Ctrl+K)" active={s.link} onClick={onLink}><Link2 size={14} /></ToolBtn>
         <ToolBtn title="Chèn bảng" active={s.table} onClick={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}><TableIcon size={14} /></ToolBtn>
+        {onImage && <ToolBtn title="Chèn ảnh (chỉ lưu trên thiết bị này)" onClick={onImage}><ImagePlus size={14} /></ToolBtn>}
       </div>
       {s.table && (
         <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide opacity-90">
@@ -169,7 +195,7 @@ const LinkBar: React.FC<{
 
 const RichNoteEditor: React.FC<NoteEditorProps> = ({
   value, onChange, variant, readOnly, autoFocus, placeholder = 'Ghi chú...', showToolbar, onFocus, onBlur, focusRef,
-  onLegacyRewrite, fallbackId,
+  onLegacyRewrite, fallbackId, imageScope,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
@@ -195,6 +221,56 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
   const setBaseline = (md: string, source: string) => {
     baselineRef.current = md;
     legacyRef.current = source.trim() !== md;
+  };
+
+  // ── Ảnh (chỉ lưu trên thiết bị) ──
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<Editor | null>(null);
+  const [imageNotice, setImageNotice] = useState<{ text: string; busy?: boolean } | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showNotice = (text: string, busy = false) => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    setImageNotice({ text, busy });
+    if (!busy) noticeTimer.current = setTimeout(() => setImageNotice(null), 5000);
+  };
+  useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
+
+  const imageScopeRef = useRef(imageScope);
+  imageScopeRef.current = readOnly ? undefined : imageScope;
+
+  /** Nén + lưu từng ảnh rồi chèn tham chiếu sticky-img:// (tại `pos` khi thả, ngược lại tại con trỏ). */
+  const insertImagesRef = useRef(async (_files: File[], _pos?: number) => {});
+  insertImagesRef.current = async (files: File[], pos?: number) => {
+    const ed = editorRef.current;
+    const scope = imageScopeRef.current;
+    if (!ed || ed.isDestroyed || !scope || !files.length) return;
+    const room = MAX_IMAGES_PER_NOTE - countLocalImages(ed);
+    if (room <= 0) { showNotice(`Mỗi ghi chú tối đa ${MAX_IMAGES_PER_NOTE} ảnh.`); return; }
+    const batch = files.slice(0, room);
+    let error: string | null = files.length > room ? `Mỗi ghi chú tối đa ${MAX_IMAGES_PER_NOTE} ảnh — đã bỏ bớt.` : null;
+    showNotice(batch.length > 1 ? `Đang xử lý ${batch.length} ảnh…` : 'Đang xử lý ảnh…', true);
+    let insertAt = pos;
+    for (const file of batch) {
+      try {
+        const { blob, width, height } = await compressImage(file);
+        const src = await stickyImageStore.put({ userId: scope.userId, noteId: scope.noteId, blob, width, height });
+        if (ed.isDestroyed) return;
+        const node = { type: 'image', attrs: { src, alt: '' } };
+        if (insertAt !== undefined) {
+          const at = Math.min(insertAt, ed.state.doc.content.size);
+          ed.chain().focus().insertContentAt(at, node).run();
+          insertAt = ed.state.selection.to;
+        } else {
+          ed.chain().focus().insertContent(node).run();
+        }
+      } catch (e) {
+        error = e instanceof StickyImageError ? e.message : 'Không lưu được ảnh trên thiết bị này.';
+        console.warn('[sticky] chèn ảnh lỗi:', e);
+      }
+    }
+    if (error) showNotice(error);
+    else setImageNotice(null);
+    stickyImageStore.requestPersistence();
   };
 
   const editor = useEditor({
@@ -243,6 +319,22 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
         }
         return false;
       },
+      handlePaste: (_view, event) => {
+        const files = imageFiles(event.clipboardData?.files);
+        if (!files.length || !imageScopeRef.current) return false;
+        event.preventDefault();
+        insertImagesRef.current(files);
+        return true;
+      },
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved) return false;
+        const files = imageFiles((event as DragEvent).dataTransfer?.files);
+        if (!files.length || !imageScopeRef.current) return false;
+        event.preventDefault();
+        const pos = view.posAtCoords({ left: (event as DragEvent).clientX, top: (event as DragEvent).clientY })?.pos;
+        insertImagesRef.current(files, pos);
+        return true;
+      },
       handleKeyDown: (view, event) => {
         if (event.key === 'Escape' && variant === 'card') {
           (view.dom as HTMLElement).blur();
@@ -266,6 +358,7 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
       onChangeRef.current(md);
     },
   }, []);
+  editorRef.current = editor;
 
   // Baseline = nội dung vừa nạp (chạy đồng bộ khi mount, trước autofocus của Tiptap)
   useLayoutEffect(() => {
@@ -339,7 +432,33 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
   if (!editor) return null;
 
   const toolbarVisible = !readOnly && (variant === 'card' ? focused : !!showToolbar);
-  const toolbar = toolbarVisible && <FormatToolbar editor={editor} onLink={openLink} />;
+  const canInsertImage = !readOnly && !!imageScope;
+  const toolbar = toolbarVisible && (
+    <FormatToolbar editor={editor} onLink={openLink} onImage={canInsertImage ? () => fileInputRef.current?.click() : undefined} />
+  );
+  const imageExtras = canInsertImage && (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        tabIndex={-1}
+        onChange={(e) => {
+          const files = imageFiles(e.target.files);
+          e.target.value = '';
+          insertImagesRef.current(files);
+        }}
+      />
+      {imageNotice && (
+        <div role="status" className="flex items-center gap-1.5 py-0.5 text-[11px] opacity-80">
+          {imageNotice.busy && <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />}
+          {imageNotice.text}
+        </div>
+      )}
+    </>
+  );
   const linkBar = link && (
     <LinkBar
       key={link.key}
@@ -356,6 +475,7 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
       <div ref={containerRef} {...focusHandlers} className="flex-1 min-h-0 flex flex-col">
         {toolbar}
         {linkBar}
+        {imageExtras}
         <EditorContent editor={editor} className="sticky-editor sticky-editor-fill sticky-scroll flex-1 min-h-0 overflow-y-auto mt-1" />
       </div>
     );
@@ -365,6 +485,7 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
     <div ref={containerRef} {...focusHandlers}>
       <EditorContent editor={editor} className="sticky-editor sticky-scroll max-h-[480px] overflow-y-auto text-sm mt-1" />
       {linkBar}
+      {imageExtras}
       {toolbar}
     </div>
   );

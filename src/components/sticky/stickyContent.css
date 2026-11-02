@@ -23,6 +23,10 @@
 .sticky-md pre code { background: none; padding: 0; }
 .sticky-md hr { border: 0; border-top: 1px solid rgb(0 0 0 / 0.15); margin: 0.6em 0; }
 .sticky-md img { max-width: 100%; height: auto; border-radius: 0.5em; }
+.sticky-image-node { margin: 0.4em 0; line-height: 0; }
+.sticky-image-node > * { line-height: normal; }
+.sticky-image-node.is-selected img,
+.sticky-image-node.is-selected > span { outline: 2px solid rgb(99 102 241); outline-offset: 2px; border-radius: 0.5em; }
 
 /* Bảng */
 .sticky-md .tableWrapper { overflow-x: auto; }

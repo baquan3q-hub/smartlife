@@ -5,8 +5,8 @@
 import React from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ImageOff } from 'lucide-react';
-import { isAllowedImageSrc, sanitizeHref, stickyImageId } from '../../utils/stickyMarkdown';
+import { sanitizeHref } from '../../utils/stickyMarkdown';
+import { StickyImage } from './StickyImage';
 import './stickyContent.css';
 
 const components: Components = {
@@ -16,17 +16,7 @@ const components: Components = {
       ? <a href={safe} target="_blank" rel="noopener noreferrer nofollow">{children}</a>
       : <span>{children}</span>;
   },
-  img: ({ src, alt }) => {
-    const value = typeof src === 'string' ? src : '';
-    if (!isAllowedImageSrc(value) || stickyImageId(value)) {
-      return (
-        <span className="inline-flex items-center gap-1 text-xs opacity-60 italic">
-          <ImageOff size={12} /> {alt || 'Ảnh'}
-        </span>
-      );
-    }
-    return <img src={value} alt={alt || ''} loading="lazy" />;
-  },
+  img: ({ src, alt }) => <StickyImage src={typeof src === 'string' ? src : ''} alt={alt} />,
   input: ({ checked, type }) => (type === 'checkbox' ? <input type="checkbox" checked={!!checked} readOnly disabled /> : null),
 };
 
