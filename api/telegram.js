@@ -83,6 +83,10 @@ const TOOL_LABELS = {
     delete_transaction: 'xóa giao dịch',
     list_insights: 'nhật ký AI',
     create_insight: 'ghi nhật ký AI',
+    list_sticky_notes: 'danh sách ghi chú',
+    get_sticky_note: 'đọc ghi chú',
+    create_sticky_note: 'tạo ghi chú',
+    update_sticky_note: 'sửa ghi chú',
 };
 
 // ---------------------------------------------------------------------------
@@ -611,6 +615,7 @@ function detectCategory(text) {
     if (/tiền|chi tiêu|số dư|ngân sách|chi phí|ví|giao dịch/.test(s)) return 'finance';
     if (/lịch|thời khóa biểu|tkb|tiết học|phòng học/.test(s)) return 'schedule';
     if (/thói quen|habit|streak/.test(s)) return 'habits';
+    if (/ghi chú|\bnote\b|sticky/.test(s)) return 'notes';
     return null;
 }
 
@@ -696,7 +701,7 @@ function createProgress(chatId, { messageId = null, title = 'Đang suy nghĩ', p
 // ---------------------------------------------------------------------------
 // Gọi tool SmartLife (có cache ngắn cho tool đọc)
 // ---------------------------------------------------------------------------
-const WRITE_TOOLS = new Set(['add_transaction', 'delete_transaction', 'create_task', 'update_task', 'reorder_tasks', 'create_insight']);
+const WRITE_TOOLS = new Set(['add_transaction', 'delete_transaction', 'create_task', 'update_task', 'reorder_tasks', 'create_insight', 'create_sticky_note', 'update_sticky_note']);
 
 function cacheKey(name, args) {
     const a = { ...(args || {}) };
@@ -899,6 +904,7 @@ function systemPrompt() {
         'Nếu tin nhắn người dùng có khối <smartlife_data>, đó là kết quả tool vừa lấy trong CHÍNH lượt này (số liệu mới nhất): dùng trực tiếp, KHÔNG gọi lại các tool đó; chỉ gọi thêm tool khi khối này thiếu dữ liệu cần thiết. Không nhắc tới khối này với người dùng.',
         'Không bao giờ hiển thị phần [Ghi chú nội bộ] cho người dùng.',
         'Trước khi tạo, sửa hoặc sắp xếp lại task, nói rõ bạn sẽ làm gì và chờ người dùng đồng ý (trừ khi họ đã yêu cầu rõ ràng).',
+        'GHI CHÚ DÁN: người dùng bảo ghi / lưu / note / thêm vào ghi chú → làm ngay, không hỏi lại. Muốn thêm vào ghi chú có sẵn thì list_sticky_notes (q = từ khóa) để lấy id rồi update_sticky_note với append; nếu có nhiều ghi chú khớp mà không rõ cái nào thì hỏi lại kèm tiêu đề từng cái. Ghi đè nội dung hoặc xóa ghi chú chỉ khi người dùng đã đồng ý. Sau khi ghi, xác nhận ngắn gọn: tên ghi chú và nội dung vừa thêm; KHÔNG chép lại cả ghi chú dài.',
     ].join('\n');
 }
 
@@ -1403,6 +1409,10 @@ const WELCOME_HTML = [
     '⌨️ <b>Lệnh nhanh</b>',
     '<code>/spend 45k ăn trưa</code>  ·  /overdue  ·  /bills  ·  /reset',
     '',
+    '📝 <b>Ghi chú dán</b>',
+    '<code>/note mua sữa, gọi bác sĩ</code>  ·  /notes',
+    '<i>Hoặc nhắn "thêm vào note Việc nhà: giặt đồ", "đọc note họp tuần".</i>',
+    '',
     '💬 <i>Hoặc cứ nhắn tự do bất cứ điều gì bạn muốn hỏi!</i>',
 ].join('\n');
 
@@ -1480,6 +1490,26 @@ async function handleMessage(msg) {
             category: 'finance',
             loading: 'Đang ghi khoản chi',
         });
+    } else if (command === '/note') {
+        const restText = text.replace(/^\/note(@\S+)?\s*/i, '');
+        ok = await respond(chatId, {
+            prompt: restText
+                ? `Tạo ghi chú dán mới với nội dung sau (đặt tiêu đề ngắn phù hợp, giữ nguyên ý, chia dòng / checklist nếu có nhiều ý): ${restText}`
+                : 'Tôi muốn tạo một ghi chú dán, hãy hỏi tôi nội dung cần ghi.',
+            prefetch: [],
+            category: 'notes',
+            loading: 'Đang ghi chú',
+        });
+    } else if (command === '/notes') {
+        const restText = text.replace(/^\/notes(@\S+)?\s*/i, '');
+        ok = await respond(chatId, {
+            prompt: restText
+                ? `Tìm trong ghi chú dán của tôi: ${restText}. Cho biết tiêu đề và tóm tắt ngắn từng ghi chú khớp.`
+                : 'Liệt kê các ghi chú dán đang dùng của tôi (ghim lên đầu). Trình bày bảng: Ghi chú | Cập nhật, sau đó hỏi tôi muốn mở ghi chú nào.',
+            prefetch: [],
+            category: 'notes',
+            loading: 'Đang mở ghi chú',
+        });
     } else {
         ok = await respond(chatId, { prompt: text, category: detectCategory(text) });
     }
@@ -1514,6 +1544,8 @@ async function setup(req, res) {
             { command: 'pomodoro', description: 'Gợi ý khung giờ tập trung' },
             { command: 'review', description: 'Tổng kết ngày' },
             { command: 'spend', description: 'Ghi nhanh khoản chi, vd /spend 45k ăn trưa' },
+            { command: 'note', description: 'Tạo ghi chú dán, vd /note mua sữa, gọi bác sĩ' },
+            { command: 'notes', description: 'Xem / tìm ghi chú dán, vd /notes họp tuần' },
             { command: 'reset', description: 'Bắt đầu cuộc trò chuyện mới' },
             { command: 'icons', description: 'Đổi icon 3D động cho các nút bấm' },
             { command: 'debug', description: 'Bật/tắt hiện công cụ bot đã dùng' },

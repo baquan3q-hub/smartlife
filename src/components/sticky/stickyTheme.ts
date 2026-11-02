@@ -93,4 +93,5 @@ export const DEVICE_LABEL: Record<string, string> = {
   web: 'Web',
   mobile: 'Điện thoại',
   desktop: 'Windows',
+  bot: 'Trợ lý AI',
 };
