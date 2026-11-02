@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  contentMatchesQuery, escapeRawHtml, extractStickyImageIds, isAllowedImageSrc, protectImages, replaceImagesWithLabel, restoreImages, markdownToPlainText, safeFileName, sanitizeHref, stickyImageId, uniqueFileName,
+  contentMatchesQuery, escapeRawHtml, extractStickyImageIds, isAllowedImageSrc, protectImages, replaceImagesWithLabel, restoreImages, markdownToPlainText, notePreview, safeFileName, sanitizeHref, stickyImageId, uniqueFileName,
 } from './stickyMarkdown';
 
 describe('sanitizeHref', () => {
@@ -129,5 +129,33 @@ describe('ảnh khi gửi AI', () => {
   });
   test('ảnh → [ảnh]', () => {
     expect(replaceImagesWithLabel('x ![a](sticky-img://aaaaaaaa-1)')).toBe('x [ảnh]');
+  });
+});
+
+describe('xem trước trên điện thoại', () => {
+  test('chữ thường, checklist, bảng, ảnh được tách riêng', () => {
+    const p = notePreview([
+      '**Họp** nhóm lúc 9h',
+      '',
+      '- [x] Gửi ~~báo cáo~~',
+      '- [ ] Gọi *khách*',
+      '',
+      '| A | B |',
+      '| - | - |',
+      '| 1 | 2 |',
+      '',
+      '![bìa](sticky-img://aaaaaaaa-1111)',
+      '```',
+      'code',
+      '```',
+    ].join('\n'));
+    expect(p.lines).toEqual(['Họp nhóm lúc 9h', 'A · B', '1 · 2', 'code']);
+    expect(p.tasks).toEqual([{ text: 'Gửi báo cáo', done: true }, { text: 'Gọi khách', done: false }]);
+    expect(p.hasTable).toBe(true);
+    expect(p.imageCount).toBe(1);
+  });
+
+  test('note trống', () => {
+    expect(notePreview('')).toEqual({ lines: [], tasks: [], hasTable: false, imageCount: 0 });
   });
 });

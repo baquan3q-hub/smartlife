@@ -176,6 +176,39 @@ export function firstLines(markdown: string, count = 2): string[] {
   return markdownToPlainText(markdown).split('\n').map(l => l.trim()).filter(Boolean).slice(0, count);
 }
 
+export interface NotePreviewTask { text: string; done: boolean }
+export interface NotePreview {
+  /** Dòng chữ thường (đã bỏ cú pháp, bỏ ảnh, bỏ dòng checklist) */
+  lines: string[];
+  /** Mọi dòng checklist theo thứ tự */
+  tasks: NotePreviewTask[];
+  hasTable: boolean;
+  imageCount: number;
+}
+
+const TASK_LINE_RE = /^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*)$/;
+const TABLE_SEPARATOR_RE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/m;
+
+/** Bản xem trước gọn cho danh sách ghi chú trên điện thoại. */
+export function notePreview(markdown: string): NotePreview {
+  const source = (markdown || '').replace(/\r\n?/g, '\n');
+  const imageCount = (source.match(IMAGE_MD_RE) || []).length;
+  const lines: string[] = [];
+  const tasks: NotePreviewTask[] = [];
+  for (const raw of source.replace(IMAGE_MD_RE, '').split('\n')) {
+    const task = TASK_LINE_RE.exec(raw);
+    if (task) {
+      const text = markdownToPlainText(task[2]);
+      if (text) tasks.push({ text, done: task[1] !== ' ' });
+      continue;
+    }
+    if (/^\s{0,3}(`{3,}|~{3,})/.test(raw)) continue; // dòng mở/đóng khối code
+    const text = markdownToPlainText(raw);
+    if (text) lines.push(text);
+  }
+  return { lines, tasks, hasTable: TABLE_SEPARATOR_RE.test(source), imageCount };
+}
+
 /** Tên file an toàn trên Windows/Android/iOS: bỏ dấu, bỏ ký tự cấm, tối đa 80 ký tự. */
 export function safeFileName(name: string, fallback = 'ghi-chu'): string {
   const base = (name || '')
