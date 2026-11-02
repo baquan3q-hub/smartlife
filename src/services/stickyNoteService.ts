@@ -161,14 +161,38 @@ export const stickyNoteService = {
     safeSet(`${OUTBOX_PREFIX}${userId}`, items);
   },
 
-  /** Lấy ra (và xoá khỏi outbox) patch đang chờ của 1 note đã có trên server, để gộp vào lần lưu kế tiếp. */
-  takePatch(userId: string, id: string): StickyNotePatch | undefined {
+  /** Insert lên server thành công → đổi mục "tạo" trong outbox thành patch thường (hoặc bỏ nếu không còn gì). */
+  resolveCreate(userId: string, id: string) {
     const items = this.readOutbox(userId);
-    const idx = items.findIndex(i => i.id === id && !i.create && !i.hardDelete && i.patch);
-    if (idx < 0) return undefined;
-    const [entry] = items.splice(idx, 1);
-    safeSet(`${OUTBOX_PREFIX}${userId}`, items);
-    return entry.patch;
+    const entry = items.find(i => i.id === id && i.create);
+    if (!entry) return;
+    delete entry.create;
+    const next = entry.patch && Object.keys(entry.patch).length > 0 ? items : items.filter(i => i !== entry);
+    safeSet(`${OUTBOX_PREFIX}${userId}`, next);
+  },
+
+  /** Bỏ mọi mục outbox của 1 note (vd đã xoá thành công trên server). */
+  dequeue(userId: string, id: string) {
+    safeSet(`${OUTBOX_PREFIX}${userId}`, this.readOutbox(userId).filter(i => i.id !== id));
+  },
+
+  /** Đọc (không xoá) patch đang chờ trong outbox của 1 note đã có trên server. */
+  peekPatch(userId: string, id: string): StickyNotePatch | undefined {
+    const entry = this.readOutbox(userId).find(i => i.id === id && !i.create && !i.hardDelete && i.patch);
+    return entry?.patch ? { ...entry.patch } : undefined;
+  },
+
+  /**
+   * Server đã lưu `sent` → gỡ mục outbox của note nếu nó không có gì mới hơn.
+   * Nếu người dùng gõ thêm trong lúc chờ, mục outbox đã khác → giữ lại để lần lưu sau gửi tiếp.
+   */
+  ackPatch(userId: string, id: string, sent: StickyNotePatch) {
+    const items = this.readOutbox(userId);
+    const entry = items.find(i => i.id === id && !i.create && !i.hardDelete);
+    if (!entry?.patch) return;
+    const sameAsSent = Object.entries(entry.patch).every(([k, v]) =>
+      k in sent && JSON.stringify((sent as any)[k]) === JSON.stringify(v));
+    if (sameAsSent) safeSet(`${OUTBOX_PREFIX}${userId}`, items.filter(i => i !== entry));
   },
 
   /** Lượt đẩy outbox đang chạy (nếu có). */

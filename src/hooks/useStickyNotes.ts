@@ -5,7 +5,8 @@
 // - Mỗi note có tối đa 1 request đang chạy (inflight). Thay đổi mới trong lúc chờ nằm ở pendingPatches
 //   và được gửi tiếp sau khi request trước xong → không bao giờ ghi đè lẫn nhau.
 // - Kết quả server = nguồn sự thật, chỉ trừ các trường người dùng vừa gõ mà chưa gửi.
-// - Mất mạng → patch vào outbox (localStorage) và tự gửi lại khi online.
+// - Mỗi lần gõ phím: ghi ngay patch vào outbox (localStorage, đồng bộ) → mất mạng / tắt máy / mất điện
+//   giữa chừng vẫn còn dữ liệu, lần mở sau tự gửi lên. Gửi thành công thì mục outbox được gỡ.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../services/supabase';
@@ -75,7 +76,7 @@ export function useStickyNotes(userId: string | undefined) {
   const reload = useCallback(async () => {
     if (!userId) return;
     try {
-      await stickyNoteService.flushOutbox(userId);
+      const remaining = await stickyNoteService.flushOutbox(userId);
       const serverNotes = await stickyNoteService.list(userId);
       setNeedsSetup(false);
       setNotes(prev => {
@@ -95,7 +96,7 @@ export function useStickyNotes(userId: string | undefined) {
         });
         return merged;
       });
-      setStatus(stickyNoteService.hasPendingOutbox(userId) ? 'offline' : 'idle');
+      setStatus(remaining > 0 ? (navigator.onLine ? 'saving' : 'offline') : (pendingPatches.current.size > 0 ? 'saving' : 'idle'));
     } catch (err) {
       handleError(err);
     } finally {
@@ -168,7 +169,7 @@ export function useStickyNotes(userId: string | undefined) {
     window.addEventListener('online', onOnline);
     document.addEventListener('visibilitychange', onVisible);
     const interval = setInterval(() => {
-      if (stickyNoteService.hasPendingOutbox(userId) && navigator.onLine) reload();
+      if (pendingPatches.current.size === 0 && stickyNoteService.hasPendingOutbox(userId) && navigator.onLine) reload();
     }, OUTBOX_RETRY_MS);
     return () => {
       window.removeEventListener('online', onOnline);
@@ -196,8 +197,8 @@ export function useStickyNotes(userId: string | undefined) {
     }
 
     const pending = pendingPatches.current.get(id);
-    // Gộp patch còn kẹt trong outbox (lỗi mạng trước đó / lúc đóng tab) để không gửi lại bản cũ sau này
-    const queued = pending ? stickyNoteService.takePatch(userId, id) : undefined;
+    // Gộp patch đang nằm trong outbox (nháp từng phím / lỗi mạng trước đó). Chỉ gỡ khỏi outbox khi server xác nhận.
+    const queued = pending ? stickyNoteService.peekPatch(userId, id) : undefined;
     if (!pending) return;
     const patch = { ...(queued || {}), ...pending };
     pendingPatches.current.delete(id);
@@ -215,6 +216,7 @@ export function useStickyNotes(userId: string | undefined) {
     try {
       const row = await request;
       inflight.current.delete(id);
+      stickyNoteService.ackPatch(userId, id, patch);
       // Server là nguồn sự thật, trừ các trường người dùng vừa gõ thêm trong lúc chờ
       setNotes(prev => prev.map(n => (n.id === id ? { ...row, ...(pendingPatches.current.get(id) || {}) } : n)));
       const deferred = deferredRemote.current.get(id);
@@ -226,11 +228,12 @@ export function useStickyNotes(userId: string | undefined) {
       if (isRowNotFoundError(err)) {
         // Note đã bị xoá ở thiết bị khác
         pendingPatches.current.delete(id);
+        stickyNoteService.dequeue(userId, id);
         setNotes(prev => prev.filter(n => n.id !== id));
         setStatus('idle');
         return;
       }
-      if (isNetworkError(err)) stickyNoteService.enqueue(userId, { id, patch });
+      // Lỗi mạng: dữ liệu vẫn nằm trong outbox (đã ghi từ lúc gõ), sẽ tự gửi lại khi có mạng
       handleError(err);
     }
   }, [userId, handleError, applyDeferred]);
@@ -238,6 +241,8 @@ export function useStickyNotes(userId: string | undefined) {
   const updateNote = useCallback((id: string, patch: StickyNotePatch, opts: { immediate?: boolean } = {}) => {
     setNotes(prev => prev.map(n => (n.id === id ? { ...n, ...patch } : n)));
     pendingPatches.current.set(id, { ...(pendingPatches.current.get(id) || {}), ...patch });
+    // Ghi nháp bền vững ngay lập tức (an toàn khi mất điện / tắt máy trước lúc kịp gửi)
+    if (userId) stickyNoteService.enqueue(userId, { id, patch });
     const old = timers.current.get(id);
     if (old) clearTimeout(old);
     setStatus('saving');
@@ -247,22 +252,30 @@ export function useStickyNotes(userId: string | undefined) {
     } else {
       timers.current.set(id, setTimeout(() => flush(id), SAVE_DEBOUNCE_MS));
     }
-  }, [flush]);
+  }, [userId, flush]);
 
   const createNote = useCallback(async (partial: StickyNotePatch = {}, opts: { id?: string } = {}): Promise<StickyNote | null> => {
     if (!userId) return null;
     const note = newStickyNote(userId, partial, opts.id);
     setNotes(prev => (prev.some(n => n.id === note.id) ? prev : [note, ...prev]));
     creating.current.add(note.id);
+    // Ghi lệnh "tạo" vào outbox trước — nếu app tắt trước khi insert xong, lần sau sẽ tự tạo lại
+    stickyNoteService.enqueue(userId, { id: note.id, create: note });
     setStatus('saving');
-    const request = stickyNoteService.insert(note);
+    const request = stickyNoteService.insert(note).catch(async (err) => {
+      // Đã có trên server (outbox vừa đẩy lên trước) → coi như thành công
+      if ((err as any)?.code === '23505') return note;
+      throw err;
+    });
     inflight.current.set(note.id, request);
     try {
       const row = await request;
+      stickyNoteService.resolveCreate(userId, note.id);
       setNotes(prev => prev.map(n => (n.id === note.id ? { ...row, ...(pendingPatches.current.get(note.id) || {}) } : n)));
       setStatus(pendingPatches.current.size > 0 ? 'saving' : 'saved');
     } catch (err) {
-      if (isNetworkError(err)) stickyNoteService.enqueue(userId, { id: note.id, create: note });
+      // Lỗi mạng: mục "tạo" vẫn nằm trong outbox, sẽ gửi lại sau. Lỗi khác: bỏ để không kẹt hàng đợi.
+      if (!isNetworkError(err)) stickyNoteService.dequeue(userId, note.id);
       handleError(err);
     } finally {
       inflight.current.delete(note.id);
@@ -279,14 +292,16 @@ export function useStickyNotes(userId: string | undefined) {
     pendingPatches.current.delete(id);
     deferredRemote.current.delete(id);
     setNotes(prev => prev.filter(n => n.id !== id));
+    stickyNoteService.enqueue(userId, { id, hardDelete: true });
     // Đợi insert/update đang chạy xong, nếu không lệnh xoá có thể tới server trước lệnh tạo
     for (let running = inflight.current.get(id); running; running = inflight.current.get(id)) {
       await running.catch(() => { });
     }
     try {
       await stickyNoteService.deleteForever(userId, id);
+      stickyNoteService.dequeue(userId, id);
     } catch (err) {
-      if (isNetworkError(err)) stickyNoteService.enqueue(userId, { id, hardDelete: true });
+      if (!isNetworkError(err)) stickyNoteService.dequeue(userId, id);
       handleError(err);
     }
   }, [userId, handleError]);
@@ -334,7 +349,15 @@ export function useStickyNotes(userId: string | undefined) {
     };
   }, [userId, flush]);
 
+  /** Gửi ngay mọi thay đổi đang chờ (dùng khi đóng cửa sổ / thoát app). */
+  const saveNow = useCallback(async () => {
+    // Cả note có thay đổi chờ gửi lẫn note đang có request chạy dở (flush sẽ đợi request đó xong)
+    const ids = new Set([...pendingPatches.current.keys(), ...inflight.current.keys()]);
+    await Promise.all(Array.from(ids).map(id => flush(id)));
+  }, [flush]);
+
   return {
+    saveNow,
     notes, isLoading, status, needsSetup, errorMessage,
     createNote, updateNote, deleteForever, setEditing, reload, flush,
   };

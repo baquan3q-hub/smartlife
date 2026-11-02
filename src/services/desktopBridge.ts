@@ -1,87 +1,78 @@
 // File: src/services/desktopBridge.ts
 // Cầu nối tới vỏ Windows (Tauri v2). Dùng window.__TAURI__ (withGlobalTauri) nên web/mobile không cần thêm thư viện.
-// Mọi hàm đều an toàn khi chạy ngoài Tauri (không làm gì).
+// Mọi hàm đều an toàn khi chạy ngoài Tauri và không bao giờ ném lỗi — trả về false nếu không làm được.
+// Các việc quan trọng (kéo/đóng/đổi kích thước cửa sổ, nhớ note đang mở) do Rust xử lý, không phụ thuộc file này.
 
 import { isTauri } from './stickyNoteService';
-
-const OPEN_WINDOWS_KEY = 'smartlife_sticky_open_windows';
 
 function tauri(): any {
   return (window as any).__TAURI__;
 }
 
-async function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T | undefined> {
-  const t = tauri();
-  if (!t?.core?.invoke) return undefined;
-  return t.core.invoke(cmd, args);
-}
-
-function currentWindow(): any {
-  return tauri()?.window?.getCurrentWindow?.();
-}
-
-function readOpenIds(): string[] {
+async function invoke(cmd: string, args?: Record<string, unknown>): Promise<boolean> {
   try {
-    const ids = JSON.parse(localStorage.getItem(OPEN_WINDOWS_KEY) || '[]');
-    return Array.isArray(ids) ? ids.filter((x: unknown) => typeof x === 'string') : [];
-  } catch {
-    return [];
+    const t = tauri();
+    if (!t?.core?.invoke) return false;
+    await t.core.invoke(cmd, args);
+    return true;
+  } catch (err) {
+    console.warn(`[SmartLife desktop] ${cmd} thất bại:`, err);
+    return false;
   }
 }
 
-function writeOpenIds(ids: string[]) {
+async function withCurrentWindow(fn: (w: any) => Promise<unknown> | unknown): Promise<boolean> {
   try {
-    localStorage.setItem(OPEN_WINDOWS_KEY, JSON.stringify(Array.from(new Set(ids))));
-  } catch { /* ignore */ }
+    const w = tauri()?.window?.getCurrentWindow?.();
+    if (!w) return false;
+    await fn(w);
+    return true;
+  } catch (err) {
+    console.warn('[SmartLife desktop] window API thất bại:', err);
+    return false;
+  }
 }
 
 export const desktopBridge = {
   isDesktop: isTauri,
 
   /** Mở (hoặc focus) cửa sổ note nổi trên desktop. */
-  async openStickyWindow(noteId: string): Promise<void> {
-    await invoke('open_sticky_window', { noteId });
+  openStickyWindow(noteId: string): Promise<boolean> {
+    return invoke('open_sticky_window', { noteId });
   },
 
-  async setAlwaysOnTop(on: boolean): Promise<void> {
-    await currentWindow()?.setAlwaysOnTop?.(on);
+  /** Mở cửa sổ note mới (giống Ctrl+Alt+N). */
+  newStickyWindow(): Promise<boolean> {
+    return invoke('new_sticky_window');
   },
 
-  async closeCurrentWindow(): Promise<void> {
-    await currentWindow()?.close?.();
+  setAlwaysOnTop(on: boolean): Promise<boolean> {
+    return withCurrentWindow(w => w.setAlwaysOnTop(on));
   },
 
-  async focusMainWindow(): Promise<void> {
-    await invoke('show_main_window');
+  setTitle(title: string): Promise<boolean> {
+    if (!isTauri()) return Promise.resolve(false);
+    return withCurrentWindow(w => w.setTitle(title));
+  },
+
+  closeCurrentWindow(): Promise<boolean> {
+    return withCurrentWindow(w => w.close());
+  },
+
+  focusMainWindow(): Promise<boolean> {
+    return invoke('show_main_window');
   },
 
   /** Lắng nghe lệnh điều hướng từ khay hệ thống (vd mở tab Sticky). Trả về hàm huỷ. */
   async onNavigate(cb: (tab: string) => void): Promise<(() => void) | undefined> {
-    const listen = tauri()?.event?.listen;
-    if (!listen) return undefined;
-    return listen('smartlife://navigate', (e: { payload: unknown }) => {
-      if (typeof e.payload === 'string') cb(e.payload);
-    });
-  },
-
-  /** Ghi nhớ cửa sổ note đang mở để khôi phục khi khởi động lại app. */
-  rememberOpen(noteId: string) {
-    writeOpenIds([...readOpenIds(), noteId]);
-  },
-
-  forgetOpen(noteId: string) {
-    writeOpenIds(readOpenIds().filter(id => id !== noteId));
-  },
-
-  /** Gọi 1 lần từ cửa sổ chính khi app desktop khởi động. */
-  async restoreOpenWindows(): Promise<void> {
-    if (!isTauri()) return;
-    for (const id of readOpenIds()) {
-      try {
-        await invoke('open_sticky_window', { noteId: id });
-      } catch {
-        this.forgetOpen(id);
-      }
+    try {
+      const listen = tauri()?.event?.listen;
+      if (!listen) return undefined;
+      return await listen('smartlife://navigate', (e: { payload: unknown }) => {
+        if (typeof e.payload === 'string') cb(e.payload);
+      });
+    } catch {
+      return undefined;
     }
   },
 };

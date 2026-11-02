@@ -239,13 +239,12 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
         }
     }, [activeTab]);
 
-    // Windows desktop (Tauri): mở lại các note nổi lần trước + nhận lệnh điều hướng từ khay hệ thống
+    // Windows desktop (Tauri): nhận lệnh điều hướng từ khay hệ thống (note nổi do Rust tự mở lại)
     useEffect(() => {
         if (!user?.id || !desktopBridge.isDesktop()) return;
-        desktopBridge.restoreOpenWindows();
         let unlisten: (() => void) | undefined;
         let disposed = false;
-        desktopBridge.onNavigate((tab) => setActiveTab(tab as any)).then(fn => {
+        desktopBridge.onNavigate((tab) => { if (tab === 'sticky') setActiveTab('sticky'); }).then(fn => {
             if (disposed) fn?.(); else unlisten = fn;
         });
         return () => { disposed = true; unlisten?.(); };

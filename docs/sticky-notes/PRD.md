@@ -48,7 +48,7 @@ Người dùng mục tiêu (sinh viên, người đi làm trẻ) đang dùng **M
 ### Epic B — Desktop Windows (Giai đoạn 2)
 - **B1.** Tôi muốn cài app Windows, ghim vào taskbar, có icon ở khay hệ thống.
 - **B2.** Tôi muốn "tách" một note ra thành cửa sổ nổi nhỏ trên desktop, có thể luôn nằm trên cùng.
-- **B3.** Tôi muốn phím tắt toàn cục `Ctrl+Shift+N` để tạo note từ bất kỳ đâu.
+- **B3.** Tôi muốn phím tắt toàn cục `Ctrl+Alt+N` để tạo note từ bất kỳ đâu.
 - **B4.** Tôi muốn app tự khởi động cùng Windows (bật/tắt được).
 - **B5.** Vị trí/kích thước cửa sổ note được nhớ trên máy đó.
 
@@ -71,7 +71,7 @@ Người dùng mục tiêu (sinh viên, người đi làm trẻ) đang dùng **M
    tab #/sticky   cùng bundle React   ├ cửa sổ chính = web    quota + Gemini 2.5 Flash
                                       ├ cửa sổ note nổi:
                                       │  #/sticky-window?id=…
-                                      ├ tray, Ctrl+Shift+N
+                                      ├ tray, Ctrl+Alt+N
                                       └ autostart, window-state
 ```
 

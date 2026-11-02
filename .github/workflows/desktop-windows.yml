@@ -109,7 +109,7 @@ jobs:
           body: |
             ## SmartLife cho Windows
             - Sticky Notes nổi trên màn hình, luôn nằm trên cùng
-            - Phím tắt toàn cục **Ctrl+Shift+N** tạo ghi chú mới
+            - Phím tắt toàn cục **Ctrl+Alt+N** tạo ghi chú mới
             - Icon khay hệ thống, ghim taskbar, khởi động cùng Windows
             - Đồng bộ realtime với web và điện thoại
 
