@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ORPHAN_GRACE_MS, stickyImageStore, __resetStickyImageStoreForTests } from './stickyImageStore';
 import { fitSize, MAX_INPUT_BYTES, StickyImageError, validateImageFile } from '../utils/stickyImageCompress';
 
@@ -51,6 +51,36 @@ describe('stickyImageStore', () => {
     expect(await stickyImageStore.get(idOf(orphan))).toBeNull();
     expect(await stickyImageStore.get(idOf(used))).not.toBeNull();
     expect(await stickyImageStore.get(idOf(other))).not.toBeNull();
+  });
+
+  test('xoá vĩnh viễn note: xoá ngay ảnh không còn dùng, giữ ảnh đã chép sang note khác và ảnh user khác', async () => {
+    const a = await stickyImageStore.put({ userId: 'u1', noteId: 'n1', blob: blob(), width: 1, height: 1 });
+    const b = await stickyImageStore.put({ userId: 'u1', noteId: 'n1', blob: blob(), width: 1, height: 1 });
+    const foreign = await stickyImageStore.put({ userId: 'u2', noteId: 'n9', blob: blob(), width: 1, height: 1 });
+    const n = await stickyImageStore.deleteUnused('u1', [idOf(a), idOf(b), idOf(foreign)], [`chép ![](${b})`]);
+    expect(n).toBe(1);
+    expect(await stickyImageStore.get(idOf(a))).toBeNull();
+    expect(await stickyImageStore.get(idOf(b))).not.toBeNull();
+    expect(await stickyImageStore.get(idOf(foreign))).not.toBeNull();
+  });
+
+  test('object URL: dùng chung khi đang hiển thị, thu hồi sau khi không còn ai dùng', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const revoke = vi.spyOn(URL, 'revokeObjectURL');
+    try {
+      const id = idOf(await stickyImageStore.put({ userId: 'u1', noteId: 'n1', blob: blob(), width: 1, height: 1 }));
+      const u1 = await stickyImageStore.getUrl(id);
+      const u2 = await stickyImageStore.getUrl(id);
+      expect(u2).toBe(u1);
+      stickyImageStore.releaseUrl(id);
+      stickyImageStore.releaseUrl(id);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(revoke).toHaveBeenCalledWith(u1);
+      expect(await stickyImageStore.getUrl(id)).not.toBe(u1);
+    } finally {
+      revoke.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });
 

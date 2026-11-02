@@ -73,7 +73,17 @@ function newId(): string {
   return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 }
 
-const urlCache = new Map<string, Promise<string | null>>();
+/** Object URL đang dùng: refs = số ảnh đang hiển thị; về 0 thì thu hồi sau URL_RELEASE_MS (tránh tạo lại khi cuộn/đổi note). */
+const urlCache = new Map<string, { url: Promise<string | null>; refs: number; timer?: ReturnType<typeof setTimeout> }>();
+const URL_RELEASE_MS = 30_000;
+
+function forgetUrl(id: string) {
+  const entry = urlCache.get(id);
+  if (!entry) return;
+  urlCache.delete(id);
+  if (entry.timer) clearTimeout(entry.timer);
+  entry.url.then(u => { if (u) URL.revokeObjectURL(u); }, () => {});
+}
 
 export const stickyImageStore = {
   /** Lưu ảnh (đã nén) → trả về src để chèn vào note: sticky-img://<id> */
@@ -109,18 +119,57 @@ export const stickyImageStore = {
     return record ? new Blob([record.data], { type: record.mime }) : null;
   },
 
-  /** Object URL để hiển thị (cache trong phiên). null = ảnh không có trên thiết bị này. */
+  /**
+   * Object URL để hiển thị, mỗi lần gọi phải kèm 1 lần releaseUrl(id).
+   * null = ảnh không có trên thiết bị này; reject = không đọc được kho ảnh (bị chặn, ẩn danh…).
+   */
   getUrl(id: string): Promise<string | null> {
-    let cached = urlCache.get(id);
-    if (!cached) {
-      cached = this.getBlob(id)
-        .then(blob => (blob ? URL.createObjectURL(blob) : null))
-        .catch(() => null);
-      // Không giữ kết quả "không có" — ảnh có thể vừa được ghi xong ở cửa sổ khác
-      cached.then(url => { if (!url) urlCache.delete(id); });
-      urlCache.set(id, cached);
+    let entry = urlCache.get(id);
+    if (!entry) {
+      const url = this.getBlob(id).then(blob => (blob ? URL.createObjectURL(blob) : null));
+      entry = { url, refs: 0 };
+      urlCache.set(id, entry);
+      // Không giữ kết quả "không có"/lỗi — ảnh có thể vừa được ghi xong ở cửa sổ khác
+      const mine = entry;
+      url.then(u => { if (!u && urlCache.get(id) === mine) urlCache.delete(id); },
+        () => { if (urlCache.get(id) === mine) urlCache.delete(id); });
     }
-    return cached;
+    entry.refs++;
+    if (entry.timer) { clearTimeout(entry.timer); entry.timer = undefined; }
+    return entry.url;
+  },
+
+  releaseUrl(id: string) {
+    const entry = urlCache.get(id);
+    if (!entry || --entry.refs > 0) return;
+    entry.refs = 0;
+    entry.timer = setTimeout(() => { if (urlCache.get(id) === entry && entry.refs === 0) forgetUrl(id); }, URL_RELEASE_MS);
+  },
+
+  /**
+   * Xoá ngay các ảnh `ids` của user không còn nằm trong `stillUsed` (nội dung các note còn lại).
+   * Dùng khi xoá vĩnh viễn note — không đợi hạn mồ côi.
+   */
+  async deleteUnused(userId: string, ids: string[], stillUsed: string[]): Promise<number> {
+    const used = new Set(stillUsed.flatMap(c => extractStickyImageIds(c)));
+    const targets = ids.filter(id => !used.has(id));
+    if (!targets.length) return 0;
+    const db = await openDb();
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    let deleted = 0;
+    for (const id of targets) {
+      const req = store.get(id);
+      req.onsuccess = () => {
+        const rec = req.result as StickyImageRecord | undefined;
+        if (rec?.user_id !== userId) return;
+        store.delete(id);
+        deleted++;
+      };
+    }
+    await done(tx);
+    targets.forEach(forgetUrl);
+    return deleted;
   },
 
   /**
@@ -147,9 +196,7 @@ export const stickyImageStore = {
       } else if (now - rec.orphaned_at >= ORPHAN_GRACE_MS) {
         cursor.delete();
         deleted++;
-        const url = urlCache.get(rec.id);
-        urlCache.delete(rec.id);
-        url?.then(u => { if (u) URL.revokeObjectURL(u); });
+        forgetUrl(rec.id);
       }
       cursor.continue();
     };
@@ -170,5 +217,6 @@ export async function __resetStickyImageStoreForTests() {
   const db = await dbPromise?.catch(() => null);
   db?.close();
   dbPromise = null;
+  urlCache.forEach(e => e.timer && clearTimeout(e.timer));
   urlCache.clear();
 }

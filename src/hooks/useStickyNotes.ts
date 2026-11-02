@@ -15,6 +15,7 @@ import {
   isNetworkError, isMissingTableError, isRowNotFoundError,
 } from '../services/stickyNoteService';
 import { stickyImageStore } from '../services/stickyImageStore';
+import { extractStickyImageIds } from '../utils/stickyMarkdown';
 
 export type StickySyncStatus = 'idle' | 'saving' | 'saved' | 'offline' | 'error';
 
@@ -308,10 +309,21 @@ export function useStickyNotes(userId: string | undefined) {
     const timer = timers.current.get(id);
     if (timer) clearTimeout(timer);
     timers.current.delete(id);
+    const removed = notesRef.current.find(n => n.id === id);
+    const removedContent = [removed?.content || '', pendingPatches.current.get(id)?.content || ''].join('\n');
     pendingPatches.current.delete(id);
     deferredRemote.current.delete(id);
     setNotes(prev => prev.filter(n => n.id !== id));
     stickyNoteService.enqueue(userId, { id, hardDelete: true });
+    // Ảnh của note bị xoá vĩnh viễn: xoá ngay khỏi thiết bị (trừ ảnh đã được chép sang note khác)
+    const imageIds = extractStickyImageIds(removedContent);
+    if (imageIds.length && typeof indexedDB !== 'undefined') {
+      const others = [
+        ...notesRef.current.filter(n => n.id !== id).map(n => n.content),
+        ...Array.from(pendingPatches.current.values(), p => p.content || ''),
+      ];
+      stickyImageStore.deleteUnused(userId, imageIds, others).catch(e => console.warn('[sticky] xoá ảnh lỗi:', e));
+    }
     // Đợi insert/update đang chạy xong, nếu không lệnh xoá có thể tới server trước lệnh tạo
     for (let running = inflight.current.get(id); running; running = inflight.current.get(id)) {
       await running.catch(() => { });

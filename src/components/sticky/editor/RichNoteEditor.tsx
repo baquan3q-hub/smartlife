@@ -18,6 +18,7 @@ import { TableKit } from '@tiptap/extension-table';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Placeholder } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
+import { NodeSelection } from '@tiptap/pm/state';
 import {
   Bold, Italic, Strikethrough, List, ListOrdered, ListChecks, Link2, Table as TableIcon, ExternalLink, Unlink, Check, X, ImagePlus,
 } from 'lucide-react';
@@ -237,6 +238,8 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
 
   const imageScopeRef = useRef(imageScope);
   imageScopeRef.current = readOnly ? undefined : imageScope;
+  /** Ảnh đang nén/lưu, chưa nằm trong tài liệu — tính vào giới hạn để dán/thả liên tiếp không vượt. */
+  const pendingImagesRef = useRef(0);
 
   /** Nén + lưu từng ảnh rồi chèn tham chiếu sticky-img:// (tại `pos` khi thả, ngược lại tại con trỏ). */
   const insertImagesRef = useRef(async (_files: File[], _pos?: number) => {});
@@ -244,32 +247,50 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
     const ed = editorRef.current;
     const scope = imageScopeRef.current;
     if (!ed || ed.isDestroyed || !scope || !files.length) return;
-    const room = MAX_IMAGES_PER_NOTE - countLocalImages(ed);
+    const room = MAX_IMAGES_PER_NOTE - countLocalImages(ed) - pendingImagesRef.current;
     if (room <= 0) { showNotice(`Mỗi ghi chú tối đa ${MAX_IMAGES_PER_NOTE} ảnh.`); return; }
     const batch = files.slice(0, room);
     let error: string | null = files.length > room ? `Mỗi ghi chú tối đa ${MAX_IMAGES_PER_NOTE} ảnh — đã bỏ bớt.` : null;
     showNotice(batch.length > 1 ? `Đang xử lý ${batch.length} ảnh…` : 'Đang xử lý ảnh…', true);
+    // Cửa sổ nổi dùng 1 trình soạn thảo cho nhiều note: đổi note giữa chừng → ngừng, không chèn nhầm
+    const sameNote = () => !ed.isDestroyed && imageScopeRef.current?.noteId === scope.noteId;
     let insertAt = pos;
-    for (const file of batch) {
-      try {
-        const { blob, width, height } = await compressImage(file);
-        const src = await stickyImageStore.put({ userId: scope.userId, noteId: scope.noteId, blob, width, height });
-        if (ed.isDestroyed) return;
-        const node = { type: 'image', attrs: { src, alt: '' } };
-        if (insertAt !== undefined) {
-          const at = Math.min(insertAt, ed.state.doc.content.size);
-          ed.chain().focus().insertContentAt(at, node).run();
-          insertAt = ed.state.selection.to;
-        } else {
-          ed.chain().focus().insertContent(node).run();
+    pendingImagesRef.current += batch.length;
+    let left = batch.length;
+    try {
+      for (const file of batch) {
+        try {
+          const { blob, width, height } = await compressImage(file);
+          if (!sameNote()) return;
+          const src = await stickyImageStore.put({ userId: scope.userId, noteId: scope.noteId, blob, width, height });
+          // Ảnh đã lưu nhưng không chèn → thành mồ côi, bước dọn ảnh sẽ xoá
+          if (!sameNote()) return;
+          const node = { type: 'image', attrs: { src, alt: '' } };
+          if (insertAt !== undefined) {
+            const at = Math.min(insertAt, ed.state.doc.content.size);
+            ed.chain().focus().insertContentAt(at, node).run();
+            insertAt = ed.state.selection.to;
+          } else {
+            // Đang chọn cả 1 ảnh → chèn ngay sau nó, không thay mất ảnh cũ
+            const sel = ed.state.selection;
+            if (sel instanceof NodeSelection) ed.chain().focus().insertContentAt(sel.to, node).run();
+            else ed.chain().focus().insertContent(node).run();
+          }
+        } catch (e) {
+          error = e instanceof StickyImageError ? e.message : 'Không lưu được ảnh trên thiết bị này.';
+          console.warn('[sticky] chèn ảnh lỗi:', e);
+        } finally {
+          pendingImagesRef.current--;
+          left--;
         }
-      } catch (e) {
-        error = e instanceof StickyImageError ? e.message : 'Không lưu được ảnh trên thiết bị này.';
-        console.warn('[sticky] chèn ảnh lỗi:', e);
       }
+    } finally {
+      pendingImagesRef.current -= left;
+      if (!sameNote()) setImageNotice(null);
+      else if (error) showNotice(error);
+      // Chỉ tắt ô "đang xử lý" — giữ thông báo lỗi/giới hạn của lượt khác
+      else if (!pendingImagesRef.current) setImageNotice(n => (n?.busy ? null : n));
     }
-    if (error) showNotice(error);
-    else setImageNotice(null);
     stickyImageStore.requestPersistence();
   };
 

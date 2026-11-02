@@ -21,7 +21,7 @@ export function fitSize(width: number, height: number, max = MAX_IMAGE_SIDE): { 
 export function validateImageFile(file: Blob): void {
   const type = (file.type || '').toLowerCase();
   if (!type.startsWith('image/') || type.includes('svg')) {
-    throw new StickyImageError('Chỉ chèn được ảnh PNG, JPEG, WebP, GIF hoặc HEIC.');
+    throw new StickyImageError('Chỉ chèn được ảnh PNG, JPEG, WebP hoặc GIF.');
   }
   if (file.size > MAX_INPUT_BYTES) throw new StickyImageError('Ảnh lớn hơn 10 MB — hãy chọn ảnh nhỏ hơn.');
 }
@@ -44,7 +44,7 @@ async function decode(file: Blob): Promise<Decoded> {
     return { source: img, width: img.naturalWidth, height: img.naturalHeight, release: () => URL.revokeObjectURL(url) };
   } catch {
     URL.revokeObjectURL(url);
-    throw new StickyImageError('Không đọc được ảnh này (định dạng không hỗ trợ trên thiết bị).');
+    throw new StickyImageError('Không đọc được ảnh này trên thiết bị — ảnh HEIC (iPhone) hãy đổi sang JPEG rồi chèn lại.');
   }
 }
 
