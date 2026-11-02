@@ -33,9 +33,30 @@ const components: Components = {
 // Giữ nguyên URL để components tự lọc (mặc định react-markdown xoá scheme lạ như sticky-img://)
 const keepUrl = (url: string) => url;
 
+const BLOCK_PARENTS = new Set(['root', 'blockquote', 'listItem']);
+
+/**
+ * HTML thô không được render (an toàn) nhưng cũng không được biến mất: note cũ "Gửi <Nam>" hiện nguyên chữ,
+ * <br> (xuống dòng trong ô bảng) thành ngắt dòng.
+ */
+function remarkRawHtmlAsText() {
+  const walk = (node: any) => {
+    if (!Array.isArray(node.children)) return;
+    node.children = node.children.map((child: any) => {
+      if (child.type !== 'html') { walk(child); return child; }
+      if (/^<br\s*\/?>$/i.test(String(child.value).trim())) return { type: 'break' };
+      const text = { type: 'text', value: child.value };
+      return BLOCK_PARENTS.has(node.type) ? { type: 'paragraph', children: [text] } : text;
+    });
+  };
+  return (tree: any) => walk(tree);
+}
+
+const remarkPlugins = [remarkGfm, remarkRawHtmlAsText];
+
 export const StickyMarkdownView: React.FC<{ markdown: string; className?: string }> = ({ markdown, className = '' }) => (
   <div className={`sticky-md ${className}`}>
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={keepUrl}>
+    <ReactMarkdown remarkPlugins={remarkPlugins} components={components} urlTransform={keepUrl}>
       {markdown}
     </ReactMarkdown>
   </div>

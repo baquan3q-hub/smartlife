@@ -84,6 +84,39 @@ export function replaceImagesWithLabel(markdown: string): string {
   return (markdown || '').replace(IMAGE_MD_RE, '[ảnh]');
 }
 
+// Trình soạn thảo lưu "<" / ">" / "&" gõ trong chữ thành &lt; &gt; &amp; → giải mã khi hiển thị chữ thuần
+const HTML_ENTITY_RE = /&(#\d+|#x[0-9a-f]+|lt|gt|amp|quot|apos|nbsp);/gi;
+const NAMED_ENTITIES: Record<string, string> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: ' ' };
+
+function decodeEntity(match: string, name: string): string {
+  if (name[0] !== '#') return NAMED_ENTITIES[name.toLowerCase()] ?? match;
+  const code = name[1] === 'x' || name[1] === 'X' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+  return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+}
+
+// Thẻ HTML thô (trừ <br> do bảng sinh ra và autolink <https://…>, <a@b.com>)
+const RAW_HTML_START_RE = /<(?=[a-z/!?])(?!br\s*\/?>)(?![a-z][a-z0-9+.-]*:[^\s<>]*>)(?![^\s<>@]+@[^\s<>]+>)/gi;
+
+/**
+ * Note văn bản thuần cũ có thể chứa "<Nam>", "<div>"… — Markdown hiểu là thẻ HTML và trình soạn thảo sẽ bỏ mất.
+ * Chuyển "<" mở thẻ thành &lt; (ngoài khối code) để giữ nguyên dạng chữ. Ứng dụng không bao giờ tự sinh HTML thô
+ * ngoài <br> trong ô bảng, nên không ảnh hưởng nội dung mới.
+ */
+export function escapeRawHtml(markdown: string): string {
+  if (!markdown || !markdown.includes('<')) return markdown;
+  let fence: { char: string; len: number } | null = null;
+  return markdown.split('\n').map((line) => {
+    const m = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
+    if (m) {
+      if (!fence) fence = { char: m[1][0], len: m[1].length };
+      else if (m[1][0] === fence.char && m[1].length >= fence.len) fence = null;
+      return line;
+    }
+    if (fence) return line;
+    return line.split(/(`[^`\n]*`)/).map((part, i) => (i % 2 ? part : part.replace(RAW_HTML_START_RE, '&lt;'))).join('');
+  }).join('\n');
+}
+
 /**
  * Markdown → văn bản thuần (dùng cho tìm kiếm, tiêu đề cửa sổ, preview danh sách).
  * Không cần chính xác tuyệt đối — chỉ bỏ cú pháp để người dùng đọc/tìm được.
@@ -113,7 +146,7 @@ export function markdownToPlainText(markdown: string): string {
     .replace(/~~(?=\S)([^\n]*?\S)~~/g, '$1')
     .replace(/`([^`\n]+)`/g, '$1')
     .replace(/\\([\\`*_{}[\]()#+\-.!|>~])/g, '$1')
-    .replace(/&nbsp;/g, ' ')
+    .replace(HTML_ENTITY_RE, decodeEntity)
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

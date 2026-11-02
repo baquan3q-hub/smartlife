@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  contentMatchesQuery, extractStickyImageIds, isAllowedImageSrc, protectImages, replaceImagesWithLabel, restoreImages, markdownToPlainText, safeFileName, sanitizeHref, stickyImageId, uniqueFileName,
+  contentMatchesQuery, escapeRawHtml, extractStickyImageIds, isAllowedImageSrc, protectImages, replaceImagesWithLabel, restoreImages, markdownToPlainText, safeFileName, sanitizeHref, stickyImageId, uniqueFileName,
 } from './stickyMarkdown';
 
 describe('sanitizeHref', () => {
@@ -99,6 +99,19 @@ describe('sửa theo code review', () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(new URL('./stickyMarkdown.ts', import.meta.url), 'utf8');
     expect(src).not.toMatch(/\(\?<[!=]/);
+  });
+});
+
+describe('HTML thô trong note cũ', () => {
+  test('escape thẻ, giữ <br>, autolink và code', () => {
+    expect(escapeRawHtml('Gửi <Nam> và <div>x</div>')).toBe('Gửi &lt;Nam> và &lt;div>x&lt;/div>');
+    expect(escapeRawHtml('| 2<br>x | <https://a.com> <a@b.com> |')).toBe('| 2<br>x | <https://a.com> <a@b.com> |');
+    expect(escapeRawHtml('`<b>` ngoài <b>\n```\n<div>\n```\n<i>')).toBe('`<b>` ngoài &lt;b>\n```\n<div>\n```\n&lt;i>');
+    expect(escapeRawHtml('5 < 6')).toBe('5 < 6');
+  });
+  test('chữ thuần giải mã entity', () => {
+    expect(markdownToPlainText('Gửi &lt;Nam&gt; &amp;lt; &#39;x&#x27;')).toBe("Gửi <Nam> &lt; 'x'");
+    expect(contentMatchesQuery('a&lt;b', 'a<b')).toBe(true);
   });
 });
 

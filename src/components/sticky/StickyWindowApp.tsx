@@ -429,6 +429,7 @@ const StickyWindowInner: React.FC = () => {
             autoFocus
             value={note.content}
             onChange={(content) => updateNote(note.id, { content })}
+            onLegacyRewrite={() => { stickyNoteService.snapshot(note).catch(() => {}); }}
             onFocus={() => setEditing(note.id)}
             onBlur={() => setEditing(null)}
             showToolbar={showFormat}

@@ -4,7 +4,7 @@ import {
   Pin, PinOff, Palette, Sparkles, History, ExternalLink, Archive, ArchiveRestore,
   Trash2, RotateCcw, X, Tag, Plus,
 } from 'lucide-react';
-import { StickyColor, StickyNote, StickyNotePatch, STICKY_COLORS } from '../../services/stickyNoteService';
+import { StickyColor, StickyNote, StickyNotePatch, STICKY_COLORS, stickyNoteService } from '../../services/stickyNoteService';
 import { STICKY_THEME, relativeTime, DEVICE_LABEL } from './stickyTheme';
 import { NoteEditor } from './editor/NoteEditor';
 
@@ -134,6 +134,7 @@ export const StickyNoteCard: React.FC<StickyNoteCardProps> = ({
           readOnly={readOnly}
           autoFocus={autoFocus}
           onChange={(content) => onChange({ content })}
+          onLegacyRewrite={() => { stickyNoteService.snapshot(note).catch(() => {}); }}
         />
 
         {/* Nhãn */}

@@ -19,7 +19,7 @@ import { Markdown } from '@tiptap/markdown';
 import {
   Bold, Italic, Strikethrough, List, ListOrdered, ListChecks, Link2, Table as TableIcon, ExternalLink, Unlink, Check, X,
 } from 'lucide-react';
-import { isAllowedImageSrc, sanitizeHref, stickyImageId } from '../../../utils/stickyMarkdown';
+import { escapeRawHtml, isAllowedImageSrc, sanitizeHref, stickyImageId } from '../../../utils/stickyMarkdown';
 import type { NoteEditorProps } from './NoteEditor';
 import '../stickyContent.css';
 
@@ -169,22 +169,33 @@ const LinkBar: React.FC<{
 
 const RichNoteEditor: React.FC<NoteEditorProps> = ({
   value, onChange, variant, readOnly, autoFocus, placeholder = 'Ghi chú...', showToolbar, onFocus, onBlur, focusRef,
+  onLegacyRewrite, fallbackId,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
-  const onFocusRef = useRef(onFocus);
-  const onBlurRef = useRef(onBlur);
+  const onLegacyRewriteRef = useRef(onLegacyRewrite);
   onChangeRef.current = onChange;
-  onFocusRef.current = onFocus;
-  onBlurRef.current = onBlur;
+  onLegacyRewriteRef.current = onLegacyRewrite;
+  // Đang gõ trong textarea dự phòng (lúc chunk còn tải) → nhận lại focus khi thay bằng trình soạn thảo
+  const [inheritFocus] = useState(() => {
+    const active = typeof document !== 'undefined' ? document.activeElement as HTMLElement | null : null;
+    return !!fallbackId && active?.dataset?.stickyFallback === fallbackId;
+  });
 
   /** Giá trị `value` mà trình soạn thảo đang phản ánh (do mình phát ra hoặc đã nạp vào). */
   const lastValueRef = useRef(value);
   /** Markdown đã chuẩn hoá của nội dung đang hiển thị — chỉ lưu khi khác giá trị này. */
   const baselineRef = useRef<string | null>(null);
+  /** Nội dung gốc khác bản chuẩn hoá (note văn bản thuần cũ) → báo cha chụp phiên bản trước lần lưu đầu. */
+  const legacyRef = useRef(false);
   const openLinkRef = useRef<() => void>(() => {});
   const [focused, setFocused] = useState(false);
-  const [link, setLink] = useState<{ initial: string; hasLink: boolean } | null>(null);
+  const [link, setLink] = useState<{ initial: string; hasLink: boolean; key: number } | null>(null);
+
+  const setBaseline = (md: string, source: string) => {
+    baselineRef.current = md;
+    legacyRef.current = source.trim() !== md;
+  };
 
   const editor = useEditor({
     extensions: [
@@ -209,10 +220,10 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
       Markdown,
       StickyShortcuts.configure({ onLink: () => openLinkRef.current() }),
     ],
-    content: value,
+    content: escapeRawHtml(value),
     contentType: 'markdown',
     editable: !readOnly,
-    autofocus: autoFocus ? 'end' : false,
+    autofocus: autoFocus || inheritFocus ? 'end' : false,
     immediatelyRender: true,
     shouldRerenderOnTransaction: false,
     editorProps: {
@@ -243,25 +254,22 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
     onUpdate: ({ editor: e, transaction }) => {
       // Lần cập nhật đầu có thể đến trước khi baseline kịp đặt (autofocus → extension chèn đoạn trống):
       // lấy baseline từ tài liệu NGAY TRƯỚC giao dịch này.
-      if (baselineRef.current === null && e.markdown) baselineRef.current = tidy(e.markdown.serialize(transaction.before.toJSON()));
+      if (baselineRef.current === null && e.markdown) setBaseline(tidy(e.markdown.serialize(transaction.before.toJSON())), lastValueRef.current);
       const md = serialize(e);
       if (md === baselineRef.current) return;
+      if (legacyRef.current) {
+        legacyRef.current = false;
+        onLegacyRewriteRef.current?.();
+      }
       baselineRef.current = md;
       lastValueRef.current = md;
       onChangeRef.current(md);
-    },
-    onFocus: () => { setFocused(true); onFocusRef.current?.(); },
-    onBlur: ({ event }) => {
-      // Chuyển focus sang thanh định dạng / ô link của chính editor → vẫn coi là đang sửa
-      if (containerRef.current?.contains(event.relatedTarget as Node | null)) return;
-      setFocused(false);
-      onBlurRef.current?.();
     },
   }, []);
 
   // Baseline = nội dung vừa nạp (chạy đồng bộ khi mount, trước autofocus của Tiptap)
   useLayoutEffect(() => {
-    if (editor && baselineRef.current === null) baselineRef.current = serialize(editor);
+    if (editor && baselineRef.current === null) setBaseline(serialize(editor), lastValueRef.current);
   }, [editor]);
 
   // Nội dung thay đổi từ ngoài (máy khác, khôi phục phiên bản, AI) → nạp lại, không phát lượt lưu
@@ -269,8 +277,8 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
     if (!editor || editor.isDestroyed || value === lastValueRef.current) return;
     lastValueRef.current = value;
     const { from, to } = editor.state.selection;
-    editor.commands.setContent(value, { emitUpdate: false, contentType: 'markdown' });
-    baselineRef.current = serialize(editor);
+    editor.commands.setContent(escapeRawHtml(value), { emitUpdate: false, contentType: 'markdown' });
+    setBaseline(serialize(editor), value);
     if (editor.isFocused) {
       const max = editor.state.doc.content.size;
       try { editor.commands.setTextSelection({ from: Math.min(from, max), to: Math.min(to, max) }); } catch { /* giữ con trỏ đầu */ }
@@ -278,8 +286,6 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
   }, [editor, value]);
 
   useEffect(() => { editor?.setEditable(!readOnly, false); }, [editor, readOnly]);
-
-  useEffect(() => { if (autoFocus && editor) editor.commands.focus('end'); }, [autoFocus, editor]);
 
   useEffect(() => {
     if (!focusRef || !editor) return;
@@ -290,7 +296,8 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
   const openLink = useCallback(() => {
     if (!editor || readOnly) return;
     const href = (editor.getAttributes('link').href as string | undefined) || '';
-    setLink({ initial: href, hasLink: !!href });
+    // key mới → ô link nạp lại địa chỉ khi bấm Ctrl+K ở link khác lúc ô đang mở
+    setLink({ initial: href, hasLink: !!href, key: Date.now() });
   }, [editor, readOnly]);
   openLinkRef.current = openLink;
 
@@ -312,12 +319,30 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
     return true;
   };
 
+  // Focus tính theo cả khung (nội dung + thanh định dạng + ô link): đi lại giữa các phần bên trong vẫn là "đang sửa",
+  // rời khỏi khung từ bất kỳ phần nào (kể cả ô link) mới là thôi sửa.
+  const isInside = (node: EventTarget | null) => !!node && !!containerRef.current?.contains(node as Node);
+  const focusHandlers = {
+    onFocus: (e: React.FocusEvent) => {
+      if (isInside(e.relatedTarget)) return;
+      setFocused(true);
+      onFocus?.();
+    },
+    onBlur: (e: React.FocusEvent) => {
+      if (isInside(e.relatedTarget)) return;
+      setFocused(false);
+      setLink(null);
+      onBlur?.();
+    },
+  };
+
   if (!editor) return null;
 
   const toolbarVisible = !readOnly && (variant === 'card' ? focused : !!showToolbar);
   const toolbar = toolbarVisible && <FormatToolbar editor={editor} onLink={openLink} />;
   const linkBar = link && (
     <LinkBar
+      key={link.key}
       initial={link.initial}
       hasLink={link.hasLink}
       onApply={applyLink}
@@ -328,7 +353,7 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
 
   if (variant === 'window') {
     return (
-      <div ref={containerRef} className="flex-1 min-h-0 flex flex-col">
+      <div ref={containerRef} {...focusHandlers} className="flex-1 min-h-0 flex flex-col">
         {toolbar}
         {linkBar}
         <EditorContent editor={editor} className="sticky-editor sticky-editor-fill sticky-scroll flex-1 min-h-0 overflow-y-auto mt-1" />
@@ -337,7 +362,7 @@ const RichNoteEditor: React.FC<NoteEditorProps> = ({
   }
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} {...focusHandlers}>
       <EditorContent editor={editor} className="sticky-editor sticky-scroll max-h-[480px] overflow-y-auto text-sm mt-1" />
       {linkBar}
       {toolbar}

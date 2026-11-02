@@ -3,7 +3,7 @@
 // trong lúc tải, khi tải lỗi (offline sau khi có bản deploy mới) hoặc khi tắt công tắc,
 // dùng textarea cũ: vẫn sửa được Markdown thô, không mất dữ liệu.
 
-import React, { Suspense, lazy, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { Suspense, lazy, useEffect, useId, useLayoutEffect, useRef } from 'react';
 import { isRichEditorEnabled } from '../../../utils/stickyFeatures';
 
 export interface NoteEditorProps {
@@ -20,12 +20,19 @@ export interface NoteEditorProps {
   onBlur?: () => void;
   /** Gán hàm focus() để component cha đặt con trỏ vào note */
   focusRef?: React.MutableRefObject<(() => void) | null>;
+  /** Lần sửa đầu sẽ lưu note cũ ở dạng Markdown chuẩn hoá (khác chuỗi gốc) → cha chụp phiên bản cũ trước. */
+  onLegacyRewrite?: () => void;
+  /** Nội bộ: id của textarea dự phòng — trình soạn thảo nhận lại focus nếu người dùng đang gõ trong đó. */
+  fallbackId?: string;
 }
+
+// Đọc 1 lần (localStorage) — đổi công tắc cần tải lại trang
+const RICH_ENABLED = isRichEditorEnabled();
 
 let editorModule: Promise<typeof import('./RichNoteEditor')> | null = null;
 /** Tải trước chunk trình soạn thảo (gọi khi mở bảng Sticky Notes). */
 export function preloadRichEditor() {
-  if (!isRichEditorEnabled()) return;
+  if (!RICH_ENABLED) return;
   editorModule ??= import('./RichNoteEditor');
   editorModule.catch(() => { editorModule = null; });
 }
@@ -37,7 +44,7 @@ const RichNoteEditor = lazy(() => {
 
 /** Textarea cũ — dùng khi trình soạn thảo chưa sẵn sàng. */
 export const PlainNoteEditor: React.FC<NoteEditorProps> = ({
-  value, onChange, variant, readOnly, autoFocus, placeholder = 'Ghi chú...', onFocus, onBlur, focusRef,
+  value, onChange, variant, readOnly, autoFocus, placeholder = 'Ghi chú...', onFocus, onBlur, focusRef, fallbackId,
 }) => {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -59,6 +66,7 @@ export const PlainNoteEditor: React.FC<NoteEditorProps> = ({
   return (
     <textarea
       ref={ref}
+      data-sticky-fallback={fallbackId}
       value={value}
       readOnly={readOnly}
       onChange={(e) => onChange(e.target.value)}
@@ -84,12 +92,12 @@ class EditorErrorBoundary extends React.Component<{ fallback: React.ReactNode; c
 }
 
 export const NoteEditor: React.FC<NoteEditorProps> = (props) => {
-  if (!isRichEditorEnabled()) return <PlainNoteEditor {...props} />;
-  const fallback = <PlainNoteEditor {...props} />;
+  const fallbackId = useId();
+  if (!RICH_ENABLED) return <PlainNoteEditor {...props} />;
   return (
-    <EditorErrorBoundary fallback={fallback}>
-      <Suspense fallback={fallback}>
-        <RichNoteEditor {...props} />
+    <EditorErrorBoundary fallback={<PlainNoteEditor {...props} />}>
+      <Suspense fallback={<PlainNoteEditor {...props} fallbackId={fallbackId} />}>
+        <RichNoteEditor {...props} fallbackId={fallbackId} />
       </Suspense>
     </EditorErrorBoundary>
   );
