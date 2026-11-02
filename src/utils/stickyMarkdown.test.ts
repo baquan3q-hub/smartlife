@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  contentMatchesQuery, extractStickyImageIds, isAllowedImageSrc, markdownToPlainText, safeFileName, sanitizeHref, stickyImageId, uniqueFileName,
+  contentMatchesQuery, extractStickyImageIds, isAllowedImageSrc, protectImages, replaceImagesWithLabel, restoreImages, markdownToPlainText, safeFileName, sanitizeHref, stickyImageId, uniqueFileName,
 } from './stickyMarkdown';
 
 describe('sanitizeHref', () => {
@@ -99,5 +99,22 @@ describe('sửa theo code review', () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(new URL('./stickyMarkdown.ts', import.meta.url), 'utf8');
     expect(src).not.toMatch(/\(\?<[!=]/);
+  });
+});
+
+describe('ảnh khi gửi AI', () => {
+  test('thay ảnh bằng mã rồi đặt lại', () => {
+    const md = 'A ![sơ đồ](sticky-img://aaaaaaaa-1) B\n\n![](https://x.com/a.png)';
+    const { text, images } = protectImages(md);
+    expect(text).toBe('A [[IMG_0]] B\n\n[[IMG_1]]');
+    expect(restoreImages(text, images)).toBe(md);
+  });
+  test('AI làm mất mã → ảnh nối vào cuối, không trùng', () => {
+    const { images } = protectImages('![a](sticky-img://aaaaaaaa-1) ![b](sticky-img://bbbbbbbb-2)');
+    expect(restoreImages('Gọn: [[IMG_1]] [[IMG_1]]', images))
+      .toBe('Gọn: ![b](sticky-img://bbbbbbbb-2)\n\n![a](sticky-img://aaaaaaaa-1)');
+  });
+  test('ảnh → [ảnh]', () => {
+    expect(replaceImagesWithLabel('x ![a](sticky-img://aaaaaaaa-1)')).toBe('x [ảnh]');
   });
 });

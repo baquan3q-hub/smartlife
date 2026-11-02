@@ -56,6 +56,34 @@ export function extractStickyImageIds(markdown: string): string[] {
   return ids;
 }
 
+const IMAGE_MD_RE = /!\[[^\]]*\]\([^)\s]*(?:\s+"[^"]*")?\)/g;
+
+/** Thay ảnh bằng mã [[IMG_n]] trước khi gửi AI (đỡ tốn token, AI không làm hỏng đường dẫn ảnh). */
+export function protectImages(markdown: string): { text: string; images: string[] } {
+  const images: string[] = [];
+  const text = (markdown || '').replace(IMAGE_MD_RE, (m) => `[[IMG_${images.push(m) - 1}]]`);
+  return { text, images };
+}
+
+/** Đặt ảnh lại vào chỗ mã [[IMG_n]]; ảnh nào AI làm mất mã thì nối vào cuối — không bao giờ mất ảnh. */
+export function restoreImages(text: string, images: string[]): string {
+  const used = new Set<number>();
+  let out = (text || '').replace(/\[\[IMG_(\d+)\]\]/g, (m, n: string) => {
+    const i = Number(n);
+    if (!images[i] || used.has(i)) return '';
+    used.add(i);
+    return images[i];
+  });
+  const missing = images.filter((_, i) => !used.has(i));
+  if (missing.length) out = `${out.trimEnd()}\n\n${missing.join('\n\n')}`;
+  return out;
+}
+
+/** Ảnh → "[ảnh]" (cho các tác vụ AI không cần ảnh). */
+export function replaceImagesWithLabel(markdown: string): string {
+  return (markdown || '').replace(IMAGE_MD_RE, '[ảnh]');
+}
+
 /**
  * Markdown → văn bản thuần (dùng cho tìm kiếm, tiêu đề cửa sổ, preview danh sách).
  * Không cần chính xác tuyệt đối — chỉ bỏ cú pháp để người dùng đọc/tìm được.

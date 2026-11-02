@@ -18,6 +18,7 @@ import { StickyHistoryModal } from './StickyHistoryModal';
 import { StickyAIPanel } from './StickyAIPanel';
 import { STICKY_THEME } from './stickyTheme';
 import { contentMatchesQuery } from '../../utils/stickyMarkdown';
+import { preloadRichEditor } from './editor/NoteEditor';
 
 export const DESKTOP_RELEASES_URL = 'https://github.com/baquan3q-hub/smartlife/releases';
 
@@ -121,6 +122,9 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
       setFocusId(note.id);
     }
   }, [createNote, view, colorFilter, labelFilter]);
+
+  // Tải sẵn trình soạn thảo rich text (chunk riêng) để lần bấm vào note đầu tiên không phải chờ
+  useEffect(() => { preloadRichEditor(); }, []);
 
   // Phím tắt: N = note mới, / = tìm kiếm
   useEffect(() => {

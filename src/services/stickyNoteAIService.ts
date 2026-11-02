@@ -5,6 +5,7 @@
 import { callGeminiRaw, estimateGeminiCost } from './geminiService';
 import { supabase } from './supabase';
 import { StickyColor, StickyNote, STICKY_COLORS } from './stickyNoteService';
+import { protectImages, replaceImagesWithLabel, restoreImages } from '../utils/stickyMarkdown';
 
 const MAX_NOTE_CHARS = 4000;
 
@@ -25,8 +26,8 @@ export interface AIOrganizeSuggestion {
 
 export type AIRewriteMode = 'summarize' | 'cleanup';
 
-function noteText(note: Pick<StickyNote, 'title' | 'content'>): string {
-  const text = `${note.title ? `Tiêu đề: ${note.title}\n` : ''}${note.content}`.trim();
+function noteText(note: Pick<StickyNote, 'title' | 'content'>, content = replaceImagesWithLabel(note.content)): string {
+  const text = `${note.title ? `Tiêu đề: ${note.title}\n` : ''}${content}`.trim();
   return text.slice(0, MAX_NOTE_CHARS);
 }
 
@@ -98,6 +99,7 @@ export const stickyNoteAIService = {
 - priority: urgent (gấp, hôm nay), high (quan trọng / sắp tới hạn), medium (mặc định), low (khi rảnh).
 - deadline: nếu ghi chú nhắc thời điểm ("mai", "thứ 6", "20/11 9h") thì quy đổi sang ISO 8601 có múi giờ địa phương; không có thì null. Thiếu giờ → 23:59.
 - Không bịa task không có trong ghi chú. Ghi chú không có việc cần làm → tasks rỗng.
+- Ghi chú dùng Markdown: bỏ qua mục checklist đã xong ("- [x]"); bỏ ký hiệu **, *, [ ] khỏi nội dung task.
 ${nowContext()}`,
       `Ghi chú:\n"""\n${text}\n"""`,
       {
@@ -161,17 +163,22 @@ ${nowContext()}`,
 
   /** C3 — Tóm tắt hoặc viết lại gọn gàng. */
   async rewrite(note: Pick<StickyNote, 'title' | 'content'>, mode: AIRewriteMode): Promise<string> {
-    const text = noteText(note);
+    // Ảnh → mã [[IMG_n]]; "Viết lại" phải giữ mọi ảnh, "Tóm tắt" thì không cần
+    const { text: protectedContent, images } = protectImages(note.content);
+    const text = noteText(note, protectedContent);
     if (!text) return '';
     const instruction = mode === 'summarize'
-      ? 'Tóm tắt ghi chú thành 3–5 gạch đầu dòng ngắn ("- "), giữ các con số, tên riêng, thời hạn.'
-      : 'Viết lại ghi chú cho rõ ràng, sửa chính tả, sắp xếp thành gạch đầu dòng nếu hợp lý. KHÔNG thêm thông tin mới, KHÔNG bỏ ý.';
+      ? 'Tóm tắt ghi chú thành 3–5 gạch đầu dòng ngắn ("- "), giữ các con số, tên riêng, thời hạn. Bỏ các mã [[IMG_n]].'
+      : 'Viết lại ghi chú cho rõ ràng, sửa chính tả, sắp xếp thành gạch đầu dòng nếu hợp lý. KHÔNG thêm thông tin mới, KHÔNG bỏ ý. Giữ nguyên mọi mã [[IMG_n]] (là ảnh) ở vị trí tương ứng.';
     const result = await callJSON<{ text: string }>(
       `sticky_ai_${mode}`,
-      `${instruction} Trả lời bằng đúng ngôn ngữ của ghi chú, dạng văn bản thuần (không markdown đậm/tiêu đề).`,
+      `${instruction}
+Trả lời bằng đúng ngôn ngữ của ghi chú, dạng Markdown đơn giản: **đậm**, *nghiêng*, danh sách "- ", checklist "- [ ] " / "- [x] ", bảng (chỉ khi ghi chú gốc có bảng).
+Giữ nguyên link dạng [chữ](địa chỉ) và trạng thái checklist. Không dùng tiêu đề (#), không bọc trong \`\`\`.`,
       `Ghi chú:\n"""\n${text}\n"""`,
       { type: 'OBJECT', properties: { text: { type: 'STRING' } }, required: ['text'] },
     );
-    return String(result.text || '').trim();
+    const out = String(result.text || '').trim();
+    return mode === 'cleanup' ? restoreImages(out, images) : out.replace(/\[\[IMG_\d+\]\]/g, '').trim();
   },
 };
