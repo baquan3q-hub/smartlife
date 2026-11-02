@@ -24,7 +24,7 @@ use tauri_plugin_window_state::StateFlags;
 
 const MAIN_LABEL: &str = "main";
 const STICKY_PREFIX: &str = "sticky-";
-const APP_URL: &str = "https://smartlife.courses/";
+const APP_URL: &str = "https://www.smartlife.courses/";
 /// Tên miền gốc. Chấp nhận cả biến thể có tiền tố (vd www.smartlife.courses) vì máy chủ có thể chuyển hướng.
 const APP_HOST: &str = "smartlife.courses";
 /// Tiền tố đường dẫn của "lệnh desktop" (xem desktop_command_handler).
