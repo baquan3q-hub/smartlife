@@ -13,8 +13,16 @@ const COMMAND_PATH = '/__desktop/';
 /** Khoảng cách giữa 2 lệnh: gán location liên tiếp quá nhanh thì lệnh sau huỷ lệnh trước. */
 const COMMAND_GAP_MS = 120;
 
+/** index.tsx đặt cờ này nếu một lệnh không được app chặn (trang bị chuyển tới /__desktop/...). */
+export const BRIDGE_BROKEN_KEY = 'smartlife_desktop_bridge_broken';
+
 function hasCommandBridge(): boolean {
-  return typeof window !== 'undefined' && Number((window as any).__SMARTLIFE_DESKTOP__) >= 2;
+  if (typeof window === 'undefined' || Number((window as any).__SMARTLIFE_DESKTOP__) < 2) return false;
+  try {
+    return sessionStorage.getItem(BRIDGE_BROKEN_KEY) !== '1';
+  } catch {
+    return true;
+  }
 }
 
 let queue: Promise<void> = Promise.resolve();

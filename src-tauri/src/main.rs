@@ -25,6 +25,7 @@ use tauri_plugin_window_state::StateFlags;
 const MAIN_LABEL: &str = "main";
 const STICKY_PREFIX: &str = "sticky-";
 const APP_URL: &str = "https://smartlife.courses/";
+/// Tên miền gốc. Chấp nhận cả biến thể có tiền tố (vd www.smartlife.courses) vì máy chủ có thể chuyển hướng.
 const APP_HOST: &str = "smartlife.courses";
 /// Tiền tố đường dẫn của "lệnh desktop" (xem desktop_command_handler).
 const COMMAND_PREFIX: &str = "/__desktop/";
@@ -44,6 +45,10 @@ static OPEN_LIST_LOCK: Mutex<()> = Mutex::new(());
 /// để dùng chung phiên đăng nhập Supabase (localStorage).
 fn sticky_url(query: &str) -> Result<tauri::Url, String> {
     tauri::Url::parse(&format!("{APP_URL}#/sticky-window?{query}")).map_err(|e| e.to_string())
+}
+
+fn is_app_host(host: Option<&str>) -> bool {
+    host.is_some_and(|h| h == APP_HOST || h.ends_with(&format!(".{APP_HOST}")))
 }
 
 fn is_valid_note_id(id: &str) -> bool {
@@ -192,9 +197,17 @@ fn quit_gracefully(app: &AppHandle) {
 /// Trả về hàm xử lý điều hướng cho 1 cửa sổ. URL dạng https://smartlife.courses/__desktop/<lệnh>?<tham số>
 /// được coi là lệnh: chặn điều hướng (trang giữ nguyên) và thực hiện lệnh. URL khác cho đi bình thường.
 fn desktop_command_handler(app: AppHandle, label: String) -> impl Fn(&tauri::Url) -> bool + Send + 'static {
+    let is_sticky = label.starts_with(STICKY_PREFIX);
     move |url: &tauri::Url| {
-        let is_command = url.host_str() == Some(APP_HOST) && url.path().starts_with(COMMAND_PREFIX);
+        let on_app_host = is_app_host(url.host_str());
+        let is_command = on_app_host && url.path().starts_with(COMMAND_PREFIX);
         if !is_command {
+            // Cửa sổ note chỉ được ở trang gốc (#/sticky-window). Mọi điều hướng khác bị chặn để note
+            // không bao giờ biến thành giao diện app đầy đủ.
+            if is_sticky {
+                let path = url.path();
+                return on_app_host && (path == "/" || path == "/index.html");
+            }
             return true;
         }
         let command = url.path()[COMMAND_PREFIX.len()..].trim_end_matches('/').to_string();

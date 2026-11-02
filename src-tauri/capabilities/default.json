@@ -9,7 +9,9 @@
   "remote": {
     "urls": [
       "https://smartlife.courses/*",
-      "https://smartlife.courses"
+      "https://smartlife.courses",
+      "https://*.smartlife.courses/*",
+      "https://*.smartlife.courses"
     ]
   },
   "permissions": [
