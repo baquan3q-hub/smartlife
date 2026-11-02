@@ -6,6 +6,7 @@
 import { Capacitor } from '@capacitor/core';
 
 const EXPORT_DIR = 'exports';
+const EXPORT_TTL_MS = 24 * 60 * 60 * 1000;
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -26,8 +27,15 @@ export async function saveFile(blob: Blob, filename: string): Promise<void> {
       import('@capacitor/filesystem'),
       import('@capacitor/share'),
     ]);
-    // Chỉ giữ file của lần xuất này — file cũ đã chia sẻ xong, xoá để cache không phình ra
-    await Filesystem.rmdir({ path: EXPORT_DIR, directory: Directory.Cache, recursive: true }).catch(() => {});
+    // Dọn file xuất cũ hơn 1 ngày để cache không phình ra. Không xoá file mới:
+    // app nhận chia sẻ (vd. Gmail) có thể chỉ đọc file khi gửi.
+    try {
+      const { files } = await Filesystem.readdir({ path: EXPORT_DIR, directory: Directory.Cache });
+      const cutoff = Date.now() - EXPORT_TTL_MS;
+      await Promise.all(files
+        .filter(f => f.type === 'file' && f.mtime < cutoff)
+        .map(f => Filesystem.deleteFile({ path: `${EXPORT_DIR}/${f.name}`, directory: Directory.Cache }).catch(() => {})));
+    } catch { /* chưa có thư mục */ }
     const { uri } = await Filesystem.writeFile({
       path: `${EXPORT_DIR}/${filename}`,
       data: await blobToBase64(blob),
