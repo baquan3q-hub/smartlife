@@ -83,6 +83,10 @@
             "destination": "/api/v1/tasks?id=:id"
         },
         {
+            "source": "/t/:token",
+            "destination": "/api/v1/openapi?share=:token"
+        },
+        {
             "source": "/api/v1/(.*)",
             "destination": "/api/v1/not-found"
         },
