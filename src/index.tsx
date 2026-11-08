@@ -3,6 +3,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import StickyWindowApp, { isStickyWindowRoute } from './components/sticky/StickyWindowApp'
+import SharedTaskView, { isSharedTaskRoute } from './components/share/SharedTaskView'
 import { BRIDGE_BROKEN_KEY } from './services/desktopBridge'
 import './index.css' // Quan trọng: Import CSS để có giao diện đẹp (Tailwind)
 
@@ -62,8 +63,9 @@ if (!rootElement) {
 if (!isStrayDesktopCommand) ReactDOM.createRoot(rootElement as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
+      {/* Link task được chia sẻ (#/t/<token>): trang công khai chỉ đọc, không tải App/đăng nhập */}
       {/* Cửa sổ note nổi của bản Windows (Tauri) chỉ render phần ghi chú, không tải toàn bộ App */}
-      {isStickyWindowRoute() ? <StickyWindowApp /> : <App />}
+      {isStickyWindowRoute() ? <StickyWindowApp /> : isSharedTaskRoute() ? <SharedTaskView /> : <App />}
     </ErrorBoundary>
   </React.StrictMode>,
 )
