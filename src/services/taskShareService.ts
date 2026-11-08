@@ -1,7 +1,8 @@
 import { supabase } from './supabase';
-import { parseTaskLinks, TaskLink } from '../types';
 
 // Chia sẻ task bằng link công khai (chỉ xem). Schema: sql/task_share.sql
+// Chỉ gồm phần quản lý link của chủ task. Trang người xem `/t/<token>` được server vẽ
+// hoàn toàn bằng HTML trong api/_lib/sharePage.js (không cần JS, chạy được trong webview Zalo).
 
 export interface TaskShare {
   id: string;
@@ -30,28 +31,6 @@ export const DEFAULT_SHARE_OPTIONS: TaskShareOptions = {
   expires_at: null,
 };
 
-export interface SharedTask {
-  title: string;
-  status: string;
-  priority?: string;
-  completed_at?: string;
-  description?: string;
-  subtasks?: { id: string; title: string; is_completed: boolean }[];
-  deadline?: string;
-  attach_link?: string;
-  owner_name?: string;
-  updated_at?: string;
-  expires_at?: string;
-}
-
-export type SharedTaskResult =
-  | { ok: true; task: SharedTask }
-  | { ok: false; reason: 'not_found' | 'expired' | 'error' };
-
-const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
-
-export const isValidShareToken = (token: string): boolean => TOKEN_PATTERN.test(token);
-
 /**
  * Domain công khai dùng cho link chia sẻ. App Capacitor/Tauri chạy ở localhost nên không thể
  * dùng window.location.origin → đặt VITE_PUBLIC_APP_URL (vd https://smartlife.vn) khi build.
@@ -64,31 +43,6 @@ export const getPublicBaseUrl = (): string => {
 
 export const buildShareUrl = (token: string, baseUrl: string = getPublicBaseUrl()): string =>
   `${baseUrl.replace(/\/+$/, '')}/t/${token}`;
-
-/** Lấy token từ hash `#/t/<token>`; trả null nếu không phải route chia sẻ. */
-export const parseShareHash = (hash: string): string | null => {
-  const m = /^#\/t\/([^/?#]+)/.exec(hash);
-  return m ? m[1] : null;
-};
-
-/** Chỉ cho phép link http(s) — chặn javascript:, data:... từ dữ liệu người dùng nhập. */
-export const toSafeHttpUrl = (raw: string): string | null => {
-  const trimmed = (raw || '').trim();
-  if (!trimmed) return null;
-  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  try {
-    const u = new URL(withScheme);
-    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : null;
-  } catch {
-    return null;
-  }
-};
-
-export const getSafeSharedLinks = (attachLink?: string | null): (TaskLink & { href: string })[] =>
-  parseTaskLinks(attachLink).flatMap((l) => {
-    const href = toSafeHttpUrl(l.url);
-    return href ? [{ ...l, href }] : [];
-  });
 
 // ── Phía chủ task (cần đăng nhập, RLS) ─────────────────────────────────────────
 
@@ -126,17 +80,4 @@ export async function updateTaskShare(shareId: string, options: Partial<TaskShar
 export async function stopTaskShare(shareId: string): Promise<void> {
   const { error } = await supabase.from('task_shares').delete().eq('id', shareId);
   if (error) throw error;
-}
-
-// ── Phía người xem (không cần đăng nhập) ───────────────────────────────────────
-
-export async function fetchSharedTask(token: string): Promise<SharedTaskResult> {
-  if (!isValidShareToken(token)) return { ok: false, reason: 'not_found' };
-  try {
-    const { data, error } = await supabase.rpc('get_shared_task', { p_token: token });
-    if (error || !data) return { ok: false, reason: 'error' };
-    return data as SharedTaskResult;
-  } catch {
-    return { ok: false, reason: 'error' };
-  }
 }
