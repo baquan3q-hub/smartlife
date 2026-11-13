@@ -1,3 +1,5 @@
+
+
 # 🚀 SmartLife - Siêu Ứng Dụng Quản Trị Học Tập & Đời Sống Sinh Viên Toàn Diện
 
 > **SmartLife** là một Super App (Siêu ứng dụng) đa phân hệ được thiết kế đặc thù nhằm giải quyết các bài toán thiết thực của sinh viên và người tự học trong kỷ nguyên số. Ứng dụng tích hợp sâu sắc giữa quản lý học vụ (GPA VNU), định hướng nghề nghiệp dựa trên tính cách (MBTI/DISC) bằng trí tuệ nhân tạo (Gemini AI), thiết lập và kết xuất CV tự động chuẩn ATS, quản lý chi tiêu toán học thông minh, rèn luyện thói quen, không gian tập trung Pomodoro, nhật ký cảm xúc có khóa bảo mật mã PIN và **Ví tài liệu số cá nhân** tích hợp.
@@ -180,6 +182,11 @@ Chi tiết về kỹ thuật giới hạn quota, AI Boost Packs và sơ đồ c�
 4. **Biên dịch dự án (Build):**
    ```bash
    npm run build
+   ```
+
+5. **Xem trước bản build (Preview):**
+   ```bash
+   npm run preview
    ```
 
 ---
