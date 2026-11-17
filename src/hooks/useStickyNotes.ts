@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../services/supabase';
 import {
-  StickyNote, StickyNotePatch, stickyNoteService, newStickyNote,
+  StickyNote, StickyNotePatch, stickyNoteService, newStickyNote, normalizeStickyNote,
   isNetworkError, isMissingTableError, isRowNotFoundError,
 } from '../services/stickyNoteService';
 import { stickyImageStore } from '../services/stickyImageStore';
@@ -123,6 +123,8 @@ export function useStickyNotes(userId: string | undefined) {
       setLoadedFor(userId);
     }
   }, [userId, handleError]);
+  const reloadRef = useRef(reload);
+  reloadRef.current = reload;
 
   useEffect(() => {
     if (!userId) {
@@ -148,25 +150,35 @@ export function useStickyNotes(userId: string | undefined) {
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'sticky_notes', filter: `user_id=eq.${userId}` },
         (payload: any) => {
-          const remote = payload.new as StickyNote;
-          if (!remote?.id) return;
+          const remote = normalizeStickyNote(payload.new);
+          if (!remote) return;
           setNotes(prev => (prev.some(n => n.id === remote.id) ? prev : [remote, ...prev]));
         })
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'sticky_notes', filter: `user_id=eq.${userId}` },
         (payload: any) => {
-          const remote = payload.new as StickyNote;
-          if (!remote?.id) return;
+          const id = payload.new?.id;
+          if (typeof id !== 'string' || !id) return;
+          // Bản ghi realtime có thể thiếu cột lớn không đổi (vd. nội dung dài) → ghép lên bản đang có, không thay nguyên
+          const local = notesRef.current.find(n => n.id === id) || null;
+          const remote = normalizeStickyNote(payload.new, deferredRemote.current.get(id) || local);
+          if (!remote) return;
+          if (!local && typeof payload.new.content !== 'string') {
+            // Note lạ mà thiếu nội dung → không đoán, tải lại cả danh sách từ server
+            reloadRef.current();
+            return;
+          }
           if (isBusy(remote.id)) {
             const prevDeferred = deferredRemote.current.get(remote.id);
             if (!prevDeferred || remote.updated_at > prevDeferred.updated_at) deferredRemote.current.set(remote.id, remote);
             return;
           }
           setNotes(prev => {
-            const local = prev.find(n => n.id === remote.id);
-            if (!local) return [remote, ...prev];
-            if (remote.updated_at <= local.updated_at) return prev;
-            return prev.map(n => (n.id === remote.id ? remote : n));
+            const cur = prev.find(n => n.id === remote.id);
+            if (!cur) return [remote, ...prev];
+            if (remote.updated_at <= cur.updated_at) return prev;
+            const merged = normalizeStickyNote(payload.new, cur) || cur;
+            return prev.map(n => (n.id === remote.id ? merged : n));
           });
         })
       // Supabase không lọc được sự kiện DELETE theo cột (bản cũ chỉ có khoá chính) → nghe không lọc,

@@ -23,6 +23,7 @@ import InvoiceModal from './components/InvoiceModal';
 import MySpotify from './components/MySpotify';
 import ExpandSection from './components/ExpandSection';
 import StickyNotesDashboard from './components/sticky/StickyNotesDashboard';
+import StickyErrorBoundary from './components/sticky/StickyErrorBoundary';
 import { desktopBridge } from './services/desktopBridge';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import ProGateOverlay from './components/ProGateOverlay';
@@ -2412,12 +2413,14 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         )
                     )}
                     {deferredTab === 'sticky' && user && (
-                        <StickyNotesDashboard
-                            userId={user.id}
-                            hasAIAccess={proAccess.hasAccess}
-                            onUpgrade={handleOpenPricing}
-                            onAddTodo={(content, priority, deadline) => handleAddTodo(content, priority, deadline, 'todo')}
-                        />
+                        <StickyErrorBoundary userId={user.id}>
+                            <StickyNotesDashboard
+                                userId={user.id}
+                                hasAIAccess={proAccess.hasAccess}
+                                onUpgrade={handleOpenPricing}
+                                onAddTodo={(content, priority, deadline) => handleAddTodo(content, priority, deadline, 'todo')}
+                            />
+                        </StickyErrorBoundary>
                     )}
                     {deferredTab === 'expand' && (
                         <ExpandSection
