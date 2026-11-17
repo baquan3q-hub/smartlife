@@ -3,7 +3,7 @@ import {
     X, Plus, StickyNote, Link2, FileText, Image, Music, Video,
     Trash2, Pin, PinOff, ExternalLink, Download, Search,
     Loader2, AlertCircle, Bold, Italic, Eye, Edit3, Palette, ChevronLeft,
-    CheckSquare, List, LockKeyhole, Maximize2, FileDown, Play
+    CheckSquare, List, Maximize2, FileDown, Play
 } from 'lucide-react';
 import { GlassIcon } from './icons/GlassIcon';
 import { supabase } from '../services/supabase';
