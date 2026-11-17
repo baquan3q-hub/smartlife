@@ -125,15 +125,67 @@ export function newStickyNote(userId: string, partial: StickyNotePatch = {}, id?
   };
 }
 
+const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
+
+/**
+ * Chuẩn hoá một note từ bên ngoài (server, realtime, cache cũ) để giao diện không bao giờ gặp null/undefined.
+ * `base`: bản đang có — trường nào bản mới thiếu thì giữ của base. Realtime của Supabase bỏ các cột lớn
+ * không đổi (TOAST, ví dụ nội dung dài) khỏi bản ghi UPDATE; thay nguyên note sẽ làm mất nội dung và
+ * từng làm trắng trang Sticky Notes. Trả về null nếu không có id.
+ */
+export function normalizeStickyNote(raw: unknown, base?: StickyNote | null): StickyNote | null {
+  if (!raw || typeof raw !== 'object') return base ?? null;
+  const r = raw as Partial<Record<keyof StickyNote, unknown>>;
+  const id = str(r.id) || base?.id;
+  if (!id) return null;
+  const pick = <K extends keyof StickyNote>(k: K): unknown => (r[k] === undefined ? base?.[k] : r[k]);
+  const created = str(pick('created_at')) || str(pick('updated_at')) || new Date(0).toISOString();
+  const color = pick('color');
+  const labels = pick('labels');
+  const device = pick('last_device');
+  return {
+    id,
+    user_id: str(pick('user_id')),
+    title: str(pick('title')),
+    content: str(pick('content')),
+    color: STICKY_COLORS.includes(color as StickyColor) ? (color as StickyColor) : 'yellow',
+    labels: Array.isArray(labels) ? labels.filter((l): l is string => typeof l === 'string' && l !== '') : [],
+    is_pinned: pick('is_pinned') === true,
+    is_archived: pick('is_archived') === true,
+    deleted_at: str(pick('deleted_at')) || null,
+    sort_order: typeof pick('sort_order') === 'number' ? (pick('sort_order') as number) : 0,
+    version: typeof pick('version') === 'number' ? (pick('version') as number) : 1,
+    last_device: typeof device === 'string' && device ? (device as StickyDevice) : null,
+    created_at: created,
+    updated_at: str(pick('updated_at')) || created,
+  };
+}
+
+/** Chuẩn hoá cả danh sách, bỏ mục hỏng / trùng id. */
+export function normalizeStickyNotes(list: unknown): StickyNote[] {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set<string>();
+  const out: StickyNote[] = [];
+  for (const item of list) {
+    const note = normalizeStickyNote(item);
+    if (note && !seen.has(note.id)) { seen.add(note.id); out.push(note); }
+  }
+  return out;
+}
+
 export const stickyNoteService = {
   // ── Cache ────────────────────────────────
   readCache(userId: string): StickyNote[] {
-    const notes = safeGet<StickyNote[]>(`${CACHE_PREFIX}${userId}`, []);
-    return Array.isArray(notes) ? notes : [];
+    return normalizeStickyNotes(safeGet<unknown>(`${CACHE_PREFIX}${userId}`, []));
   },
 
   writeCache(userId: string, notes: StickyNote[]) {
     safeSet(`${CACHE_PREFIX}${userId}`, notes);
+  },
+
+  /** Xoá bản lưu tạm (không đụng outbox — thay đổi chưa gửi vẫn được đẩy lên lần mở sau). */
+  clearCache(userId: string) {
+    try { localStorage.removeItem(`${CACHE_PREFIX}${userId}`); } catch { /* bỏ qua */ }
   },
 
   // ── Outbox (thay đổi chờ đẩy lên khi có mạng) ──
@@ -262,7 +314,7 @@ export const stickyNoteService = {
         .order('id', { ascending: true })
         .range(from, from + PAGE - 1);
       if (error) throw error;
-      all.push(...((data || []) as StickyNote[]));
+      all.push(...normalizeStickyNotes(data));
       if (!data || data.length < PAGE) return all;
     }
   },
@@ -274,7 +326,7 @@ export const stickyNoteService = {
       .select()
       .single();
     if (error) throw error;
-    return data as StickyNote;
+    return normalizeStickyNote(data, note) as StickyNote;
   },
 
   async update(userId: string, id: string, patch: StickyNotePatch): Promise<StickyNote> {
@@ -286,7 +338,9 @@ export const stickyNoteService = {
       .select()
       .single();
     if (error) throw error;
-    return data as StickyNote;
+    const row = normalizeStickyNote(data);
+    if (!row) throw new Error('Máy chủ trả về ghi chú không hợp lệ');
+    return row;
   },
 
   async deleteForever(userId: string, id: string): Promise<void> {
