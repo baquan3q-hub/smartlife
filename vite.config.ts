@@ -495,7 +495,7 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         injectRegister: null, // Disable auto-registration to avoid conflict with firebase-messaging-sw.js
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,lottie}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,lottie}', 'icons/glass/*-sm.webp'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit
           runtimeCaching: [
             {

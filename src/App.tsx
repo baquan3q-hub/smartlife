@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, CalendarDays, Wallet as WalletIcon, LogOut, Loader2, Settings, TimerIcon, Music, GraduationCap, ShieldAlert, ChevronLeft, ChevronRight, Menu, Crown, Flame, BookOpen, Target, Grid2X2, StickyNote as StickyNoteIcon } from 'lucide-react';
+import { LogOut, Loader2, TimerIcon, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
+import { GlassIcon, type GlassIconName } from './components/icons/GlassIcon';
 import { NotificationPopupModal } from './components/NotificationPopupModal';
 import { getUnreadCount, getUserNotifications } from './services/adminNotificationService';
 
@@ -323,10 +324,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
     // Fixed mobile navbar tabs (4 items only)
     const MOBILE_NAV_TABS = [
-        { id: 'visual', labelVi: 'Tổng quan', labelEn: 'Overview', labelKo: '개요', icon: LayoutDashboard, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', icon: WalletIcon, color: 'text-blue-900', bg: 'bg-blue-50' },
-        { id: 'schedule', labelVi: 'Lịch trình', labelEn: 'Schedule', labelKo: '일정', icon: CalendarDays, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { id: 'expand', labelVi: 'Mở rộng', labelEn: 'More', labelKo: '더보기', icon: Grid2X2, color: 'text-violet-600', bg: 'bg-violet-50' },
+        { id: 'visual', labelVi: 'Tổng quan', labelEn: 'Overview', labelKo: '개요', glass: 'overview' as GlassIconName, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { id: 'finance', labelVi: 'Tài chính', labelEn: 'Finance', labelKo: '재정', glass: 'finance' as GlassIconName, color: 'text-blue-900', bg: 'bg-blue-50' },
+        { id: 'schedule', labelVi: 'Lịch trình', labelEn: 'Schedule', labelKo: '일정', glass: 'schedule' as GlassIconName, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { id: 'expand', labelVi: 'Mở rộng', labelEn: 'More', labelKo: '더보기', glass: 'more' as GlassIconName, color: 'text-violet-600', bg: 'bg-violet-50' },
     ];
 
     // Pro Subscription State
@@ -2131,42 +2132,42 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                     </button>
 
                     <button onClick={() => setActiveTab('visual')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'visual' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.overview', lang) : ''}>
-                        <LayoutDashboard size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.overview', lang)}</span>}
+                        <GlassIcon name="overview" size={22} muted={activeTab !== 'visual'} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.overview', lang)}</span>}
                     </button>
                     <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'finance' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.finance', lang) : ''}>
-                        <WalletIcon size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.finance', lang)}</span>}
+                        <GlassIcon name="finance" size={22} muted={activeTab !== 'finance'} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.finance', lang)}</span>}
                     </button>
                     <button onClick={() => setActiveTab('schedule')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'schedule' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.schedule_goals', lang) : ''}>
-                        <CalendarDays size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.schedule_goals', lang)}</span>}
+                        <GlassIcon name="schedule" size={22} muted={activeTab !== 'schedule'} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.schedule_goals', lang)}</span>}
                     </button>
                     <button onClick={() => setActiveTab('habit')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'habit' ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.habit', lang) : ''}>
-                        <Flame size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.habit', lang)}</span>}
+                        <GlassIcon name="habit" size={22} muted={activeTab !== 'habit'} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.habit', lang)}</span>}
                     </button>
                     <button onClick={() => setActiveTab('journal')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'journal' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? t('tab.journal', lang) : ''}>
-                        <BookOpen size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.journal', lang)}</span>}
+                        <GlassIcon name="journal" size={22} muted={activeTab !== 'journal'} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('tab.journal', lang)}</span>}
                         {!proAccess.hasAccess && !isSidebarCollapsed && <span className="ml-auto text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded font-bold">PRO</span>}
                     </button>
                     <button onClick={() => setActiveTab('gpa')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'gpa' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'GPA' : ''}>
-                        <GraduationCap size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">GPA</span>}
+                        <GlassIcon name="gpa" size={22} muted={activeTab !== 'gpa'} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">GPA</span>}
                     </button>
                     <button onClick={() => setActiveTab('goals')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'goals' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Mục tiêu' : ''}>
-                        <Target size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Mục tiêu</span>}
+                        <GlassIcon name="goals" size={22} muted={activeTab !== 'goals'} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Mục tiêu</span>}
                     </button>
                     <button onClick={() => setActiveTab('sticky')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-medium text-sm ${activeTab === 'sticky' ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`} title={isSidebarCollapsed ? 'Sticky Notes' : ''}>
-                        <StickyNoteIcon size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Sticky Notes</span>}
+                        <GlassIcon name="sticky" size={22} muted={activeTab !== 'sticky'} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Sticky Notes</span>}
                     </button>
 
                     {/* Admin Panel Toggle */}
                     {user?.email === 'baquan3q@gmail.com' && (
                         <button onClick={() => setActiveTab('admin')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-bold text-sm ${activeTab === 'admin' ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-gray-50 hover:text-red-500'}`} title={isSidebarCollapsed ? 'Admin Panel' : ''}>
-                            <ShieldAlert size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Admin Panel</span>}
+                            <GlassIcon name="admin" size={22} muted={activeTab !== 'admin'} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Admin Panel</span>}
                         </button>
                     )}
 
                     {/* Pro Upgrade Button */}
                     {!proAccess.isProActive && !proAccess.isLifetime && (
                         <button onClick={handleOpenPricing} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3.5 rounded-xl transition-all font-semibold text-sm bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 hover:from-indigo-100 hover:to-purple-100 border border-indigo-100`} title={isSidebarCollapsed ? t('sidebar.upgrade_pro', lang) : ''}>
-                            <Crown size={20} className="shrink-0 text-yellow-500" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('sidebar.upgrade_pro', lang)}</span>}
+                            <GlassIcon name="pro" size={22} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">{t('sidebar.upgrade_pro', lang)}</span>}
                         </button>
                     )}
 
@@ -2193,10 +2194,10 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
 
                 <div className={`p-4 border-t border-gray-100 space-y-2 ${isSidebarCollapsed ? 'flex flex-col items-center' : ''}`}>
                     <button onClick={() => setIsSpotifyOpen(true)} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-all font-bold text-sm`} title={isSidebarCollapsed ? 'My Spotify' : ''}>
-                        <Music size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">My Spotify</span>}
+                        <GlassIcon name="music" size={22} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">My Spotify</span>}
                     </button>
                     <button onClick={() => setIsSettingsOpen(true)} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-gray-500 hover:text-indigo-600 hover:bg-gray-50 transition-all font-medium text-sm`} title={isSidebarCollapsed ? 'Cài đặt' : ''}>
-                        <Settings size={20} className="shrink-0" /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Cài đặt</span>}
+                        <GlassIcon name="settings" size={22} eager /> {!isSidebarCollapsed && <span className="whitespace-nowrap">Cài đặt</span>}
                     </button>
                 </div>
             </aside>
@@ -2220,31 +2221,31 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                             {/* Habit Shortcut — toggleable in Settings */}
                             {headerShortcuts.habit && (
                                 <button onClick={() => setActiveTab('habit')} className={`p-2 rounded-xl transition-all ${activeTab === 'habit' ? 'text-orange-600 bg-orange-100 dark:bg-orange-950/50' : 'text-orange-500 bg-orange-50/80 dark:bg-slate-800/80 hover:bg-orange-100'}`} title="Thói quen">
-                                    <Flame size={19} />
+                                    <GlassIcon name="habit" size={20} eager />
                                 </button>
                             )}
                             {/* Spotify Shortcut — toggleable in Settings */}
                             {headerShortcuts.spotify && (
                                 <button onClick={() => setIsSpotifyOpen(true)} className="p-2 text-emerald-600 bg-emerald-50/80 dark:bg-slate-800/80 dark:text-emerald-400 hover:bg-emerald-100 rounded-xl transition-colors" title="My Spotify">
-                                    <Music size={19} />
+                                    <GlassIcon name="music" size={20} eager />
                                 </button>
                             )}
                             {/* Admin Panel — always visible for admin */}
                             {user?.email === 'baquan3q@gmail.com' && (
                                 <button onClick={() => setActiveTab('admin')} className={`p-2 rounded-xl transition-colors ${activeTab === 'admin' ? 'text-red-600 bg-red-100 dark:bg-red-950/50' : 'text-red-500 bg-red-50/80 dark:bg-slate-800/80 hover:bg-red-100'}`} title="Admin Panel">
-                                    <ShieldAlert size={19} />
+                                    <GlassIcon name="admin" size={20} eager />
                                 </button>
                             )}
                             {/* Pro Upgrade */}
                             {!proAccess.isProActive && !proAccess.isLifetime && (
                                 <button onClick={handleOpenPricing} className="relative p-2 rounded-xl bg-amber-50/80 dark:bg-slate-800/80 hover:bg-amber-100 transition-colors" title="Nâng cấp Pro">
-                                    <Crown size={19} className="text-amber-500" fill="currentColor" />
+                                    <GlassIcon name="pro" size={20} eager />
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse border-2 border-white dark:border-slate-900" />
                                 </button>
                             )}
                             {/* Settings — always visible */}
                             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 dark:text-slate-400 bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200/80 rounded-xl transition-colors" title="Cài đặt">
-                                <Settings size={19} />
+                                <GlassIcon name="settings" size={20} eager />
                             </button>
                         </div>
                     </div>
@@ -2448,7 +2449,6 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                 <div className="md:hidden fixed bottom-safe-dock left-6 right-6 z-50 max-w-lg mx-auto transform-gpu">
                     <nav className="bg-card/90 backdrop-blur-xl border border-border flex justify-between items-center rounded-full h-[68px] shadow-[0_10px_35px_rgba(56,189,248,0.15)] px-3 py-1.5">
                         {MOBILE_NAV_TABS.map(tab => {
-                            const IconComponent = tab.icon;
                             const isActive = activeTab === tab.id;
                             const activeColorClass = tab.color;
                             const activeBgClass = tab.bg;
@@ -2463,7 +2463,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                                             : 'px-3 py-2 text-gray-400 active:text-gray-600 active:bg-gray-50/20'
                                         }`}
                                 >
-                                    <IconComponent size={22} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 transition-transform duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) ${isActive && tab.id === 'expand' ? 'rotate-90' : ''}`} />
+                                    <GlassIcon name={tab.glass} size={26} muted={!isActive} eager className={`transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
                                     <span
                                         className={`text-[12px] font-bold tracking-tight transition-all duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) overflow-hidden whitespace-nowrap ${isActive ? 'max-w-[100px] opacity-100 ml-2.5' : 'max-w-0 opacity-0 ml-0'
                                             }`}

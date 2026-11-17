@@ -48,3 +48,6 @@ public/music/chill-music.mp3
 # Tauri (bản Windows)
 src-tauri/target
 src-tauri/gen
+
+# Glass 3D icon sources (377MB). Only the exported WebP in public/icons/glass is committed.
+Glass_3D_Icons/
