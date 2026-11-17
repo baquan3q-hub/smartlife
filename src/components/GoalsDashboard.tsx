@@ -16,6 +16,7 @@ import {
   AlertCircle, Star, Move, ArrowUp, ArrowDown, Sparkles, CheckSquare, Square,
   Loader2, FileText, Compass, Tag
 } from 'lucide-react';
+import { GlassIcon } from './icons/GlassIcon';
 import ConfirmModal from './ConfirmModal';
 import { CVBuilder } from './CVBuilder.tsx'; // Named import from CVBuilder.tsx
 
@@ -755,7 +756,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
 
           {positions.length === 0 ? (
              <div className="bg-white rounded-2xl border border-dashed border-gray-200 py-16 px-4 text-center">
-               <Target size={48} className="mx-auto text-gray-300 mb-4" />
+               <GlassIcon name="goals" size={72} className="mx-auto mb-4" />
                <p className="text-gray-600 font-bold">Chưa có vị trí nghề nghiệp nào</p>
                <p className="text-gray-400 text-sm mt-1 mb-6 max-w-md mx-auto">
                  Hãy xác định vị trí bạn đang theo đuổi để lập lộ trình học tập, hoặc sử dụng AI để phân tích GPA và tính cách để gợi ý cho bạn.
@@ -995,7 +996,7 @@ const GoalsDashboard: React.FC<GoalsDashboardProps> = ({
           {/* Life Goals List */}
           {lifeGoals.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-gray-200 py-16 px-4 text-center">
-              <Star size={40} className="mx-auto text-gray-300 mb-3" />
+              <GlassIcon name="flag" size={64} className="mx-auto mb-3" />
               <p className="text-gray-600 font-bold">Chưa có mục tiêu 5 năm nào</p>
               <p className="text-gray-400 text-sm mt-1 mb-6">Mục tiêu dài hạn của bạn là gì? (Ví dụ: 💍 Cưới vợ, 🚗 Mua xe, 💰 Lương 100tr...)</p>
               <button

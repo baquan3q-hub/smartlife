@@ -10,6 +10,7 @@ import {
     CheckCircle2, AlertCircle, History, X, Plus, Trash2, GraduationCap,
     Heart, Pin, Copy, Check, Download, FileText, LayoutGrid, Mic, MicOff, Zap, Square
 } from 'lucide-react';
+import { GlassIcon } from './icons/GlassIcon';
 
 import { AppState, TransactionType } from '../types';
 import { generateQuickInsight, getCurrentModel, type ChatMessage } from '../services/geminiService';
@@ -1196,8 +1197,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             <ArrowLeft size={18} />
                         </button>
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-100">
-                                <Brain size={16} className="text-white" />
+                            <div className="w-9 h-9 flex items-center justify-center">
+                                <GlassIcon name="ai" size={34} eager />
                             </div>
                             <div>
                                 <h1 className="font-bold text-gray-800 text-sm leading-tight">SmartLife AI Advisor</h1>

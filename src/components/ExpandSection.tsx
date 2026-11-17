@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import {
-    GraduationCap, Target, Music, BookOpen, Flame, Settings,
-    QrCode, CreditCard, Contact, Camera, Trash2, X, Sparkles, Plus, Eye, Loader2, StickyNote
+    QrCode, CreditCard, Contact, Camera, Trash2, X, Sparkles, Plus, Eye, Loader2
 } from 'lucide-react';
+import { GlassIcon, type GlassIconName } from './icons/GlassIcon';
 import { supabase } from '../services/supabase';
 import { Profile } from '../types';
 
@@ -20,7 +20,7 @@ const EXPAND_ITEMS = [
         id: 'sticky',
         label: 'Sticky Notes',
         desc: 'Ghi nhanh, đồng bộ mọi thiết bị, AI tách task',
-        icon: StickyNote,
+        glass: "sticky" as GlassIconName,
         gradient: 'from-amber-400 to-yellow-500',
         bg: 'bg-amber-50',
         iconColor: 'text-amber-600',
@@ -31,7 +31,7 @@ const EXPAND_ITEMS = [
         id: 'gpa',
         label: 'Điểm GPA',
         desc: 'Theo dõi điểm số & kế hoạch học tập',
-        icon: GraduationCap,
+        glass: "gpa" as GlassIconName,
         gradient: 'from-blue-500 to-indigo-600',
         bg: 'bg-blue-50',
         iconColor: 'text-blue-600',
@@ -42,7 +42,7 @@ const EXPAND_ITEMS = [
         id: 'goals',
         label: 'Mục tiêu',
         desc: 'Quản lý mục tiêu & lộ trình sự nghiệp',
-        icon: Target,
+        glass: "goals" as GlassIconName,
         gradient: 'from-purple-500 to-violet-600',
         bg: 'bg-purple-50',
         iconColor: 'text-purple-600',
@@ -53,7 +53,7 @@ const EXPAND_ITEMS = [
         id: 'spotify',
         label: 'My Spotify',
         desc: 'Nghe nhạc & quản lý playlist cá nhân',
-        icon: Music,
+        glass: "music" as GlassIconName,
         gradient: 'from-emerald-500 to-green-600',
         bg: 'bg-emerald-50',
         iconColor: 'text-emerald-600',
@@ -64,7 +64,7 @@ const EXPAND_ITEMS = [
         id: 'journal',
         label: 'Nhật ký',
         desc: 'Ghi chép suy nghĩ & theo dõi cảm xúc',
-        icon: BookOpen,
+        glass: "journal" as GlassIconName,
         gradient: 'from-amber-400 to-orange-500',
         bg: 'bg-amber-50',
         iconColor: 'text-amber-600',
@@ -75,7 +75,7 @@ const EXPAND_ITEMS = [
         id: 'habit',
         label: 'Thói quen',
         desc: 'Xây dựng & duy trì thói quen hàng ngày',
-        icon: Flame,
+        glass: "habit" as GlassIconName,
         gradient: 'from-orange-500 to-red-500',
         bg: 'bg-orange-50',
         iconColor: 'text-orange-600',
@@ -86,7 +86,7 @@ const EXPAND_ITEMS = [
         id: 'settings',
         label: 'Cài đặt',
         desc: 'Tùy chỉnh hồ sơ & cấu hình ứng dụng',
-        icon: Settings,
+        glass: "settings" as GlassIconName,
         gradient: 'from-gray-500 to-slate-600',
         bg: 'bg-gray-50',
         iconColor: 'text-gray-600',
@@ -425,15 +425,14 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
 
                     <div className="grid grid-cols-3 gap-3">
                         {EXPAND_ITEMS.map((item) => {
-                            const IconComponent = item.icon;
                             return (
                                 <button
                                     key={item.id}
                                     onClick={() => handleItemClick(item)}
                                     className={`flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-white hover:shadow-md ${item.shadowColor} transition-all duration-200 active:scale-95 group relative overflow-hidden`}
                                 >
-                                    <div className={`w-11 h-11 rounded-2xl ${item.bg} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
-                                        <IconComponent size={20} className={`${item.iconColor}`} strokeWidth={2.2} />
+                                    <div className={`w-12 h-12 rounded-2xl ${item.bg} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
+                                        <GlassIcon name={item.glass} size={36} />
                                     </div>
                                     <span className="text-[10px] font-bold text-gray-800 text-center leading-tight tracking-tight">
                                         {item.label}
