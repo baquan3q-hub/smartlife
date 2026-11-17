@@ -4,6 +4,7 @@ import { GoogleTasksIcon } from '../../icons/GoogleTasksIcon';
 import { GoogleSheetsIcon } from '../../icons/GoogleSheetsIcon';
 import { LandingCopy } from '../i18n';
 import { marquee } from '../data';
+import { GlassIcon } from '../../icons/GlassIcon';
 import { Reveal } from '../motion/Reveal';
 
 interface SyncStripProps {
@@ -42,7 +43,7 @@ export const SyncStrip: React.FC<SyncStripProps> = ({ c, scrollTo }) => (
                         onClick={() => scrollTo(m.target)}
                         className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-zinc-900/[0.08] bg-white px-4 py-2 text-sm font-medium text-zinc-600 transition-all duration-300 hover:-translate-y-0.5 hover:border-zinc-900/20 hover:text-zinc-950 hover:shadow-[0_6px_16px_-8px_rgba(0,0,0,0.2)]"
                     >
-                        <m.icon size={15} className="text-zinc-400" />
+                        <GlassIcon name={m.icon} size={22} />
                         {c.marquee[m.key]}
                     </button>
                 ))}
