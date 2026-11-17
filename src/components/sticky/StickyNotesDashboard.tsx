@@ -18,6 +18,7 @@ import { AISuggestedTask } from '../../services/stickyNoteAIService';
 import { StickyNoteCard, StickyView } from './StickyNoteCard';
 import { StickyNoteRow } from './StickyNoteRow';
 import { StickyMobileEditor } from './StickyMobileEditor';
+import { StickyWindowsAppBanner, isWindowsBrowser, isWindowsAppBannerDismissed } from './StickyWindowsAppBanner';
 import { StickyHistoryModal } from './StickyHistoryModal';
 import { StickyAIPanel } from './StickyAIPanel';
 import { STICKY_THEME } from './stickyTheme';
@@ -258,6 +259,10 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
   const historyNote = notes.find(n => n.id === historyNoteId) || null;
   const aiNote = notes.find(n => n.id === aiNoteId) || null;
   const showDesktopPromo = !desktop && detectDevice() === 'web';
+  // Windows + trình duyệt (hay bản cài PWA): báo rõ ở đầu trang thay cho dòng giới thiệu cuối trang
+  const [windowsBannerOpen, setWindowsBannerOpen] = useState(
+    () => showDesktopPromo && isWindowsBrowser() && !isWindowsAppBannerDismissed(),
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-2 md:px-4 pb-24">
@@ -309,6 +314,8 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
           </button>
         </div>
       </div>
+
+      {windowsBannerOpen && <StickyWindowsAppBanner onDismiss={() => setWindowsBannerOpen(false)} />}
 
       {needsSetup && (
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-4 text-sm text-amber-800 dark:text-amber-200">
@@ -451,7 +458,7 @@ const StickyNotesDashboard: React.FC<Props> = ({ userId, hasAIAccess, onUpgrade,
         </div>
       )}
 
-      {showDesktopPromo && (
+      {showDesktopPromo && !windowsBannerOpen && (
         <a
           href={DESKTOP_RELEASES_URL}
           target="_blank"
