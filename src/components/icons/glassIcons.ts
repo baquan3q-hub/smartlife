@@ -43,6 +43,8 @@ export const GLASS_ICONS = {
     card: '052-bank-card',
     coins: '054-coins',
     lesson: '063-lesson',
+    book: '061-book',
+    flag: '075-flag',
 } as const;
 
 export type GlassIconName = keyof typeof GLASS_ICONS;

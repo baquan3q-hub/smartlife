@@ -1,6 +1,7 @@
 // File: src/components/ProGateOverlay.tsx
 import React from 'react';
 import { Lock, Crown, Sparkles, CalendarDays, Brain, LayoutDashboard, Flame, Star, Zap, TrendingUp, Trophy, BookOpen, Briefcase, FileText, Target } from 'lucide-react';
+import { GlassIcon } from './icons/GlassIcon';
 
 interface ProGateOverlayProps {
   featureName: string;
@@ -21,8 +22,8 @@ const ProGateOverlay: React.FC<ProGateOverlayProps> = ({ featureName, featureIco
           {/* Lock Icon */}
           <div className="relative mx-auto w-20 h-20 mb-6">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl rotate-6 opacity-20" />
-            <div className="relative w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
-              <Lock size={32} className="text-white" />
+            <div className="relative w-full h-full bg-white border border-indigo-100 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
+              <GlassIcon name="storage" size={52} />
             </div>
           </div>
 

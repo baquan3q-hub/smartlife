@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AppState, TransactionType } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
 import { TrendingUp, Activity, ArrowLeft } from 'lucide-react';
+import { GlassIcon } from './icons/GlassIcon';
 import { Lang } from '../i18n/i18n';
 
 const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#14B8A6', '#F97316', '#64748B'];
@@ -149,6 +150,7 @@ const CashFlowDashboard: React.FC<CashFlowDashboardProps> = ({ state, lang, onBa
                 <button onClick={onBack} className="p-2 bg-white rounded-xl shadow-sm border border-gray-100 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
                     <ArrowLeft size={20} />
                 </button>
+                <GlassIcon name="cashflow" size={44} />
                 <div>
                     <h2 className="text-2xl font-bold text-gray-800">{t.cashFlow}</h2>
                     <p className="text-gray-400 text-sm">{t.cashFlowDesc}</p>

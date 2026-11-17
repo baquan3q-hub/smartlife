@@ -10,6 +10,7 @@ import {
   LEVELS, CATEGORY_INFO,
 } from '../services/starBrainService';
 import { Star, Gift, Clock, Plus, X, Trash2, ShoppingBag, History, TrendingUp, Sparkles, ChevronRight } from 'lucide-react';
+import { GlassIcon } from './icons/GlassIcon';
 import ConfirmModal from './ConfirmModal';
 
 interface Props { userId: string; }
@@ -279,7 +280,7 @@ const StarBrainDashboard: React.FC<Props> = ({ userId }) => {
           <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><ShoppingBag size={18} className="text-purple-500" /> Lịch sử đổi thưởng</h3>
           {redemptions.length === 0 ? (
             <div className="text-center py-8">
-              <Gift size={40} className="mx-auto text-gray-200 mb-3" />
+              <GlassIcon name="gift" size={64} className="mx-auto mb-3" />
               <p className="text-gray-400 text-sm">Chưa đổi thưởng nào</p>
               <p className="text-gray-300 text-xs mt-1">Tích sao và đổi phần thưởng bạn xứng đáng!</p>
             </div>

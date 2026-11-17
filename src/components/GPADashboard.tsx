@@ -10,6 +10,7 @@ import {
   History, LineChart as LineChartIcon, Eye, Target, Zap, Star, ArrowRight,
   Briefcase
 } from 'lucide-react';
+import { GlassIcon } from './icons/GlassIcon';
 import { GPACareerTab } from './GPACareerTab';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -409,7 +410,7 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
           {/* Header gradient */}
           <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600 p-8 text-white text-center">
             <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <GraduationCap size={40} className="text-white" />
+              <GlassIcon name="gpa" size={60} />
             </div>
             <h2 className="text-2xl font-bold mb-2">Chào mừng đến với GPA Tracker!</h2>
             <p className="text-white/80 text-sm">Hãy bắt đầu bằng cách thêm học kỳ đầu tiên</p>
@@ -816,7 +817,7 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
                 </>
               ) : (
                 <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
-                  <GraduationCap size={48} className="mx-auto text-gray-300 mb-4" />
+                  <GlassIcon name="gpa" size={72} className="mx-auto mb-4" />
                   <p className="text-gray-400 font-medium">Chọn một học kỳ từ sidebar hoặc tạo mới</p>
                 </div>
               )}
@@ -1113,7 +1114,7 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
 
               {semestersComputed.length === 0 && (
                 <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
-                  <History size={48} className="mx-auto text-gray-300 mb-4" />
+                  <GlassIcon name="lesson" size={72} className="mx-auto mb-4" />
                   <p className="text-gray-400 font-medium">Chưa có lịch sử học kỳ</p>
                 </div>
               )}
@@ -1324,7 +1325,7 @@ const CourseTable: React.FC<{
   if (courses.length === 0) {
     return (
       <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center">
-        <BookOpen size={36} className="mx-auto text-gray-300 mb-3" />
+        <GlassIcon name="book" size={56} className="mx-auto mb-3" />
         <p className="text-gray-400 font-medium">Chưa có môn học nào</p>
         <p className="text-gray-400 text-xs mt-1">Nhấn "Thêm môn" để bắt đầu nhập điểm</p>
       </div>
@@ -1854,7 +1855,7 @@ const GPATargetPanel: React.FC<{
       {/* No data state */}
       {!hasCalculated && (
         <div className="bg-white rounded-2xl border-2 border-dashed border-blue-200 p-12 text-center">
-          <Target size={48} className="mx-auto text-blue-300 mb-4" />
+          <GlassIcon name="goals" size={72} className="mx-auto mb-4" />
           <p className="text-gray-500 font-medium mb-2">Chưa đặt mục tiêu GPA</p>
           <p className="text-gray-400 text-sm">Chọn nhanh hoặc nhập GPA mong muốn ở trên để bắt đầu phân tích</p>
         </div>
