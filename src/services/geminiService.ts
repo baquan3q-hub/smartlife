@@ -617,6 +617,11 @@ export async function callGeminiRaw(body: object, retryCount = 0, signal?: Abort
             throw new Error(err.message || 'Giới hạn sử dụng AI của bạn đã hết.');
         }
 
+        // Hết credit Google AI (402) hoặc model trả lời quá lâu — thử lại cũng vô ích
+        if (err?.type === 'provider_billing' || err?.type === 'timeout') {
+            throw new Error(err.message || err.error || `Gemini API Error ${status}`);
+        }
+
         // Retry cho lỗi tạm thời (server đã xử lý key rotation) - chỉ retry nếu không phải lỗi quota
         if ((status === 429 || status === 500 || status === 503 || status === 504) && retryCount < 3) {
             console.warn(`[SmartLife] Proxy returned ${status}. Retrying (${retryCount + 1}/3)...`);

@@ -5,6 +5,9 @@
         },
         "api/cron-telegram.js": {
             "maxDuration": 60
+        },
+        "api/gemini.js": {
+            "maxDuration": 60
         }
     },
     "crons": [
@@ -33,6 +36,10 @@
         {
             "source": "/api/gemini",
             "destination": "/api/gemini.js"
+        },
+        {
+            "source": "/api/search",
+            "destination": "/api/gemini?op=search"
         },
         {
             "source": "/api/send-email",
