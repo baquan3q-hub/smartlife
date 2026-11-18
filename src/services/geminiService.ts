@@ -10,6 +10,7 @@ import {
 } from './gpaCalculator';
 import { GRADE_SCALE, SEMESTER_TYPE_LABELS } from '../constants';
 import { supabase } from './supabase';
+import { createSseParser } from './ai/streamParser';
 
 // Habit/event icons are either an emoji or "lucide:<key>" (rendered in the UI only); keep emoji in the AI context.
 const iconText = (icon?: string | null) => (icon && !icon.startsWith('lucide:') ? `${icon} ` : '');
@@ -53,11 +54,23 @@ export interface ChatMessage {
     parts: MessagePart[];
 }
 
+// thought / thoughtSignature: Gemini trả về khi bật suy nghĩ; chữ ký phải gửi lại nguyên vẹn trong cùng lượt gọi hàm
+type PartExtras = { thought?: boolean; thoughtSignature?: string };
+
 export type MessagePart =
-    | { text: string }
-    | { functionCall: { name: string; args: Record<string, any> } }
+    | ({ text: string } & PartExtras)
+    | ({ functionCall: { name: string; args: Record<string, any> } } & PartExtras)
     | { functionResponse: { name: string; response: { result: any } } }
     | { inlineData: { mimeType: string; data: string } };
+
+// Tầng tốc độ gửi lên proxy — server tự chọn model và mức suy nghĩ
+export type AITier = 'fast' | 'balanced' | 'deep';
+
+export interface StreamMeta {
+    model: string;
+    tier: string;
+    weight: number;
+}
 
 export interface ToolDeclaration {
     name: string;
@@ -594,51 +607,151 @@ Hãy đọc thông tin MBTI và DISC của người dùng sau khi gọi công c�
 // ────────────────────────────────────────
 // Core API Call — single model, but cycles API keys on 429
 // ────────────────────────────────────────
-export async function callGeminiRaw(body: object, retryCount = 0, signal?: AbortSignal): Promise<any> {
+async function proxyHeaders(): Promise<Record<string, string>> {
     const { data: { session } } = await supabase.auth.getSession();
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
     }
+    return headers;
+}
 
+// Chờ có thể huỷ (bấm Dừng trong lúc đang chờ thử lại)
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) return reject(new DOMException('Request aborted', 'AbortError'));
+        const timer = setTimeout(resolve, ms);
+        signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new DOMException('Request aborted', 'AbortError'));
+        }, { once: true });
+    });
+}
+
+// Phân loại lỗi HTTP của proxy: trả về 'retry' nếu nên thử lại, còn lại ném lỗi có thông điệp dễ hiểu
+async function handleProxyError(res: Response, retryCount: number): Promise<'retry'> {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+
+    // Nếu là lỗi quota_exceeded từ proxy
+    if (err?.error === 'quota_exceeded' || err?.type?.includes('exceeded') || err?.type?.includes('gate')) {
+        throw new Error(err.message || 'Giới hạn sử dụng AI của bạn đã hết.');
+    }
+
+    // Hết credit Google AI (402) hoặc model trả lời quá lâu — thử lại cũng vô ích
+    if (err?.type === 'provider_billing' || err?.type === 'timeout') {
+        throw new Error(err.message || err.error || `Gemini API Error ${status}`);
+    }
+
+    // Retry cho lỗi tạm thời (server đã xử lý key rotation) - chỉ retry nếu không phải lỗi quota
+    if ((status === 429 || status === 500 || status === 503 || status === 504) && retryCount < 3) {
+        console.warn(`[SmartLife] Proxy returned ${status}. Retrying (${retryCount + 1}/3)...`);
+        return 'retry';
+    }
+
+    if (status === 429) {
+        throw new Error('Hệ thống AI đang bị quá tải (429). Vui lòng đợi một lát rồi thử lại. 🔄');
+    }
+
+    console.error(`[SmartLife] Proxy Error ${status}:`, err);
+    throw new Error(err?.error || `Gemini API Error ${status}`);
+}
+
+export async function callGeminiRaw(body: object, retryCount = 0, signal?: AbortSignal): Promise<any> {
     const res = await fetch(GEMINI_PROXY_URL, {
         method: 'POST',
-        headers,
+        headers: await proxyHeaders(),
         body: JSON.stringify(body),
         signal,
     });
 
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        const status = res.status;
-
-        // Nếu là lỗi quota_exceeded từ proxy
-        if (err?.error === 'quota_exceeded' || err?.type?.includes('exceeded') || err?.type?.includes('gate')) {
-            throw new Error(err.message || 'Giới hạn sử dụng AI của bạn đã hết.');
-        }
-
-        // Hết credit Google AI (402) hoặc model trả lời quá lâu — thử lại cũng vô ích
-        if (err?.type === 'provider_billing' || err?.type === 'timeout') {
-            throw new Error(err.message || err.error || `Gemini API Error ${status}`);
-        }
-
-        // Retry cho lỗi tạm thời (server đã xử lý key rotation) - chỉ retry nếu không phải lỗi quota
-        if ((status === 429 || status === 500 || status === 503 || status === 504) && retryCount < 3) {
-            console.warn(`[SmartLife] Proxy returned ${status}. Retrying (${retryCount + 1}/3)...`);
-            const delay = 2000 * (retryCount + 1);
-            await new Promise(r => setTimeout(r, delay));
-            return callGeminiRaw(body, retryCount + 1, signal);
-        }
-
-        if (status === 429) {
-            throw new Error('Hệ thống AI đang bị quá tải (429). Vui lòng đợi một lát rồi thử lại. 🔄');
-        }
-
-        console.error(`[SmartLife] Proxy Error ${status}:`, err);
-        throw new Error(err?.error || `Gemini API Error ${status}`);
+        await handleProxyError(res, retryCount);
+        await abortableDelay(2000 * (retryCount + 1), signal);
+        return callGeminiRaw(body, retryCount + 1, signal);
     }
 
     return await res.json();
+}
+
+export interface StreamCallbacks {
+    signal?: AbortSignal;
+    onMeta?: (meta: StreamMeta) => void;
+    /** Mỗi gói JSON của Gemini (đã parse) — dùng để hiện chữ / suy nghĩ ngay khi tới */
+    onChunk?: (chunk: any) => void;
+}
+
+// Gọi proxy với stream: true (Server-Sent Events). Chỉ thử lại khi stream CHƯA bắt đầu;
+// lỗi giữa chừng (event: error) được ném ra để phía trên giữ phần chữ đã nhận.
+export async function streamGeminiRaw(body: object, cb: StreamCallbacks = {}, retryCount = 0): Promise<{ meta: StreamMeta | null; usageMetadata: any }> {
+    const { signal, onMeta, onChunk } = cb;
+    const res = await fetch(GEMINI_PROXY_URL, {
+        method: 'POST',
+        headers: await proxyHeaders(),
+        body: JSON.stringify({ ...body, stream: true }),
+        signal,
+    });
+
+    if (!res.ok) {
+        await handleProxyError(res, retryCount);
+        await abortableDelay(2000 * (retryCount + 1), signal);
+        return streamGeminiRaw(body, cb, retryCount + 1);
+    }
+
+    let meta: StreamMeta | null = null;
+    let usageMetadata: any = null;
+
+    // Proxy cũ / môi trường không stream được → trả JSON thường, coi như một gói duy nhất
+    const contentType = res.headers.get('Content-Type') || '';
+    if (!contentType.includes('text/event-stream') || !res.body) {
+        const data = await res.json();
+        const model = res.headers.get('X-SmartLife-Model');
+        if (model) {
+            meta = { model, tier: res.headers.get('X-SmartLife-Tier') || 'legacy', weight: Number(res.headers.get('X-SmartLife-Weight') || 1) };
+            onMeta?.(meta);
+        }
+        onChunk?.(data);
+        return { meta, usageMetadata: data?.usageMetadata ?? null };
+    }
+
+    let streamError: Error | null = null;
+    const parser = createSseParser(({ event, data }) => {
+        let payload: any;
+        try {
+            payload = JSON.parse(data);
+        } catch {
+            return;
+        }
+        if (event === 'meta') {
+            meta = payload;
+            onMeta?.(payload);
+        } else if (event === 'error') {
+            streamError = new Error(payload?.message || payload?.error || 'Mất kết nối với AI giữa chừng.');
+        } else if (event === 'done') {
+            if (payload?.usageMetadata) usageMetadata = payload.usageMetadata;
+        } else {
+            if (payload?.usageMetadata) usageMetadata = payload.usageMetadata;
+            onChunk?.(payload);
+        }
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            parser.push(decoder.decode(value, { stream: true }));
+            if (streamError) break;
+        }
+        parser.push(decoder.decode());
+        parser.flush();
+    } finally {
+        reader.releaseLock?.();
+    }
+
+    if (streamError) throw streamError;
+    return { meta, usageMetadata };
 }
 
 // Helper to estimate token usage cost in VND

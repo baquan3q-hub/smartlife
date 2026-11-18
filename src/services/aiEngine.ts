@@ -4,14 +4,16 @@
 
 import { supabase } from './supabase';
 import {
-    callGeminiRaw, enqueue, buildFullContext, buildFullContextAsync,
+    callGeminiRaw, streamGeminiRaw, enqueue, buildFullContext, buildFullContextAsync,
     buildProfileContext, buildFinanceContext, buildGoalsContext,
     buildScheduleContext, buildGPAContext, buildHabitContext,
     buildCountdownContext, buildJournalContext,
     SYSTEM_INSTRUCTION,
     estimateGeminiCost,
-    type ChatMessage, type MessagePart, type ToolDeclaration
+    type ChatMessage, type MessagePart, type ToolDeclaration, type AITier, type StreamMeta
 } from './geminiService';
+import { createResponseAccumulator } from './ai/streamParser';
+import { describeToolCall, describeToolResult } from './ai/toolLabels';
 import { AppState } from '../types';
 import {
     computeAllCourses, calculateSemesterGPA, calculateCumulativeGPA,
@@ -35,12 +37,50 @@ export interface ActionResult {
     data?: any;
 }
 
+// Một bước AI làm trong lúc trả lời (gọi công cụ) — hiện trong ThinkingPanel
+export interface AIStep {
+    id: string;
+    tool: string;
+    label: string;
+    status: 'running' | 'done' | 'error';
+    detail?: string;
+    startedAt: number;
+    endedAt?: number;
+}
+
+// Thông tin về một lượt trả lời, lưu vào ai_messages.meta
+export interface AIRunMeta {
+    model?: string;
+    tier?: string;
+    weight?: number;
+    thoughts?: string;
+    steps?: AIStep[];
+    durationMs?: number;
+    stopped?: boolean;
+    error?: string;
+}
+
+// Sự kiện engine phát ra trong lúc trả lời để UI hiện ngay
+export type AIStreamEvent =
+    | { type: 'meta'; meta: StreamMeta }
+    | { type: 'text'; delta: string }
+    | { type: 'thought'; delta: string }
+    | { type: 'step'; step: AIStep }
+    | { type: 'chart'; chart: ChartData }
+    | { type: 'action'; action: ActionResult };
+
+export interface ChatOptions {
+    tier?: AITier;
+    onEvent?: (event: AIStreamEvent) => void;
+}
+
 export interface AIResponse {
     text: string;
     charts: ChartData[];
     actions: ActionResult[];
     updatedHistory?: ChatMessage[];
     tokens_used?: number;
+    meta?: AIRunMeta;
 }
 
 // Action handlers passed from App.tsx
@@ -550,7 +590,13 @@ async function executeQueryDatabase(args: any): Promise<any> {
 
     const { data, error } = await query;
     if (error) {
-        return { error: error.message, count: 0 };
+        // Model hay đoán tên cột (vd. goals.category) → PostgREST trả 400; gợi ý cách xem cột thật để tự sửa
+        const badColumn = error.code === '42703' || /column .* does not exist/i.test(error.message || '');
+        return {
+            error: error.message,
+            count: 0,
+            ...(badColumn ? { hint: `Bảng ${table} không có cột đó. Gọi lại với limit=1, không filters, để xem các cột có thật rồi lọc lại.` } : {}),
+        };
     }
     return { data, count: data?.length || 0 };
 }
@@ -1102,13 +1148,16 @@ async function executeBatchAddTransactions(
 // ────────────────────────────────────────
 // Main Orchestrator — Chat with Function Calling loop
 // ────────────────────────────────────────
+// Chỉ giữ chữ người dùng + câu trả lời cuối của AI (bỏ suy nghĩ, chữ ký, lượt gọi hàm) cho lịch sử nhiều lượt
 function cleanChatHistory(contents: ChatMessage[]): ChatMessage[] {
     return contents.map(m => {
         if (m.role === 'user') {
             return m;
         }
         if (m.role === 'model') {
-            const textPartsOnly = m.parts.filter(p => 'text' in p);
+            const textPartsOnly = m.parts
+                .filter((p: any) => typeof p.text === 'string' && p.text && !p.thought)
+                .map((p: any) => ({ text: p.text }));
             if (textPartsOnly.length > 0) {
                 return { role: 'model' as const, parts: textPartsOnly };
             }
@@ -1118,6 +1167,42 @@ function cleanChatHistory(contents: ChatMessage[]): ChatMessage[] {
 }
 
 const MAX_TOOL_CALLS = 10; // Safety limit to prevent infinite loops
+const TOOL_ROUND_GAP_MS = 500; // nghỉ ngắn giữa các vòng gọi công cụ để tránh nghẽn burst (503)
+
+function abortError() {
+    return new DOMException('Request aborted', 'AbortError');
+}
+
+function waitOrAbort(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) return reject(abortError());
+        const timer = setTimeout(resolve, ms);
+        signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(abortError());
+        }, { once: true });
+    });
+}
+
+function logChatTokens(usage: any, model: string) {
+    if (!usage?.totalTokenCount) return;
+    supabase.auth.getUser().then(({ data: authData }) => {
+        const uid = authData?.user?.id;
+        if (!uid) { console.warn('[SmartLife] Token log skipped: no user'); return; }
+        supabase.from('api_logs').insert([{
+            user_id: uid,
+            action: 'chat',
+            tokens_used: usage.totalTokenCount,
+            prompt_tokens: usage.promptTokenCount || 0,
+            candidates_tokens: usage.candidatesTokenCount || 0,
+            thoughts_tokens: usage.thoughtsTokenCount || usage.thinkingTokenCount || 0,
+            estimated_cost_vnd: estimateGeminiCost(usage.promptTokenCount || 0, usage.candidatesTokenCount || 0, model),
+            model
+        }]).then(({ error }) => {
+            if (error) console.error('[SmartLife] ❌ Token log failed:', error.message);
+        });
+    });
+}
 
 export async function chatWithAI(
     history: ChatMessage[],
@@ -1125,8 +1210,14 @@ export async function chatWithAI(
     handlers: ActionHandlers = {},
     memoryContext: string = '',
     attachments?: AIAttachment[],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options: ChatOptions = {}
 ): Promise<AIResponse> {
+    const { tier, onEvent } = options;
+    const emit = (event: AIStreamEvent) => {
+        try { onEvent?.(event); } catch (e) { console.error('[SmartLife AI] onEvent error:', e); }
+    };
+
     const userName = appState.profile?.full_name || 'Người dùng';
     const now = new Date();
     const minimalContext = `\n👤 NGƯỜI DÙNG HIỆN TẠI: ${userName}\n📅 THỜI GIAN HỆ THỐNG: ${now.toLocaleString('vi-VN')} (Thứ ${now.getDay() === 0 ? 'Chủ Nhật' : now.getDay() + 1}, ngày ${now.getDate()} tháng ${now.getMonth() + 1} năm ${now.getFullYear()})`;
@@ -1139,6 +1230,11 @@ export async function chatWithAI(
 
     const charts: ChartData[] = [];
     const actions: ActionResult[] = [];
+    const steps: AIStep[] = [];
+    let thoughts = '';
+    let answer = '';
+    let runModel: StreamMeta | null = null;
+    const startedAt = Date.now();
 
     // Build request with tools
     const buildRequest = (contents: any[]) => ({
@@ -1153,12 +1249,14 @@ export async function chatWithAI(
             { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
             { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
         ],
+        ...(tier ? { tier } : {}),
+        purpose: 'chat',
     });
 
     return enqueue(async () => {
-        // Convert to Gemini format (only user/model roles, skip function roles for initial)
+        // Gemini chỉ nhận vai user/model (họ 3.x từ chối vai 'function') — kết quả công cụ gửi bằng vai user
         let contents: ChatMessage[] = history.map(m => ({
-            role: m.role === 'function' ? 'function' : m.role,
+            role: m.role === 'function' ? 'user' : m.role,
             parts: [...m.parts] // shallow copy to preserve original history parts
         }));
 
@@ -1177,89 +1275,102 @@ export async function chatWithAI(
         }
 
         let toolCallCount = 0;
+        let round = 0;
         let totalTokensConsumed = 0;
 
-        while (toolCallCount < MAX_TOOL_CALLS) {
-            if (signal?.aborted) {
-                throw new DOMException('Request aborted', 'AbortError');
-            }
+        const finish = (text: string): AIResponse => ({
+            text,
+            charts,
+            actions,
+            updatedHistory: cleanChatHistory(contents),
+            tokens_used: totalTokensConsumed,
+            meta: {
+                model: runModel?.model,
+                tier: runModel?.tier,
+                weight: runModel?.weight,
+                thoughts: thoughts || undefined,
+                steps: steps.length ? steps : undefined,
+                durationMs: Date.now() - startedAt,
+            },
+        });
 
-            if (toolCallCount > 0) {
-                // Tránh gọi API liên tục quá nhanh gây nghẽn burst limit (lỗi 503)
-                await new Promise<void>((resolve, reject) => {
-                    const timer = setTimeout(resolve, 1200);
-                    if (signal) {
-                        signal.addEventListener('abort', () => {
-                            clearTimeout(timer);
-                            reject(new DOMException('Request aborted', 'AbortError'));
-                        });
-                    }
-                });
-            }
+        while (toolCallCount < MAX_TOOL_CALLS) {
+            if (signal?.aborted) throw abortError();
+            if (round > 0) await waitOrAbort(TOOL_ROUND_GAP_MS, signal);
 
             const body = {
                 ...buildRequest(contents),
-                isToolCall: toolCallCount > 0
+                isToolCall: round > 0
             };
-            const data = await callGeminiRaw(body, 0, signal);
 
-            // Log token usage with detailed tracking (Phase 1)
-            if (data?.usageMetadata?.totalTokenCount) {
-                totalTokensConsumed += data.usageMetadata.totalTokenCount;
-                supabase.auth.getUser().then(({ data: authData }) => {
-                    const uid = authData?.user?.id;
-                    if (!uid) { console.warn('[SmartLife] Token log skipped: no user'); return; }
-                    supabase.from('api_logs').insert([{
-                        user_id: uid,
-                        action: 'chat',
-                        tokens_used: data.usageMetadata.totalTokenCount,
-                        prompt_tokens: data.usageMetadata.promptTokenCount || 0,
-                        candidates_tokens: data.usageMetadata.candidatesTokenCount || 0,
-                        thoughts_tokens: data.usageMetadata.thoughtsTokenCount || data.usageMetadata.thinkingTokenCount || 0,
-                        estimated_cost_vnd: estimateGeminiCost(data.usageMetadata.promptTokenCount || 0, data.usageMetadata.candidatesTokenCount || 0),
-                        model: 'gemini-2.5-flash'
-                    }]).then(({ error }) => {
-                        if (error) console.error('[SmartLife] ❌ Token log failed:', error.message);
-                        else console.info(`[SmartLife] ✅ Logged ${data.usageMetadata.totalTokenCount} tokens`);
-                    });
+            // Có onEvent → stream để hiện chữ/suy nghĩ ngay; không thì gọi thường như trước
+            let data: any;
+            if (onEvent) {
+                const acc = createResponseAccumulator();
+                let roundHasText = false;
+                let roundHasThought = false;
+                await streamGeminiRaw(body, {
+                    signal,
+                    onMeta: (meta) => {
+                        if (!runModel) {
+                            runModel = meta;
+                            emit({ type: 'meta', meta });
+                        }
+                    },
+                    onChunk: (chunk) => {
+                        const delta = acc.add(chunk);
+                        if (delta.thought) {
+                            const sep = !roundHasThought && thoughts ? '\n\n' : '';
+                            roundHasThought = true;
+                            thoughts += sep + delta.thought;
+                            emit({ type: 'thought', delta: sep + delta.thought });
+                        }
+                        if (delta.text) {
+                            const sep = !roundHasText && answer ? '\n\n' : '';
+                            roundHasText = true;
+                            answer += sep + delta.text;
+                            emit({ type: 'text', delta: sep + delta.text });
+                        }
+                    },
                 });
+                data = acc.result();
+            } else {
+                data = await callGeminiRaw(body, 0, signal);
+                const parts = data?.candidates?.[0]?.content?.parts || [];
+                const roundText = parts.filter((p: any) => typeof p.text === 'string' && !p.thought).map((p: any) => p.text).join('');
+                const roundThought = parts.filter((p: any) => p.thought && p.text).map((p: any) => p.text).join('');
+                if (roundThought) thoughts += (thoughts ? '\n\n' : '') + roundThought;
+                if (roundText) answer += (answer ? '\n\n' : '') + roundText;
+            }
+            round++;
+
+            const usage = data?.usageMetadata;
+            if (usage?.totalTokenCount) {
+                totalTokensConsumed += usage.totalTokenCount;
+                logChatTokens(usage, runModel?.model || 'gemini-2.5-flash');
             }
 
             const candidate = data?.candidates?.[0];
-            
+
             // Kiểm tra trường hợp Prompt bị hệ thống Google chặn ngay lập tức (Safety / Policy Block)
             if (!candidate) {
-                let blockMsg = 'Không nhận được phản hồi từ AI.';
+                let blockMsg = answer || 'Không nhận được phản hồi từ AI.';
                 if (data?.promptFeedback?.blockReason) {
                     blockMsg = `⚠️ Yêu cầu bị hệ thống kiểm duyệt tự động chặn (Lý do: ${data.promptFeedback.blockReason}). Vui lòng điều chỉnh hoặc diễn đạt lại câu hỏi phù hợp hơn.`;
                 }
-                return { text: blockMsg, charts, actions, updatedHistory: cleanChatHistory(contents), tokens_used: totalTokensConsumed };
+                return finish(blockMsg);
             }
 
             // Kiểm tra finishReason của candidate
-            if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-                if (candidate.finishReason === 'SAFETY') {
-                    return {
-                        text: '⚠️ Phản hồi bị chặn bởi bộ lọc an toàn tự động của Google (Lý do: SAFETY). Điều này có thể xảy ra nếu thông tin thói quen, nhật ký hoặc dữ liệu liên quan của bạn có từ ngữ quá nhạy cảm. Vui lòng kiểm tra lại dữ liệu hoặc diễn đạt câu hỏi theo cách khác.',
-                        charts,
-                        actions,
-                        updatedHistory: cleanChatHistory(contents),
-                        tokens_used: totalTokensConsumed
-                    };
-                }
-                if (candidate.finishReason === 'RECITATION') {
-                    return {
-                        text: '⚠️ Phản hồi bị chặn do phát hiện nội dung sao chép tài liệu có bản quyền (Lý do: RECITATION). Vui lòng đặt câu hỏi khác hoặc diễn đạt theo cách khác.',
-                        charts,
-                        actions,
-                        updatedHistory: cleanChatHistory(contents),
-                        tokens_used: totalTokensConsumed
-                    };
-                }
+            if (candidate.finishReason === 'SAFETY') {
+                return finish('⚠️ Phản hồi bị chặn bởi bộ lọc an toàn tự động của Google (Lý do: SAFETY). Điều này có thể xảy ra nếu thông tin thói quen, nhật ký hoặc dữ liệu liên quan của bạn có từ ngữ quá nhạy cảm. Vui lòng kiểm tra lại dữ liệu hoặc diễn đạt câu hỏi theo cách khác.');
+            }
+            if (candidate.finishReason === 'RECITATION') {
+                return finish('⚠️ Phản hồi bị chặn do phát hiện nội dung sao chép tài liệu có bản quyền (Lý do: RECITATION). Vui lòng đặt câu hỏi khác hoặc diễn đạt theo cách khác.');
             }
 
-            if (!candidate.content?.parts) {
-                return { text: 'Không nhận được phản hồi từ AI.', charts, actions, updatedHistory: cleanChatHistory(contents), tokens_used: totalTokensConsumed };
+            if (!candidate.content?.parts?.length) {
+                return finish(answer || 'Không nhận được phản hồi từ AI.');
             }
 
             const responseParts: MessagePart[] = candidate.content.parts;
@@ -1270,192 +1381,210 @@ export async function chatWithAI(
             ) as Array<{ functionCall: { name: string; args: Record<string, any> } }>;
 
             if (functionCalls.length === 0) {
-                // No function calls — extract text and return
+                // No function calls — trả lời xong
                 contents.push({ role: 'model', parts: responseParts });
-                const textParts = responseParts
-                    .filter((p: any) => p.text)
-                    .map((p: any) => p.text);
-                return {
-                    text: textParts.join('\n') || 'Không có phản hồi.',
-                    charts,
-                    actions,
-                    updatedHistory: cleanChatHistory(contents),
-                    tokens_used: totalTokensConsumed
-                };
+                return finish(answer || 'Không có phản hồi.');
             }
 
             // Process each function call
             const functionResponses: any[] = [];
-            
-            // Append the model's function call message to contents
+
+            // Giữ nguyên các phần của model (kể cả thoughtSignature) — họ Gemini 3 bắt buộc khi gửi kết quả hàm
             contents.push({ role: 'model', parts: responseParts });
 
             for (const fc of functionCalls) {
-                const { name, args } = fc.functionCall;
+                if (signal?.aborted) throw abortError();
+                const { name, args = {} } = fc.functionCall;
                 console.info(`[SmartLife AI] Tool call: ${name}`, args);
                 let result: any;
 
-                switch (name) {
-                    case 'query_database':
-                        result = await executeQueryDatabase(args);
-                        break;
-                    case 'add_timetable': {
-                        const actionResult = await executeAddTimetable(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'add_todo': {
-                        const actionResult = await executeAddTodo(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'update_todo': {
-                        const actionResult = await executeUpdateTodo(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'delete_todo': {
-                        const actionResult = await executeDeleteTodo(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'get_bookmarks': {
-                        result = await executeGetBookmarks(appState);
-                        break;
-                    }
-                    case 'add_bookmark': {
-                        const actionResult = await executeAddBookmark(args, appState);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'update_bookmark': {
-                        const actionResult = await executeUpdateBookmark(args, appState);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'delete_bookmark': {
-                        const actionResult = await executeDeleteBookmark(args, appState);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'add_calendar_event': {
-                        const actionResult = await executeAddCalendarEvent(args, appState, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'update_calendar_event': {
-                        const actionResult = await executeUpdateCalendarEvent(args, appState, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'delete_calendar_event': {
-                        const actionResult = await executeDeleteCalendarEvent(args, appState, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'add_transaction': {
-                        const actionResult = await executeAddTransaction(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'render_chart': {
-                        charts.push({
-                            chart_type: args.chartType || args.chart_type || 'bar',
-                            title: args.title,
-                            data: args.data || []
-                        });
-                        result = { success: true, message: `Biểu đồ "${args.title}" đã được tạo và hiển thị cho người dùng.` };
-                        break;
-                    }
-                    case 'calculate_needed_gpa': {
-                        result = executeCalculateNeededGPA(args, appState);
-                        break;
-                    }
-                    case 'simulate_gpa': {
-                        result = executeSimulateGPA(args, appState);
-                        break;
-                    }
-                    case 'batch_add_transactions': {
-                        const actionResult = await executeBatchAddTransactions(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'import_gpa_data': {
-                        if (handlers.onImportGPAData) {
+                const step: AIStep = {
+                    id: `${round}-${steps.length}`,
+                    tool: name,
+                    label: describeToolCall(name, args),
+                    status: 'running',
+                    startedAt: Date.now(),
+                };
+                steps.push(step);
+                emit({ type: 'step', step: { ...step } });
+                const chartsBefore = charts.length;
+                const actionsBefore = actions.length;
+
+                try {
+                    switch (name) {
+                        case 'query_database':
+                            result = await executeQueryDatabase(args);
+                            break;
+                        case 'add_timetable': {
+                            const actionResult = await executeAddTimetable(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'add_todo': {
+                            const actionResult = await executeAddTodo(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'update_todo': {
+                            const actionResult = await executeUpdateTodo(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'delete_todo': {
+                            const actionResult = await executeDeleteTodo(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'get_bookmarks': {
+                            result = await executeGetBookmarks(appState);
+                            break;
+                        }
+                        case 'add_bookmark': {
+                            const actionResult = await executeAddBookmark(args, appState);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'update_bookmark': {
+                            const actionResult = await executeUpdateBookmark(args, appState);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'delete_bookmark': {
+                            const actionResult = await executeDeleteBookmark(args, appState);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'add_calendar_event': {
+                            const actionResult = await executeAddCalendarEvent(args, appState, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'update_calendar_event': {
+                            const actionResult = await executeUpdateCalendarEvent(args, appState, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'delete_calendar_event': {
+                            const actionResult = await executeDeleteCalendarEvent(args, appState, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'add_transaction': {
+                            const actionResult = await executeAddTransaction(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'render_chart': {
+                            charts.push({
+                                chart_type: args.chartType || args.chart_type || 'bar',
+                                title: args.title,
+                                data: args.data || []
+                            });
+                            result = { success: true, message: `Biểu đồ "${args.title}" đã được tạo và hiển thị cho người dùng.` };
+                            break;
+                        }
+                        case 'calculate_needed_gpa': {
+                            result = executeCalculateNeededGPA(args, appState);
+                            break;
+                        }
+                        case 'simulate_gpa': {
+                            result = executeSimulateGPA(args, appState);
+                            break;
+                        }
+                        case 'batch_add_transactions': {
+                            const actionResult = await executeBatchAddTransactions(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'import_gpa_data': {
+                            if (handlers.onImportGPAData) {
+                                try {
+                                    await handlers.onImportGPAData(args.semesters);
+                                    result = { success: true, message: `✅ Đã import thành công ${args.semesters.length} học kỳ vào GPA Tracker.` };
+                                } catch (e: any) {
+                                    result = { success: false, error: e.message };
+                                }
+                            } else {
+                                result = { success: false, error: 'GPA Import handler is not registered.' };
+                            }
+                            break;
+                        }
+                        case 'simulate_financial_impact': {
                             try {
-                                await handlers.onImportGPAData(args.semesters);
-                                result = { success: true, message: `✅ Đã import thành công ${args.semesters.length} học kỳ vào GPA Tracker.` };
+                                const simResult = await simulateFinancialImpact(args.description, args.amount, appState, 'vi');
+                                result = { success: true, ...simResult };
+                                actions.push({
+                                    type: 'financial_impact' as any,
+                                    success: true,
+                                    message: `Đã mô phỏng tác động tài chính của kịch bản "${args.description}" với số tiền ${args.amount.toLocaleString('vi-VN')}đ.`,
+                                    data: {
+                                        description: args.description,
+                                        amount: args.amount,
+                                        simulation: simResult
+                                    }
+                                });
                             } catch (e: any) {
                                 result = { success: false, error: e.message };
                             }
-                        } else {
-                            result = { success: false, error: 'GPA Import handler is not registered.' };
+                            break;
                         }
-                        break;
-                    }
-                    case 'simulate_financial_impact': {
-                        try {
-                            const simResult = await simulateFinancialImpact(args.description, args.amount, appState, 'vi');
-                            result = { success: true, ...simResult };
-                            actions.push({
-                                type: 'financial_impact' as any,
-                                success: true,
-                                message: `Đã mô phỏng tác động tài chính của kịch bản "${args.description}" với số tiền ${args.amount.toLocaleString('vi-VN')}đ.`,
-                                data: {
-                                    description: args.description,
-                                    amount: args.amount,
-                                    simulation: simResult
-                                }
-                            });
-                        } catch (e: any) {
-                            result = { success: false, error: e.message };
+                        case 'get_user_profile':
+                            result = { result: buildProfileContext(appState) };
+                            break;
+                        case 'get_financial_report':
+                            result = { result: buildFinanceContext(appState) };
+                            break;
+                        case 'get_todos_and_schedule':
+                            result = { result: buildScheduleContext(appState) };
+                            break;
+                        case 'get_academic_gpa_record':
+                            result = { result: buildGPAContext(appState) };
+                            break;
+                        case 'get_habits_tracker':
+                            result = { result: await buildHabitContext() };
+                            break;
+                        case 'get_countdown_events':
+                            result = { result: await buildCountdownContext() };
+                            break;
+                        case 'get_journal_entries':
+                            result = { result: await buildJournalContext() };
+                            break;
+                        case 'search_nearby_places': {
+                            result = await executeSearchNearbyPlaces(args);
+                            break;
                         }
-                        break;
+                        case 'get_google_calendar_events': {
+                            result = await executeGetGoogleCalendarEvents(args);
+                            break;
+                        }
+                        default:
+                            result = { error: `Unknown tool: ${name}` };
                     }
-                    case 'get_user_profile':
-                        result = { result: buildProfileContext(appState) };
-                        break;
-                    case 'get_financial_report':
-                        result = { result: buildFinanceContext(appState) };
-                        break;
-                    case 'get_todos_and_schedule':
-                        result = { result: buildScheduleContext(appState) };
-                        break;
-                    case 'get_academic_gpa_record':
-                        result = { result: buildGPAContext(appState) };
-                        break;
-                    case 'get_habits_tracker':
-                        result = { result: await buildHabitContext() };
-                        break;
-                    case 'get_countdown_events':
-                        result = { result: await buildCountdownContext() };
-                        break;
-                    case 'get_journal_entries':
-                        result = { result: await buildJournalContext() };
-                        break;
-                    case 'search_nearby_places': {
-                        result = await executeSearchNearbyPlaces(args);
-                        break;
-                    }
-                    case 'get_google_calendar_events': {
-                        result = await executeGetGoogleCalendarEvents(args);
-                        break;
-                    }
-                    default:
-                        result = { error: `Unknown tool: ${name}` };
+                } catch (e: any) {
+                    if (e?.name === 'AbortError') throw e;
+                    console.error(`[SmartLife AI] Tool ${name} failed:`, e);
+                    result = { success: false, error: e?.message || 'Công cụ gặp lỗi.' };
                 }
+
+                const outcome = describeToolResult(name, result);
+                step.status = outcome.ok ? 'done' : 'error';
+                step.detail = outcome.detail;
+                step.endedAt = Date.now();
+                emit({ type: 'step', step: { ...step } });
+                for (const chart of charts.slice(chartsBefore)) emit({ type: 'chart', chart });
+                for (const action of actions.slice(actionsBefore)) emit({ type: 'action', action });
 
                 functionResponses.push({
                     functionResponse: { name, response: { result } }
@@ -1463,18 +1592,13 @@ export async function chatWithAI(
                 toolCallCount++;
             }
 
-            // Append the function response message to contents
-            contents.push({ role: 'function', parts: functionResponses });
+            // Kết quả công cụ trả về bằng vai 'user' (Gemini 3.x không nhận vai 'function')
+            contents.push({ role: 'user', parts: functionResponses });
         }
 
         // If we hit the limit, return what we have
-        return {
-            text: '⚠️ AI đã thực hiện quá nhiều truy vấn. Vui lòng thử câu hỏi đơn giản hơn.',
-            charts,
-            actions,
-            updatedHistory: cleanChatHistory(contents),
-            tokens_used: totalTokensConsumed
-        };
+        const limitNote = '⚠️ AI đã thực hiện quá nhiều truy vấn. Vui lòng thử câu hỏi đơn giản hơn.';
+        return finish(answer ? `${answer}\n\n${limitNote}` : limitNote);
     });
 }
 

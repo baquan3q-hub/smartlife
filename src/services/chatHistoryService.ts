@@ -2,7 +2,7 @@
 // Service to manage AI Chat History in Supabase
 
 import { supabase } from './supabase';
-import type { ChartData, ActionResult } from './aiEngine';
+import type { ChartData, ActionResult, AIRunMeta } from './aiEngine';
 
 export interface AIConversation {
     id: string;
@@ -13,15 +13,30 @@ export interface AIConversation {
     updated_at: string;
 }
 
+// ai_messages.meta — mọi thông tin phụ của một tin, thêm trường mới không cần migration
+export interface AIMessageMeta extends AIRunMeta {
+    tokens_used?: number;
+    feedback?: 'up' | 'down';
+    files?: Array<{ name: string; type: string; size: number }>;
+}
+
 export interface AIMessage {
     id: string;
     conversation_id: string;
     role: 'user' | 'assistant';
     content: string;
-    charts?: ChartData[];
-    actions?: ActionResult[];
+    charts?: ChartData[] | null;
+    actions?: ActionResult[] | null;
+    meta?: AIMessageMeta | null;
+    deleted_at?: string | null;
     created_at: string;
-    tokens_used?: number;
+}
+
+async function touchConversation(conversationId: string) {
+    await supabase
+        .from('ai_conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', conversationId);
 }
 
 export const chatHistoryService = {
@@ -49,6 +64,7 @@ export const chatHistoryService = {
                 .from('ai_messages')
                 .select('*')
                 .eq('conversation_id', conversationId)
+                .is('deleted_at', null)
                 .order('created_at', { ascending: true });
 
             if (error) return [];
@@ -104,27 +120,23 @@ export const chatHistoryService = {
         } catch { return false; }
     },
 
-    // Lưu một tin nhắn
+    // Lưu một tin nhắn (meta: tầng tốc độ, suy nghĩ, các bước, phản hồi 👍/👎, file đính kèm…)
     async saveMessage(
         conversationId: string,
         role: 'user' | 'assistant',
         content: string,
-        charts?: ChartData[],
-        actions?: ActionResult[],
-        tokens_used?: number
+        extras: { charts?: ChartData[]; actions?: ActionResult[]; meta?: AIMessageMeta } = {}
     ): Promise<AIMessage | null> {
         try {
-            const payload: any = {
+            const { charts, actions, meta } = extras;
+            const payload: Record<string, unknown> = {
                 conversation_id: conversationId,
                 role,
                 content,
                 charts: charts?.length ? charts : null,
-                actions: actions?.length ? actions : null
+                actions: actions?.length ? actions : null,
+                meta: meta && Object.keys(meta).length ? meta : null,
             };
-
-            if (tokens_used !== undefined && tokens_used !== null) {
-                payload.tokens_used = tokens_used;
-            }
 
             const { data, error } = await supabase
                 .from('ai_messages')
@@ -132,36 +144,46 @@ export const chatHistoryService = {
                 .select()
                 .single();
 
-            // Nếu lỗi do cột tokens_used chưa tồn tại (chưa chạy migration)
-            if (error && tokens_used !== undefined) {
-                console.warn('[chatHistoryService] Failed to insert with tokens_used, retrying without it...', error.message);
-                delete payload.tokens_used;
-                const { data: retryData, error: retryError } = await supabase
-                    .from('ai_messages')
-                    .insert([payload])
-                    .select()
-                    .single();
-
-                if (retryError) return null;
-
-                // Cập nhật updated_at của conversation
-                await supabase
-                    .from('ai_conversations')
-                    .update({ updated_at: new Date().toISOString() })
-                    .eq('id', conversationId);
-
-                return retryData;
+            if (error) {
+                console.warn('[chatHistoryService] saveMessage failed:', error.message);
+                return null;
             }
 
-            if (error) return null;
-
-            // Cập nhật updated_at của conversation
-            await supabase
-                .from('ai_conversations')
-                .update({ updated_at: new Date().toISOString() })
-                .eq('id', conversationId);
-
+            await touchConversation(conversationId);
             return data;
         } catch { return null; }
-    }
+    },
+
+    // Ghi đè meta của một tin (vd. 👍/👎)
+    async updateMessageMeta(id: string, meta: AIMessageMeta): Promise<boolean> {
+        try {
+            const { error } = await supabase.from('ai_messages').update({ meta }).eq('id', id);
+            return !error;
+        } catch { return false; }
+    },
+
+    // Xoá mềm một tin (vẫn còn trong DB, không gửi cho AI nữa)
+    async softDeleteMessage(id: string): Promise<boolean> {
+        try {
+            const { error } = await supabase
+                .from('ai_messages')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('id', id);
+            return !error;
+        } catch { return false; }
+    },
+
+    // "Quay lại đây": xoá mềm tin này và mọi tin sau nó trong cuộc trò chuyện
+    async softDeleteFrom(conversationId: string, fromCreatedAt: string): Promise<boolean> {
+        try {
+            const { error } = await supabase
+                .from('ai_messages')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('conversation_id', conversationId)
+                .gte('created_at', fromCreatedAt)
+                .is('deleted_at', null);
+            if (!error) await touchConversation(conversationId);
+            return !error;
+        } catch { return false; }
+    },
 };
