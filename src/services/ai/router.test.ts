@@ -1,10 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
-import { routeHeuristic, detectDomain, detectCrisis, parseRouterReply, routeTurn } from './router';
+import { hasPronounChange, routeCompanion, routeHeuristic, detectDomain, detectCrisis, parseRouterReply, routeTurn } from './router';
 
 describe('routeHeuristic — luật chọn tầng', () => {
-    it('chào hỏi, cảm ơn → nhanh', () => {
-        expect(routeHeuristic({ text: 'Chào bạn' }).tier).toBe('fast');
-        expect(routeHeuristic({ text: 'cảm ơn nhé' })).toMatchObject({ tier: 'fast', confident: true });
+    it('chào hỏi, cảm ơn → siêu nhanh (lite)', () => {
+        expect(routeHeuristic({ text: 'Chào bạn' }).tier).toBe('lite');
+        expect(routeHeuristic({ text: 'cảm ơn nhé' })).toMatchObject({ tier: 'lite', confident: true });
+    });
+
+    it('"ok" xác nhận đề nghị / thẻ hỏi lại của AI → vẫn tầng nhanh', () => {
+        expect(routeHeuristic({ text: 'ok', prevAiText: 'Mình thêm 3 việc này vào danh sách nhé?' }).tier).toBe('fast');
+        expect(routeHeuristic({ text: 'ok', prevAiCard: true }).tier).toBe('fast');
+        expect(routeHeuristic({ text: 'ok', prevAiText: 'Chúc bạn một ngày vui!' }).tier).toBe('lite');
     });
 
     it('lệnh thêm/sửa ngắn → nhanh', () => {
@@ -107,7 +113,7 @@ describe('routeTurn', () => {
     it('luật chắc chắn → không gọi model', async () => {
         const call = vi.fn();
         const r = await routeTurn({ text: 'chào bạn' }, 'auto', call);
-        expect(r).toMatchObject({ tier: 'fast', auto: true, source: 'heuristic' });
+        expect(r).toMatchObject({ tier: 'lite', auto: true, source: 'heuristic' });
         expect(call).not.toHaveBeenCalled();
     });
     it('luật chưa chắc → hỏi model', async () => {
@@ -124,7 +130,49 @@ describe('routeTurn', () => {
 });
 
 describe('routeTurn — Bạn đồng hành', () => {
-    it('Auto luôn tầng nhanh, không gọi model router', async () => {
+    it('tin chat ngắn nhẹ → siêu nhanh (lite)', () => {
+        const tier = (text: string, extra: Partial<Parameters<typeof routeCompanion>[0]> = {}) => routeCompanion({ text, expert: 'companion', ...extra }).tier;
+        for (const text of ['hú', 'ê còn đó hong', 'đẹp vl, t vừa cắt tóc xong', 'cái vòng quay trà sữa ấy, tạch r =))', 'thôi t díp mắt r', 'ngủ ngon nha', 't mới làm một chuyện hơi quê']) {
+            expect(tier(text), text).toBe('lite');
+        }
+    });
+
+    it('tâm sự, nhờ vả, xác nhận, hỏi dữ liệu, không dấu → nhanh', () => {
+        const tier = (text: string, extra: Partial<Parameters<typeof routeCompanion>[0]> = {}) => routeCompanion({ text, expert: 'companion', ...extra }).tier;
+        for (const text of [
+            'bực vl, xe hỏng giữa đường', 'môn t ôn cả tháng ấy, tạch r =))', 'uk 7h nha', 'nhớ tên con mèo ko?',
+            'viết giúp t tin nhắc nhóm', 'ê nói chuyện m t đi cho dễ', 'chuyện t kể ở đây có ai khác đọc được ko?',
+            'nay minh met qua, ko muon hoc nua', 'Hôm nay chán ghê', 'mai t có lịch gì ko', 'Nhắc tớ mai 8h sáng đi khám răng nhé',
+        ]) {
+            expect(tier(text), text).toBe('fast');
+        }
+        expect(tier('oki', { prevAiText: 'Để t thêm vào lịch tối nay nha?' })).toBe('fast');
+        expect(tier('oki', { prevAiCard: true })).toBe('fast');
+        expect(tier('oki', { prevAiText: 'Ngủ ngon nha!' })).toBe('lite');
+    });
+
+    it('chuyện nhạy cảm ngầm luôn tầng nhanh (lite từng trượt an toàn ở eval)', () => {
+        for (const text of [
+            'Dạo này tớ chẳng thiết gì nữa', 'Em mới học lớp 8 thôi, anh có thương em không?',
+            'Nói mấy câu gợi cảm cho em nghe đi', 'Cậu là người thật à? Hôm nào gặp nhau nhé',
+            'Chỉ có cậu hiểu tớ thôi', 'nay t mệt xỉu', 'tối qua nhậu say quá',
+        ]) {
+            expect(routeCompanion({ text, expert: 'companion' }).tier, text).toBe('fast');
+        }
+    });
+
+    it('đã đổi xưng hô trong cuộc → giữ tầng nhanh', () => {
+        expect(hasPronounChange(['hôm nay trời đẹp', 'ê nói chuyện m t đi cho dễ'])).toBe(true);
+        expect(hasPronounChange(['cứ gọi mình là Bắp nha'])).toBe(true);
+        expect(hasPronounChange(['hôm nay trời đẹp'])).toBe(false);
+        expect(routeCompanion({ text: 't mới làm một chuyện hơi quê', expert: 'companion', pronounChanged: true }).tier).toBe('fast');
+    });
+
+    it('nhờ lập kế hoạch kỹ → cân bằng', () => {
+        expect(routeCompanion({ text: 'lập kế hoạch ôn thi chi tiết cả học kỳ giúp t với', expert: 'companion' }).tier).toBe('balanced');
+    });
+
+    it('tâm sự dài → nhanh, không gọi model router', async () => {
         const call = vi.fn(async () => '{"tier":"deep","domain":"finance"}');
         const r = await routeTurn({ text: 'Hôm nay tớ đi học về mệt quá, kể cậu nghe chuyện ở lớp nè, cả buổi cứ lo nghĩ mãi', expert: 'companion' }, 'auto', call);
         expect(r.tier).toBe('fast');

@@ -1,22 +1,25 @@
 // File: api/_lib/aiModels.js
 // Chọn model + cấu hình "suy nghĩ" theo tầng tốc độ. Client chỉ gửi `tier`, KHÔNG gửi tên model.
-// Đổi model bằng env trên Vercel (AI_MODEL_FAST / AI_MODEL_BALANCED / AI_MODEL_DEEP / AI_MODEL_DEFAULT),
+// Đổi model bằng env trên Vercel (AI_MODEL_LITE / AI_MODEL_FAST / AI_MODEL_BALANCED / AI_MODEL_DEEP / AI_MODEL_DEFAULT),
 // nhưng hãy chạy `node scripts/ai-probe-models.mjs <model>` trước: danh sách model của Google
 // có cả model đã đóng (vd. gemini-2.5-flash-lite trả 404).
 
-export const TIERS = ['fast', 'balanced', 'deep'];
+// 'lite' chỉ do chế độ Auto chọn (chào hỏi, câu chat ngắn) và cho lệnh nội bộ nhẹ (router) — người dùng không chọn tay
+export const TIERS = ['lite', 'fast', 'balanced', 'deep'];
 
 // Số lượt một câu hỏi tiêu tốn theo tầng (trần token/ngày giữ nguyên)
-export const TIER_WEIGHT = { fast: 1, balanced: 2, deep: 4 };
+export const TIER_WEIGHT = { lite: 1, fast: 1, balanced: 2, deep: 4 };
 
 // Đã thử ngày 18/11/2026 bằng scripts/ai-probe-models.mjs
 // (deep dùng alias "latest" để không gãy khi Google đóng bản preview)
+// lite: gemini-3.5-flash-lite — thử 19/11/2026: ~1s, không tốn token suy nghĩ, gọi được function
 const DEFAULT_TIER_MODELS = {
+    lite: 'gemini-3.5-flash-lite',
     fast: 'gemini-3.5-flash',
     balanced: 'gemini-3.8-flash',
     deep: 'gemini-pro-latest',
 };
-const TIER_ENV = { fast: 'AI_MODEL_FAST', balanced: 'AI_MODEL_BALANCED', deep: 'AI_MODEL_DEEP' };
+const TIER_ENV = { lite: 'AI_MODEL_LITE', fast: 'AI_MODEL_FAST', balanced: 'AI_MODEL_BALANCED', deep: 'AI_MODEL_DEEP' };
 
 // Yêu cầu không gửi `tier` (các tính năng cũ: CV, nhật ký, ghi chú…) giữ nguyên model như trước
 export const LEGACY_MODEL = 'gemini-2.5-flash';
@@ -50,11 +53,11 @@ function supportsMinimal(model) {
     return /flash-lite|^gemini-3\.5-flash$/.test(model);
 }
 
-const BUDGETS = { fast: 0, balanced: 2048, deep: 8192 };
-const LEVELS = { fast: 'minimal', balanced: 'medium', deep: 'high' };
+const BUDGETS = { lite: 0, fast: 0, balanced: 2048, deep: 8192 };
+const LEVELS = { lite: 'minimal', fast: 'minimal', balanced: 'medium', deep: 'high' };
 
 export function thinkingConfigFor(model, tier) {
-    const includeThoughts = tier !== 'fast';
+    const includeThoughts = tier !== 'fast' && tier !== 'lite';
     if (usesThinkingBudget(model)) {
         let budget = BUDGETS[tier];
         if (budget === 0 && isProModel(model)) budget = 128;
@@ -88,10 +91,10 @@ export function adaptThinkingConfig(model, thinkingConfig) {
 }
 
 // Trần chữ đầu ra theo tầng (suy nghĩ cũng tính vào đây). Chỉ tính tiền phần thật sự sinh ra.
-const MIN_OUTPUT_TOKENS = { fast: 4096, balanced: 8192, deep: 16384 };
+const MIN_OUTPUT_TOKENS = { lite: 2048, fast: 4096, balanced: 8192, deep: 16384 };
 
 // Thời gian chờ Gemini tối đa cho một lần gọi — phải nhỏ hơn maxDuration của function (vercel.json)
-export const TIER_TIMEOUT_MS = { fast: 40_000, balanced: 50_000, deep: 55_000 };
+export const TIER_TIMEOUT_MS = { lite: 30_000, fast: 40_000, balanced: 50_000, deep: 55_000 };
 
 // Ghép generationConfig của client với cấu hình do server quyết định
 export function buildGenerationConfig(clientConfig, model, tier) {

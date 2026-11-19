@@ -5,7 +5,8 @@
 //   npx jiti scripts/ai-eval/run.ts --variant new          # khối prompt + chuyên gia + ask_user + web_search
 //   npx jiti scripts/ai-eval/run.ts --compare              # gộp hai bản JSON mới nhất thành summary.md
 //
-// Tuỳ chọn: --tier fast|balanced|deep (mặc định balanced, giữ giống nhau giữa hai lần chạy),
+// Tuỳ chọn: --tier lite|fast|balanced|deep|auto (mặc định balanced, giữ giống nhau giữa hai lần chạy;
+//           auto = mỗi câu chọn tầng bằng luật của router như app, không gọi model router),
 //           --only gen-1,psy-1  --prefix vi-,comp-  --concurrency 3
 //           --no-examples / --no-style (Bạn đồng hành: bỏ khối hội thoại mẫu / quy tắc giọng người bạn Việt)  --label <tên file báo cáo, mặc định = variant>
 //   npx jiti scripts/ai-eval/run.ts --compare-labels companion-vi-noex,companion-vi-ex   # so hai nhãn, chỉ các câu chung
@@ -21,14 +22,15 @@ import { BASE_TOOL_DECLARATIONS, toolsFor } from '../../src/services/ai/toolDecl
 import { buildSystemPrompt } from '../../src/services/ai/promptBlocks';
 import { getExpert } from '../../src/services/ai/experts';
 import { DEFAULT_COMPANION, sanitizeCompanion, type CompanionProfile } from '../../src/services/ai/companion/types';
-import { detectCrisis, detectDomain } from '../../src/services/ai/router';
+import { detectCrisis, detectDomain, hasPronounChange, routeHeuristic } from '../../src/services/ai/router';
 import { BULK_WRITE_LIMIT, clarificationToText, countWrites, normalizeAskUser, type ClarifyRequest } from '../../src/services/ai/clarify';
 import { MAX_WEB_SEARCHES, WEB_SEARCH_LIMIT_ERROR } from '../../src/services/ai/webSearch';
 // @ts-ignore — module JS của server
 import { buildGenerationConfig, modelForTier } from '../../api/_lib/aiModels.js';
 
 type Variant = 'baseline' | 'new';
-type Tier = 'fast' | 'balanced' | 'deep';
+type Tier = 'lite' | 'fast' | 'balanced' | 'deep';
+type TierArg = Tier | 'auto';
 
 const ROOT = process.cwd();
 const REPORT_DIR = join(ROOT, 'scripts', 'ai-eval', 'reports');
@@ -100,6 +102,8 @@ interface RunResult {
     blocks?: string[];
     rounds: number;
     durationMs: number;
+    /** Tầng thật đã chạy (khác meta.tier khi --tier auto) */
+    tier?: Tier;
     error?: string;
 }
 
@@ -118,8 +122,17 @@ function companionFor(c: EvalCase): CompanionProfile | null {
 
 const wordCount = (s: string) => s.replace(/[*_#>`|-]/g, ' ').split(/\s+/).filter(Boolean).length;
 
-async function runCase(c: EvalCase, variant: Variant, tier: Tier): Promise<RunResult> {
+/** Tầng của một câu: cố định, hoặc theo luật router (như app ở chế độ Auto) */
+function tierFor(c: EvalCase, tierArg: TierArg): Tier {
+    if (tierArg !== 'auto') return tierArg;
+    const prevAiText = c.history?.length ? c.history[c.history.length - 1].ai : undefined;
+    const pronounChanged = c.mode === 'companion' && hasPronounChange((c.history || []).map(t => t.user));
+    return routeHeuristic({ text: c.text, expert: c.mode, prevAiText, pronounChanged }).tier as Tier;
+}
+
+async function runCase(c: EvalCase, variant: Variant, tierArg: TierArg): Promise<RunResult> {
     const started = Date.now();
+    const tier = tierFor(c, tierArg);
     const model = modelForTier(tier);
     let system: string;
     let tools: any[];
@@ -206,9 +219,9 @@ async function runCase(c: EvalCase, variant: Variant, tier: Tier): Promise<RunRe
             contents.push({ role: 'user', parts: responses });
         }
     } catch (e: any) {
-        return { id: c.id, mode: c.mode, text: c.text, variant, model, answer, clarification, tools: log, writesExecuted, webSearches, blocks, rounds, durationMs: Date.now() - started, error: e?.message || String(e) };
+        return { id: c.id, mode: c.mode, text: c.text, variant, model, answer, clarification, tools: log, writesExecuted, webSearches, blocks, rounds, durationMs: Date.now() - started, tier, error: e?.message || String(e) };
     }
-    return { id: c.id, mode: c.mode, text: c.text, variant, model, answer: answer.trim(), clarification, tools: log, writesExecuted, webSearches, blocks, rounds, durationMs: Date.now() - started };
+    return { id: c.id, mode: c.mode, text: c.text, variant, model, answer: answer.trim(), clarification, tools: log, writesExecuted, webSearches, blocks, rounds, durationMs: Date.now() - started, tier };
 }
 
 // ── Chấm điểm ──
@@ -347,7 +360,7 @@ function rate(results: Scored[], filter: (r: Scored) => boolean, k?: Criterion) 
     return { pass, total };
 }
 
-function markdownReport(results: Scored[], meta: { variant: Variant; tier: Tier; model: string; date: string; commit: string; label?: string; examples?: boolean }) {
+function markdownReport(results: Scored[], meta: { variant: Variant; tier: TierArg; model: string; date: string; commit: string; label?: string; examples?: boolean }) {
     const L: string[] = [];
     L.push(`# AI eval — ${meta.label && meta.label !== meta.variant ? meta.label : meta.variant === 'baseline' ? 'Baseline (41490dc)' : 'Sau GĐ2 (chế độ chuyên gia)'}`);
     L.push('');
@@ -358,6 +371,7 @@ function markdownReport(results: Scored[], meta: { variant: Variant; tier: Tier;
     const all = rate(results, () => true);
     const q = results.filter(r => r.quality).map(r => r.quality);
     L.push(`**Tổng: ${pct(all.pass, all.total)} tiêu chí đạt · chất lượng TB ${(q.reduce((a, b) => a + b, 0) / (q.length || 1)).toFixed(2)}/5 · lỗi chạy ${results.filter(r => r.error).length}**`);
+    L.push(`- Thời gian trả lời TB ${avgSec(results)}s · tầng: ${tierMix(results, meta.tier)}`);
     L.push('');
     L.push('## Theo tiêu chí');
     L.push('| Tiêu chí | Đạt |');
@@ -391,7 +405,7 @@ function markdownReport(results: Scored[], meta: { variant: Variant; tier: Tier;
         L.push(`### ${r.id} — ${r.text}`);
         const hist = CASES.find(x => x.id === r.id)?.history;
         if (hist?.length) L.push(`_Trước đó: ${hist.map(t => `"${t.user}" → "${t.ai}"`).join(' · ')}_`);
-        if (r.blocks) L.push(`_Khối prompt: ${r.blocks.join(', ')}_`);
+        if (r.blocks) L.push(`_Khối prompt: ${r.blocks.join(', ')}${r.tier ? ` · tầng ${r.tier} · ${(r.durationMs / 1000).toFixed(1)}s` : ''}_`);
         L.push('');
         L.push(r.answer ? r.answer.split('\n').map(l => `> ${l}`).join('\n') : '> (trống)');
         if (r.clarification) { L.push(''); L.push('```'); L.push(clarificationToText(r.clarification, r.answer)); L.push('```'); }
@@ -399,6 +413,14 @@ function markdownReport(results: Scored[], meta: { variant: Variant; tier: Tier;
     }
     L.push('</details>');
     return L.join('\n') + '\n';
+}
+
+const avgSec = (rs: RunResult[]) => (rs.reduce((a, r) => a + (r.durationMs || 0), 0) / (rs.length || 1) / 1000).toFixed(1);
+/** Phân bố tầng: "lite 10 · fast 12" (báo cáo cũ không lưu tầng từng câu → dùng meta.tier) */
+function tierMix(rs: RunResult[], fallback: string) {
+    const n: Record<string, number> = {};
+    for (const r of rs) n[r.tier || fallback] = (n[r.tier || fallback] || 0) + 1;
+    return Object.entries(n).map(([t, k]) => `${t} ${k}`).join(' · ');
 }
 
 function compareReport(base: { meta: any; results: Scored[] }, next: { meta: any; results: Scored[] }, title = 'so sánh trước / sau GĐ2') {
@@ -420,6 +442,8 @@ function compareReport(base: { meta: any; results: Scored[] }, next: { meta: any
     for (const m of MODES) row(`chế độ ${getExpert(m).name}`, r => r.mode === m);
     const avgQ = (rs: Scored[]) => { const q = rs.filter(r => r.quality).map(r => r.quality); return (q.reduce((x, y) => x + y, 0) / (q.length || 1)).toFixed(2); };
     L.push(`| chất lượng TB (1–5) | ${avgQ(base.results)} | ${avgQ(next.results)} |`);
+    L.push(`| thời gian trả lời TB | ${avgSec(base.results)}s | ${avgSec(next.results)}s |`);
+    L.push(`| tầng đã chạy | ${tierMix(base.results, base.meta.tier)} | ${tierMix(next.results, next.meta.tier)} |`);
     L.push('');
     L.push('## Câu thay đổi kết quả');
     L.push('| ID | Tiêu chí | Trước | Sau |');
@@ -484,7 +508,7 @@ async function main() {
         return;
     }
     const variant = (arg('variant', 'new') as Variant);
-    const tier = (arg('tier', 'balanced') as Tier);
+    const tier = (arg('tier', 'balanced') as TierArg);
     const concurrency = Number(arg('concurrency', '3'));
     const only = arg('only')?.split(',');
     const prefixes = arg('prefix')?.split(',');
@@ -493,16 +517,17 @@ async function main() {
     const examples = !has('no-examples');
     const commit = arg('commit', variant === 'baseline' ? '41490dc (prompt + công cụ gốc)' : 'nhánh claude/ai-companion-modes-f09d01 (chưa commit)')!;
 
-    console.log(`▶ ${variant} · ${cases.length} câu · tầng ${tier} (${modelForTier(tier)}) · ${KEYS.length} key`);
+    const modelText = tier === 'auto' ? 'theo luật router' : modelForTier(tier);
+    console.log(`▶ ${variant} · ${cases.length} câu · tầng ${tier} (${modelText}) · ${KEYS.length} key`);
     const results = await pool(cases, concurrency, async (c) => {
         const r = await runCase(c, variant, tier);
         const s = await judge(c, r);
         const marks = Object.entries(s.scores).map(([k, v]) => `${v!.pass ? '✓' : '✗'}${k}`).join(' ');
-        console.log(`  ${c.id.padEnd(8)} ${(r.durationMs / 1000).toFixed(1).padStart(5)}s  ${marks}${r.error ? '  LỖI ' + r.error.slice(0, 80) : ''}`);
+        console.log(`  ${c.id.padEnd(8)} ${(r.tier || '').padEnd(8)} ${(r.durationMs / 1000).toFixed(1).padStart(5)}s  ${marks}${r.error ? '  LỖI ' + r.error.slice(0, 80) : ''}`);
         return s;
     });
     const date = new Date().toISOString().slice(0, 16).replace(':', '');
-    const meta = { variant, tier, model: modelForTier(tier), date, commit, label, examples };
+    const meta = { variant, tier, model: modelText, date, commit, label, examples };
     const base = join(REPORT_DIR, `${label}-${date}`);
     writeFileSync(`${base}.json`, JSON.stringify({ meta, results }, null, 2));
     writeFileSync(`${base}.md`, markdownReport(results, meta));

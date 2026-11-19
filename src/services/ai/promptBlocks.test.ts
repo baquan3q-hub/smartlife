@@ -81,6 +81,13 @@ describe('buildSystemPrompt — Bạn đồng hành', () => {
         expect(p.text).toContain('**Mây**');
     });
 
+    it('tầng lite: nhắc lại xưng hô ở cuối prompt; tầng khác không có', () => {
+        const lite = buildSystemPrompt({ expert: 'companion', companion, tier: 'lite', userText: 'hú' });
+        expect(lite.blocks[lite.blocks.length - 1]).toBe('companion_reminder');
+        expect(lite.text).toContain('xưng "tớ", gọi người dùng là "cậu"');
+        expect(buildSystemPrompt({ expert: 'companion', companion, tier: 'fast', userText: 'hú' }).blocks).not.toContain('companion_reminder');
+    });
+
     it('hội thoại mẫu chọn theo tin nhắn, tắt được bằng cờ', () => {
         const p = buildSystemPrompt({ expert: 'companion', companion, userText: 'môn t ôn cả tháng ấy, tạch r =))' });
         expect(p.text).toContain('Ôn cả tháng mà ra kết quả vậy');

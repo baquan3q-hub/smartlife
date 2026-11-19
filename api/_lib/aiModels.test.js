@@ -16,6 +16,12 @@ describe('requestWeight', () => {
         expect(requestWeight({ tier: 'deep' })).toBe(4);
     });
 
+    it('tầng Siêu nhanh (lite) vẫn 1 lượt — tiết kiệm phía chi phí model, không trừ thêm lượt', () => {
+        expect(requestWeight({ tier: 'lite' })).toBe(1);
+        expect(requestWeight({ tier: 'lite', purpose: 'router' })).toBe(0);
+        expect(normalizeTier('lite')).toBe('lite');
+    });
+
     it('tính năng cũ không gửi tier vẫn là 1 lượt', () => {
         expect(requestWeight({ tier: null })).toBe(1);
     });
@@ -32,6 +38,15 @@ describe('modelForTier', () => {
     const saved = { ...process.env };
     afterEach(() => {
         process.env = { ...saved };
+    });
+
+    it('lite dùng flash-lite, đổi được bằng AI_MODEL_LITE; không suy nghĩ', () => {
+        delete process.env.AI_MODEL_LITE;
+        expect(modelForTier('lite')).toBe('gemini-3.5-flash-lite');
+        expect(thinkingConfigFor('gemini-3.5-flash-lite', 'lite')).toEqual({ thinkingLevel: 'minimal', includeThoughts: false });
+        process.env.AI_MODEL_LITE = 'gemini-flash-lite-latest';
+        expect(modelForTier('lite')).toBe('gemini-flash-lite-latest');
+        expect(buildGenerationConfig({ maxOutputTokens: 200 }, 'gemini-flash-lite-latest', 'lite').maxOutputTokens).toBe(2048);
     });
 
     it('không có tier → giữ model cũ', () => {

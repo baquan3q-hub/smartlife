@@ -98,7 +98,7 @@ export async function loadUsage(db, userId, now = new Date()) {
     return usage;
 }
 
-const TIER_LABEL = { fast: 'Nhanh', balanced: 'Nghĩ vừa', deep: 'Nghĩ sâu' };
+const TIER_LABEL = { lite: 'Siêu nhanh', fast: 'Nhanh', balanced: 'Nghĩ vừa', deep: 'Nghĩ sâu' };
 
 // Quyết định có cho gọi không (hàm thuần, không I/O — để test).
 // weight: số lượt câu hỏi này tiêu tốn (0 với lệnh gọi con/nội bộ).

@@ -6,7 +6,7 @@
 //
 // Body (JSON) nhận từ client:
 //   contents, systemInstruction, generationConfig, safetySettings, tools, toolConfig — chuyển tiếp cho Gemini
-//   tier:       'fast' | 'balanced' | 'deep'  — server tự chọn model + mức suy nghĩ (bỏ trống = model cũ)
+//   tier:       'lite' | 'fast' | 'balanced' | 'deep'  — server tự chọn model + mức suy nghĩ (bỏ trống = model cũ)
 //   purpose:    'chat' (mặc định) | 'router' | 'search' | 'memory' | 'greeting' — lệnh nội bộ không tính lượt
 //   isToolCall: true với các lần gọi tiếp theo trong cùng một câu hỏi (không tính lượt)
 //   stream:     true để nhận Server-Sent Events (xem streamToClient)
@@ -133,7 +133,7 @@ export default async function handler(req, res) {
     // 2. Tầng tốc độ, mục đích, số lượt tiêu tốn
     const purpose = PURPOSES.has(body.purpose) ? body.purpose : 'chat';
     let tier = normalizeTier(body.tier);
-    if (purpose !== 'chat' && tier && tier !== 'fast') tier = 'fast'; // lệnh nội bộ luôn chạy model nhanh
+    if (purpose !== 'chat' && tier && tier !== 'fast' && tier !== 'lite') tier = 'fast'; // lệnh nội bộ chỉ chạy model nhanh / siêu nhanh
     const isToolCall = body.isToolCall === true;
     const weight = requestWeight({ tier, purpose, isToolCall });
     const model = modelForTier(tier);

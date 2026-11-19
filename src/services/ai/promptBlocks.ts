@@ -165,7 +165,13 @@ function buildCompanionPrompt(opts: PromptOptions, expert: ExpertProfile): Built
     if (webAllowed) out.push(['web_search', WEB_SEARCH_BLOCK]);
     out.push(['clarify', COMPANION_CLARIFY]);
     if (opts.hasPersonality) out.push(['personalization', PERSONALIZATION_BLOCK]);
+    // Model lite (flash-lite) hay quên xưng hô đặt ở đầu prompt → nhắc lại ở cuối (eval: gọi "Minh Anh" / tự xưng "mình" thay cho tớ–cậu)
+    if (opts.tier === 'lite') out.push(['companion_reminder', companionReminder(p)]);
     return { text: out.map(([, t]) => t).join('\n\n'), blocks: out.map(([n]) => n) };
+}
+
+function companionReminder(p: CompanionProfile): string {
+    return `🔁 NHẮC LẠI TRƯỚC KHI TRẢ LỜI: xưng "${p.selfPronoun}", gọi người dùng là "${p.userPronoun}" — không thay đại từ bằng tên riêng của người dùng, không tự đổi sang cách xưng khác, trừ khi chính người dùng đã đổi trong cuộc trò chuyện. Trả lời 1–2 câu như tin nhắn.`;
 }
 
 const RESTRICTED_TOOLS_NOTE = '- Trong chế độ chuyên gia này chỉ dùng các công cụ được khai báo cho lượt này; công cụ nào được nhắc ở trên mà không có thì bỏ qua.';

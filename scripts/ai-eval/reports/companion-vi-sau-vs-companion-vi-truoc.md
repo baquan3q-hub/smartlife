@@ -12,6 +12,8 @@
 | tiêu chí tone | 63% (10/16) | 100% (16/16) |
 | chế độ Bạn đồng hành | 79% (27/34) | 97% (33/34) |
 | chất lượng TB (1–5) | 4.31 | 5.00 |
+| thời gian trả lời TB | 2.7s | 1.7s |
+| tầng đã chạy | fast 16 | fast 16 |
 
 ## Câu thay đổi kết quả
 | ID | Tiêu chí | Trước | Sau |

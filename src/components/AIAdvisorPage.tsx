@@ -34,7 +34,7 @@ import Composer from './ai/Composer';
 import ArtifactPane, { type Artifact } from './ai/ArtifactPane';
 import { loadSpeed, saveSpeed, SPEED_OPTIONS, type SpeedChoice } from './ai/tiers';
 import { getExpert, isExpertId, type ExpertId } from '../services/ai/experts';
-import { routeTurn } from '../services/ai/router';
+import { hasPronounChange, routeTurn } from '../services/ai/router';
 import { countClarifyRounds, lastAskedConfirm, type ClarifyRequest } from '../services/ai/clarify';
 import type { WebSource } from '../services/ai/webSearch';
 import CompanionSetup from './ai/CompanionSetup';
@@ -634,8 +634,15 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 // Câu hỏi cần trả lời = tin người dùng cuối cùng; Auto chọn tầng + đoán lĩnh vực / dấu hiệu khủng hoảng
                 const question = [...base].reverse().find(m => m.role === 'user' && !m.local);
                 const userText = question ? editableText(question) : '';
+                // Tin AI ngay trước câu hỏi: câu "ok" trả lời đề nghị / thẻ hỏi lại thì không xuống tầng Siêu nhanh
+                const prevAi = question ? base.slice(0, base.lastIndexOf(question)).reverse().find(m => m.role !== 'user' && !m.local) : undefined;
                 const route = await routeTurn(
-                    { text: userText, hasAttachments: attachments.length > 0, expert },
+                    {
+                        text: userText, hasAttachments: attachments.length > 0, expert,
+                        prevAiText: prevAi?.content, prevAiCard: !!prevAi?.meta?.clarification,
+                        pronounChanged: expert === 'companion'
+                            && hasPronounChange(base.filter(m => m.role === 'user' && !m.local && m !== question).map(m => m.content)),
+                    },
                     speed,
                     prompt => callRouterModel(prompt, controller.signal),
                 );

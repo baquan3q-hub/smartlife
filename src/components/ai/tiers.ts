@@ -33,8 +33,13 @@ export const SPEED_OPTIONS: SpeedOption[] = [
     ...TIER_OPTIONS.map(t => ({ id: t.id, label: t.label, cost: String(t.weight), hint: t.hint })),
 ];
 
-export const tierLabel = (tier?: string) => TIER_OPTIONS.find(t => t.id === tier)?.label;
-export const tierWeight = (tier?: string) => TIER_OPTIONS.find(t => t.id === tier)?.weight;
+/** Tầng chỉ Auto dùng (không có trong menu) — vẫn cần nhãn để hiện "Auto → Siêu nhanh" */
+const AUTO_ONLY: Partial<Record<AITier, { label: string; weight: number }>> = {
+    lite: { label: 'Siêu nhanh', weight: 1 },
+};
+
+export const tierLabel = (tier?: string) => TIER_OPTIONS.find(t => t.id === tier)?.label ?? AUTO_ONLY[tier as AITier]?.label;
+export const tierWeight = (tier?: string) => TIER_OPTIONS.find(t => t.id === tier)?.weight ?? AUTO_ONLY[tier as AITier]?.weight;
 
 const STORAGE_KEY = 'smartlife.ai.tier';
 

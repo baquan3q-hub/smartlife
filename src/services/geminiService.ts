@@ -64,8 +64,9 @@ export type MessagePart =
     | { functionResponse: { name: string; response: { result: any } } }
     | { inlineData: { mimeType: string; data: string } };
 
-// Tầng tốc độ gửi lên proxy — server tự chọn model và mức suy nghĩ
-export type AITier = 'fast' | 'balanced' | 'deep';
+// Tầng tốc độ gửi lên proxy — server tự chọn model và mức suy nghĩ.
+// 'lite' (flash-lite) chỉ do Auto chọn cho câu chat ngắn và cho lệnh nội bộ nhẹ — không có trong menu chọn tay.
+export type AITier = 'lite' | 'fast' | 'balanced' | 'deep';
 
 export interface StreamMeta {
     model: string;
@@ -692,20 +693,22 @@ export function estimateGeminiCost(promptTokens: number, candidatesTokens: numbe
 }
 
 // ────────────────────────────────────────
-// Router của chế độ Auto: gọi model nhanh (purpose 'router' → server ép tầng fast, không tính lượt)
+// Router của chế độ Auto: phân loại bằng model siêu nhanh (tầng lite, purpose 'router' → không tính lượt).
+// Trước đây không gửi tier nên rơi về model cũ gemini-2.5-flash có suy nghĩ → chậm hơn cần thiết.
 // ────────────────────────────────────────
 export async function callRouterModel(prompt: string, signal?: AbortSignal): Promise<string> {
     const data = await callGeminiRaw({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: { maxOutputTokens: 256, responseMimeType: 'application/json' },
         purpose: 'router',
+        tier: 'lite',
     }, 0, signal);
     const parts = data?.candidates?.[0]?.content?.parts || [];
     return parts.filter((p: any) => typeof p.text === 'string' && !p.thought).map((p: any) => p.text).join('');
 }
 
 // ────────────────────────────────────────
-// Lời chào chủ động của Bạn đồng hành (purpose 'greeting' → tầng fast, không tính lượt; mỗi ngày tối đa 1 lần)
+// Lời chào chủ động của Bạn đồng hành (purpose 'greeting', tầng fast không suy nghĩ, không tính lượt; mỗi ngày tối đa 1 lần)
 // ────────────────────────────────────────
 export async function callGreetingModel(systemPrompt: string, signal?: AbortSignal): Promise<string> {
     const data = await callGeminiRaw({
@@ -713,6 +716,7 @@ export async function callGreetingModel(systemPrompt: string, signal?: AbortSign
         contents: [{ role: 'user', parts: [{ text: '(người dùng vừa mở ứng dụng)' }] }],
         generationConfig: { temperature: 0.9, maxOutputTokens: 200 },
         purpose: 'greeting',
+        tier: 'fast',
     }, 0, signal);
     const parts = data?.candidates?.[0]?.content?.parts || [];
     return parts.filter((p: any) => typeof p.text === 'string' && !p.thought).map((p: any) => p.text).join('').trim();
