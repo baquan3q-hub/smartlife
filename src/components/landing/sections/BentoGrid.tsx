@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { LandingCopy } from '../i18n';
 import { bento } from '../data';
+import { GlassIcon } from '../../icons/GlassIcon';
 import { Reveal, Stagger, StaggerItem } from '../motion/Reveal';
 import { TiltCard } from '../motion/TiltCard';
 import { ResponsiveImage } from '../motion/Media';
@@ -35,9 +36,7 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ c, onLogin }) => (
                                 <div className="l-spotlight pointer-events-none absolute inset-0" />
                                 <div className="relative flex items-start justify-between gap-4">
                                     <div>
-                                        <div className={`mb-4 flex h-9 w-9 items-center justify-center rounded-xl border ${dark ? 'border-white/10 text-zinc-300' : 'border-zinc-900/[0.07] text-zinc-600'}`}>
-                                            <item.icon size={17} />
-                                        </div>
+                                        <GlassIcon name={item.icon} size={44} className="mb-4 -ml-1 transition-transform duration-500 group-hover:-translate-y-0.5 group-hover:scale-105" />
                                         <h3 className={`l-h3 ${dark ? 'text-white' : 'text-zinc-950'}`}>{copy.title}</h3>
                                         <p className={`mt-1.5 max-w-sm text-[15px] leading-6 ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>{copy.desc}</p>
                                     </div>

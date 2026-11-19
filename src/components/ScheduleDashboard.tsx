@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AppState, TimetableEvent, Goal, Todo, TodoStatus, TaskLink, parseTaskLinks, encodeTaskLinks } from '../types';
-import { Calendar, Clock, Target, Plus, Trash2, Edit2, X, MapPin, Star, ChevronDown, ChevronUp, Download, CheckCircle, RefreshCw, BarChart2, ListTodo, LayoutGrid, Settings, Paperclip, Upload, Eye, ExternalLink, Link2, Sparkles } from 'lucide-react';
+import { Calendar, Clock, Target, Plus, Trash2, Edit2, X, MapPin, Star, ChevronDown, ChevronUp, Download, CheckCircle, RefreshCw, BarChart2, ListTodo, LayoutGrid, Settings, Paperclip, Upload, Eye, ExternalLink, Link2, Sparkles, Share2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import MusicSpace from './MusicSpace';
 import { TaskAttachment, saveAttachment, getAttachments, deleteAttachment, downloadAttachment, formatFileSize, getFileIcon, isPreviewable } from '../services/taskAttachmentService';
@@ -18,6 +18,7 @@ import { GoogleCalendarHub } from './tracker/GoogleCalendarHub';
 import { isGoogleTasksConnected, syncTaskStatusAndDueToGoogle, updateGoogleTask, deleteGoogleTask, completeGoogleTask, uncompleteGoogleTask, syncGoogleTasksWithKanban, isAutoSyncEnabled } from '../services/googleTasksService';
 import ConfirmModal from './ConfirmModal';
 import { ReminderTimeSelector } from './common/ReminderTimeSelector';
+import ShareTaskModal from './share/ShareTaskModal';
 import { getDoneCleanupSetting, getEligibleDoneTasksForCleanup } from '../services/doneTasksCleanupService';
 
 const formatBeforeMinutes = (minutes?: number) => {
@@ -194,6 +195,8 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
   // Unified Task creation/edit modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  useEffect(() => { if (!isModalOpen) setIsShareModalOpen(false); }, [isModalOpen]);
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [todoToDeleteId, setTodoToDeleteId] = useState<string | null>(null);
 
@@ -1172,6 +1175,16 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
                 {modalMode === 'edit' ? 'Chi tiết công việc' : 'Tạo công việc mới'}
               </span>
               <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsShareModalOpen(true)}
+                  disabled={modalMode !== 'edit' || !selectedTodo || !effectiveUserId}
+                  className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-40 disabled:hover:text-slate-400 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                  title={modalMode === 'edit' ? 'Chia sẻ task bằng link' : 'Lưu task trước để có thể chia sẻ'}
+                  aria-label="Chia sẻ task"
+                >
+                  <Share2 size={17} />
+                </button>
                 {modalMode === 'edit' && (
                   <button
                     type="button"
@@ -1673,6 +1686,15 @@ const ScheduleDashboard: React.FC<ScheduleDashboardProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {isModalOpen && isShareModalOpen && modalMode === 'edit' && selectedTodo && effectiveUserId && (
+        <ShareTaskModal
+          todoId={selectedTodo.id}
+          userId={effectiveUserId}
+          taskTitle={modalContent.trim() || selectedTodo.content}
+          onClose={() => setIsShareModalOpen(false)}
+        />
       )}
 
       {/* Delete Confirmation Modal */}

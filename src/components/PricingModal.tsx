@@ -1,6 +1,7 @@
 // File: src/components/PricingModal.tsx
 import React, { useState } from 'react';
-import { X, Sparkles, CheckCircle, Zap, Brain, CalendarDays, LayoutDashboard, Crown, Star, Flame, Trophy, BarChart3, TrendingUp, BookOpen, Target, Briefcase, FileText, GraduationCap, Award } from 'lucide-react';
+import { X, Sparkles, CheckCircle, Star, Award } from 'lucide-react';
+import { GlassIcon } from './icons/GlassIcon';
 import { SUBSCRIPTION_PLANS, PAYMENT_INFO } from '../services/subscriptionService';
 import { SubscriptionPlanDuration } from '../types';
 
@@ -36,16 +37,16 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
   const bestValuePlan = SUBSCRIPTION_PLANS.find(p => p.is_best_value);
 
   const features = [
-    { icon: <Brain size={18} />, color: 'text-violet-600', bgColor: 'bg-violet-50', text: 'AI Cố vấn riêng — 600.000 token/tháng included' },
-    { icon: <Briefcase size={18} />, color: 'text-rose-600', bgColor: 'bg-rose-50', text: 'AI Career Analyzer — Phân tích ngành học & tính cách đề xuất nghề nghiệp' },
-    { icon: <FileText size={18} />, color: 'text-sky-600', bgColor: 'bg-sky-50', text: 'CV Builder — Tự động điền học vấn & kỹ năng, export PDF chuyên nghiệp' },
-    { icon: <Target size={18} />, color: 'text-purple-600', bgColor: 'bg-purple-50', text: 'Lộ trình Sự nghiệp & Mục tiêu 5 năm — AI cố vấn kỹ năng dựa trên GPA' },
-    { icon: <Trophy size={18} />, color: 'text-cyan-600', bgColor: 'bg-cyan-50', text: 'GPA Tracker nâng cao — dự đoán GPA tốt nghiệp & lộ trình học tập' },
-    { icon: <LayoutDashboard size={18} />, color: 'text-indigo-600', bgColor: 'bg-indigo-50', text: 'Visual Board — toàn cảnh cuộc sống đại học trong 1 giao diện' },
-    { icon: <TrendingUp size={18} />, color: 'text-emerald-600', bgColor: 'bg-emerald-50', text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },
-    { icon: <BookOpen size={18} />, color: 'text-teal-600', bgColor: 'bg-teal-50', text: 'Nhật ký cá nhân — không gian chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
-    { icon: <Flame size={18} />, color: 'text-orange-600', bgColor: 'bg-orange-50', text: 'Habit Tracker không giới hạn — theo dõi thói quen với streak & count-up' },
-    { icon: <Star size={18} />, color: 'text-amber-500', bgColor: 'bg-amber-50', text: 'StarBrain 🌟 — hệ thống sao thưởng & cửa hàng đổi quà' },
+    { icon: <GlassIcon name="ai" size={26} />, color: 'text-violet-600', bgColor: 'bg-violet-50', text: 'AI Cố vấn riêng — 600.000 token/tháng included' },
+    { icon: <GlassIcon name="growth" size={26} />, color: 'text-rose-600', bgColor: 'bg-rose-50', text: 'AI Career Analyzer — Phân tích ngành học & tính cách đề xuất nghề nghiệp' },
+    { icon: <GlassIcon name="cv" size={26} />, color: 'text-sky-600', bgColor: 'bg-sky-50', text: 'CV Builder — Tự động điền học vấn & kỹ năng, export PDF chuyên nghiệp' },
+    { icon: <GlassIcon name="goals" size={26} />, color: 'text-purple-600', bgColor: 'bg-purple-50', text: 'Lộ trình Sự nghiệp & Mục tiêu 5 năm — AI cố vấn kỹ năng dựa trên GPA' },
+    { icon: <GlassIcon name="gpa" size={26} />, color: 'text-cyan-600', bgColor: 'bg-cyan-50', text: 'GPA Tracker nâng cao — dự đoán GPA tốt nghiệp & lộ trình học tập' },
+    { icon: <GlassIcon name="overview" size={26} />, color: 'text-indigo-600', bgColor: 'bg-indigo-50', text: 'Visual Board — toàn cảnh cuộc sống đại học trong 1 giao diện' },
+    { icon: <GlassIcon name="cashflow" size={26} />, color: 'text-emerald-600', bgColor: 'bg-emerald-50', text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },
+    { icon: <GlassIcon name="book" size={26} />, color: 'text-teal-600', bgColor: 'bg-teal-50', text: 'Nhật ký cá nhân — không gian chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
+    { icon: <GlassIcon name="habit" size={26} />, color: 'text-orange-600', bgColor: 'bg-orange-50', text: 'Habit Tracker không giới hạn — theo dõi thói quen với streak & count-up' },
+    { icon: <GlassIcon name="gift" size={26} />, color: 'text-amber-500', bgColor: 'bg-amber-50', text: 'StarBrain 🌟 — hệ thống sao thưởng & cửa hàng đổi quà' },
   ];
 
   return (
@@ -64,7 +65,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
         <div className="relative overflow-hidden rounded-t-3xl">
           <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 px-8 py-8 text-white">
             <div className="flex items-center gap-2 mb-2">
-              <Crown size={24} className="text-yellow-300" />
+              <GlassIcon name="pro" size={28} />
               <span className="text-sm font-semibold bg-white/20 px-3 py-1 rounded-full">Nâng cấp Pro</span>
             </div>
             <h2 className="text-2xl font-bold mt-2">Mở khóa toàn bộ SmartLife</h2>

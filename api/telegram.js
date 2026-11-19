@@ -21,12 +21,15 @@
 
 import { TOOLS, TOOL_MAP, INSTRUCTIONS } from './_lib/tools.js';
 import { ApiError } from './_lib/authKey.js';
+import { formatApiError, keyErrorHelp, toolErrorText } from './_lib/apiErrorText.js';
+import { adaptThinkingConfig } from './_lib/aiModels.js';
 
 const MODEL = process.env.TELEGRAM_GEMINI_MODEL || 'gemini-2.5-flash';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const ALLOWED_CHAT_ID = (process.env.TELEGRAM_ALLOWED_CHAT_ID || '').trim();
 const SMARTLIFE_KEY = process.env.SMARTLIFE_API_KEY;
+const BOT_KEY_LOCATION = 'biến SMARTLIFE_API_KEY trên Vercel rồi Redeploy';
 const TZ = 'Asia/Ho_Chi_Minh';
 
 const rawBudget = process.env.TELEGRAM_THINKING_BUDGET;
@@ -83,6 +86,10 @@ const TOOL_LABELS = {
     delete_transaction: 'xóa giao dịch',
     list_insights: 'nhật ký AI',
     create_insight: 'ghi nhật ký AI',
+    list_sticky_notes: 'danh sách ghi chú',
+    get_sticky_note: 'đọc ghi chú',
+    create_sticky_note: 'tạo ghi chú',
+    update_sticky_note: 'sửa ghi chú',
 };
 
 // ---------------------------------------------------------------------------
@@ -611,6 +618,7 @@ function detectCategory(text) {
     if (/tiền|chi tiêu|số dư|ngân sách|chi phí|ví|giao dịch/.test(s)) return 'finance';
     if (/lịch|thời khóa biểu|tkb|tiết học|phòng học/.test(s)) return 'schedule';
     if (/thói quen|habit|streak/.test(s)) return 'habits';
+    if (/ghi chú|\bnote\b|sticky/.test(s)) return 'notes';
     return null;
 }
 
@@ -696,7 +704,7 @@ function createProgress(chatId, { messageId = null, title = 'Đang suy nghĩ', p
 // ---------------------------------------------------------------------------
 // Gọi tool SmartLife (có cache ngắn cho tool đọc)
 // ---------------------------------------------------------------------------
-const WRITE_TOOLS = new Set(['add_transaction', 'delete_transaction', 'create_task', 'update_task', 'reorder_tasks', 'create_insight']);
+const WRITE_TOOLS = new Set(['add_transaction', 'delete_transaction', 'create_task', 'update_task', 'reorder_tasks', 'create_insight', 'create_sticky_note', 'update_sticky_note']);
 
 function cacheKey(name, args) {
     const a = { ...(args || {}) };
@@ -811,8 +819,17 @@ class GeminiError extends Error {
     }
 }
 
-// Model dự phòng có hạn mức riêng: dùng khi model chính bị 429 (hết lượt) / quá tải / quá chậm
-const FALLBACK_MODEL = process.env.TELEGRAM_GEMINI_FALLBACK_MODEL ?? 'gemini-2.5-flash-lite';
+// Model dự phòng có hạn mức riêng: dùng khi model chính bị 429 (hết lượt) / quá tải / quá chậm.
+// (gemini-2.5-flash-lite đã đóng với key mới → 404; dùng alias "latest" để không gãy lần nữa)
+const FALLBACK_MODEL = process.env.TELEGRAM_GEMINI_FALLBACK_MODEL ?? 'gemini-flash-lite-latest';
+
+// Cấu hình suy nghĩ viết cho model chính (thinkingBudget) → đổi cho hợp model đang gọi.
+// Họ 3.x từ chối thinkingBudget = 0 (lỗi 400), nên phải đổi sang thinkingLevel.
+function bodyForModel(body, model) {
+    const tc = body?.generationConfig?.thinkingConfig;
+    if (!tc) return body;
+    return { ...body, generationConfig: { ...body.generationConfig, thinkingConfig: adaptThinkingConfig(model, tc) } };
+}
 const RETRYABLE = new Set([429, 500, 503, 504]);
 const modelCooldown = new Map();   // model -> thời điểm được gọi lại sau khi bị 429
 
@@ -837,7 +854,7 @@ async function callGemini(body, deadline = Date.now() + 45_000) {
             res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
+                body: JSON.stringify(bodyForModel(body, model)),
                 // Model chính không được ăn hết thời gian → chừa chỗ cho model dự phòng
                 signal: AbortSignal.timeout(Math.min(model === MODEL && models.length > 1 ? 20_000 : 25_000, remaining)),
             });
@@ -876,10 +893,17 @@ function describeError(err) {
             const wait = err.retryAfterSec ? `khoảng ${err.retryAfterSec} giây` : 'khoảng 1 phút';
             return { title: '🚦 AI đang hết lượt gọi (giới hạn miễn phí của Gemini).', hint: `Chờ ${wait} rồi bấm Thử lại nhé.`, code: 'GEMINI_429' };
         }
+        if (err.status === 402) {
+            return { title: '💳 Tài khoản Google AI của SmartLife đã hết tín dụng.', hint: 'Nạp thêm credit trong Google AI Studio (Billing) rồi thử lại.', code: 'GEMINI_402' };
+        }
         if ([400, 401, 403, 404].includes(err.status)) {
             return { title: '🔑 Cấu hình Gemini có vấn đề (key hoặc tên model).', hint: 'Kiểm tra GEMINI_API_KEYS / TELEGRAM_GEMINI_MODEL trên Vercel.', code: `GEMINI_${err.status}` };
         }
         return { title: '🌩️ Máy chủ Gemini đang quá tải.', hint: 'Thử lại sau ít phút nhé.', code: `GEMINI_${err.status || 'NET'}` };
+    }
+    const keyHelp = keyErrorHelp(err, BOT_KEY_LOCATION);
+    if (keyHelp) {
+        return { title: '🔑 API key của bot không dùng được.', hint: keyHelp, code: `DB_${err.status}_${err.code}` };
     }
     if (err instanceof ApiError) {
         return { title: '🗄️ Không lấy được dữ liệu SmartLife.', hint: 'Thử lại sau ít phút nhé.', code: `DB_${err.status}_${err.code}` };
@@ -899,6 +923,7 @@ function systemPrompt() {
         'Nếu tin nhắn người dùng có khối <smartlife_data>, đó là kết quả tool vừa lấy trong CHÍNH lượt này (số liệu mới nhất): dùng trực tiếp, KHÔNG gọi lại các tool đó; chỉ gọi thêm tool khi khối này thiếu dữ liệu cần thiết. Không nhắc tới khối này với người dùng.',
         'Không bao giờ hiển thị phần [Ghi chú nội bộ] cho người dùng.',
         'Trước khi tạo, sửa hoặc sắp xếp lại task, nói rõ bạn sẽ làm gì và chờ người dùng đồng ý (trừ khi họ đã yêu cầu rõ ràng).',
+        'GHI CHÚ DÁN: người dùng bảo ghi / lưu / note / thêm vào ghi chú → làm ngay, không hỏi lại. Muốn thêm vào ghi chú có sẵn thì list_sticky_notes (q = từ khóa) để lấy id rồi update_sticky_note với append; nếu có nhiều ghi chú khớp mà không rõ cái nào thì hỏi lại kèm tiêu đề từng cái. Ghi đè nội dung hoặc xóa ghi chú chỉ khi người dùng đã đồng ý. Sau khi ghi, xác nhận ngắn gọn: tên ghi chú và nội dung vừa thêm; KHÔNG chép lại cả ghi chú dài.',
     ].join('\n');
 }
 
@@ -979,11 +1004,11 @@ async function runAgent(chatId, userText, {
                     memo.push(`${functionCall.name} → id=${result?.id ?? result?.deleted ?? '?'}${result?.summary ? ` (${result.summary})` : ''}`);
                 }
             } catch (err) {
-                response = { error: err instanceof ApiError ? `[${err.status} ${err.code}] ${err.message}` : 'Lỗi máy chủ' };
-                toolsUsed.push(`⚠️ ${functionCall.name}: ${response.error}`);
+                response = { error: toolErrorText(err, BOT_KEY_LOCATION) };
+                toolsUsed.push(`⚠️ ${functionCall.name}: ${formatApiError(err)}`);
                 if (!(err instanceof ApiError)) console.error('[telegram] tool error', err);
             }
-            console.log('[telegram] tool', functionCall.name, JSON.stringify(functionCall.args || {}), response.error || 'ok');
+            console.log('[telegram] tool', functionCall.name, JSON.stringify(functionCall.args || {}), response.error ? toolsUsed.at(-1) : 'ok');
             return { functionResponse: { name: functionCall.name, response } };
         }));
         contents.push({ role: 'user', parts: responses });
@@ -1403,6 +1428,10 @@ const WELCOME_HTML = [
     '⌨️ <b>Lệnh nhanh</b>',
     '<code>/spend 45k ăn trưa</code>  ·  /overdue  ·  /bills  ·  /reset',
     '',
+    '📝 <b>Ghi chú dán</b>',
+    '<code>/note mua sữa, gọi bác sĩ</code>  ·  /notes',
+    '<i>Hoặc nhắn "thêm vào note Việc nhà: giặt đồ", "đọc note họp tuần".</i>',
+    '',
     '💬 <i>Hoặc cứ nhắn tự do bất cứ điều gì bạn muốn hỏi!</i>',
 ].join('\n');
 
@@ -1480,6 +1509,26 @@ async function handleMessage(msg) {
             category: 'finance',
             loading: 'Đang ghi khoản chi',
         });
+    } else if (command === '/note') {
+        const restText = text.replace(/^\/note(@\S+)?\s*/i, '');
+        ok = await respond(chatId, {
+            prompt: restText
+                ? `Tạo ghi chú dán mới với nội dung sau (đặt tiêu đề ngắn phù hợp, giữ nguyên ý, chia dòng / checklist nếu có nhiều ý): ${restText}`
+                : 'Tôi muốn tạo một ghi chú dán, hãy hỏi tôi nội dung cần ghi.',
+            prefetch: [],
+            category: 'notes',
+            loading: 'Đang ghi chú',
+        });
+    } else if (command === '/notes') {
+        const restText = text.replace(/^\/notes(@\S+)?\s*/i, '');
+        ok = await respond(chatId, {
+            prompt: restText
+                ? `Tìm trong ghi chú dán của tôi: ${restText}. Cho biết tiêu đề và tóm tắt ngắn từng ghi chú khớp.`
+                : 'Liệt kê các ghi chú dán đang dùng của tôi (ghim lên đầu). Trình bày bảng: Ghi chú | Cập nhật, sau đó hỏi tôi muốn mở ghi chú nào.',
+            prefetch: [],
+            category: 'notes',
+            loading: 'Đang mở ghi chú',
+        });
     } else {
         ok = await respond(chatId, { prompt: text, category: detectCategory(text) });
     }
@@ -1514,6 +1563,8 @@ async function setup(req, res) {
             { command: 'pomodoro', description: 'Gợi ý khung giờ tập trung' },
             { command: 'review', description: 'Tổng kết ngày' },
             { command: 'spend', description: 'Ghi nhanh khoản chi, vd /spend 45k ăn trưa' },
+            { command: 'note', description: 'Tạo ghi chú dán, vd /note mua sữa, gọi bác sĩ' },
+            { command: 'notes', description: 'Xem / tìm ghi chú dán, vd /notes họp tuần' },
             { command: 'reset', description: 'Bắt đầu cuộc trò chuyện mới' },
             { command: 'icons', description: 'Đổi icon 3D động cho các nút bấm' },
             { command: 'debug', description: 'Bật/tắt hiện công cụ bot đã dùng' },

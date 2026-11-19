@@ -1,343 +1,181 @@
 // File: api/gemini.js
-// Vercel Serverless Function — Proxy cho Gemini API với Quota Enforcement & Token Tracking
-// API key được giữ an toàn phía server (process.env.GEMINI_API_KEYS)
+// Vercel Serverless Function — Proxy cho Gemini API với hạn mức theo gói, tầng tốc độ và streaming.
+// API key được giữ an toàn phía server (process.env.GEMINI_API_KEYS).
+// Logic dùng chung ở api/_lib/ (aiModels, aiQuota, geminiClient, webSearch); dev server Vite gọi thẳng
+// handler này (vite.config.ts) nên chỉ cần sửa một chỗ. ?op=search (= /api/search) → tìm web có nguồn.
+//
+// Body (JSON) nhận từ client:
+//   contents, systemInstruction, generationConfig, safetySettings, tools, toolConfig — chuyển tiếp cho Gemini
+//   tier:       'lite' | 'fast' | 'balanced' | 'deep'  — server tự chọn model + mức suy nghĩ (bỏ trống = model cũ)
+//   purpose:    'chat' (mặc định) | 'router' | 'search' | 'memory' | 'greeting' — lệnh nội bộ không tính lượt
+//   isToolCall: true với các lần gọi tiếp theo trong cùng một câu hỏi (không tính lượt)
+//   stream:     true để nhận Server-Sent Events (xem streamToClient)
 
-import { createClient } from '@supabase/supabase-js';
+import { TIER_TIMEOUT_MS, normalizeTier, modelForTier, buildGenerationConfig, requestWeight } from './_lib/aiModels.js';
+import { authenticate, loadUsage, enforceQuota, recordUsage, FREE_GATE } from './_lib/aiQuota.js';
+import { getApiKeys, openGemini, readGeminiSse, toClientError } from './_lib/geminiClient.js';
+import { handleWebSearch } from './_lib/webSearch.js';
 
-const MODEL = 'gemini-2.5-flash';
+const PURPOSES = new Set(['chat', 'router', 'search', 'memory', 'greeting']);
+const LEGACY_TIMEOUT_MS = 55_000;
 
-// Khởi tạo Supabase Client
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
-
-// Quota config cho từng plan
-const QUOTA_LIMITS = {
-    free: { requests_per_day: 0, tokens_per_day: 0, tokens_per_month: 0 },
-    trial: { requests_per_day: 3, tokens_per_day: 30000, tokens_per_month: Infinity },
-    pro: { requests_per_day: 10, tokens_per_day: 50000, tokens_per_month: 600000 },
-    lifetime: { requests_per_day: 10, tokens_per_day: 50000, tokens_per_month: 600000 },
-};
-
-// Đọc API keys từ server environment (KHÔNG có prefix VITE_)
-function getApiKeys() {
-    const envKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
-    return envKeys.split(',').map(k => k.trim()).filter(Boolean);
+// Chỉ chuyển tiếp function calling; công cụ có sẵn của Google (tìm web…) tính phí riêng → đi qua /api/search
+function sanitizeTools(tools) {
+    if (!Array.isArray(tools)) return undefined;
+    const allowed = tools.filter((t) => t && Array.isArray(t.functionDeclarations));
+    return allowed.length ? allowed : undefined;
 }
 
-// Key rotation index (reset mỗi cold start — chấp nhận được cho serverless)
-let currentKeyIndex = 0;
+function setAiHeaders(res, { model, tier, weight }) {
+    res.setHeader('X-SmartLife-Model', model);
+    res.setHeader('X-SmartLife-Tier', tier || 'legacy');
+    res.setHeader('X-SmartLife-Weight', String(weight));
+    res.setHeader('Access-Control-Expose-Headers', 'X-SmartLife-Model, X-SmartLife-Tier, X-SmartLife-Weight');
+}
 
-async function callGeminiWithRetry(body, retryCount = 0) {
-    const keys = getApiKeys();
-    if (keys.length === 0) {
-        throw new Error('GEMINI_API_KEYS chưa được cấu hình trên server.');
-    }
-
-    const key = keys[currentKeyIndex % keys.length];
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
-
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-        const status = res.status;
-        const err = await res.json().catch(() => ({}));
-
-        // Retry với key rotation cho các lỗi tạm thời
-        if ((status === 429 || status === 403 || status === 500 || status === 503 || status === 504)
-            && retryCount < Math.max(3, keys.length)) {
-            if (keys.length > 1) {
-                currentKeyIndex++;
-                console.warn(`[SmartLife Proxy] Status ${status}. Rotating to key #${(currentKeyIndex % keys.length) + 1}...`);
-            }
-            const delay = 1500 * (retryCount + 1);
-            await new Promise(r => setTimeout(r, delay));
-            return callGeminiWithRetry(body, retryCount + 1);
+// Stream SSE về client:
+//   event: meta  → { model, tier, weight }
+//   (mặc định)   → từng gói JSON của Gemini (candidates, usageMetadata…)
+//   event: error → { error, type?, message? } khi lỗi giữa chừng
+//   event: done  → { usageMetadata }
+// Quota được ghi sau khi stream kết thúc — kể cả khi người dùng bấm Dừng giữa chừng.
+async function streamToClient({ req, res, model, tier, weight, geminiBody, timeoutMs, onFinish }) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException('Gemini timeout', 'TimeoutError')), timeoutMs);
+    let clientGone = false;
+    const onClose = () => {
+        if (!res.writableFinished) {
+            clientGone = true;
+            controller.abort(new DOMException('Client closed', 'AbortError'));
         }
+    };
+    res.on('close', onClose);
+    req.on?.('aborted', onClose);
 
-        // Trả lỗi cho client (KHÔNG bao gồm API key)
-        const errorMessage = err?.error?.message || `Gemini API Error ${status}`;
-        const error = new Error(errorMessage);
-        error.status = status;
-        throw error;
+    let upstream;
+    try {
+        upstream = await openGemini({ model, body: geminiBody, stream: true, signal: controller.signal });
+    } catch (err) {
+        clearTimeout(timer);
+        if (clientGone) return;
+        console.error('[SmartLife AI] Stream open error:', err.message);
+        const e = toClientError(err);
+        return res.status(e.status).json(e.body);
     }
 
-    return res.json();
-}
+    res.statusCode = 200;
+    setAiHeaders(res, { model, tier, weight });
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
 
-// Hàm xác định gói của user
-function determineActualPlan(profile, email) {
-    if (email === 'baquan3q@gmail.com') return 'lifetime';
-    if (!profile) return 'free';
-    if (profile.plan === 'lifetime') return 'lifetime';
-    
-    const now = new Date();
-    
-    if (profile.plan === 'trial' && profile.trial_started_at) {
-        const trialStart = new Date(profile.trial_started_at);
-        const trialEnd = new Date(trialStart);
-        trialEnd.setDate(trialEnd.getDate() + 7);
-        const graceEnd = new Date(trialEnd);
-        graceEnd.setDate(graceEnd.getDate() + 3); // 3 ngày grace
-        
-        if (now < graceEnd) return 'trial';
-    }
-    
-    if (profile.plan === 'pro' && profile.pro_expiry_date) {
-        const expiryDate = new Date(profile.pro_expiry_date);
-        const graceEnd = new Date(expiryDate);
-        graceEnd.setDate(graceEnd.getDate() + 3); // 3 ngày grace
-        
-        if (now < graceEnd) return 'pro';
-    }
-    
-    return 'free';
-}
+    const send = (event, data) => {
+        if (clientGone) return;
+        res.write(`${event ? `event: ${event}\n` : ''}data: ${JSON.stringify(data)}\n\n`);
+    };
+    send('meta', { model, tier: tier || 'legacy', weight });
 
-// Logic kiểm tra và trừ token từ các gói AI Boost Packs (Phase 5)
-async function checkAndConsumeBoostTokens(supabaseClient, userId, tokensToDeduct) {
-    if (!supabaseClient) return false;
-    
-    const { data: boosts, error } = await supabaseClient
-        .from('user_ai_boost')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .gt('expires_at', new Date().toISOString())
-        .order('purchased_at', { ascending: true }); // FIFO
-        
-    if (error || !boosts || boosts.length === 0) return false;
-    
-    // Nếu chỉ kiểm tra khả dụng (tokensToDeduct === 0)
-    if (tokensToDeduct === 0) {
-        const totalRemaining = boosts.reduce((sum, b) => sum + (Number(b.tokens_total) - Number(b.tokens_used)), 0);
-        return totalRemaining > 0;
-    }
-    
-    let remainingToDeduct = tokensToDeduct;
-    for (const boost of boosts) {
-        const available = Number(boost.tokens_total) - Number(boost.tokens_used);
-        if (available <= 0) continue;
-        
-        if (remainingToDeduct <= available) {
-            const newUsed = Number(boost.tokens_used) + remainingToDeduct;
-            const status = newUsed >= Number(boost.tokens_total) ? 'exhausted' : 'active';
-            await supabaseClient
-                .from('user_ai_boost')
-                .update({ tokens_used: newUsed, status })
-                .eq('id', boost.id);
-            remainingToDeduct = 0;
-            break;
-        } else {
-            await supabaseClient
-                .from('user_ai_boost')
-                .update({ tokens_used: boost.tokens_total, status: 'exhausted' })
-                .eq('id', boost.id);
-            remainingToDeduct -= available;
+    let usageMetadata = null;
+    let completed = false;
+    try {
+        await readGeminiSse(upstream, (chunk) => {
+            if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
+            send(null, chunk);
+        });
+        completed = true;
+    } catch (err) {
+        if (!clientGone) {
+            console.error('[SmartLife AI] Stream error:', err.message);
+            send('error', toClientError(err).body);
         }
+    } finally {
+        clearTimeout(timer);
     }
-    
-    return remainingToDeduct === 0;
+
+    // Người dùng tự dừng vẫn tính lượt; lỗi phía Gemini chỉ tính token đã dùng
+    await onFinish({ tokens: usageMetadata?.totalTokenCount || 0, countRequest: completed || clientGone });
+
+    if (!clientGone) {
+        send('done', { usageMetadata });
+        res.end();
+    }
 }
 
 export default async function handler(req, res) {
-    // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    // Handle preflight
-    if (req.method === 'OPTIONS') {
-        return res.status(204).end();
-    }
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed. Use POST.' });
 
-    // Chỉ cho phép POST
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed. Use POST.' });
-    }
-
-    // Kiểm tra API key đã cấu hình chưa
-    const keys = getApiKeys();
-    if (keys.length === 0) {
+    if (getApiKeys().length === 0) {
         return res.status(500).json({
-            error: 'API key chưa được cấu hình. Hãy thêm GEMINI_API_KEYS vào Vercel Environment Variables.'
+            error: 'API key chưa được cấu hình. Hãy thêm GEMINI_API_KEYS vào Vercel Environment Variables.',
         });
     }
 
-    let userId = null;
-    let userPlan = 'free';
-    let userEmail = null;
-    let supabaseClient = supabase;
+    // /api/search → rewrite về đây (gói Hobby giới hạn 12 function nên không tách file riêng)
+    if (req.query?.op === 'search') return handleWebSearch(req, res);
 
-    // 1. Authenticate user bằng JWT token gửi từ client
-    if (supabaseUrl && supabaseAnonKey) {
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            const token = authHeader.split(' ')[1];
-            
-            // Khởi tạo Supabase client scoped với token của user để vượt qua RLS
-            supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-                global: {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
-            });
-
-            const { data: { user }, error } = await supabaseClient.auth.getUser(token);
-            if (user) {
-                userId = user.id;
-                userEmail = user.email;
-                
-                // Lấy plan từ database
-                const { data: profile } = await supabaseClient
-                    .from('profiles')
-                    .select('plan, pro_expiry_date, trial_started_at')
-                    .eq('id', userId)
-                    .single();
-                    
-                userPlan = determineActualPlan(profile, userEmail);
-            }
-        }
+    const body = req.body || {};
+    const { contents, systemInstruction, generationConfig, safetySettings, tools, toolConfig } = body;
+    if (!contents || !Array.isArray(contents)) {
+        return res.status(400).json({ error: 'Thiếu trường "contents" trong request body.' });
     }
 
-    // 2. Chặn nếu là user Free
-    if (userPlan === 'free') {
-        return res.status(403).json({
-            error: 'quota_exceeded',
-            type: 'free_gate',
-            message: 'Gói Free không bao gồm quyền truy cập AI. Vui lòng nâng cấp lên gói Pro để sử dụng tính năng này! 👑'
-        });
+    // 1. Xác thực + chặn gói Free
+    const auth = await authenticate(req);
+    if (auth.plan === 'free') return res.status(FREE_GATE.status).json(FREE_GATE.body);
+
+    // 2. Tầng tốc độ, mục đích, số lượt tiêu tốn
+    const purpose = PURPOSES.has(body.purpose) ? body.purpose : 'chat';
+    let tier = normalizeTier(body.tier);
+    if (purpose !== 'chat' && tier && tier !== 'fast' && tier !== 'lite') tier = 'fast'; // lệnh nội bộ chỉ chạy model nhanh / siêu nhanh
+    const isToolCall = body.isToolCall === true;
+    const weight = requestWeight({ tier, purpose, isToolCall });
+    const model = modelForTier(tier);
+
+    // 3. Hạn mức (vượt mà còn Boost Pack thì vẫn cho qua)
+    const usage = await loadUsage(auth.db, auth.userId);
+    const quota = await enforceQuota({ auth, usage, weight, tier });
+    if (quota.blocked) return res.status(quota.blocked.status).json(quota.blocked.body);
+
+    // 4. Dựng request cho Gemini
+    const geminiBody = { contents };
+    if (systemInstruction) geminiBody.systemInstruction = systemInstruction;
+    geminiBody.generationConfig = buildGenerationConfig(generationConfig, model, tier);
+    if (safetySettings) geminiBody.safetySettings = safetySettings;
+    const safeTools = sanitizeTools(tools);
+    if (safeTools) {
+        geminiBody.tools = safeTools;
+        if (toolConfig) geminiBody.toolConfig = toolConfig;
     }
 
-    // 3. Truy cập dữ liệu quota hiện tại
-    const todayStr = new Date().toISOString().split('T')[0];
-    const now = new Date();
-    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const limits = QUOTA_LIMITS[userPlan];
+    const timeoutMs = tier ? TIER_TIMEOUT_MS[tier] : LEGACY_TIMEOUT_MS;
+    const finish = ({ tokens, countRequest }) => recordUsage({
+        auth,
+        usage,
+        weight: countRequest ? weight : 0,
+        tokens,
+        usingBoost: quota.usingBoost,
+    });
 
-    let usage = null;
-    let totalTokensMonth = 0;
-
-    if (supabaseClient && userId) {
-        const { data } = await supabaseClient
-            .from('user_ai_quota')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('date', todayStr)
-            .maybeSingle();
-        usage = data;
-
-        const { data: monthData } = await supabaseClient
-            .from('user_ai_quota')
-            .select('tokens_today')
-            .eq('user_id', userId)
-            .eq('month_key', monthKey);
-        
-        totalTokensMonth = (monthData || []).reduce((sum, row) => sum + Number(row.tokens_today || 0), 0);
-    }
-
-    const todayRequests = usage ? usage.requests_today : 0;
-    const todayTokens = usage ? usage.tokens_today : 0;
-
-    // Đọc isToolCall từ body (mặc định false)
-    const isToolCall = req.body?.isToolCall || false;
-
-    // Kiểm tra xem hạn mức có bị vượt không
-    const isDailyRequestsExceeded = todayRequests >= limits.requests_per_day;
-    const isDailyTokensExceeded = todayTokens >= limits.tokens_per_day;
-    const isMonthlyTokensExceeded = limits.tokens_per_month !== Infinity && totalTokensMonth >= limits.tokens_per_month;
-
-    let usingBoost = false;
-
-    // Chỉ kiểm tra giới hạn lượt yêu cầu nếu không phải cuộc gọi con (isToolCall === false)
-    const isRequestLimitHit = !isToolCall && isDailyRequestsExceeded;
-
-    if (isRequestLimitHit || isDailyTokensExceeded || isMonthlyTokensExceeded) {
-        // Nếu vượt hạn mức, kiểm tra xem có Boost Pack khả dụng không
-        const hasBoost = await checkAndConsumeBoostTokens(supabaseClient, userId, 0);
-        if (!hasBoost) {
-            if (isRequestLimitHit) {
-                return res.status(429).json({
-                    error: 'quota_exceeded',
-                    type: 'daily_requests_exceeded',
-                    message: `Bạn đã dùng hết ${limits.requests_per_day} lượt yêu cầu AI hôm nay. Vui lòng mua thêm gói AI Boost Pack hoặc quay lại vào ngày mai! ⏰`
-                });
-            }
-            if (isDailyTokensExceeded) {
-                return res.status(429).json({
-                    error: 'quota_exceeded',
-                    type: 'daily_tokens_exceeded',
-                    message: `Bạn đã dùng hết giới hạn ${limits.tokens_per_day.toLocaleString()} token hôm nay. Vui lòng mua thêm gói AI Boost Pack hoặc quay lại vào ngày mai! ⚡`
-                });
-            }
-            return res.status(429).json({
-                error: 'quota_exceeded',
-                type: 'monthly_tokens_exceeded',
-                message: `Bạn đã dùng hết giới hạn ${limits.tokens_per_month.toLocaleString()} token của tháng này. Vui lòng mua thêm gói AI Boost Pack để tiếp tục sử dụng! 🚀`
-            });
-        }
-        usingBoost = true;
+    if (body.stream === true) {
+        return streamToClient({ req, res, model, tier, weight, geminiBody, timeoutMs, onFinish: finish });
     }
 
     try {
-        const { contents, systemInstruction, generationConfig, safetySettings, tools, toolConfig } = req.body;
-
-        if (!contents || !Array.isArray(contents)) {
-            return res.status(400).json({ error: 'Thiếu trường "contents" trong request body.' });
-        }
-
-        // Xây dựng body gửi tới Gemini API
-        const geminiBody = { contents };
-        if (systemInstruction) geminiBody.systemInstruction = systemInstruction;
-        if (generationConfig) geminiBody.generationConfig = generationConfig;
-        if (safetySettings) geminiBody.safetySettings = safetySettings;
-        if (tools) geminiBody.tools = tools;
-        if (toolConfig) geminiBody.toolConfig = toolConfig;
-
-        // Gọi Gemini API
-        const data = await callGeminiWithRetry(geminiBody);
-
-        // 7. Ghi nhận lượng token tiêu thụ sau khi gọi thành công
-        const responseTokens = data?.usageMetadata?.totalTokenCount || 0;
-
-        if (supabaseClient && userId) {
-            // Cập nhật bảng quota hàng ngày
-            const newRequestsToday = isToolCall ? todayRequests : todayRequests + 1;
-            const newTokensToday = todayTokens + responseTokens;
-
-            const { error: upsertError } = await supabaseClient
-                .from('user_ai_quota')
-                .upsert({
-                    user_id: userId,
-                    date: todayStr,
-                    requests_today: newRequestsToday,
-                    tokens_today: newTokensToday,
-                    month_key: monthKey,
-                    updated_at: new Date().toISOString()
-                }, {
-                    onConflict: 'user_id,date'
-                });
-
-            if (upsertError) {
-                console.error('[SmartLife Proxy] ❌ Quota upsert error:', upsertError.message);
-            }
-
-            // Nếu đang dùng Boost Pack, trừ token từ Boost Pack tương ứng
-            if (usingBoost && responseTokens > 0) {
-                await checkAndConsumeBoostTokens(supabaseClient, userId, responseTokens);
-            }
-        }
-
+        const upstream = await openGemini({ model, body: geminiBody, signal: AbortSignal.timeout(timeoutMs) });
+        const data = await upstream.json();
+        await finish({ tokens: data?.usageMetadata?.totalTokenCount || 0, countRequest: true });
+        setAiHeaders(res, { model, tier, weight });
         return res.status(200).json(data);
-    } catch (error) {
-        console.error('[SmartLife Proxy] Error:', error.message);
-        const status = error.status || 500;
-        return res.status(status).json({ error: error.message });
+    } catch (err) {
+        console.error('[SmartLife AI] Error:', err.message);
+        const e = toClientError(err);
+        return res.status(e.status).json(e.body);
     }
 }

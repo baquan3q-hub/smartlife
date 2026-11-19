@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { GoogleCalendarIcon } from '../../icons/GoogleCalendarIcon';
+import { GlassIcon } from '../../icons/GlassIcon';
 import { GoogleTasksIcon } from '../../icons/GoogleTasksIcon';
 import { LandingCopy } from '../i18n';
 import { StoryDef } from '../data';
@@ -41,15 +42,15 @@ export const StoryFeature: React.FC<StoryFeatureProps> = ({ c, story, index, tot
                     </Reveal>
                     <Stagger as="ul" className="mt-8 space-y-1">
                         {s.points.map((point, i) => {
-                            const Icon = story.icons[i];
+                            const icon = story.icons[i];
                             return (
                                 <StaggerItem
                                     as="li"
                                     key={point}
                                     className="group flex items-start gap-3.5 rounded-xl px-2 py-2.5 transition-colors duration-300 hover:bg-white"
                                 >
-                                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-zinc-900/[0.07] bg-white text-zinc-500 transition-colors duration-300 group-hover:border-sky-200 group-hover:text-[var(--l-accent)]">
-                                        {Icon && <Icon size={15} />}
+                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                                        {icon && <GlassIcon name={icon} size={28} />}
                                     </span>
                                     <span className="text-[15px] leading-6 text-zinc-700">{point}</span>
                                 </StaggerItem>

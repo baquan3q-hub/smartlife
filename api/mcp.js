@@ -11,6 +11,7 @@
 
 import { TOOLS, TOOL_MAP, INSTRUCTIONS } from './_lib/tools.js';
 import { ApiError } from './_lib/authKey.js';
+import { toolErrorText } from './_lib/apiErrorText.js';
 
 const SERVER_INFO = { name: 'smartlife', title: 'SmartLife', version: '1.0.0' };
 const SUPPORTED_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
@@ -68,7 +69,7 @@ async function handleMessage(msg, key) {
             } catch (err) {
                 // Lỗi nghiệp vụ trả về cho model đọc được (isError), không làm hỏng phiên MCP
                 const message = err instanceof ApiError
-                    ? `[${err.status} ${err.code}] ${err.message}`
+                    ? toolErrorText(err, 'cấu hình MCP (header Authorization)')
                     : 'Lỗi máy chủ, vui lòng thử lại.';
                 if (!(err instanceof ApiError)) console.error('[api/mcp] tool error', err);
                 return rpcResult(msg.id, { content: [{ type: 'text', text: message }], isError: true });

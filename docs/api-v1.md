@@ -43,6 +43,8 @@ Lý do chọn thiết kế này:
 | `finance:read` | `GET /finance/overview`, `/finance/options`, `/finance/transactions` |
 | `finance:write` | Thêm / xóa giao dịch, tự cập nhật số dư ví (bao gồm cả `finance:read`) |
 | `insights:write` | `POST /ai/insights` (bao gồm cả `insights:read`) |
+| `sticky:read` | MCP / bot: `list_sticky_notes`, `get_sticky_note`. **`read:all` không bao gồm** scope này vì ghi chú thường riêng tư |
+| `sticky:write` | MCP / bot: tạo, nối thêm, sửa, lưu trữ, bỏ vào thùng rác ghi chú (bao gồm cả `sticky:read`). Cần chạy `sql/api_v1_sticky_notes.sql` |
 
 Giới hạn: 120 request/phút/key, tối đa 10 key đang hoạt động, 200 task tạo mới/giờ, 200 insight/ngày.
 
@@ -71,7 +73,9 @@ Mức ưu tiên: API dùng nhãn giao diện `urgent / focus / chill / temp`, DB
 
 `api/mcp.js` là MCP server chạy kiểu Streamable HTTP, stateless, trả về JSON. Nó dùng lại các hàm `api_v1_*`, nên scope và rate limit giống hệt REST API.
 
-Có 13 tool: `get_context`, `list_tasks`, `get_task`, `create_task`, `update_task`, `reorder_tasks`, `get_finance_overview`, `list_transactions`, `get_finance_options`, `add_transaction`, `delete_transaction`, `list_insights`, `create_insight`.
+Có 17 tool: `get_context`, `list_tasks`, `get_task`, `create_task`, `update_task`, `reorder_tasks`, `get_finance_overview`, `list_transactions`, `get_finance_options`, `add_transaction`, `delete_transaction`, `list_insights`, `create_insight`, `list_sticky_notes`, `get_sticky_note`, `create_sticky_note`, `update_sticky_note`.
+
+Ghi chú dán (Sticky Notes) chưa có endpoint REST, chỉ qua MCP và bot Telegram. `update_sticky_note` hỗ trợ `append` (nối vào cuối, nguyên tử), `content` (ghi đè, kèm `expected_version` để tránh đè bản vừa sửa ở thiết bị khác), `in_trash` (xóa mềm 30 ngày). Ghi chú sửa qua API đi qua cùng trigger lịch sử phiên bản và Realtime như app, nên hiện ngay trên mọi thiết bị.
 
 | Ứng dụng | Cấu hình |
 |---|---|

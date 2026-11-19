@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { X, Sparkles, LayoutDashboard, BrainCircuit, Wallet, CalendarDays, Flame, Music, GraduationCap, Clock, Archive, BookOpen, Target, FileText, Compass, ListChecks, UserCircle } from 'lucide-react';
+import { X } from 'lucide-react';
+import { GlassIcon } from './icons/GlassIcon';
 
 interface WelcomeTourModalProps {
     isOpen: boolean;
@@ -7,21 +8,21 @@ interface WelcomeTourModalProps {
 }
 
 const features = [
-    { icon: <LayoutDashboard size={20} className="text-blue-500" />, title: 'Visual Board', desc: 'Trực quan hóa bức tranh toàn bộ cuộc sống của bạn' },
-    { icon: <BrainCircuit size={20} className="text-purple-500" />, title: 'AI Advisor', desc: 'Trợ lý thông minh hành động và phân tích all your data' },
-    { icon: <Wallet size={20} className="text-emerald-500" />, title: 'Tài chính', desc: 'Kiểm soát thu chi, báo cáo trực quan' },
-    { icon: <CalendarDays size={20} className="text-indigo-500" />, title: 'Lịch trình', desc: 'Sắp xếp thời gian, Todo list thông minh và đặt mục tiêu cá' },
-    { icon: <ListChecks size={20} className="text-lime-500" />, title: 'Todolist', desc: 'Quản lý công việc hàng ngày, ưu tiên task & check-in tiến độ' },
-    { icon: <UserCircle size={20} className="text-fuchsia-500" />, title: 'Profile cá nhân hóa', desc: 'MBTI, DISC & thông tin cá nhân giúp AI hiểu bạn hơn' },
-    { icon: <Flame size={20} className="text-orange-500" />, title: 'Thói quen', desc: 'Hình thành habit bằng cơ chế đổi thưởng dopamine, countdown/up' },
-    { icon: <BookOpen size={20} className="text-emerald-600" />, title: 'Nhật ký cá nhân', desc: 'Chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
-    { icon: <Target size={20} className="text-purple-600" />, title: 'Mục tiêu & Lộ trình', desc: 'Lập kế hoạch sự nghiệp, mục tiêu 5 năm & AI định hướng lộ trình' },
-    { icon: <Compass size={20} className="text-teal-500" />, title: 'Định hướng nghề nghiệp', desc: 'AI phân tích năng lực & đề xuất lộ trình sự nghiệp phù hợp' },
-    { icon: <FileText size={20} className="text-sky-500" />, title: 'CV Builder', desc: 'Tạo CV chuyên nghiệp dựa trên mục tiêu & định hướng nghề nghiệp của bạn' },
-    { icon: <Clock size={20} className="text-rose-500" />, title: 'Pomodoro', desc: 'Tập trung cao độ với bộ đếm giờ' },
-    { icon: <GraduationCap size={20} className="text-cyan-500" />, title: 'GPA Tracker', desc: 'Quản lý điểm số, đặt mục tiêu học tập' },
-    { icon: <Music size={20} className="text-pink-500" />, title: 'My Spotify', desc: 'Nghe nhạc & Podcast không giới hạn' },
-    { icon: <Archive size={20} className="text-amber-500" />, title: 'My Storage', desc: 'Kho lưu trữ đa phương tiện bảo mật' },
+    { icon: <GlassIcon name="overview" size={28} />, title: 'Visual Board', desc: 'Trực quan hóa bức tranh toàn bộ cuộc sống của bạn' },
+    { icon: <GlassIcon name="ai" size={28} />, title: 'AI Advisor', desc: 'Trợ lý thông minh hành động và phân tích all your data' },
+    { icon: <GlassIcon name="finance" size={28} />, title: 'Tài chính', desc: 'Kiểm soát thu chi, báo cáo trực quan' },
+    { icon: <GlassIcon name="schedule" size={28} />, title: 'Lịch trình', desc: 'Sắp xếp thời gian, Todo list thông minh và đặt mục tiêu cá' },
+    { icon: <GlassIcon name="tasks" size={28} />, title: 'Todolist', desc: 'Quản lý công việc hàng ngày, ưu tiên task & check-in tiến độ' },
+    { icon: <GlassIcon name="user" size={28} />, title: 'Profile cá nhân hóa', desc: 'MBTI, DISC & thông tin cá nhân giúp AI hiểu bạn hơn' },
+    { icon: <GlassIcon name="habit" size={28} />, title: 'Thói quen', desc: 'Hình thành habit bằng cơ chế đổi thưởng dopamine, countdown/up' },
+    { icon: <GlassIcon name="book" size={28} />, title: 'Nhật ký cá nhân', desc: 'Chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
+    { icon: <GlassIcon name="goals" size={28} />, title: 'Mục tiêu & Lộ trình', desc: 'Lập kế hoạch sự nghiệp, mục tiêu 5 năm & AI định hướng lộ trình' },
+    { icon: <GlassIcon name="growth" size={28} />, title: 'Định hướng nghề nghiệp', desc: 'AI phân tích năng lực & đề xuất lộ trình sự nghiệp phù hợp' },
+    { icon: <GlassIcon name="cv" size={28} />, title: 'CV Builder', desc: 'Tạo CV chuyên nghiệp dựa trên mục tiêu & định hướng nghề nghiệp của bạn' },
+    { icon: <GlassIcon name="timer" size={28} />, title: 'Pomodoro', desc: 'Tập trung cao độ với bộ đếm giờ' },
+    { icon: <GlassIcon name="gpa" size={28} />, title: 'GPA Tracker', desc: 'Quản lý điểm số, đặt mục tiêu học tập' },
+    { icon: <GlassIcon name="music" size={28} />, title: 'My Spotify', desc: 'Nghe nhạc & Podcast không giới hạn' },
+    { icon: <GlassIcon name="storage" size={28} />, title: 'My Storage', desc: 'Kho lưu trữ đa phương tiện bảo mật' },
 ];
 
 const WelcomeTourModal: React.FC<WelcomeTourModalProps> = ({ isOpen, onClose }) => {
@@ -79,7 +80,7 @@ const WelcomeTourModal: React.FC<WelcomeTourModalProps> = ({ isOpen, onClose }) 
                 <div className="p-6 sm:p-8 flex flex-col h-full overflow-y-auto custom-scrollbar relative z-10">
                     <div className="text-center mb-8">
                         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 mb-4 shadow-inner">
-                            <Sparkles size={32} />
+                            <GlassIcon name="gift" size={44} />
                         </div>
                         <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">
                             Chào mừng đến với SmartLife! 🎉

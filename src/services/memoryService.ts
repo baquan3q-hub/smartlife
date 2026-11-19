@@ -83,6 +83,7 @@ ${chatHistory}
 Định dạng trả về là JSON Array: [{"type": "fact|preference|habit|goal_note", "content": "nội dung tiếng Việt", "importance": 1-10}]. Trả về [] nếu không có gì đáng nhớ.`;
 
         const body = {
+            purpose: 'memory', // lệnh nội bộ: chỉ tính token, không trừ lượt câu hỏi
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             generationConfig: {
                 responseMimeType: 'application/json',
