@@ -13,7 +13,7 @@ import {
 import { GlassIcon } from './icons/GlassIcon';
 
 import { AppState, TransactionType } from '../types';
-import { generateQuickInsight, type AITier } from '../services/geminiService';
+import { callRouterModel, generateQuickInsight } from '../services/geminiService';
 import {
     chatWithAI,
     type ActionHandlers, type ActionResult, type AIAttachment, type AIRunMeta, type AIStep, type AIStreamEvent, type ChartData,
@@ -32,7 +32,11 @@ import MessageBubble from './ai/MessageBubble';
 import MessageList from './ai/MessageList';
 import Composer from './ai/Composer';
 import ArtifactPane, { type Artifact } from './ai/ArtifactPane';
-import { loadTier, saveTier, tierLabel } from './ai/tiers';
+import { loadSpeed, saveSpeed, SPEED_OPTIONS, type SpeedChoice } from './ai/tiers';
+import { getExpert, isExpertId, type ExpertId } from '../services/ai/experts';
+import { routeTurn } from '../services/ai/router';
+import { countClarifyRounds, lastAskedConfirm, type ClarifyRequest } from '../services/ai/clarify';
+import type { WebSource } from '../services/ai/webSearch';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Lang } from '../i18n/i18n';
@@ -272,7 +276,9 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [isLoadingConversation, setIsLoadingConversation] = useState(false);
     const [activeArtifact, setActiveArtifact] = useState<Artifact | null>(null);
-    const [tier, setTier] = useState<AITier>(loadTier);
+    const [speed, setSpeed] = useState<SpeedChoice>(loadSpeed);
+    // Chế độ chuyên gia của cuộc trò chuyện đang mở (lưu ở ai_conversations.expert_mode)
+    const [expert, setExpert] = useState<ExpertId>('general');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [pinSignal, setPinSignal] = useState(0);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -286,9 +292,18 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const [simAmount, setSimAmount] = useState('');
     const [selectedImpactDetails, setSelectedImpactDetails] = useState<any>(null);
 
-    const handleTierChange = (next: AITier) => {
-        setTier(next);
-        saveTier(next);
+    const handleSpeedChange = (next: SpeedChoice) => {
+        setSpeed(next);
+        saveSpeed(next);
+    };
+
+    const handleExpertChange = (next: ExpertId) => {
+        if (next === expert) return;
+        setExpert(next);
+        const convId = conversationIdRef.current;
+        if (!convId) return;
+        chatHistoryService.updateConversationExpert(convId, next).catch(console.error);
+        setConversations(prev => prev.map(c => (c.id === convId ? { ...c, expert_mode: next === 'general' ? null : next } : c)));
     };
 
     // Dừng: chỉ huỷ request — lượt chạy tự giữ phần chữ đã nhận, gắn nhãn "Đã dừng" và lưu lại
@@ -434,7 +449,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const ensureConversation = async (title: string): Promise<string | null> => {
         if (conversationIdRef.current) return conversationIdRef.current;
         const session = sessionRef.current;
-        const conv = await chatHistoryService.createConversation(title.length > 50 ? title.substring(0, 50) + '...' : title);
+        const conv = await chatHistoryService.createConversation(title.length > 50 ? title.substring(0, 50) + '...' : title, expert);
         if (!conv) return null;
         if (sessionRef.current === session) setConvId(conv.id);
         return conv.id;
@@ -485,11 +500,15 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             charts: [] as ChartData[],
             actions: [] as ActionResult[],
             run: {} as AIRunMeta,
+            clarification: undefined as ClarifyRequest | undefined,
+            sources: [] as WebSource[],
         };
         const liveMeta = (): AIMessageMeta => ({
             ...live.run,
             thoughts: live.thoughts || undefined,
             steps: live.steps.length ? [...live.steps] : undefined,
+            clarification: live.clarification,
+            sources: live.sources.length ? [...live.sources] : undefined,
         });
         let frame = 0;
         const flush = () => {
@@ -505,7 +524,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         const onEvent = (event: AIStreamEvent) => {
             switch (event.type) {
                 case 'meta':
-                    live.run = { model: event.meta.model, tier: event.meta.tier, weight: event.meta.weight };
+                    live.run = { ...live.run, model: event.meta.model, tier: event.meta.tier, weight: event.meta.weight };
                     break;
                 case 'text': live.text += event.delta; break;
                 case 'thought': live.thoughts += event.delta; break;
@@ -517,6 +536,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 }
                 case 'chart': live.charts.push(event.chart); break;
                 case 'action': live.actions.push(event.action); break;
+                case 'clarify': live.clarification = event.request; break;
+                case 'sources': live.sources = event.sources; break;
             }
             if (!frame) frame = requestAnimationFrame(flush);
         };
@@ -524,9 +545,29 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         try {
             let final: UIMessage;
             try {
+                // Câu hỏi cần trả lời = tin người dùng cuối cùng; Auto chọn tầng + đoán lĩnh vực / dấu hiệu khủng hoảng
+                const question = [...base].reverse().find(m => m.role === 'user' && !m.local);
+                const userText = question ? editableText(question) : '';
+                const route = await routeTurn(
+                    { text: userText, hasAttachments: attachments.length > 0, expert },
+                    speed,
+                    prompt => callRouterModel(prompt, controller.signal),
+                );
+                if (controller.signal.aborted) throw new DOMException('Đã dừng', 'AbortError');
+                live.run = { ...live.run, tier: route.tier, auto: route.auto || undefined, expert, domain: route.domain };
                 const response = await chatWithAI(
                     toGeminiHistory(base), appState, actionHandlers, memoryContext, attachments, controller.signal,
-                    { tier, onEvent }
+                    {
+                        tier: route.tier,
+                        onEvent,
+                        expert,
+                        auto: route.auto,
+                        domain: route.domain,
+                        crisis: route.crisis,
+                        userText,
+                        clarifyRoundsUsed: countClarifyRounds(base),
+                        confirmedBulk: lastAskedConfirm(base),
+                    }
                 );
                 final = {
                     id: replyId,
@@ -634,6 +675,12 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         if (!isLoading) setEditingId(message.id);
     });
     const handleCancelEdit = useStableCallback(() => setEditingId(null));
+
+    // Trả lời thẻ hỏi lại (ask_user): gửi thành tin nhắn tiếp theo của người dùng
+    const handleAnswerClarify = useStableCallback((text: string) => {
+        // Gửi thẳng, không đụng tới ô soạn / tệp người dùng đang chuẩn bị
+        if (!isLoading) sendTurn(messagesRef.current, text);
+    });
 
     // Sửa & gửi lại: bỏ tin này cùng mọi tin sau, gửi nội dung mới (giữ tệp đính kèm nếu còn trong phiên)
     const handleSubmitEdit = useStableCallback((target: UIMessage, text: string) => {
@@ -751,6 +798,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         leaveCurrentConversation();
         setIsLoadingConversation(true);
         try {
+            const conv = conversations.find(c => c.id === convId);
+            setExpert(isExpertId(conv?.expert_mode) ? conv!.expert_mode as ExpertId : 'general');
             const rows = await chatHistoryService.getMessages(convId);
             const ui = fromStoredMessages(rows);
             setMessages(ui.length > 0 ? ui : [localNotice(EMPTY_TEXT)]);
@@ -901,7 +950,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                                     </span>
-                                    Chế độ {tierLabel(tier)}{modelLabel ? ` · ${modelLabel}` : ''}
+                                    {getExpert(expert).name} · {SPEED_OPTIONS.find(o => o.id === speed)?.label}{modelLabel ? ` · ${modelLabel}` : ''}
                                 </div>
                             </div>
                         </div>
@@ -1325,6 +1374,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                             </div>
                         ) : (() => {
                             let seenUser = false;
+                            const lastId = messages[messages.length - 1]?.id;
                             return messages.map(m => {
                                 if (m.role === 'user' && !m.local) seenUser = true;
                                 return (
@@ -1345,6 +1395,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                         onRegenerate={handleRegenerate}
                                         onDelete={handleDeleteMessage}
                                         onFeedback={handleFeedback}
+                                        isLast={m.id === lastId}
+                                        onAnswerClarify={handleAnswerClarify}
                                     />
                                 );
                             });
@@ -1390,8 +1442,10 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         attachedFiles={attachedFiles}
                         setAttachedFiles={setAttachedFiles}
                         isLoading={isLoading}
-                        tier={tier}
-                        onTierChange={handleTierChange}
+                        speed={speed}
+                        onSpeedChange={handleSpeedChange}
+                        expert={expert}
+                        onExpertChange={handleExpertChange}
                         onSend={() => handleSend()}
                         onStop={handleStopResponse}
                         inputRef={inputRef}

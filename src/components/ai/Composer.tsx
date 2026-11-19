@@ -1,11 +1,12 @@
 // File: src/components/ai/Composer.tsx
-// Ô soạn tin: đính kèm tệp, nhập bằng giọng nói, chọn tốc độ trả lời (Nhanh / Nghĩ vừa / Nghĩ sâu), Gửi / Dừng
+// Ô soạn tin: đính kèm tệp, nhập bằng giọng nói, chọn chuyên gia + tốc độ trả lời (Auto / Nhanh / Nghĩ vừa / Nghĩ sâu), Gửi / Dừng
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, Plus, Send, Square, X } from 'lucide-react';
 import type { Lang } from '../../i18n/i18n';
-import type { AITier } from '../../services/geminiService';
-import { TIER_OPTIONS } from './tiers';
+import type { ExpertId } from '../../services/ai/experts';
+import type { SpeedChoice } from './tiers';
+import ModeBar from './ModeBar';
 
 export const MAX_FILE_SIZE = 30 * 1024 * 1024;
 
@@ -16,8 +17,10 @@ interface ComposerProps {
     attachedFiles: File[];
     setAttachedFiles: React.Dispatch<React.SetStateAction<File[]>>;
     isLoading: boolean;
-    tier: AITier;
-    onTierChange: (tier: AITier) => void;
+    speed: SpeedChoice;
+    onSpeedChange: (speed: SpeedChoice) => void;
+    expert: ExpertId;
+    onExpertChange: (expert: ExpertId) => void;
     onSend: () => void;
     onStop: () => void;
     inputRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -25,7 +28,7 @@ interface ComposerProps {
 
 const Composer: React.FC<ComposerProps> = ({
     lang, input, setInput, attachedFiles, setAttachedFiles,
-    isLoading, tier, onTierChange, onSend, onStop, inputRef,
+    isLoading, speed, onSpeedChange, expert, onExpertChange, onSend, onStop, inputRef,
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadMenuRef = useRef<HTMLDivElement>(null);
@@ -237,34 +240,7 @@ const Composer: React.FC<ComposerProps> = ({
                 </button>
             </div>
 
-            <div className="flex items-center justify-between gap-2 mt-2">
-                <div className="flex items-center gap-1" role="radiogroup" aria-label="Tốc độ trả lời">
-                    {TIER_OPTIONS.map(option => {
-                        const active = option.id === tier;
-                        return (
-                            <button
-                                key={option.id}
-                                type="button"
-                                role="radio"
-                                aria-checked={active}
-                                onClick={() => onTierChange(option.id)}
-                                title={`${option.hint} · tốn ${option.weight} lượt`}
-                                className={`px-2 py-1 rounded-lg text-[10px] sm:text-[11px] font-semibold border transition-colors whitespace-nowrap ${
-                                    active
-                                        ? 'bg-blue-50 border-blue-200 text-blue-700'
-                                        : 'bg-white border-gray-150 text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                {option.label}
-                                <span className={`ml-1 ${active ? 'text-blue-400' : 'text-gray-300'}`}>·{option.weight}</span>
-                            </button>
-                        );
-                    })}
-                </div>
-                <p className="text-[9px] text-gray-400 text-right hidden sm:block">
-                    Số sau tên chế độ là số lượt tính · Tệp tối đa 30MB/file
-                </p>
-            </div>
+            <ModeBar speed={speed} onSpeedChange={onSpeedChange} expert={expert} onExpertChange={onExpertChange} />
         </div>
     );
 };

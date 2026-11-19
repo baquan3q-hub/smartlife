@@ -3,7 +3,7 @@
 // biểu đồ, và hàng nút thao tác tin nhắn.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, FileText, Paperclip, RefreshCw, Sparkles, Square, Zap } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Globe, Paperclip, RefreshCw, Sparkles, Square, Zap } from 'lucide-react';
 import type { AppState } from '../../types';
 import { editableText, hidePartialArtifact, parseArtifact, type UIMessage } from '../../services/ai/messages';
 import InlineChatChart from '../InlineChatChart';
@@ -12,6 +12,8 @@ import ThinkingPanel from './ThinkingPanel';
 import MessageActions from './MessageActions';
 import { FinancialImpactCard } from './FinancialImpact';
 import { tierLabel } from './tiers';
+import ClarifyCard from './ClarifyCard';
+import { getExpert } from '../../services/ai/experts';
 import type { Artifact } from './ArtifactPane';
 
 export interface MessageBubbleProps {
@@ -20,6 +22,10 @@ export interface MessageBubbleProps {
     busy: boolean;
     isEditing: boolean;
     canRegenerate: boolean;
+    /** Tin cuối cùng trong cuộc trò chuyện — chỉ thẻ hỏi lại của tin cuối mới bấm chọn được */
+    isLast?: boolean;
+    /** Gửi câu trả lời cho thẻ hỏi lại (ask_user) */
+    onAnswerClarify?: (text: string) => void;
     onAddTransaction?: (tx: any) => Promise<void>;
     onOpenImpactDetails: (data: any) => void;
     onOpenArtifact: (artifact: Artifact) => void;
@@ -85,7 +91,7 @@ const EditBox: React.FC<{
 };
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
-    message, appState, busy, isEditing, canRegenerate,
+    message, appState, busy, isEditing, canRegenerate, isLast, onAnswerClarify,
     onAddTransaction, onOpenImpactDetails, onOpenArtifact,
     onStartEdit, onCancelEdit, onSubmitEdit, onRevert, onRegenerate, onDelete, onFeedback,
 }) => {
@@ -104,6 +110,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             : source;
 
     const hasText = displayContent.trim().length > 0;
+    const sources = !isUser && !streaming ? meta?.sources || [] : [];
+    const clarification = !isUser && !streaming ? meta?.clarification : undefined;
+    const expertName = meta?.expert && meta.expert !== 'general' ? getExpert(meta.expert).name : '';
+    const modeText = meta?.tier ? `${meta.auto ? 'Auto → ' : ''}${tierLabel(meta.tier) || meta.tier}` : '';
     const showThinking = !isUser && !message.local && (streaming || !!meta?.steps?.length || !!meta?.thoughts);
 
     return (
@@ -156,6 +166,42 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                                 <MarkdownMessage content={displayContent} />
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* Nguồn web (web_search) — số [n] trong câu trả lời khớp với số ở đây */}
+                {sources.length > 0 && (
+                    <div className="mt-2 w-full">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500 mb-1 flex items-center gap-1">
+                            <Globe size={10} /> Nguồn
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {sources.map(src => (
+                                <a
+                                    key={src.n}
+                                    href={src.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={src.title}
+                                    className="inline-flex items-center gap-1.5 max-w-[240px] px-2 py-1 rounded-lg bg-white border border-gray-200 text-[11px] text-gray-600 hover:border-blue-300 hover:text-blue-700 transition-colors dark:border-slate-600 dark:text-slate-300 dark:hover:border-blue-400 dark:hover:text-blue-300"
+                                >
+                                    <span className="font-bold text-blue-600 dark:text-blue-300 shrink-0">[{src.n}]</span>
+                                    <span className="truncate">{src.title || src.domain}</span>
+                                    <span className="text-gray-400 dark:text-slate-500 shrink-0 hidden sm:inline">{src.domain}</span>
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* AI hỏi lại (ask_user) */}
+                {clarification && (
+                    <div className="w-full">
+                        <ClarifyCard
+                            request={clarification}
+                            disabled={busy || !isLast || !onAnswerClarify}
+                            onSubmit={text => onAnswerClarify?.(text)}
+                        />
                     </div>
                 )}
 
@@ -243,11 +289,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {/* Chân tin: token + chế độ, thao tác */}
                 {!message.local && !streaming && !isEditing && (
                     <div className={`flex items-center gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
-                        {!isUser && (meta?.tokens_used || meta?.tier) && (
+                        {!isUser && (meta?.tokens_used || meta?.tier || expertName) && (
                             <div className="text-[10px] text-gray-400 mt-1 ml-1 flex items-center gap-1 select-none">
                                 <Zap size={10} className="shrink-0" />
                                 {meta?.tokens_used ? <span><strong>{meta.tokens_used.toLocaleString('vi-VN')}</strong> tokens</span> : null}
-                                {meta?.tier && <span>{meta?.tokens_used ? '· ' : ''}{tierLabel(meta.tier) || meta.tier}</span>}
+                                {modeText && <span title={meta?.auto ? 'Chế độ Auto đã chọn tốc độ này' : undefined}>{meta?.tokens_used ? '· ' : ''}{modeText}</span>}
+                                {expertName && <span>{meta?.tokens_used || modeText ? '· ' : ''}{expertName}</span>}
                             </div>
                         )}
                         <MessageActions
