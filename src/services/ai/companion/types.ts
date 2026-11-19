@@ -85,20 +85,23 @@ export const TRAITS: TraitOption[] = [
 export interface AvatarOption {
     id: AvatarId;
     emoji: string;
+    /** Ảnh nhân vật 3D trong public/companion (emoji là dự phòng khi ảnh lỗi) */
+    image: string;
+    label: string;
     /** Hai màu gradient nền (hex) */
     from: string;
     to: string;
 }
 
 export const AVATARS: AvatarOption[] = [
-    { id: 'cloud', emoji: '☁️', from: '#bae6fd', to: '#818cf8' },
-    { id: 'cat', emoji: '🐱', from: '#fde68a', to: '#fb923c' },
-    { id: 'sun', emoji: '🌻', from: '#fef08a', to: '#f59e0b' },
-    { id: 'moon', emoji: '🌙', from: '#c7d2fe', to: '#6366f1' },
-    { id: 'leaf', emoji: '🍀', from: '#bbf7d0', to: '#10b981' },
-    { id: 'star', emoji: '⭐', from: '#fbcfe8', to: '#a855f7' },
-    { id: 'fox', emoji: '🦊', from: '#fed7aa', to: '#ef4444' },
-    { id: 'wave', emoji: '🌊', from: '#a5f3fc', to: '#0284c7' },
+    { id: 'cloud', emoji: '☁️', image: '/companion/robot.webp', label: 'Robot pastel', from: '#bae6fd', to: '#818cf8' },
+    { id: 'cat', emoji: '🐱', image: '/companion/teddy.webp', label: 'Gấu bông', from: '#fde68a', to: '#fb923c' },
+    { id: 'sun', emoji: '🌻', image: '/companion/girl-ponytail.webp', label: 'Cô gái tóc đuôi ngựa', from: '#fef08a', to: '#f59e0b' },
+    { id: 'moon', emoji: '🌙', image: '/companion/mentor-male.webp', label: 'Cố vấn nam', from: '#c7d2fe', to: '#6366f1' },
+    { id: 'leaf', emoji: '🍀', image: '/companion/girl-bob.webp', label: 'Cô gái tóc bob', from: '#bbf7d0', to: '#10b981' },
+    { id: 'star', emoji: '⭐', image: '/companion/mentor-female.webp', label: 'Cố vấn nữ', from: '#fbcfe8', to: '#a855f7' },
+    { id: 'fox', emoji: '🦊', image: '/companion/boy-hoodie.webp', label: 'Chàng trai hoodie', from: '#fed7aa', to: '#ef4444' },
+    { id: 'wave', emoji: '🌊', image: '/companion/boy-viet.webp', label: 'Chàng trai Việt', from: '#a5f3fc', to: '#0284c7' },
 ];
 
 export const SELF_PRONOUNS = ['mình', 'tớ', 'anh', 'chị', 'em', 't'];

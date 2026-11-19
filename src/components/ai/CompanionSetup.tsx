@@ -183,7 +183,7 @@ const CompanionSetup: React.FC<Props> = ({ initial, profileAge, onSave, onClose 
                                         <button
                                             key={a.id}
                                             type="button"
-                                            aria-label={`Ảnh ${a.emoji}`}
+                                            aria-label={`Ảnh ${a.label}`}
                                             aria-pressed={p.avatar === a.id}
                                             onClick={() => set({ avatar: a.id })}
                                             className={`rounded-full p-0.5 transition-all ${p.avatar === a.id ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900' : 'opacity-80 hover:opacity-100'}`}
