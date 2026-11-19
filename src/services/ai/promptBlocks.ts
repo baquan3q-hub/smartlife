@@ -12,6 +12,8 @@ import { MAX_WEB_SEARCHES } from './webSearch';
 import type { CompanionProfile } from './companion/types';
 import { DEFAULT_COMPANION } from './companion/types';
 import { companionFormatting, companionIdentity, companionSafetyBlock, renderCompanionBlock } from './companion/prompt';
+import { companionStyleBlock } from './companion/style';
+import { companionExamplesBlock } from './companion/examples';
 
 // ── Khối gốc (tách nguyên văn từ SYSTEM_INSTRUCTION cũ) ──────────────────────
 
@@ -151,8 +153,11 @@ function buildCompanionPrompt(opts: PromptOptions, expert: ExpertProfile): Built
         ['tools', `${TOOLS_BLOCK}\n${RESTRICTED_TOOLS_NOTE}`],
         ['formatting', companionFormatting(p)],
         ['companion_persona', renderCompanionBlock(p)],
-        ['companion_safety', companionSafetyBlock(p)],
     ];
+    if (opts.companionStyle !== false) out.push(['companion_style', companionStyleBlock(p)]);
+    // Vài hội thoại mẫu hợp ngữ cảnh — bỏ khi khủng hoảng (không để giọng đùa lấn khối an toàn)
+    if (!opts.crisis && opts.companionExamples !== false) out.push(['companion_examples', companionExamplesBlock(p, opts.userText)]);
+    out.push(['companion_safety', companionSafetyBlock(p)]);
     if (opts.crisis) {
         out.push(['crisis', `⚠️ AN TOÀN (ưu tiên cao nhất cho lượt này — tin nhắn có dấu hiệu khủng hoảng; được phép dài hơn bình thường):\n${psychology.safety.join('\n')}`]);
     }
@@ -178,6 +183,9 @@ export interface PromptOptions {
     webSearch?: boolean;
     /** Hồ sơ bạn AI (chế độ companion); bỏ trống thì dùng hồ sơ mặc định */
     companion?: CompanionProfile | null;
+    /** false = không nạp hội thoại mẫu / quy tắc giọng người bạn Việt (eval so sánh trước / sau) */
+    companionExamples?: boolean;
+    companionStyle?: boolean;
     /** Hồ sơ có MBTI/DISC không — không có thì bỏ khối cá nhân hoá */
     hasPersonality?: boolean;
 }

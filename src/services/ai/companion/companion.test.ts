@@ -47,6 +47,21 @@ describe('hồ sơ bạn AI', () => {
         expect(p.userPronoun).toBe('em');
     });
 
+    it('t–m chỉ nhận khi đi thành cặp và vai ngang hàng', () => {
+        const ok = sanitizeCompanion({ ...DEFAULT_COMPANION, selfPronoun: 't', userPronoun: 'm' });
+        expect([ok.selfPronoun, ok.userPronoun]).toEqual(['t', 'm']);
+        const buddy = sanitizeCompanion({ ...DEFAULT_COMPANION, relationship: 'study_buddy', selfPronoun: 't', userPronoun: 'm' });
+        expect(buddy.selfPronoun).toBe('t');
+        const half = sanitizeCompanion({ ...DEFAULT_COMPANION, selfPronoun: 't', userPronoun: 'cậu' });
+        expect([half.selfPronoun, half.userPronoun]).toEqual(['tớ', 'cậu']);
+        const senior = sanitizeCompanion({ ...DEFAULT_COMPANION, gender: 'male', relationship: 'senior', selfPronoun: 't', userPronoun: 'm' });
+        expect([senior.selfPronoun, senior.userPronoun]).toEqual(['anh', 'em']);
+        const sweet = sanitizeCompanion({ ...DEFAULT_COMPANION, gender: 'male', relationship: 'sweetheart', adultConfirmedAt: '2026-11-19', selfPronoun: 't', userPronoun: 'm' });
+        expect([sweet.selfPronoun, sweet.userPronoun]).toEqual(['anh', 'em']);
+        const mentor = sanitizeCompanion({ ...DEFAULT_COMPANION, gender: 'neutral', relationship: 'mentor', selfPronoun: 't', userPronoun: 'm' });
+        expect([mentor.selfPronoun, mentor.userPronoun]).toEqual(['mình', 'bạn']);
+    });
+
     it('câu chào xem trước dùng đúng tên và xưng hô', () => {
         const g = previewGreeting({ ...DEFAULT_COMPANION, name: 'Bơ', emoji: 'none' });
         expect(g).toContain('Bơ');
@@ -64,12 +79,15 @@ describe('prompt bạn AI', () => {
         expect(t).toContain('xưng "anh"');
         expect(t).toContain('gọi người dùng là "em"');
         expect(t).not.toContain('Advisor');
+        expect(t).not.toContain('MỌI câu');
+        expect(t).toContain('chỉ đổi khi chính người dùng yêu cầu');
     });
 
     it('trình bày ngắn theo độ dài và emoji', () => {
         expect(companionFormatting({ ...p, length: 'tiny', emoji: 'none' })).toContain('1–2 câu');
         expect(companionFormatting({ ...p, length: 'tiny', emoji: 'none' })).toContain('KHÔNG dùng emoji');
         expect(companionFormatting({ ...p, length: 'short' })).toContain('2–4 câu');
+        expect(companionFormatting(p)).not.toContain('tiếng Anh');
     });
 
     it('khối tính cách liệt kê các nét đã chọn', () => {

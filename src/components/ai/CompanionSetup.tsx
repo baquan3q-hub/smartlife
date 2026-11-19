@@ -6,8 +6,8 @@ import { Check, ChevronLeft, Loader2, ShieldCheck, X } from 'lucide-react';
 import CompanionAvatar from './CompanionAvatar';
 import {
     AVATARS, DEFAULT_COMPANION, EMOJI_LEVELS, GENDERS, MAX_TRAITS, NAME_MAX, RELATIONSHIPS, REPLY_LENGTHS,
-    SELF_PRONOUNS, TEXT_MAX, TRAITS, USER_PRONOUNS,
-    defaultPronouns, hasBlockedContent, previewGreeting, sanitizeCompanion,
+    PRONOUN_LABEL, SELF_PRONOUNS, TEXT_MAX, TRAITS, USER_PRONOUNS,
+    canUseTaoMay, defaultPronouns, hasBlockedContent, previewGreeting, sanitizeCompanion,
     type CompanionProfile, type TraitId,
 } from '../../services/ai/companion/types';
 
@@ -50,6 +50,32 @@ const CompanionSetup: React.FC<Props> = ({ initial, profileAge, onSave, onClose 
         if (pronounTouched) return;
         setP(prev => ({ ...prev, ...defaultPronouns(prev.gender, prev.relationship) }));
     }, [p.gender, p.relationship, pronounTouched]);
+
+    // t–m chỉ hợp Bạn thân / Bạn cùng học — đổi sang vai khác thì trả về xưng hô gợi ý
+    const taoMay = p.selfPronoun === 't' && p.userPronoun === 'm';
+    const tmAllowed = canUseTaoMay(p.relationship);
+    useEffect(() => {
+        if (taoMay && !tmAllowed) setP(prev => ({ ...prev, ...defaultPronouns(prev.gender, prev.relationship) }));
+    }, [taoMay, tmAllowed]);
+
+    /** Chọn xưng hô: t đi kèm m; bỏ một vế t–m thì vế kia về gợi ý */
+    const setPronoun = (key: 'selfPronoun' | 'userPronoun', value: string) => {
+        setPronounTouched(true);
+        setP(prev => {
+            const def = defaultPronouns(prev.gender, prev.relationship);
+            if (value === 't' || value === 'm') return { ...prev, selfPronoun: 't', userPronoun: 'm' };
+            const next = { ...prev, [key]: value };
+            if (key === 'selfPronoun' && prev.userPronoun === 'm') next.userPronoun = def.userPronoun === 'm' ? 'bạn' : def.userPronoun;
+            if (key === 'userPronoun' && prev.selfPronoun === 't') next.selfPronoun = def.selfPronoun === 't' ? 'mình' : def.selfPronoun;
+            return next;
+        });
+    };
+    const toggleTaoMay = () => {
+        if (taoMay) {
+            setPronounTouched(true);
+            setP(prev => ({ ...prev, ...defaultPronouns(prev.gender, prev.relationship) }));
+        } else setPronoun('selfPronoun', 't');
+    };
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
@@ -223,16 +249,30 @@ const CompanionSetup: React.FC<Props> = ({ initial, profileAge, onSave, onClose 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <Label>{p.name || 'Bạn AI'} xưng</Label>
-                                    <select value={p.selfPronoun} onChange={e => { setPronounTouched(true); set({ selfPronoun: e.target.value }); }} className={input}>
-                                        {SELF_PRONOUNS.map(x => <option key={x} value={x}>{x}</option>)}
+                                    <select value={p.selfPronoun} onChange={e => setPronoun('selfPronoun', e.target.value)} className={input}>
+                                        {SELF_PRONOUNS.map(x => <option key={x} value={x} disabled={x === 't' && !tmAllowed}>{PRONOUN_LABEL[x] || x}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <Label>Gọi bạn là</Label>
-                                    <select value={p.userPronoun} onChange={e => { setPronounTouched(true); set({ userPronoun: e.target.value }); }} className={input}>
-                                        {USER_PRONOUNS.map(x => <option key={x} value={x}>{x}</option>)}
+                                    <select value={p.userPronoun} onChange={e => setPronoun('userPronoun', e.target.value)} className={input}>
+                                        {USER_PRONOUNS.map(x => <option key={x} value={x} disabled={x === 'm' && !tmAllowed}>{PRONOUN_LABEL[x] || x}</option>)}
                                     </select>
                                 </div>
+                            </div>
+                            <div className="-mt-1 flex items-center gap-2 flex-wrap">
+                                <button
+                                    type="button"
+                                    aria-pressed={taoMay}
+                                    disabled={!tmAllowed}
+                                    onClick={toggleTaoMay}
+                                    className={`${chip(taoMay)} disabled:opacity-40 disabled:cursor-not-allowed`}
+                                >
+                                    {taoMay && <Check size={12} className="inline -mt-px mr-1" />}Xưng t–m
+                                </button>
+                                <span className="text-[11px] leading-snug text-gray-500 dark:text-slate-400">
+                                    {tmAllowed ? 'Thân kiểu bạn chí cốt. Đổi được ngay trong lúc chat.' : 'Chỉ dùng với Bạn thân hoặc Bạn cùng học.'}
+                                </span>
                             </div>
                             <div>
                                 <Label hint={`${p.traits.length}/${MAX_TRAITS} · chọn ${MIN_TRAITS_UI}–${MAX_TRAITS}`}>Tính cách</Label>

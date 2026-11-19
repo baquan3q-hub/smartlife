@@ -101,8 +101,13 @@ export const AVATARS: AvatarOption[] = [
     { id: 'wave', emoji: '🌊', from: '#a5f3fc', to: '#0284c7' },
 ];
 
-export const SELF_PRONOUNS = ['mình', 'tớ', 'anh', 'chị', 'em'];
-export const USER_PRONOUNS = ['bạn', 'cậu', 'em', 'anh', 'chị'];
+export const SELF_PRONOUNS = ['mình', 'tớ', 'anh', 'chị', 'em', 't'];
+export const USER_PRONOUNS = ['bạn', 'cậu', 'em', 'anh', 'chị', 'm'];
+/** Nhãn hiển thị cho xưng hô viết tắt */
+export const PRONOUN_LABEL: Record<string, string> = { t: 't (tao)', m: 'm (mày)' };
+
+/** Cặp t–m (tao–mày) chỉ hợp vai ngang hàng: bạn thân, bạn cùng học */
+export const canUseTaoMay = (relationship: CompanionRelationship) => relationship === 'friend' || relationship === 'study_buddy';
 
 export const EMOJI_LEVELS: Array<{ id: EmojiLevel; label: string }> = [
     { id: 'none', label: 'Không' },
@@ -184,8 +189,14 @@ export function sanitizeCompanion(raw: any, opts: { profileAge?: number | null }
     if (!name || hasBlockedContent(name)) name = d.name;
 
     const fallback = defaultPronouns(gender, relationship);
-    const selfPronoun = cleanText(raw?.selfPronoun, 12).toLowerCase();
-    const userPronoun = cleanText(raw?.userPronoun, 12).toLowerCase();
+    let selfPronoun = cleanText(raw?.selfPronoun, 12).toLowerCase();
+    let userPronoun = cleanText(raw?.userPronoun, 12).toLowerCase();
+    // t–m phải đi thành cặp và chỉ cho vai ngang hàng; sai thì về xưng hô gợi ý
+    const tm = selfPronoun === 't' || userPronoun === 'm';
+    if (tm && !(selfPronoun === 't' && userPronoun === 'm' && canUseTaoMay(relationship))) {
+        selfPronoun = fallback.selfPronoun;
+        userPronoun = fallback.userPronoun;
+    }
 
     const traitIds = TRAITS.map(t => t.id);
     const traits = Array.isArray(raw?.traits)

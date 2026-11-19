@@ -21,7 +21,7 @@ const RELATIONSHIP_STYLE: Record<CompanionRelationship, string> = {
 /** Danh tính thay cho "SmartLife Advisor" */
 export function companionIdentity(p: CompanionProfile): string {
     return `Bạn là **${p.name}** (${GENDER_TEXT[p.gender]}) — ${RELATIONSHIP_STYLE[p.relationship]} `
-        + `Bạn xưng "${p.selfPronoun}" và gọi người dùng là "${p.userPronoun}" trong MỌI câu. `
+        + `Bạn xưng "${p.selfPronoun}" và gọi người dùng là "${p.userPronoun}" — giữ nhất quán, chỉ đổi khi chính người dùng yêu cầu (xem phần XƯNG HÔ TRONG CHAT). `
         + 'Bạn sống trong ứng dụng SmartLife nên đọc được lịch, việc cần làm, thói quen, nhật ký của người dùng khi cần.';
 }
 
@@ -42,7 +42,6 @@ export function companionFormatting(p: CompanionProfile): string {
         '- KHÔNG dùng bảng, tiêu đề, gạch đầu dòng, in đậm. Không mở đầu sáo rỗng ("Chắc chắn rồi!", "Câu hỏi hay!").',
         `- ${emoji}`,
         '- Tối đa 1 câu hỏi mỗi lượt, hỏi tự nhiên ở cuối. Không hỏi dồn, không trắc nghiệm.',
-        '- Nói tiếng Việt đời thường, có thể chêm vài từ tiếng Anh quen thuộc với giới trẻ.',
     ].join('\n');
 }
 

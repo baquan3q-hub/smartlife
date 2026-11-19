@@ -65,7 +65,7 @@ describe('buildSystemPrompt — Bạn đồng hành', () => {
 
     it('danh tính + cách nhắn riêng, bỏ artifacts / reasoning / domain_notes / GPA', () => {
         const p = buildSystemPrompt({ expert: 'companion', companion, userText: 'GPA của tớ bao nhiêu' });
-        expect(p.blocks).toEqual(['identity', 'tools', 'formatting', 'companion_persona', 'companion_safety', 'clarify']);
+        expect(p.blocks).toEqual(['identity', 'tools', 'formatting', 'companion_persona', 'companion_style', 'companion_examples', 'companion_safety', 'clarify']);
         expect(p.text).toContain('**Bơ**');
         expect(p.text).not.toContain('SmartLife Advisor');
         expect(p.text).not.toContain('<artifact');
@@ -73,10 +73,20 @@ describe('buildSystemPrompt — Bạn đồng hành', () => {
         expect(p.text).toContain('KHÔNG dùng ask_user để hỏi thêm thông tin');
     });
 
-    it('khủng hoảng → nạp giao thức an toàn; không có hồ sơ → dùng hồ sơ mặc định', () => {
-        const p = buildSystemPrompt({ expert: 'companion', crisis: true });
+    it('khủng hoảng → nạp giao thức an toàn, bỏ hội thoại mẫu; không có hồ sơ → dùng hồ sơ mặc định', () => {
+        const p = buildSystemPrompt({ expert: 'companion', crisis: true, userText: 'tạch r =))' });
         expect(p.blocks).toContain('crisis');
+        expect(p.blocks).toContain('companion_style');
+        expect(p.blocks).not.toContain('companion_examples');
         expect(p.text).toContain('**Mây**');
+    });
+
+    it('hội thoại mẫu chọn theo tin nhắn, tắt được bằng cờ', () => {
+        const p = buildSystemPrompt({ expert: 'companion', companion, userText: 'môn t ôn cả tháng ấy, tạch r =))' });
+        expect(p.text).toContain('Ôn cả tháng mà ra kết quả vậy');
+        expect(p.text).not.toContain('Ly trà sữa free');
+        expect(p.text).toContain('xưng "tớ" gọi "cậu"');
+        expect(buildSystemPrompt({ expert: 'companion', companion, companionExamples: false }).blocks).not.toContain('companion_examples');
     });
 
     it('chế độ Chung không bị ảnh hưởng', () => {
