@@ -941,3 +941,32 @@ html.dark .ui-zinc .ring-zinc-900\/15 { --tw-ring-color: rgba(148, 163, 184, 0.3
 .dark .sticky-scroll:hover::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* AI đồng hành: con trỏ nhấp nháy cuối đoạn chữ đang stream, nhãn "đang suy nghĩ" lấp lánh */
+@keyframes ai-caret-blink { 0%, 45% { opacity: 1; } 55%, 100% { opacity: 0; } }
+.ai-streaming > :is(p, h1, h2, h3, h4, h5, h6, blockquote, pre):last-child::after,
+.ai-streaming > :is(ul, ol):last-child > li:last-child::after {
+  content: '\258D';
+  display: inline-block;
+  margin-left: 2px;
+  font-weight: 400;
+  color: #3b82f6;
+  animation: ai-caret-blink 1s steps(1) infinite;
+}
+@keyframes ai-shimmer { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+.ai-shimmer-text {
+  background-image: linear-gradient(90deg, #6b7280 0%, #6b7280 38%, #d1d5db 50%, #6b7280 62%, #6b7280 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ai-shimmer 1.8s linear infinite;
+}
+html.dark .ai-shimmer-text {
+  background-image: linear-gradient(90deg, #94a3b8 0%, #94a3b8 38%, #f1f5f9 50%, #94a3b8 62%, #94a3b8 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-shimmer-text { animation: none; }
+  .ai-streaming > :is(p, h1, h2, h3, h4, h5, h6, blockquote, pre):last-child::after,
+  .ai-streaming > :is(ul, ol):last-child > li:last-child::after { animation: none; }
+}

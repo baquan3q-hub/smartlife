@@ -1,355 +1,51 @@
 // File: src/components/AIAdvisorPage.tsx
-// Full-page AI Financial Advisor Canvas v2
-// — Function Calling, Inline Charts, NL Actions
+// Trang AI đồng hành: giữ state + điều phối. Giao diện tin nhắn nằm trong src/components/ai/*
+// — stream chữ, khung suy nghĩ, thao tác tin nhắn (sửa, quay lại, tạo lại, xoá, 👍/👎), chọn tốc độ.
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
-    ArrowLeft, Send, Sparkles, Loader2, Bot, RefreshCw,
+    ArrowLeft, Sparkles, Loader2, RefreshCw,
     TrendingDown, Target, ListChecks, BarChart3, Wallet,
     PiggyBank, CalendarCheck, Brain, Lightbulb, ChevronRight, ChevronDown, ChevronUp,
-    CheckCircle2, AlertCircle, History, X, Plus, Trash2, GraduationCap,
-    Heart, Pin, Copy, Check, Download, FileText, LayoutGrid, Mic, MicOff, Zap, Square
+    History, X, Plus, Trash2, GraduationCap,
+    Heart, Pin, LayoutGrid, Zap
 } from 'lucide-react';
 import { GlassIcon } from './icons/GlassIcon';
 
 import { AppState, TransactionType } from '../types';
-import { generateQuickInsight, getCurrentModel, type ChatMessage } from '../services/geminiService';
-import { chatWithAI, type ActionHandlers, type ChartData, type ActionResult, type AIAttachment } from '../services/aiEngine';
-import { chatHistoryService, type AIConversation, type AIMessage } from '../services/chatHistoryService';
+import { callGreetingModel, callRouterModel, generateQuickInsight } from '../services/geminiService';
+import {
+    chatWithAI,
+    type ActionHandlers, type ActionResult, type AIAttachment, type AIRunMeta, type AIStep, type AIStreamEvent, type ChartData,
+} from '../services/aiEngine';
+import { chatHistoryService, type AIConversation, type AIMessageMeta } from '../services/chatHistoryService';
 import { memoryService } from '../services/memoryService';
 import { aiQuotaService, type UserQuotaStatus } from '../services/aiQuotaService';
+import {
+    cutoffFrom, editableText, fromStoredMessages, newMessageId, parseArtifact, performedActions,
+    regenerateFrom, revertTo, toGeminiHistory, type UIMessage,
+} from '../services/ai/messages';
 import AIBoostModal from './AIBoostModal';
-import InlineChatChart from './InlineChatChart';
+import ConfirmModal from './ConfirmModal';
+import { FinancialImpactDetailsModal } from './ai/FinancialImpact';
+import MessageBubble from './ai/MessageBubble';
+import MessageList from './ai/MessageList';
+import Composer from './ai/Composer';
+import ArtifactPane, { type Artifact } from './ai/ArtifactPane';
+import { loadSpeed, saveSpeed, SPEED_OPTIONS, type SpeedChoice } from './ai/tiers';
+import { getExpert, isExpertId, type ExpertId } from '../services/ai/experts';
+import { hasPronounChange, routeTurn } from '../services/ai/router';
+import { countClarifyRounds, lastAskedConfirm, type ClarifyRequest } from '../services/ai/clarify';
+import type { WebSource } from '../services/ai/webSearch';
+import CompanionSetup from './ai/CompanionSetup';
+import CompanionAvatar from './ai/CompanionAvatar';
+import { relationshipLabel, type CompanionProfile } from '../services/ai/companion/types';
+import { buildGreetingContext, buildGreetingPrompt, fallbackGreeting, vnDateKey } from '../services/ai/companion/greeting';
+import { loadCompanion, markGreeted, saveCompanion, shouldGreet } from '../services/companionService';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import ConfirmModal from './ConfirmModal';
 import { Lang } from '../i18n/i18n';
 import * as XLSX from 'xlsx';
-
-// ────────────────────────────────────────
-// Financial Impact Components
-// ────────────────────────────────────────
-interface FinancialImpactCardProps {
-    action: any;
-    appState: AppState;
-    onAddTransaction?: (tx: any) => Promise<void>;
-    onOpenDetails: (data: any) => void;
-}
-
-const FinancialImpactCard: React.FC<FinancialImpactCardProps> = ({
-    action,
-    appState,
-    onAddTransaction,
-    onOpenDetails
-}) => {
-    const { description, amount, simulation } = action.data || {};
-    if (!simulation) return null;
-
-    const isApplied = appState.transactions.some(t => 
-        t.amount === amount && 
-        (t.description === `[AI Simulated] ${description}` || t.description.includes(description))
-    );
-
-    const getImpactColor = (level: string) => {
-        if (level === 'high') return 'text-rose-600 bg-rose-50 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/30';
-        if (level === 'medium') return 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/30';
-        return 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/30';
-    };
-
-    const handleApply = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!onAddTransaction) return;
-        try {
-            await onAddTransaction({
-                amount: Number(amount),
-                category: 'Khác',
-                type: 'expense',
-                date: new Date().toISOString().slice(0, 10),
-                description: `[AI Simulated] ${description.trim()}`
-            });
-            alert('Đã ghi nhận giao dịch thành công! 💸');
-        } catch (err: any) {
-            console.error(err);
-            alert('Lỗi ghi nhận: ' + err.message);
-        }
-    };
-
-    return (
-        <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-4 space-y-3 hover:shadow-md transition-all duration-200 animate-fade-in text-left">
-            {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-1.5">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-base shrink-0 shadow-sm">
-                        💸
-                    </div>
-                    <div>
-                        <h4 className="text-xs font-black text-slate-800 line-clamp-1">{description}</h4>
-                        <p className="text-[10px] text-slate-400 font-bold">{amount.toLocaleString('vi-VN')}đ</p>
-                    </div>
-                </div>
-                <span className={`text-[9.5px] font-extrabold px-2.5 py-1 rounded-full border uppercase tracking-wider ${getImpactColor(simulation.impact_level)}`}>
-                    {simulation.impact_level_label}
-                </span>
-            </div>
-
-            {/* Quick Summary */}
-            <p className="text-[11px] text-slate-500 leading-relaxed font-semibold bg-slate-50 p-2.5 rounded-xl border border-slate-100 line-clamp-2">
-                {simulation.summary}
-            </p>
-
-            {/* Quick Metrics */}
-            <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="p-2 bg-slate-50/50 rounded-xl border border-slate-100/50">
-                    <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider">Số dư sau phát sinh</span>
-                    <span className="text-xs font-black text-slate-800">{(simulation.current_balance_after || 0).toLocaleString('vi-VN')}đ</span>
-                </div>
-                <div className="p-2 bg-slate-50/50 rounded-xl border border-slate-100/50">
-                    <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider">Trì hoãn tiết kiệm</span>
-                    <span className="text-xs font-black text-slate-800">{simulation.savings_delay_days > 0 ? `+${simulation.savings_delay_days} ngày` : '0 ngày'}</span>
-                </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 pt-1 border-t border-slate-50">
-                <button
-                    onClick={() => onOpenDetails(action.data)}
-                    className="flex-1 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-[10px] font-extrabold transition-all border border-indigo-100 flex items-center justify-center gap-1 active:scale-[0.98]"
-                >
-                    Chi tiết cố vấn 🔍
-                </button>
-                <button
-                    onClick={handleApply}
-                    disabled={isApplied}
-                    className={`flex-1 py-1.5 px-3 rounded-xl text-[10px] font-extrabold transition-all flex items-center justify-center gap-1 active:scale-[0.98] ${
-                        isApplied 
-                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 cursor-default' 
-                            : 'bg-slate-900 hover:bg-slate-855 text-white border border-transparent'
-                    }`}
-                >
-                    {isApplied ? 'Đã ghi nhận 💸' : 'Ghi nhận thực tế ➕'}
-                </button>
-            </div>
-        </div>
-    );
-};
-
-interface FinancialImpactDetailsModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    data: any;
-    appState: AppState;
-    onAddTransaction?: (tx: any) => Promise<void>;
-}
-
-const FinancialImpactDetailsModal: React.FC<FinancialImpactDetailsModalProps> = ({
-    isOpen,
-    onClose,
-    data,
-    appState,
-    onAddTransaction
-}) => {
-    if (!isOpen || !data) return null;
-    const { description, amount, simulation } = data;
-    if (!simulation) return null;
-
-    const isApplied = appState.transactions.some(t => 
-        t.amount === amount && 
-        (t.description === `[AI Simulated] ${description}` || t.description.includes(description))
-    );
-
-    const getImpactColor = (level: string) => {
-        if (level === 'high') return 'text-rose-600 bg-rose-50 border-rose-250';
-        if (level === 'medium') return 'text-amber-600 bg-amber-50 border-amber-250';
-        return 'text-emerald-600 bg-emerald-50 border-emerald-250';
-    };
-
-    const handleApply = async () => {
-        if (!onAddTransaction) return;
-        try {
-            await onAddTransaction({
-                amount: Number(amount),
-                category: 'Khác',
-                type: 'expense',
-                date: new Date().toISOString().slice(0, 10),
-                description: `[AI Simulated] ${description.trim()}`
-            });
-            alert('Đã ghi nhận giao dịch thành công! 💸');
-        } catch (err: any) {
-            console.error(err);
-            alert('Lỗi ghi nhận: ' + err.message);
-        }
-    };
-
-    // Prepare chart for surplus trends
-    const trends = simulation.historical_trends?.monthly_trends || [];
-    const hasTrendData = trends.length > 0;
-    const chartData: ChartData | null = hasTrendData ? {
-        chart_type: 'bar',
-        title: 'Thặng dư Thu chi 6 tháng gần nhất',
-        data: trends.map((t: any) => ({
-            label: t.month,
-            value: t.surplus,
-            color: t.surplus >= 0 ? '#3b82f6' : '#f43f5e'
-        }))
-    } : null;
-
-    const trendsAvg = simulation.historical_trends || { avg_income: 0, avg_expense: 0, avg_surplus: 0, comparison_percentage: 0 };
-
-    return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-250">
-                {/* Header */}
-                <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10">
-                    <div className="flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
-                        <h2 className="text-sm font-black text-slate-800 dark:text-white">
-                            Cố vấn Phân tích Tác động Tài chính
-                        </h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 hover:text-slate-650 transition-colors"
-                    >
-                        <X size={16} />
-                    </button>
-                </div>
-
-                {/* Body */}
-                <div className="p-5 overflow-y-auto flex-1 custom-scrollbar space-y-5 text-left">
-                    {/* General Summary & Impact Level */}
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                            <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase tracking-wider flex items-center gap-1.5 ${getImpactColor(simulation.impact_level)}`}>
-                                <AlertCircle size={12} />
-                                Mức ảnh hưởng: {simulation.impact_level_label}
-                            </span>
-                        </div>
-                        <p className="text-xs leading-relaxed text-slate-650 dark:text-slate-400 font-semibold bg-slate-50 dark:bg-slate-800/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-850">
-                            {simulation.summary}
-                        </p>
-                    </div>
-
-                    {/* Quick Metrics Cards */}
-                    <div className="grid grid-cols-3 gap-3">
-                        <div className="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-850">
-                            <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Số dư sau chi</span>
-                            <span className="text-xs font-black text-slate-800 dark:text-white">{(simulation.current_balance_after || 0).toLocaleString('vi-VN')}đ</span>
-                            <p className="text-[8px] font-bold text-rose-500 mt-0.5">-{amount.toLocaleString('vi-VN')}đ</p>
-                        </div>
-                        <div className="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-850">
-                            <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Ngân sách thâm hụt</span>
-                            <span className="text-xs font-black text-slate-800 dark:text-white">{simulation.budget_impact_percent}%</span>
-                            <p className="text-[8px] font-bold text-amber-500 mt-0.5">tiêu hao ngân sách</p>
-                        </div>
-                        <div className="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-850">
-                            <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Trì hoãn tiết kiệm</span>
-                            <span className="text-xs font-black text-slate-800 dark:text-white">{simulation.savings_delay_days > 0 ? `+${simulation.savings_delay_days} ngày` : '0 ngày'}</span>
-                            <p className="text-[8px] font-bold text-rose-500 mt-0.5">đạt mục tiêu</p>
-                        </div>
-                    </div>
-
-                    {/* Historical Trends Comparison */}
-                    <div className="p-4.5 bg-gradient-to-br from-indigo-50/40 to-blue-50/20 dark:from-slate-800/20 dark:to-slate-800/5 border border-indigo-100/50 rounded-2xl space-y-3">
-                        <h3 className="text-xs font-black text-indigo-950 dark:text-white flex items-center gap-1.5 uppercase tracking-wider">
-                            📊 So sánh với xu hướng lịch sử
-                        </h3>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                                <span className="text-slate-400 block text-[9px] font-bold uppercase">Thặng dư TB 3 tháng:</span>
-                                <strong className="text-slate-700 dark:text-slate-300 font-extrabold">{trendsAvg.avg_surplus.toLocaleString('vi-VN')}đ/tháng</strong>
-                            </div>
-                            <div>
-                                <span className="text-slate-400 block text-[9px] font-bold uppercase">Tỷ trọng khoản chi:</span>
-                                <strong className={`font-extrabold ${trendsAvg.comparison_percentage > 80 ? 'text-rose-650' : 'text-indigo-650'}`}>
-                                    {trendsAvg.comparison_percentage}% thặng dư
-                                </strong>
-                            </div>
-                        </div>
-
-                        {/* Chart */}
-                        {chartData && (
-                            <div className="pt-1.5 bg-white dark:bg-slate-900 rounded-xl p-2 border border-slate-100 dark:border-slate-800">
-                                <InlineChatChart chart={chartData} />
-                            </div>
-                        )}
-
-                        <div className="text-[10px] text-slate-500 leading-relaxed font-medium">
-                            💡 {trendsAvg.avg_surplus > 0 
-                                ? `Khoản phát sinh này tiêu tốn khoảng ${trendsAvg.comparison_percentage}% số tiền bạn tiết kiệm được trung bình mỗi tháng (${trendsAvg.avg_surplus.toLocaleString('vi-VN')}đ).`
-                                : 'Bạn đang thâm hụt thu chi trung bình các tháng qua. Hãy hết sức cẩn trọng với khoản chi phát sinh này!'
-                            }
-                        </div>
-                    </div>
-
-                    {/* Wallets Impacted list */}
-                    {simulation.wallet_impacts && simulation.wallet_impacts.length > 0 && (
-                        <div className="space-y-2">
-                            <span className="block text-[9.5px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                                Ví tiền bị ảnh hưởng
-                            </span>
-                            <div className="space-y-1.5">
-                                {simulation.wallet_impacts.map((wi: any, index: number) => (
-                                    <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800/10 border border-slate-100 dark:border-slate-850">
-                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{wi.wallet_name}</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-400 line-through">{(wi.balance_before || 0).toLocaleString('vi-VN')}đ</span>
-                                            <span className="text-xs text-slate-400">→</span>
-                                            <span className="text-xs font-black text-slate-800 dark:text-white">{(wi.balance_after || 0).toLocaleString('vi-VN')}đ</span>
-                                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-650 dark:bg-rose-950/20 ml-1">-{wi.percentage_decrease}%</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Recommendations Section */}
-                    {simulation.recommendations && simulation.recommendations.length > 0 && (
-                        <div className="space-y-2">
-                            <span className="block text-[9.5px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                                Khuyến nghị & Giải pháp từ AI
-                            </span>
-                            <div className="grid grid-cols-1 gap-2">
-                                {simulation.recommendations.map((rec: any, index: number) => (
-                                    <div key={index} className="p-3 bg-slate-50 dark:bg-slate-800/20 rounded-xl border border-slate-100 dark:border-slate-850">
-                                        <h4 className="text-xs font-bold text-slate-855 dark:text-white flex items-center gap-1.5 mb-1">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                                            {rec.title}
-                                        </h4>
-                                        <p className="text-[10px] text-slate-500 dark:text-slate-450 leading-relaxed font-semibold pl-3">
-                                            {rec.description}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="p-4 bg-gray-50 dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 flex items-center justify-end gap-2 shrink-0">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 hover:bg-gray-200 dark:hover:bg-slate-850 text-gray-500 rounded-xl text-xs font-bold transition-colors"
-                    >
-                        Đóng lại
-                    </button>
-                    <button
-                        onClick={handleApply}
-                        disabled={isApplied}
-                        className={`px-4 py-2 font-bold text-xs rounded-xl shadow-md transition-all duration-200 active:scale-[0.99] flex items-center gap-1.5 ${
-                            isApplied 
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-250 cursor-default' 
-                                : 'bg-slate-900 hover:bg-slate-855 text-white'
-                        }`}
-                    >
-                        {isApplied ? 'Đã ghi nhận vào thực tế' : 'Ghi nhận khoản này thực tế'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 // ────────────────────────────────────────
 // Types
@@ -371,15 +67,6 @@ interface AIAdvisorPageProps {
     onDeleteCalendarEvent?: (id: string) => Promise<void>;
 }
 
-interface UIMessage {
-    role: 'user' | 'assistant';
-    content: string;
-    charts?: ChartData[];
-    actions?: ActionResult[];
-    files?: Array<{ name: string; type: string; size: number }>;
-    tokens_used?: number;
-}
-
 // ────────────────────────────────────────
 // Suggestion Chips
 // ────────────────────────────────────────
@@ -389,6 +76,14 @@ interface Suggestion {
     prompt: string;
     gradient: string;
 }
+
+// Câu mở đầu kiểu nhắn tin với bạn (chế độ Bạn đồng hành)
+const COMPANION_STARTERS: Array<{ emoji: string; label: string; prompt: string }> = [
+    { emoji: '☀️', label: 'Kể nghe hôm nay thế nào', prompt: 'Hôm nay của mình cũng bình thường thôi, muốn kể chút chuyện.' },
+    { emoji: '😮‍💨', label: 'Đang hơi mệt', prompt: 'Dạo này mình thấy hơi mệt.' },
+    { emoji: '🎉', label: 'Có chuyện vui', prompt: 'Mình vừa có chuyện vui nè!' },
+    { emoji: '📝', label: 'Nhắc mình việc hôm nay', prompt: 'Hôm nay mình có việc gì cần làm không?' },
+];
 
 const SUGGESTIONS: Suggestion[] = [
     {
@@ -520,6 +215,64 @@ const getMimeTypeFromExtension = (ext: string): string => {
 };
 
 // ────────────────────────────────────────
+// Tin nhắn & tệp đính kèm
+// ────────────────────────────────────────
+const WELCOME_TEXT = '👋 Chào bạn! Mình là **SmartLife Advisor v2** — trợ lý AI thông minh.\n\n🆕 **Khả năng mới:**\n- 📊 **Truy vấn dữ liệu** trực tiếp từ database\n- 📈 **Bảng tính (table) & Dự đoán** chi tiêu\n- ✏️ **Thêm lịch trình, việc cần làm, giao dịch** bằng ngôn ngữ tự nhiên\n- 📎 **Phân tích tài liệu & hình ảnh**: Đọc hiểu ảnh thời khóa biểu, hóa đơn, file excel, csv, pdf, txt, hoặc âm thanh trực tiếp trong bộ nhớ tạm để xử lý nhanh chóng.\n\n💡 **Thử hỏi mình:**\n- _"Đưa ra dự đoán chi tiêu tháng tới cho tôi"_\n- _"Lập bảng so sánh thu chi 3 tháng gần nhất"_\n- _"Thêm lịch học IELTS thứ 3, thứ 5 lúc 19h"_\n\nHoặc chọn gợi ý bên dưới! 👇';
+const RESET_TEXT = '🔄 Cuộc trò chuyện đã được làm mới! Mình sẵn sàng phân tích dữ liệu cho bạn. 🌱';
+const EMPTY_TEXT = 'Cuộc trò chuyện này trống. Hãy bắt đầu hỏi gì đó!';
+const FILES_ONLY_PROMPT = 'Hãy phân tích dữ liệu từ các tệp tôi đã tải lên.';
+
+type FileMeta = { name: string; type: string; size: number };
+
+const localNotice = (content: string): UIMessage => ({ id: newMessageId(), role: 'assistant', content, local: true });
+
+// Excel / tệp chữ → đọc thành văn bản gửi kèm câu hỏi; ảnh, PDF, âm thanh → base64 cho Gemini đọc trực tiếp
+async function readAttachedFiles(files: File[]): Promise<{ fileContext: string; attachments: AIAttachment[] }> {
+    const attachments: AIAttachment[] = [];
+    let fileContext = '';
+    for (const file of files) {
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        if (ext === 'xlsx' || ext === 'xls') {
+            try {
+                const excelText = await parseExcelToCSV(file);
+                fileContext += `\n\n--- DỮ LIỆU ĐÍNH KÈM TỪ EXCEL (${file.name}) ---\n${excelText}\n--- HẾT DỮ LIỆU EXCEL ---`;
+            } catch (err: any) {
+                console.error('Error parsing excel:', err);
+                fileContext += `\n\n[Lỗi đọc file Excel ${file.name}: ${err.message}]`;
+            }
+        } else if (['txt', 'csv', 'md', 'json', 'xml'].includes(ext)) {
+            try {
+                const text = await readTextFile(file);
+                fileContext += `\n\n--- NỘI DUNG TỆP ${file.name} ---\n${text}\n--- HẾT NỘI DUNG TỆP ---`;
+            } catch (err: any) {
+                console.error('Error reading text file:', err);
+                fileContext += `\n\n[Lỗi đọc file văn bản ${file.name}: ${err.message}]`;
+            }
+        } else {
+            try {
+                attachments.push({ mimeType: file.type || getMimeTypeFromExtension(ext), data: await fileToBase64(file) });
+            } catch (err: any) {
+                console.error('Error converting file to base64:', err);
+                alert(`Không thể đọc file ${file.name}: ${err.message}`);
+            }
+        }
+    }
+    return { fileContext, attachments };
+}
+
+const actionWarning = (actions: ActionResult[]) =>
+    actions.length
+        ? `\n\nLưu ý: ${actions.length} việc AI đã làm trong các tin này (thêm việc, ghi giao dịch, thêm lịch…) sẽ KHÔNG tự hoàn tác — hãy xoá thủ công nếu cần.`
+        : '';
+
+// Hàm ổn định (không đổi giữa các lần render) nhưng luôn gọi phiên bản mới nhất — để MessageBubble memo hiệu quả
+function useStableCallback<T extends (...args: any[]) => any>(fn: T): T {
+    const ref = useRef(fn);
+    useLayoutEffect(() => { ref.current = fn; });
+    return useCallback(((...args: any[]) => ref.current(...args)) as T, []);
+}
+
+// ────────────────────────────────────────
 // Component
 // ────────────────────────────────────────
 const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
@@ -528,29 +281,61 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     onSelectBoostPack, onUpdateTodo, onDeleteTodo,
     onAddCalendarEvent, onUpdateCalendarEvent, onDeleteCalendarEvent
 }) => {
-    const [messages, setMessages] = useState<UIMessage[]>([
-        {
-            role: 'assistant',
-            content: '👋 Chào bạn! Mình là **SmartLife Advisor v2** — trợ lý AI thông minh.\n\n🆕 **Khả năng mới:**\n- 📊 **Truy vấn dữ liệu** trực tiếp từ database\n- 📈 **Bảng tính (table) & Dự đoán** chi tiêu\n- ✏️ **Thêm lịch trình, việc cần làm, giao dịch** bằng ngôn ngữ tự nhiên\n- 📎 **Phân tích tài liệu & hình ảnh**: Đọc hiểu ảnh thời khóa biểu, hóa đơn, file excel, csv, pdf, txt, hoặc âm thanh trực tiếp trong bộ nhớ tạm để xử lý nhanh chóng.\n\n💡 **Thử hỏi mình:**\n- _"Đưa ra dự đoán chi tiêu tháng tới cho tôi"_\n- _"Lập bảng so sánh thu chi 3 tháng gần nhất"_\n- _"Thêm lịch học IELTS thứ 3, thứ 5 lúc 19h"_\n\nHoặc chọn gợi ý bên dưới! 👇'
-        }
-    ]);
-    const [geminiChatHistory, setGeminiChatHistory] = useState<ChatMessage[]>([]);
+    const [messages, setMessages] = useState<UIMessage[]>(() => [localNotice(WELCOME_TEXT)]);
+    const messagesRef = useRef(messages);
+    messagesRef.current = messages;
+
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [activeArtifact, setActiveArtifact] = useState<{ title: string; content: string } | null>(null);
-    const [copied, setCopied] = useState(false);
+    const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+    const [activeArtifact, setActiveArtifact] = useState<Artifact | null>(null);
+    const [speed, setSpeed] = useState<SpeedChoice>(loadSpeed);
+    // Chế độ chuyên gia của cuộc trò chuyện đang mở (lưu ở ai_conversations.expert_mode)
+    const [expert, setExpert] = useState<ExpertId>('general');
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [pinSignal, setPinSignal] = useState(0);
     const abortControllerRef = useRef<AbortController | null>(null);
+    // Thao tác DB đang chờ (xoá mềm khi quay lại / tạo lại) — tin mới phải lưu SAU khi xong để không bị xoá nhầm
+    const pendingDbRef = useRef<Promise<unknown>>(Promise.resolve());
+    // Tăng mỗi lần đổi / làm mới cuộc trò chuyện — để lượt chạy cũ không ghi đè cuộc trò chuyện mới
+    const sessionRef = useRef(0);
+
     const [isSimPopupOpen, setIsSimPopupOpen] = useState(false);
     const [simDescription, setSimDescription] = useState('');
     const [simAmount, setSimAmount] = useState('');
     const [selectedImpactDetails, setSelectedImpactDetails] = useState<any>(null);
 
-    const handleStopResponse = () => {
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
+    const handleSpeedChange = (next: SpeedChoice) => {
+        setSpeed(next);
+        saveSpeed(next);
+    };
+
+    // Bạn đồng hành: hồ sơ nhân vật (null = chưa tạo) + cửa sổ thiết lập
+    const [companionProfile, setCompanionProfile] = useState<CompanionProfile | null>(null);
+    const [showCompanionSetup, setShowCompanionSetup] = useState(false);
+    const greetingStartedRef = useRef(false);
+
+    const handleExpertChange = (next: ExpertId) => {
+        if (next === expert) return;
+        // Lần đầu chọn Bạn đồng hành mà chưa có hồ sơ → mở trình thiết lập, lưu xong mới chuyển
+        if (next === 'companion' && !companionProfile) {
+            setShowCompanionSetup(true);
+            return;
         }
-        setIsLoading(false);
+        applyExpert(next);
+    };
+
+    const applyExpert = (next: ExpertId) => {
+        setExpert(next);
+        const convId = conversationIdRef.current;
+        if (!convId) return;
+        chatHistoryService.updateConversationExpert(convId, next).catch(console.error);
+        setConversations(prev => prev.map(c => (c.id === convId ? { ...c, expert_mode: next === 'general' ? null : next } : c)));
+    };
+
+    // Dừng: chỉ huỷ request — lượt chạy tự giữ phần chữ đã nhận, gắn nhãn "Đã dừng" và lưu lại
+    const handleStopResponse = () => {
+        abortControllerRef.current?.abort();
     };
 
     // AI Quota states (Phase 4 & 5)
@@ -581,92 +366,10 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const widgetMenuRef = useRef<HTMLDivElement>(null);
     const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
 
-    const parseArtifact = (content: string) => {
-        const artifactRegex = /<artifact\s+title=["']([^"']+)["']\s*>([\s\S]*?)<\/artifact>/i;
-        const match = content.match(artifactRegex);
-        if (match) {
-            const title = match[1];
-            const artifactContent = match[2].trim();
-            const cleanContent = content.replace(artifactRegex, '').trim();
-            return {
-                title,
-                artifactContent,
-                cleanContent
-            };
-        }
-        return null;
-    };
-
-    const getParsedChart = (text: string): ChartData | null => {
-        try {
-            const cleanText = text.trim();
-            if (cleanText.startsWith('{') && cleanText.endsWith('}')) {
-                const parsed = JSON.parse(cleanText);
-                if (parsed && (parsed.chartType || parsed.chart_type) && parsed.title && Array.isArray(parsed.data)) {
-                    return {
-                        chart_type: parsed.chartType || parsed.chart_type || 'bar',
-                        title: parsed.title,
-                        data: parsed.data
-                    };
-                }
-            }
-        } catch (e) {
-            // silent fail
-        }
-        return null;
-    };
     const [quickInsight, setQuickInsight] = useState<string | null>(null);
     const [isLoadingInsight, setIsLoadingInsight] = useState(false);
 
-    // Attached files state
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [showUploadMenu, setShowUploadMenu] = useState(false);
-    const uploadMenuRef = useRef<HTMLDivElement>(null);
-
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files) return;
-        const newFiles = Array.from(files);
-
-        // Filter out files that exceed 15MB
-        const MAX_SIZE = 30 * 1024 * 1024;
-        const validFiles: File[] = [];
-        const oversizedFiles: string[] = [];
-
-        newFiles.forEach(file => {
-            if (file.size <= MAX_SIZE) {
-                validFiles.push(file);
-            } else {
-                oversizedFiles.push(file.name);
-            }
-        });
-
-        if (oversizedFiles.length > 0) {
-            alert(`Các tệp sau vượt quá giới hạn 15MB và không được đính kèm:\n- ${oversizedFiles.join('\n- ')}`);
-        }
-
-        setAttachedFiles(prev => [...prev, ...validFiles]);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = ''; // Reset input to allow choosing same file again
-        }
-    };
-
-    const triggerFileSelect = (type: 'image' | 'document' | 'audio') => {
-        if (!fileInputRef.current) return;
-
-        if (type === 'image') {
-            fileInputRef.current.accept = 'image/*';
-        } else if (type === 'document') {
-            fileInputRef.current.accept = 'application/pdf,text/plain,text/csv,.csv,.xlsx,.xls,.json,.md';
-        } else if (type === 'audio') {
-            fileInputRef.current.accept = 'audio/*';
-        }
-
-        fileInputRef.current.click();
-        setShowUploadMenu(false);
-    };
 
     const handleTogglePinConversation = async (e: React.MouseEvent, convId: string, pin: boolean) => {
         e.stopPropagation();
@@ -678,23 +381,81 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         }
     };
 
-
     // History and Memory State
     const [conversationId, setConversationId] = useState<string | null>(null);
+    const conversationIdRef = useRef<string | null>(null);
+    const setConvId = (id: string | null) => {
+        conversationIdRef.current = id;
+        setConversationId(id);
+    };
     const [memoryContext, setMemoryContext] = useState<string>('');
     const [conversations, setConversations] = useState<AIConversation[]>([]);
     const [showHistory, setShowHistory] = useState(false);
 
-    const [confirmDialog, setConfirmDialog] = useState({
-        isOpen: false,
-        title: '',
-        message: '',
-        onConfirm: () => { },
-    });
+    const [confirmDialog, setConfirmDialog] = useState<{
+        isOpen: boolean; title: string; message: string; confirmText?: string; onConfirm: () => void;
+    }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
+
+    useEffect(() => {
+        const userId = appState.profile?.id;
+        if (!userId) return;
+        let cancelled = false;
+        loadCompanion(userId, appState.profile?.age).then(p => { if (!cancelled) setCompanionProfile(p); });
+        return () => { cancelled = true; };
+    }, [appState.profile?.id, appState.profile?.age]);
+
+    const handleSaveCompanion = async (profile: CompanionProfile) => {
+        const userId = appState.profile?.id;
+        const saved = userId ? await saveCompanion(userId, profile, appState.profile?.age) : profile;
+        setCompanionProfile(saved);
+        setShowCompanionSetup(false);
+        if (expert !== 'companion') applyExpert('companion');
+    };
+
+    // Mỗi ngày (giờ VN) một lần: mở trang khi chưa vào cuộc trò chuyện nào → bạn AI nhắn trước
+    const sendGreeting = async (profile: CompanionProfile, userId: string, today: string) => {
+        const session = sessionRef.current;
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+        const id = newMessageId();
+        const startedAt = Date.now();
+        const meta: AIMessageMeta = { expert: 'companion', greeting: true };
+        setCompanionProfile(await markGreeted(userId, profile, today));
+        setExpert('companion');
+        setIsLoading(true);
+        setMessages([{ id, role: 'assistant', content: '', status: 'streaming', startedAt, meta }]);
+        const ctx = buildGreetingContext(appState, new Date());
+        let text = '';
+        try {
+            text = await callGreetingModel(buildGreetingPrompt(profile, ctx), controller.signal);
+        } catch (e) {
+            if (!controller.signal.aborted) console.warn('[SmartLife] Lời chào AI lỗi, dùng câu mẫu:', e);
+        } finally {
+            if (abortControllerRef.current === controller) abortControllerRef.current = null;
+            setIsLoading(false);
+        }
+        if (sessionRef.current !== session) return; // người dùng đã chuyển sang cuộc khác
+        if (!text) text = fallbackGreeting(profile, ctx);
+        patchMessage(id, { content: text, status: 'done' });
+        const conv = await chatHistoryService.createConversation(`${profile.name} nhắn cho bạn`, 'companion');
+        if (!conv || sessionRef.current !== session) return;
+        setConvId(conv.id);
+        const saved = await chatHistoryService.saveMessage(conv.id, 'assistant', text, { meta });
+        if (saved) patchMessage(id, { dbId: saved.id, createdAt: saved.created_at });
+    };
+
+    useEffect(() => {
+        const userId = appState.profile?.id;
+        if (!userId || !companionProfile || greetingStartedRef.current) return;
+        const today = vnDateKey();
+        if (!shouldGreet(companionProfile, today)) return;
+        if (conversationIdRef.current || isLoading || !messagesRef.current.every(m => m.local)) return;
+        greetingStartedRef.current = true;
+        void sendGreeting(companionProfile, userId, today);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [companionProfile, appState.profile?.id]);
 
     const [showPopupHint, setShowPopupHint] = useState(false);
-
-    const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
     // Action handlers for aiEngine
@@ -710,32 +471,20 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         onDeleteCalendarEvent,
     };
 
-    // Auto scroll
-    const scrollToBottom = useCallback(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, []);
-
-    useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
     useEffect(() => {
         inputRef.current?.focus();
 
         // Show hint popup for 8 seconds on mount
         setShowPopupHint(true);
-        const timer = setTimeout(() => {
-            setShowPopupHint(false);
-        }, 8000);
+        const timer = setTimeout(() => setShowPopupHint(false), 8000);
         return () => {
             clearTimeout(timer);
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-            }
+            abortControllerRef.current?.abort();
         };
     }, []);
 
     useEffect(() => {
-        const handleResize = () => {
-            setIsDesktop(window.innerWidth >= 1024);
-        };
+        const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
@@ -759,25 +508,6 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         }
     };
 
-    const handleCopyArtifact = () => {
-        if (!activeArtifact) return;
-        navigator.clipboard.writeText(activeArtifact.content);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    const handleDownloadArtifact = () => {
-        if (!activeArtifact) return;
-        const blob = new Blob([activeArtifact.content], { type: 'text/markdown;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `${activeArtifact.title.replace(/\s+/g, '_')}.md`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
     // Load memory context on mount
     useEffect(() => {
         memoryService.getMemoryContextString()
@@ -785,290 +515,396 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             .catch(console.error);
     }, []);
 
-    // Speech Recognition states & setup
-    const [isRecording, setIsRecording] = useState(false);
-    const [recordingError, setRecordingError] = useState<string | null>(null);
-    const recognitionRef = useRef<any>(null);
-
+    // Click outside widget menu
     useEffect(() => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            const rec = new SpeechRecognition();
-            rec.continuous = true;
-            rec.interimResults = true;
-            rec.lang = lang === 'vi' ? 'vi-VN' : lang === 'ko' ? 'ko-KR' : 'en-US';
+        if (!showWidgetMenu) return;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (widgetMenuRef.current && !widgetMenuRef.current.contains(event.target as Node)) setShowWidgetMenu(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showWidgetMenu]);
 
-            rec.onresult = (event: any) => {
-                let currentText = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        currentText += event.results[i][0].transcript;
-                    }
-                }
-                if (currentText) {
-                    setInput(prev => prev + (prev ? ' ' : '') + currentText);
-                }
-            };
-
-            rec.onerror = (event: any) => {
-                console.error('Speech recognition error:', event.error);
-                if (event.error !== 'no-speech') {
-                    setRecordingError(event.error);
-                    setIsRecording(false);
-                }
-            };
-
-            rec.onend = () => {
-                setIsRecording(false);
-            };
-
-            recognitionRef.current = rec;
-        }
-    }, [lang]);
-
-    const toggleRecording = () => {
-        if (!recognitionRef.current) {
-            alert(lang === 'vi' ? 'Trình duyệt của bạn không hỗ trợ nhận diện giọng nói.' : 'Your browser does not support Speech Recognition.');
-            return;
-        }
-
-        if (isRecording) {
-            recognitionRef.current.stop();
-            setIsRecording(false);
-        } else {
-            setRecordingError(null);
-            try {
-                recognitionRef.current.start();
-                setIsRecording(true);
-            } catch (err: any) {
-                console.error('Error starting recognition:', err);
-                setIsRecording(false);
-            }
-        }
+    // ────────────────────────────────────────
+    // Lưu trữ
+    // ────────────────────────────────────────
+    const patchMessage = (id: string, patch: Partial<UIMessage>) => {
+        setMessages(prev => prev.map(m => (m.id === id ? { ...m, ...patch } : m)));
     };
 
-    // Click outside upload menu & widget menu handler
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (uploadMenuRef.current && !uploadMenuRef.current.contains(event.target as Node)) {
-                setShowUploadMenu(false);
-            }
-            if (widgetMenuRef.current && !widgetMenuRef.current.contains(event.target as Node)) {
-                setShowWidgetMenu(false);
-            }
-        };
-        if (showUploadMenu || showWidgetMenu) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [showUploadMenu, showWidgetMenu]);
+    const ensureConversation = async (title: string): Promise<string | null> => {
+        if (conversationIdRef.current) return conversationIdRef.current;
+        const session = sessionRef.current;
+        const conv = await chatHistoryService.createConversation(title.length > 50 ? title.substring(0, 50) + '...' : title, expert);
+        if (!conv) return null;
+        if (sessionRef.current === session) setConvId(conv.id);
+        return conv.id;
+    };
 
+    const persistUserMessage = async (message: UIMessage, title: string): Promise<string | null> => {
+        const convId = await ensureConversation(title);
+        if (!convId) return null;
+        const saved = await chatHistoryService.saveMessage(convId, 'user', message.content, { meta: message.meta });
+        if (saved) patchMessage(message.id, { dbId: saved.id, createdAt: saved.created_at });
+        return convId;
+    };
 
-    // Send message — uses new aiEngine with function calling
-    const handleSend = async (overrideMessage?: string) => {
-        const msg = overrideMessage || input.trim();
-        if ((!msg && attachedFiles.length === 0) || isLoading) return;
+    // Xoá mềm trong DB mọi tin từ vị trí index trở đi (theo created_at)
+    const softDeleteFromIndex = (list: UIMessage[], index: number) => {
+        const cutoff = cutoffFrom(list, index);
+        const convId = conversationIdRef.current;
+        if (!cutoff || !convId) return;
+        pendingDbRef.current = pendingDbRef.current.then(() => chatHistoryService.softDeleteFrom(convId, cutoff));
+    };
 
-        setInput('');
+    const maybeExtractMemories = (list: UIMessage[]) => {
+        const real = list.filter(m => !m.local && m.content.trim());
+        if (real.length < 4 || real.length % 4 !== 0) return;
+        const chatText = real.map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
+        memoryService.extractMemoriesFromConversation(chatText).catch(console.error);
+    };
 
-        let finalUserMsg = msg;
-        if (!finalUserMsg && attachedFiles.length > 0) {
-            finalUserMsg = "Hãy phân tích dữ liệu từ các tệp tôi đã tải lên.";
-        }
-
-        setIsLoading(true);
-        const attachmentsToSend: AIAttachment[] = [];
-        let promptExtension = '';
-
-        // Process files sequentially
-        for (const file of attachedFiles) {
-            const ext = file.name.split('.').pop()?.toLowerCase();
-            if (ext === 'xlsx' || ext === 'xls') {
-                try {
-                    const excelText = await parseExcelToCSV(file);
-                    promptExtension += `\n\n--- DỮ LIỆU ĐÍNH KÈM TỪ EXCEL (${file.name}) ---\n${excelText}\n--- HẾT DỮ LIỆU EXCEL ---`;
-                } catch (err: any) {
-                    console.error('Error parsing excel:', err);
-                    promptExtension += `\n\n[Lỗi đọc file Excel ${file.name}: ${err.message}]`;
-                }
-            } else if (['txt', 'csv', 'md', 'json', 'xml'].includes(ext || '')) {
-                try {
-                    const fileContent = await readTextFile(file);
-                    promptExtension += `\n\n--- NỘI DUNG TỆP ${file.name} ---\n${fileContent}\n--- HẾT NỘI DUNG TỆP ---`;
-                } catch (err: any) {
-                    console.error('Error reading text file:', err);
-                    promptExtension += `\n\n[Lỗi đọc file văn bản ${file.name}: ${err.message}]`;
-                }
-            } else {
-                try {
-                    const base64Data = await fileToBase64(file);
-                    attachmentsToSend.push({
-                        mimeType: file.type || getMimeTypeFromExtension(ext || ''),
-                        data: base64Data
-                    });
-                } catch (err: any) {
-                    console.error('Error converting file to base64:', err);
-                    alert(`Không thể đọc file ${file.name}: ${err.message}`);
-                }
-            }
-        }
-
-        // Save metadata of files for UI chat history rendering
-        const filesMetadata = attachedFiles.map(f => ({ name: f.name, type: f.type, size: f.size }));
-        setAttachedFiles([]);
-
-        // Text sent to database/UI includes file names for context
-        let visibleMessageContent = finalUserMsg;
-        if (filesMetadata.length > 0) {
-            visibleMessageContent += '\n\n' + filesMetadata.map(f => `📎 **${f.name}** (${(f.size / 1024).toFixed(1)} KB)`).join('\n');
-        }
-
-        const newMessages: UIMessage[] = [...messages, { role: 'user', content: visibleMessageContent, files: filesMetadata }];
-        setMessages(newMessages);
-
-        // Initialize AbortController for request cancellation
+    // ────────────────────────────────────────
+    // Một lượt trả lời của AI (stream)
+    // base: danh sách tin tới câu hỏi cần trả lời; conversationReady: id cuộc trò chuyện khi tin người dùng đã lưu xong
+    // ────────────────────────────────────────
+    const runAssistant = async (base: UIMessage[], attachments: AIAttachment[], conversationReady: Promise<string | null>) => {
         const controller = new AbortController();
         abortControllerRef.current = controller;
+        const replyId = newMessageId();
+        const startedAt = Date.now();
+
+        setMessages([...base, { id: replyId, role: 'assistant', content: '', status: 'streaming', startedAt, meta: { expert } }]);
+        setIsLoading(true);
+        setPinSignal(s => s + 1);
+
+        // Gom sự kiện, mỗi khung hình vẽ lại một lần
+        const live = {
+            text: '',
+            thoughts: '',
+            steps: [] as AIStep[],
+            charts: [] as ChartData[],
+            actions: [] as ActionResult[],
+            // gắn chế độ ngay từ đầu: Bạn đồng hành hiện "… đang soạn tin nhắn" thay vì khung phân tích
+            run: { expert } as AIRunMeta,
+            clarification: undefined as ClarifyRequest | undefined,
+            sources: [] as WebSource[],
+        };
+        const liveMeta = (): AIMessageMeta => ({
+            ...live.run,
+            thoughts: live.thoughts || undefined,
+            steps: live.steps.length ? [...live.steps] : undefined,
+            clarification: live.clarification,
+            sources: live.sources.length ? [...live.sources] : undefined,
+        });
+        let frame = 0;
+        const flush = () => {
+            frame = 0;
+            setMessages(prev => prev.map(m => (m.id === replyId ? {
+                ...m,
+                content: live.text,
+                charts: live.charts.length ? [...live.charts] : undefined,
+                actions: live.actions.length ? [...live.actions] : undefined,
+                meta: liveMeta(),
+            } : m)));
+        };
+        const onEvent = (event: AIStreamEvent) => {
+            switch (event.type) {
+                case 'meta':
+                    live.run = { ...live.run, model: event.meta.model, tier: event.meta.tier, weight: event.meta.weight };
+                    break;
+                case 'text': live.text += event.delta; break;
+                case 'thought': live.thoughts += event.delta; break;
+                case 'step': {
+                    const i = live.steps.findIndex(s => s.id === event.step.id);
+                    if (i === -1) live.steps.push({ ...event.step });
+                    else live.steps[i] = { ...event.step };
+                    break;
+                }
+                case 'chart': live.charts.push(event.chart); break;
+                case 'action': live.actions.push(event.action); break;
+                case 'clarify': live.clarification = event.request; break;
+                case 'sources': live.sources = event.sources; break;
+            }
+            if (!frame) frame = requestAnimationFrame(flush);
+        };
 
         try {
-            // Save conversation & user message to DB
-            let currentConvId = conversationId;
-            if (!currentConvId) {
-                const conv = await chatHistoryService.createConversation((msg || "Phân tích tài liệu").substring(0, 50) + '...');
-                if (conv) {
-                    currentConvId = conv.id;
-                    setConversationId(currentConvId);
-                }
-            }
-            if (currentConvId) {
-                await chatHistoryService.saveMessage(currentConvId, 'user', visibleMessageContent);
-            }
-
-            // Construct new user ChatMessage for Gemini history
-            const userPartText = finalUserMsg + promptExtension;
-            const newUserMsg: ChatMessage = {
-                role: 'user',
-                parts: [{ text: userPartText }]
-            };
-            const historyToSend = [...geminiChatHistory, newUserMsg];
-
-            const response = await chatWithAI(historyToSend, appState, actionHandlers, memoryContext, attachmentsToSend, controller.signal);
-
-            // Save AI response to DB
-            if (currentConvId) {
-                await chatHistoryService.saveMessage(
-                    currentConvId,
-                    'assistant',
-                    response.text,
-                    response.charts.length > 0 ? response.charts : undefined,
-                    response.actions.length > 0 ? response.actions : undefined,
-                    response.tokens_used
+            let final: UIMessage;
+            try {
+                // Câu hỏi cần trả lời = tin người dùng cuối cùng; Auto chọn tầng + đoán lĩnh vực / dấu hiệu khủng hoảng
+                const question = [...base].reverse().find(m => m.role === 'user' && !m.local);
+                const userText = question ? editableText(question) : '';
+                // Tin AI ngay trước câu hỏi: câu "ok" trả lời đề nghị / thẻ hỏi lại thì không xuống tầng Siêu nhanh
+                const prevAi = question ? base.slice(0, base.lastIndexOf(question)).reverse().find(m => m.role !== 'user' && !m.local) : undefined;
+                const route = await routeTurn(
+                    {
+                        text: userText, hasAttachments: attachments.length > 0, expert,
+                        prevAiText: prevAi?.content, prevAiCard: !!prevAi?.meta?.clarification,
+                        pronounChanged: expert === 'companion'
+                            && hasPronounChange(base.filter(m => m.role === 'user' && !m.local && m !== question).map(m => m.content)),
+                    },
+                    speed,
+                    prompt => callRouterModel(prompt, controller.signal),
                 );
+                if (controller.signal.aborted) throw new DOMException('Đã dừng', 'AbortError');
+                live.run = { ...live.run, tier: route.tier, auto: route.auto || undefined, expert, domain: route.domain };
+                const response = await chatWithAI(
+                    toGeminiHistory(base), appState, actionHandlers, memoryContext, attachments, controller.signal,
+                    {
+                        tier: route.tier,
+                        onEvent,
+                        expert,
+                        companion: expert === 'companion' ? companionProfile : null,
+                        auto: route.auto,
+                        domain: route.domain,
+                        crisis: route.crisis,
+                        userText,
+                        clarifyRoundsUsed: countClarifyRounds(base),
+                        confirmedBulk: lastAskedConfirm(base),
+                    }
+                );
+                final = {
+                    id: replyId,
+                    role: 'assistant',
+                    content: response.text,
+                    status: 'done',
+                    startedAt,
+                    charts: response.charts.length ? response.charts : undefined,
+                    actions: response.actions.length ? response.actions : undefined,
+                    meta: { ...response.meta, tokens_used: response.tokens_used || undefined },
+                };
+                const artifact = parseArtifact(response.text);
+                if (artifact) setActiveArtifact({ title: artifact.title, content: artifact.artifactContent });
+            } catch (error: any) {
+                const aborted = error?.name === 'AbortError';
+                if (!aborted) console.error(error);
+                final = {
+                    id: replyId,
+                    role: 'assistant',
+                    content: live.text,
+                    status: aborted ? 'stopped' : 'error',
+                    startedAt,
+                    charts: live.charts.length ? live.charts : undefined,
+                    actions: live.actions.length ? live.actions : undefined,
+                    meta: {
+                        ...liveMeta(),
+                        durationMs: Date.now() - startedAt,
+                        ...(aborted ? { stopped: true } : { error: error?.message || String(error) }),
+                    },
+                };
             }
+            if (frame) cancelAnimationFrame(frame);
+            frame = 0;
+            setMessages(prev => prev.map(m => (m.id === replyId ? final : m)));
 
-            // Update Gemini Chat History state
-            if (response.updatedHistory) {
-                setGeminiChatHistory(response.updatedHistory);
-            } else {
-                setGeminiChatHistory([...historyToSend, { role: 'model', parts: [{ text: response.text }] }]);
-            }
-
-            // Extract memories periodically
-            if (newMessages.length > 3 && newMessages.length % 4 === 1) {
-                const chatText = newMessages.map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
-                memoryService.extractMemoriesFromConversation(chatText).catch(console.error);
-            }
-
-            // Auto-open artifact if generated
-            const parsedRes = parseArtifact(response.text);
-            if (parsedRes) {
-                setActiveArtifact({
-                    title: parsedRes.title,
-                    content: parsedRes.artifactContent
+            // Lưu: câu trả lời đầy đủ, hoặc phần dở dang khi dừng / lỗi nếu đã có nội dung hay đã làm thao tác
+            const convId = await conversationReady;
+            const hasContent = !!final.content.trim() || !!final.charts || !!final.actions;
+            if (convId && (final.status === 'done' || hasContent)) {
+                const saved = await chatHistoryService.saveMessage(convId, 'assistant', final.content, {
+                    charts: final.charts,
+                    actions: final.actions,
+                    meta: final.meta,
                 });
+                if (saved) patchMessage(replyId, { dbId: saved.id, createdAt: saved.created_at });
             }
-
-            setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: response.text,
-                charts: response.charts.length > 0 ? response.charts : undefined,
-                actions: response.actions.length > 0 ? response.actions : undefined,
-                tokens_used: response.tokens_used
-            }]);
-        } catch (error: any) {
-            if (error.name === 'AbortError') {
-                setMessages(prev => [...prev, {
-                    role: 'assistant',
-                    content: `🛑 Đã dừng phản hồi từ AI theo yêu cầu.`
-                }]);
-            } else {
-                console.error(error);
-                setMessages(prev => [...prev, {
-                    role: 'assistant',
-                    content: `⚠️ Xin lỗi, đã có lỗi xảy ra: ${error.message}\n\nVui lòng thử lại.`
-                }]);
-            }
+            if (final.status === 'done') maybeExtractMemories([...base, final]);
+        } catch (error) {
+            console.error('[AIAdvisor] runAssistant:', error);
         } finally {
+            if (frame) cancelAnimationFrame(frame);
+            if (abortControllerRef.current === controller) abortControllerRef.current = null;
             setIsLoading(false);
-            abortControllerRef.current = null;
             refreshQuota();
         }
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
+    // Thêm tin người dùng vào sau base rồi để AI trả lời
+    const sendTurn = (
+        base: UIMessage[],
+        text: string,
+        extras: { fileContext?: string; attachments?: AIAttachment[]; files?: FileMeta[] } = {}
+    ) => {
+        const files = extras.files?.length ? extras.files : undefined;
+        const content = files
+            ? `${text}\n\n${files.map(f => `📎 **${f.name}** (${(f.size / 1024).toFixed(1)} KB)`).join('\n')}`
+            : text;
+        const userMessage: UIMessage = {
+            id: newMessageId(),
+            role: 'user',
+            content,
+            status: 'done',
+            fileContext: extras.fileContext || undefined,
+            attachments: extras.attachments?.length ? extras.attachments : undefined,
+            meta: files ? { files } : undefined,
+        };
+        const conversationReady = pendingDbRef.current
+            .catch(() => undefined)
+            .then(() => persistUserMessage(userMessage, text));
+        return runAssistant([...base, userMessage], userMessage.attachments || [], conversationReady);
+    };
+
+    const handleSend = async (overrideMessage?: string) => {
+        const msg = (overrideMessage ?? input).trim();
+        if ((!msg && attachedFiles.length === 0) || isLoading) return;
+
+        const files = attachedFiles;
+        setInput('');
+        setAttachedFiles([]);
+        setEditingId(null);
+        setIsLoading(true);
+
+        const { fileContext, attachments } = await readAttachedFiles(files);
+        await sendTurn(messagesRef.current, msg || FILES_ONLY_PROMPT, {
+            fileContext,
+            attachments,
+            files: files.map(f => ({ name: f.name, type: f.type, size: f.size })),
+        });
+    };
+
+    // ────────────────────────────────────────
+    // Thao tác trên tin nhắn
+    // ────────────────────────────────────────
+    const handleStartEdit = useStableCallback((message: UIMessage) => {
+        if (!isLoading) setEditingId(message.id);
+    });
+    const handleCancelEdit = useStableCallback(() => setEditingId(null));
+
+    // Trả lời thẻ hỏi lại (ask_user): gửi thành tin nhắn tiếp theo của người dùng
+    const handleAnswerClarify = useStableCallback((text: string) => {
+        // Gửi thẳng, không đụng tới ô soạn / tệp người dùng đang chuẩn bị
+        if (!isLoading) sendTurn(messagesRef.current, text);
+    });
+
+    // Sửa & gửi lại: bỏ tin này cùng mọi tin sau, gửi nội dung mới (giữ tệp đính kèm nếu còn trong phiên)
+    const handleSubmitEdit = useStableCallback((target: UIMessage, text: string) => {
+        if (isLoading) return;
+        const list = messagesRef.current;
+        const cut = revertTo(list, target.id);
+        if (!cut) return;
+        setEditingId(null);
+        softDeleteFromIndex(list, cut.kept.length);
+        const keepFiles = !!(target.attachments || target.fileContext);
+        sendTurn(cut.kept, text, {
+            fileContext: target.fileContext,
+            attachments: target.attachments,
+            files: keepFiles ? target.meta?.files : undefined,
+        });
+    });
+
+    // Quay lại đây: bỏ tin này cùng mọi tin sau, đưa nội dung lên ô soạn để nhắn lại
+    const handleRevert = useStableCallback((target: UIMessage) => {
+        if (isLoading) return;
+        const list = messagesRef.current;
+        const cut = revertTo(list, target.id);
+        if (!cut) return;
+        const later = cut.removed.length - 1;
+        const filesNote = target.meta?.files?.length ? '\n\nTệp đính kèm của tin này cần chọn lại trước khi gửi.' : '';
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Quay lại tin nhắn này?',
+            message: `Tin này${later > 0 ? ` và ${later} tin sau nó` : ''} sẽ được gỡ khỏi cuộc trò chuyện — AI cũng sẽ quên phần đó. Nội dung tin được đưa lại vào ô soạn để bạn sửa và gửi lại.`
+                + filesNote + actionWarning(performedActions(cut.removed)),
+            confirmText: 'Quay lại',
+            onConfirm: () => {
+                softDeleteFromIndex(list, cut.kept.length);
+                setMessages(cut.kept.length ? cut.kept : [localNotice(WELCOME_TEXT)]);
+                setEditingId(null);
+                setInput(editableText(target));
+                setTimeout(() => inputRef.current?.focus(), 0);
+            },
+        });
+    });
+
+    // Tạo lại: bỏ câu trả lời này (và mọi tin sau), AI trả lời lại câu hỏi trước đó
+    const handleRegenerate = useStableCallback((target: UIMessage) => {
+        if (isLoading) return;
+        const list = messagesRef.current;
+        const cut = regenerateFrom(list, target.id);
+        if (!cut) return;
+        const run = () => {
+            softDeleteFromIndex(list, cut.kept.length);
+            const ready = pendingDbRef.current.catch(() => undefined).then(() => conversationIdRef.current);
+            runAssistant(cut.kept, cut.question.attachments || [], ready);
+        };
+        const done = performedActions(cut.removed);
+        const later = cut.removed.length - 1;
+        if (!done.length && later <= 0) {
+            run();
+            return;
         }
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Tạo lại câu trả lời?',
+            message: `Câu trả lời này${later > 0 ? ` và ${later} tin sau nó` : ''} sẽ được thay bằng câu trả lời mới.` + actionWarning(done),
+            confirmText: 'Tạo lại',
+            onConfirm: run,
+        });
+    });
+
+    const handleDeleteMessage = useStableCallback((target: UIMessage) => {
+        if (isLoading) return;
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Xoá tin nhắn?',
+            message: 'Tin nhắn sẽ được gỡ khỏi cuộc trò chuyện và AI không dùng nó làm ngữ cảnh nữa.' + actionWarning(performedActions([target])),
+            confirmText: 'Xoá',
+            onConfirm: () => {
+                const dbId = target.dbId;
+                if (dbId) pendingDbRef.current = pendingDbRef.current.then(() => chatHistoryService.softDeleteMessage(dbId));
+                setMessages(prev => {
+                    const next = prev.filter(m => m.id !== target.id);
+                    return next.length ? next : [localNotice(WELCOME_TEXT)];
+                });
+                if (editingId === target.id) setEditingId(null);
+            },
+        });
+    });
+
+    const handleFeedback = useStableCallback((target: UIMessage, value: 'up' | 'down') => {
+        const current = messagesRef.current.find(m => m.id === target.id) || target;
+        const meta: AIMessageMeta = { ...current.meta, feedback: current.meta?.feedback === value ? undefined : value };
+        patchMessage(target.id, { meta });
+        if (current.dbId) chatHistoryService.updateMessageMeta(current.dbId, meta);
+    });
+
+    const handleOpenArtifact = useStableCallback((artifact: Artifact) => setActiveArtifact(artifact));
+    const handleOpenImpactDetails = useStableCallback((data: any) => setSelectedImpactDetails(data));
+
+    // ────────────────────────────────────────
+    // Cuộc trò chuyện
+    // ────────────────────────────────────────
+    const leaveCurrentConversation = () => {
+        sessionRef.current += 1;
+        abortControllerRef.current?.abort();
+        setActiveArtifact(null);
+        setEditingId(null);
     };
 
     const handleReset = () => {
-        setConversationId(null);
-        setActiveArtifact(null);
-        setMessages([{
-            role: 'assistant',
-            content: '🔄 Cuộc trò chuyện đã được làm mới! Mình sẵn sàng phân tích dữ liệu cho bạn. 🌱'
-        }]);
-        setGeminiChatHistory([]);
+        leaveCurrentConversation();
+        setConvId(null);
+        setMessages([localNotice(RESET_TEXT)]);
         setShowHistory(false);
     };
 
     const loadConversation = async (convId: string) => {
-        setIsLoading(true);
-        setActiveArtifact(null);
+        leaveCurrentConversation();
+        setIsLoadingConversation(true);
         try {
-            const msgs: AIMessage[] = await chatHistoryService.getMessages(convId);
-            const uiMsgs: UIMessage[] = msgs.map((m: AIMessage) => ({
-                role: m.role,
-                content: m.content,
-                charts: m.charts || undefined,
-                actions: m.actions || undefined,
-                tokens_used: m.tokens_used
-            }));
-            setMessages(uiMsgs.length > 0 ? uiMsgs : [{
-                role: 'assistant',
-                content: 'Cuộc trò chuyện này trống. Hãy bắt đầu hỏi gì đó!'
-            }]);
-
-            // Reconstruct the Gemini Chat History from loaded database messages
-            const loadedHistory: ChatMessage[] = msgs.map(m => ({
-                role: m.role === 'user' ? 'user' as const : 'model' as const,
-                parts: [{ text: m.content }]
-            }));
-            // Shift the first message if it is from model to satisfy Gemini's alternating role constraint
-            if (loadedHistory.length > 0 && loadedHistory[0].role === 'model') {
-                loadedHistory.shift();
-            }
-            setGeminiChatHistory(loadedHistory);
-
-            setConversationId(convId);
+            const conv = conversations.find(c => c.id === convId);
+            setExpert(isExpertId(conv?.expert_mode) ? conv!.expert_mode as ExpertId : 'general');
+            const rows = await chatHistoryService.getMessages(convId);
+            const ui = fromStoredMessages(rows);
+            setMessages(ui.length > 0 ? ui : [localNotice(EMPTY_TEXT)]);
+            setConvId(convId);
             setShowHistory(false);
+            setPinSignal(s => s + 1);
         } catch (e) {
             console.error(e);
         } finally {
-            setIsLoading(false);
+            setIsLoadingConversation(false);
         }
     };
 
@@ -1082,7 +918,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                 const success = await chatHistoryService.deleteConversation(convId);
                 if (success) {
                     setConversations(prev => prev.filter(c => c.id !== convId));
-                    if (conversationId === convId) {
+                    if (conversationIdRef.current === convId) {
                         handleReset();
                     }
                 }
@@ -1090,7 +926,10 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         });
     };
 
-    const showSuggestions = messages.length <= 1 && !isLoading;
+    const showSuggestions = messages.every(m => m.local || m.meta?.greeting) && !isLoading && !isLoadingConversation;
+    const isCompanion = expert === 'companion';
+    const lastRun = [...messages].reverse().find(m => m.meta?.model)?.meta;
+    const modelLabel = lastRun?.model ? lastRun.model.replace(/^gemini-/, '') : null;
 
     // ── Quick Stats ──
     const now = new Date();
@@ -1198,16 +1037,20 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         </button>
                         <div className="flex items-center gap-3">
                             <div className="w-9 h-9 flex items-center justify-center">
-                                <GlassIcon name="ai" size={34} eager />
+                                {isCompanion
+                                    ? <CompanionAvatar avatar={companionProfile?.avatar} size={34} online />
+                                    : <GlassIcon name="ai" size={34} eager />}
                             </div>
                             <div>
-                                <h1 className="font-bold text-gray-800 text-sm leading-tight">SmartLife AI Advisor</h1>
+                                <h1 className="font-bold text-gray-800 text-sm leading-tight">
+                                    {isCompanion ? (companionProfile?.name || 'Bạn đồng hành') : 'SmartLife AI Advisor'}
+                                </h1>
                                 <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
                                     <span className="relative flex h-2 w-2">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                                     </span>
-                                    Gemini AI Advisor ({getCurrentModel().replace('gemini-', '')})
+                                    {isCompanion ? relationshipLabel(companionProfile?.relationship || 'friend') : getExpert(expert).name} · {SPEED_OPTIONS.find(o => o.id === speed)?.label}{modelLabel ? ` · ${modelLabel}` : ''}
                                 </div>
                             </div>
                         </div>
@@ -1624,175 +1467,57 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
 
                 {/* ── Chat Area ── */}
                 <div className="flex-1 flex flex-col min-h-0 bg-white lg:rounded-t-2xl lg:border lg:border-gray-100 lg:shadow-sm overflow-hidden">
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
-                        {messages.map((msg, idx) => {
-                            const parsedArtifactData = msg.role === 'assistant' ? parseArtifact(msg.content) : null;
-                            const displayContent = parsedArtifactData
-                                ? (parsedArtifactData.cleanContent || `📊 AI đã lập báo cáo **${parsedArtifactData.title}**`)
-                                : msg.content;
-
-                            return (
-                                <div key={idx} className={`flex items-end gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in`}>
-                                    {/* Avatar */}
-                                    {msg.role === 'assistant' && (
-                                        <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
-                                            <Sparkles size={12} className="text-white bg-transparent" />
-                                        </div>
-                                    )}
-
-                                    {/* Bubble */}
-                                    <div className={`max-w-[88%] ${msg.role === 'user' ? 'lg:max-w-[75%]' : 'lg:max-w-[85%]'} ${msg.role === 'user' ? '' : ''}`}>
-                                        <div className={`px-3.5 py-2.5 md:px-4 md:py-3 text-sm md:text-[15px] leading-relaxed shadow-sm
-                                            ${msg.role === 'user'
-                                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl rounded-br-md prose-invert prose-p:text-white prose-headings:text-white'
-                                                : 'bg-gray-50 text-gray-700 border border-gray-100 rounded-2xl rounded-bl-md prose prose-sm md:prose-base prose-p:my-1 md:prose-p:my-1.5 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-blue-700 prose-h3:text-base md:prose-h3:text-lg prose-h3:mt-3 prose-h3:mb-1'
-                                            }`}
-                                        >
-                                            {msg.role === 'assistant' ? (
-                                                <ReactMarkdown
-                                                    remarkPlugins={[remarkGfm]}
-                                                    components={{
-                                                        p: ({ node, ...props }) => <p className="mb-3.5 leading-relaxed text-gray-700 last:mb-0" {...props} />,
-                                                        h3: ({ node, ...props }) => <h3 className="text-base font-bold text-blue-800 mt-4 mb-2" {...props} />,
-                                                        ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-3.5 space-y-1.5" {...props} />,
-                                                        ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-3.5 space-y-1.5" {...props} />,
-                                                        li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
-                                                        strong: ({ node, ...props }) => <strong className="font-bold text-blue-950" {...props} />,
-                                                        table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-blue-200 text-sm" {...props} /></div>,
-                                                        thead: ({ node, ...props }) => <thead className="bg-blue-50" {...props} />,
-                                                        th: ({ node, ...props }) => <th className="border border-blue-200 px-4 py-2 text-left font-semibold text-blue-900" {...props} />,
-                                                        td: ({ node, ...props }) => <td className="border border-blue-100 px-4 py-2 text-gray-700" {...props} />,
-                                                        tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />,
-                                                        a: ({ node, href, children, ...props }: any) => {
-                                                            const isGoogleMaps = href && (href.includes('google.com/maps') || href.includes('maps.google.com') || href.includes('maps.app.goo.gl'));
-                                                            if (isGoogleMaps) {
-                                                                return (
-                                                                    <a
-                                                                        href={href}
-                                                                        target="_blank"
-                                                                        rel="noreferrer"
-                                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 my-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all no-underline not-prose"
-                                                                        {...props}
-                                                                    >
-                                                                        <span>🗺️</span>
-                                                                        <span>{children || 'Mở Google Maps chỉ đường'}</span>
-                                                                        <span className="text-[10px]">↗</span>
-                                                                    </a>
-                                                                );
-                                                            }
-                                                            return (
-                                                                <a
-                                                                    href={href}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className="text-blue-600 font-bold hover:underline inline-flex items-center gap-0.5"
-                                                                    {...props}
-                                                                >
-                                                                    {children}
-                                                                </a>
-                                                            );
-                                                        }
-                                                    }}
-                                                >
-                                                    {displayContent}
-                                                </ReactMarkdown>
-                                            ) : (
-                                                displayContent
-                                            )}
-                                        </div>
-
-                                        {/* Artifact Card trigger in Chat Bubble */}
-                                        {parsedArtifactData && !isDesktop && (
-                                            <div className="mt-2 p-3 bg-blue-50/75 rounded-xl border border-blue-100 flex items-center justify-between gap-3 animate-fade-in shadow-sm">
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-semibold text-blue-950 flex items-center gap-1.5">
-                                                        <FileText size={14} className="text-blue-600" /> Báo cáo: {parsedArtifactData.title}
-                                                    </p>
-                                                    <p className="text-[10px] text-blue-700/80 mt-0.5 truncate">Báo cáo chi tiết đã được lập.</p>
-                                                </div>
-                                                <button
-                                                    onClick={() => setActiveArtifact({ title: parsedArtifactData.title, content: parsedArtifactData.artifactContent })}
-                                                    className="px-2.5 py-1.5 bg-white text-blue-700 hover:bg-blue-50 border border-blue-150 text-xs font-bold rounded-lg transition-colors shadow-sm shrink-0"
-                                                >
-                                                    Xem báo cáo 📑
-                                                </button>
-                                            </div>
-                                        )}
-
-                                         {/* Action Confirmations */}
-                                         {msg.actions && msg.actions.length > 0 && (
-                                             <div className="mt-2 space-y-2">
-                                                 {msg.actions.map((action, ai) => {
-                                                     if (action.type === 'financial_impact') {
-                                                         return (
-                                                             <FinancialImpactCard
-                                                                 key={ai}
-                                                                 action={action}
-                                                                 appState={appState}
-                                                                 onAddTransaction={onAddTransaction}
-                                                                 onOpenDetails={(data) => setSelectedImpactDetails(data)}
-                                                             />
-                                                         );
-                                                     }
-                                                     return (
-                                                         <div
-                                                             key={ai}
-                                                             className={`flex items-start gap-2 px-3 py-2 rounded-xl text-xs ${action.success
-                                                                 ? 'bg-blue-50 border border-blue-200 text-blue-700'
-                                                                 : 'bg-red-50 border border-red-200 text-red-700'
-                                                                 }`}
-                                                         >
-                                                             {action.success
-                                                                 ? <CheckCircle2 size={14} className="text-blue-500 shrink-0 mt-0.5" />
-                                                                 : <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
-                                                             }
-                                                             <span>{action.message}</span>
-                                                         </div>
-                                                     );
-                                                 })}
-                                             </div>
-                                         )}
-                                         
-                                        {/* Inline Charts */}
-                                        {msg.charts && msg.charts.length > 0 && (
-                                            <div className="mt-2 space-y-2">
-                                                {msg.charts.map((chart, ci) => (
-                                                    <InlineChatChart key={ci} chart={chart} />
-                                                ))}
-                                            </div>
-                                        )}
-                                        {/* Token Counter */}
-                                        {msg.role === 'assistant' && msg.tokens_used !== undefined && msg.tokens_used !== null && (
-                                            <div className="text-[10px] text-gray-400 mt-1 ml-1 flex items-center gap-1 select-none animate-fade-in">
-                                                <Zap size={10} className="text-gray-400 shrink-0" />
-                                                <span>Tiêu tốn: <strong>{msg.tokens_used.toLocaleString()}</strong> tokens</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-
-                        {/* Loading */}
-                        {isLoading && (
-                            <div className="flex items-end gap-2.5 animate-fade-in">
-                                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0">
-                                    <Sparkles size={12} className="text-white" />
-                                </div>
-                                <div className="bg-gray-50 px-4 py-3 md:px-5 md:py-4 rounded-2xl rounded-bl-md border border-gray-100 shadow-sm">
-                                    <div className="flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></span>
-                                        <span className="text-[10px] text-gray-400 ml-1">Đang phân tích dữ liệu...</span>
-                                    </div>
-                                </div>
+                    <MessageList pinSignal={pinSignal}>
+                        {isLoadingConversation ? (
+                            <div className="flex items-center justify-center gap-2 py-10 text-xs text-gray-400">
+                                <Loader2 size={14} className="animate-spin" /> Đang tải cuộc trò chuyện...
                             </div>
-                        )}
+                        ) : (() => {
+                            let seenUser = false;
+                            const lastId = messages[messages.length - 1]?.id;
+                            return messages.map(m => {
+                                if (m.role === 'user' && !m.local) seenUser = true;
+                                return (
+                                    <MessageBubble
+                                        key={m.id}
+                                        message={m}
+                                        appState={appState}
+                                        busy={isLoading}
+                                        isEditing={editingId === m.id}
+                                        canRegenerate={m.role === 'assistant' && !m.local && seenUser}
+                                        onAddTransaction={onAddTransaction}
+                                        onOpenImpactDetails={handleOpenImpactDetails}
+                                        onOpenArtifact={handleOpenArtifact}
+                                        onStartEdit={handleStartEdit}
+                                        onCancelEdit={handleCancelEdit}
+                                        onSubmitEdit={handleSubmitEdit}
+                                        onRevert={handleRevert}
+                                        onRegenerate={handleRegenerate}
+                                        onDelete={handleDeleteMessage}
+                                        onFeedback={handleFeedback}
+                                        isLast={m.id === lastId}
+                                        onAnswerClarify={handleAnswerClarify}
+                                        companion={companionProfile}
+                                    />
+                                );
+                            });
+                        })()}
 
                         {/* Suggestions */}
-                        {showSuggestions && (
+                        {showSuggestions && isCompanion && (
+                            <div className="pt-3 flex flex-wrap gap-2">
+                                {COMPANION_STARTERS.map(s => (
+                                    <button
+                                        key={s.label}
+                                        onClick={() => handleSend(s.prompt)}
+                                        className="px-3 py-1.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 transition-colors dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
+                                    >
+                                        <span aria-hidden="true">{s.emoji}</span> {s.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {showSuggestions && !isCompanion && (
                             <div className="pt-3">
                                 <p className="text-[11px] text-gray-400 font-semibold mb-3 uppercase tracking-wider flex items-center gap-1.5">
                                     <Lightbulb size={12} /> Gợi ý câu hỏi
@@ -1822,290 +1547,45 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                 </div>
                             </div>
                         )}
+                    </MessageList>
 
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    {/* Input Area */}
-                    <div className="p-3 md:p-4 bg-white border-t border-gray-100 shrink-0">
-                        {/* Attached Files Preview */}
-                        {attachedFiles.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-2 p-2 bg-gray-50 rounded-xl border border-gray-100 max-h-32 overflow-y-auto custom-scrollbar">
-                                {attachedFiles.map((file, fIdx) => {
-                                    return (
-                                        <div key={fIdx} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white rounded-lg border border-gray-200 text-xs shadow-sm max-w-[200px] animate-fade-in">
-                                            <span className="truncate font-medium text-gray-700" title={file.name}>{file.name}</span>
-                                            <span className="text-[10px] text-gray-400 shrink-0">({(file.size / 1024).toFixed(0)}KB)</span>
-                                            <button
-                                                onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== fIdx))}
-                                                className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500 transition-colors shrink-0"
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                        <div className="relative flex items-end gap-2 bg-gray-50 rounded-xl border border-gray-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                            {/* Upload Popover Menu */}
-                            {showUploadMenu && (
-                                <div
-                                    ref={uploadMenuRef}
-                                    className="absolute bottom-14 left-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-150 p-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col gap-0.5"
-                                >
-                                    <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tải lên tệp tin</div>
-                                    <button
-                                        type="button"
-                                        onClick={() => triggerFileSelect('image')}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors text-left"
-                                    >
-                                        <span className="text-base">🖼️</span> Hình ảnh (Ảnh chụp, TKB...)
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => triggerFileSelect('document')}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors text-left"
-                                    >
-                                        <span className="text-base">📄</span> Tài liệu (PDF, Excel, TXT...)
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => triggerFileSelect('audio')}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors text-left"
-                                    >
-                                        <span className="text-base">🎙️</span> Âm thanh (Audio, Ghi âm...)
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Hidden file input */}
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
-                                className="hidden"
-                                multiple
-                                accept="image/*,audio/*,application/pdf,text/plain,text/csv,.csv,.xlsx,.xls,.json,.md"
-                            />
-                            {/* Attachment trigger button */}
-                            <button
-                                type="button"
-                                onClick={() => setShowUploadMenu(!showUploadMenu)}
-                                disabled={isLoading}
-                                className={`m-1 p-2 rounded-xl transition-all shrink-0 ${showUploadMenu ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:text-blue-600 hover:bg-gray-150'}`}
-                                title="Đính kèm tài liệu, ảnh hoặc âm thanh"
-                            >
-                                <Plus size={20} className={`transition-transform duration-200 ${showUploadMenu ? 'rotate-45' : ''}`} />
-                            </button>
-
-                            {/* Voice recognition mic button */}
-                            <button
-                                type="button"
-                                onClick={toggleRecording}
-                                disabled={isLoading}
-                                className={`m-1 p-2 rounded-xl transition-all shrink-0 ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-gray-400 hover:text-blue-600 hover:bg-gray-150'}`}
-                                title={lang === 'vi' ? 'Nhận diện giọng nói' : 'Voice Typing'}
-                            >
-                                <Mic size={20} />
-                            </button>
-
-                            {/* Live Speech Recognition Overlay */}
-                            {isRecording && (
-                                <div className="absolute inset-y-0.5 left-0.5 right-0.5 bg-white/95 backdrop-blur-sm flex items-center justify-between px-4 z-10 animate-fade-in rounded-[10px] border border-red-100">
-                                    <div className="flex items-center gap-3">
-                                        <span className="relative flex h-3 w-3">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                        </span>
-                                        <span className="text-xs font-bold text-gray-650 animate-pulse">
-                                            {lang === 'vi' ? 'Đang lắng nghe giọng nói...' : lang === 'ko' ? '음성을 듣고 있습니다...' : 'Listening to your voice...'}
-                                        </span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={toggleRecording}
-                                        className="text-xs font-bold text-red-500 hover:text-red-600 px-3 py-1 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100"
-                                    >
-                                        {lang === 'vi' ? 'Hoàn thành' : lang === 'ko' ? '완료' : 'Done'}
-                                    </button>
-                                </div>
-                            )}
-
-                            <textarea
-                                ref={inputRef}
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={handleKeyPress}
-                                placeholder='Nhập đi bạn ơi, hoặc đính kèm ảnh, âm thanh, tài liệu....'
-                                className="flex-1 bg-transparent px-1 py-2.5 text-sm outline-none resize-none max-h-28 min-h-[44px] placeholder:text-gray-400"
-                                rows={1}
-                            />
-                            <button
-                                type="button"
-                                onClick={isLoading ? handleStopResponse : () => handleSend()}
-                                disabled={!isLoading && !input.trim() && attachedFiles.length === 0}
-                                className={`m-1 p-2 rounded-xl transition-all shrink-0 ${isLoading
-                                    ? 'bg-red-500 hover:bg-red-600 text-white hover:shadow-lg hover:shadow-red-200 animate-pulse'
-                                    : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg hover:shadow-blue-200 disabled:opacity-40 disabled:hover:shadow-none'
-                                    }`}
-                                title={isLoading ? 'Dừng phản hồi' : 'Gửi tin nhắn'}
-                            >
-                                {isLoading ? <Square size={16} className="fill-white text-white" /> : <Send size={16} />}
-                            </button>
-                        </div>
-                        <p className="text-[9px] text-center text-gray-400 mt-2">
-                            Powered by Gemini ({getCurrentModel().replace('gemini-', '')}) · Tải lên tối đa 15MB/file, phân tích qua bộ nhớ RAM
-                        </p>
-                    </div>
+                    <Composer
+                        lang={lang}
+                        input={input}
+                        setInput={setInput}
+                        attachedFiles={attachedFiles}
+                        setAttachedFiles={setAttachedFiles}
+                        isLoading={isLoading}
+                        speed={speed}
+                        onSpeedChange={handleSpeedChange}
+                        expert={expert}
+                        onExpertChange={handleExpertChange}
+                        companion={companionProfile}
+                        onEditCompanion={() => setShowCompanionSetup(true)}
+                        onSend={() => handleSend()}
+                        onStop={handleStopResponse}
+                        inputRef={inputRef}
+                    />
                 </div>
 
                 {/* ── Artifact Pane (Desktop side column, Mobile drawer) ── */}
                 {activeArtifact && (
-                    <>
-                        {/* Desktop Side Column */}
-                        {isDesktop && (
-                            <div className="hidden lg:flex flex-col w-[45%] lg:max-w-2xl shrink-0 bg-white border border-gray-100 rounded-t-2xl shadow-sm overflow-hidden animate-fade-in-left">
-                                <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
-                                            <FileText size={14} className="bg-transparent text-blue-700" />
-                                        </div>
-                                        <h2 className="font-bold text-gray-800 text-sm truncate" title={activeArtifact.title}>
-                                            {activeArtifact.title}
-                                        </h2>
-                                    </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        <button
-                                            onClick={handleCopyArtifact}
-                                            className="p-1.5 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1 bg-transparent"
-                                            title="Sao chép báo cáo"
-                                        >
-                                            {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                                        </button>
-                                        <button
-                                            onClick={handleDownloadArtifact}
-                                            className="p-1.5 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors bg-transparent"
-                                            title="Tải xuống Markdown"
-                                        >
-                                            <Download size={14} />
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveArtifact(null)}
-                                            className="p-1.5 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors ml-1 bg-transparent"
-                                            title="Đóng báo cáo"
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-6 prose prose-sm md:prose-base custom-scrollbar">
-                                    {(() => {
-                                        const chart = getParsedChart(activeArtifact.content);
-                                        if (chart) {
-                                            return (
-                                                <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-sm max-w-full overflow-hidden">
-                                                    <InlineChatChart chart={chart} />
-                                                </div>
-                                            );
-                                        }
-                                        return (
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                components={{
-                                                    p: ({ node, ...props }) => <p className="mb-4 leading-relaxed text-gray-700 last:mb-0" {...props} />,
-                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-blue-800 mt-4 mb-2" {...props} />,
-                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
-                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
-                                                    li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
-                                                    strong: ({ node, ...props }) => <strong className="font-bold text-blue-950" {...props} />,
-                                                    table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-blue-200 text-sm" {...props} /></div>,
-                                                    thead: ({ node, ...props }) => <thead className="bg-blue-50" {...props} />,
-                                                    th: ({ node, ...props }) => <th className="border border-blue-200 px-4 py-2 text-left font-semibold text-blue-900" {...props} />,
-                                                    td: ({ node, ...props }) => <td className="border border-blue-100 px-4 py-2 text-gray-700" {...props} />,
-                                                    tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
-                                                }}
-                                            >
-                                                {activeArtifact.content}
-                                            </ReactMarkdown>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Mobile Slide-up Fullscreen Drawer */}
-                        <div className="lg:hidden fixed inset-0 z-[100] flex flex-col bg-white animate-fade-in-up">
-                            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
-                                        <FileText size={14} className="bg-transparent text-blue-700" />
-                                    </div>
-                                    <h2 className="font-bold text-gray-800 text-sm truncate" title={activeArtifact.title}>
-                                        {activeArtifact.title}
-                                    </h2>
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                        onClick={handleCopyArtifact}
-                                        className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1 bg-transparent"
-                                    >
-                                        {copied ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
-                                    </button>
-                                    <button
-                                        onClick={handleDownloadArtifact}
-                                        className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors bg-transparent"
-                                    >
-                                        <Download size={16} />
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveArtifact(null)}
-                                        className="p-2 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-700 transition-colors bg-transparent"
-                                    >
-                                        <X size={18} />
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-5 prose prose-sm md:prose-base custom-scrollbar pb-10">
-                                {(() => {
-                                    const chart = getParsedChart(activeArtifact.content);
-                                    if (chart) {
-                                        return (
-                                            <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-sm max-w-full overflow-hidden">
-                                                <InlineChatChart chart={chart} />
-                                            </div>
-                                        );
-                                    }
-                                    return (
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                            components={{
-                                                p: ({ node, ...props }) => <p className="mb-4 leading-relaxed text-gray-700 last:mb-0" {...props} />,
-                                                h3: ({ node, ...props }) => <h3 className="text-base font-bold text-blue-800 mt-4 mb-2" {...props} />,
-                                                ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
-                                                ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
-                                                li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
-                                                strong: ({ node, ...props }) => <strong className="font-bold text-blue-950" {...props} />,
-                                                table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border border-blue-200 text-sm" {...props} /></div>,
-                                                thead: ({ node, ...props }) => <thead className="bg-blue-50" {...props} />,
-                                                th: ({ node, ...props }) => <th className="border border-blue-200 px-4 py-2 text-left font-semibold text-blue-900" {...props} />,
-                                                td: ({ node, ...props }) => <td className="border border-blue-100 px-4 py-2 text-gray-700" {...props} />,
-                                                tr: ({ node, ...props }) => <tr className="even:bg-gray-50/50" {...props} />
-                                            }}
-                                        >
-                                            {activeArtifact.content}
-                                        </ReactMarkdown>
-                                    );
-                                })()}
-                            </div>
-                        </div>
-                    </>
+                    <ArtifactPane artifact={activeArtifact} isDesktop={isDesktop} onClose={() => setActiveArtifact(null)} />
                 )}
             </div>
+            {showCompanionSetup && (
+                <CompanionSetup
+                    initial={companionProfile}
+                    profileAge={appState.profile?.age}
+                    onSave={handleSaveCompanion}
+                    onClose={() => setShowCompanionSetup(false)}
+                />
+            )}
             <ConfirmModal
                 isOpen={confirmDialog.isOpen}
                 title={confirmDialog.title}
                 message={confirmDialog.message}
+                confirmText={confirmDialog.confirmText}
                 onConfirm={confirmDialog.onConfirm}
                 onCancel={() => setConfirmDialog(p => ({ ...p, isOpen: false }))}
             />

@@ -10,6 +10,8 @@ import {
 } from './gpaCalculator';
 import { GRADE_SCALE, SEMESTER_TYPE_LABELS } from '../constants';
 import { supabase } from './supabase';
+import { createSseParser } from './ai/streamParser';
+import { LEGACY_SYSTEM_INSTRUCTION } from './ai/promptBlocks';
 
 // Habit/event icons are either an emoji or "lucide:<key>" (rendered in the UI only); keep emoji in the AI context.
 const iconText = (icon?: string | null) => (icon && !icon.startsWith('lucide:') ? `${icon} ` : '');
@@ -53,11 +55,24 @@ export interface ChatMessage {
     parts: MessagePart[];
 }
 
+// thought / thoughtSignature: Gemini trả về khi bật suy nghĩ; chữ ký phải gửi lại nguyên vẹn trong cùng lượt gọi hàm
+type PartExtras = { thought?: boolean; thoughtSignature?: string };
+
 export type MessagePart =
-    | { text: string }
-    | { functionCall: { name: string; args: Record<string, any> } }
+    | ({ text: string } & PartExtras)
+    | ({ functionCall: { name: string; args: Record<string, any> } } & PartExtras)
     | { functionResponse: { name: string; response: { result: any } } }
     | { inlineData: { mimeType: string; data: string } };
+
+// Tầng tốc độ gửi lên proxy — server tự chọn model và mức suy nghĩ.
+// 'lite' (flash-lite) chỉ do Auto chọn cho câu chat ngắn và cho lệnh nội bộ nhẹ — không có trong menu chọn tay.
+export type AITier = 'lite' | 'fast' | 'balanced' | 'deep';
+
+export interface StreamMeta {
+    model: string;
+    tier: string;
+    weight: number;
+}
 
 export interface ToolDeclaration {
     name: string;
@@ -508,132 +523,157 @@ export function buildFullContext(state: AppState): string {
 // ────────────────────────────────────────
 // System Prompt
 // ────────────────────────────────────────
-export const SYSTEM_INSTRUCTION = `Bạn là **SmartLife Advisor** — trợ lý AI chuyên tư vấn tài chính cá nhân, quản lý cuộc sống, và **tư vấn học vụ GPA cho sinh viên ĐHQGHN**.
-
-QUY TẮC BẢO MẬT & TIẾT KIỆM TOKEN:
-- Hồ sơ cá nhân của người dùng (tên, tuổi, MBTI, DISC, nghề nghiệp, định hướng...) đã được nhúng sẵn ở prompt hệ thống dưới đây để giúp bạn cá nhân hóa xưng hô và phong cách giao tiếp từ câu đầu tiên. Bạn KHÔNG cần gọi hàm get_user_profile nữa trừ khi muốn refresh thông tin từ database.
-- Hãy chủ động gọi các công cụ truy vấn (Function Calling) tương ứng dưới đây khi cần dữ liệu động để trả lời người dùng (ví dụ: giao dịch tài chính, điểm số, thói quen, công việc):
-  • Gọi \`get_financial_report\` khi hỏi tổng quan về tài chính, số dư ví, nợ nần, ngân sách, chi tiêu danh mục của tháng hiện tại.
-  • Gọi \`get_todos_and_schedule\` khi hỏi về công việc cần làm, Kanban board (gồm 4 cột: Backlog, Todo, Doing, Done), chi tiết nhiệm vụ, subtasks, và thời khóa biểu cố định.
-  • Gọi \`get_academic_gpa_record\` khi hỏi về điểm số học tập, các học kỳ, môn học, tín chỉ, tính GPA tích lũy.
-  • Gọi \`get_habits_tracker\` khi hỏi về thói quen cá nhân, streaks thói quen, tỷ lệ check-in hoàn thành.
-  • Gọi \`get_countdown_events\` khi hỏi về các sự kiện đếm ngược hoặc mốc đếm tiến.
-  • Gọi \`get_journal_entries\` khi hỏi về nội dung nhật ký gần đây hoặc phân tích cảm xúc dạo gần đây.
-  • Gọi \`simulate_financial_impact\` khi người dùng hỏi về kịch bản chi tiêu phát sinh đột xuất, chi tiêu giả định (ví dụ: bị CSGT phạt, đám cưới bạn thân, hỏng xe, đầu tư công nghệ...).
-  • Gọi \`query_database\` khi cần lấy dữ liệu chi tiết, danh sách đầy đủ hoặc lọc theo mốc thời gian cụ thể (ví dụ: truy vấn tất cả giao dịch trong quá khứ của tháng trước, lọc danh sách việc đã xong, tìm kiếm nội dung...). BẮT BUỘC dùng tool này thay vì \`get_financial_report\` khi người dùng hỏi các thông tin lịch sử tài chính chi tiết ngoài 30 giao dịch gần nhất hoặc ngoài tháng hiện tại.
-  • Gọi các công cụ quản lý lịch hẹn cuộc họp (\`add_calendar_event\`, \`update_calendar_event\`, \`delete_calendar_event\`) khi người dùng muốn lên lịch, cập nhật hoặc xóa các cuộc hẹn/sự kiện cụ thể theo ngày (lịch không cố định).
-- Bạn phải LUÔN gọi các công cụ này trước khi trả lời, KHÔNG tự bịa số liệu hay đoán bừa nếu chưa gọi tool tương ứng.
-
-ĐỊNH DẠNG BÁO CÁO CHI TIẾT (ARTIFACTS):
-- BẮT BUỘC sử dụng thẻ <artifact title="Mô phỏng Tác động Tài chính">...</artifact> để bọc kết quả mô phỏng tác động tài chính phát sinh đột xuất (sau khi gọi tool simulate_financial_impact). Điều này giúp tự động hiển thị kết quả trên Canvas (bảng báo cáo riêng biệt) trực quan cho người dùng.
-- Chỉ sử dụng cặp thẻ <artifact title="Tiêu đề ngắn gọn của báo cáo">...</artifact> trong trường hợp khác khi người dùng có yêu cầu rõ ràng như "tạo báo cáo", "lập tài liệu", "tạo tài liệu riêng", "lập báo cáo phân tích riêng", hoặc "tải báo cáo".
-- Đối với mọi câu hỏi bình thường khác (kể cả câu trả lời dài dòng, phân tích chi tiết, bảng biểu lớn, hay kế hoạch học tập/tài chính), bạn TUYỆT ĐỐI KHÔNG tự ý sử dụng thẻ <artifact>. Thay vào đó, bạn phải phản hồi trực tiếp bằng văn bản Markdown bình thường trong đoạn chat để hiển thị inline trực tiếp cho người dùng ở cả giao diện máy tính và điện thoại.
-
-🧠 PHÂN TÍCH LOGIC & CHUỖI SUY NGHĨ (CHAIN OF THOUGHT):
-1. **Suy nghĩ từng bước (Think step-by-step)**: Khi người dùng hỏi các câu liên quan đến tính toán số liệu (VD: tổng tiền chi tiêu, dự báo ngân sách, tính GPA tích lũy, số tín chỉ cần học), bạn phải thực hiện phân tích và tính toán từng bước logic trước khi đưa ra kết quả. Tránh đưa ra kết luận vội vã mà không kiểm tra độ chính xác của các con số.
-2. **Xử lý dữ liệu rỗng & Lỗi hệ thống**: 
-   - Khi dữ liệu trả về từ tool báo trống (ví dụ: chưa có thói quen, chưa có sự kiện đếm ngược, chưa có nhật ký), **tuyệt đối không chỉ trả lời cụt lủn** mà hãy gợi ý, hướng dẫn người dùng cách thêm mới trên ứng dụng (VD: *"Bạn chưa thiết lập thói quen nào. Hãy bấm nút '+' hoặc gõ 'Thêm thói quen tập thể dục hàng ngày' để bắt đầu nhé!"*).
-   - Nếu dữ liệu trả về thông báo "Lỗi hệ thống khi tải...", hãy thông báo lịch sự cho người dùng biết kết nối đang bị gián đoạn và gợi ý họ thử lại sau.
-
-NGUYÊN TẮC PHÂN TÍCH & TRÌNH BÀY (QUAN TRỌNG):
-1. Luôn phân tích dựa trên DỮ LIỆU THỰC của người dùng thu được từ các công cụ gọi hàm.
-2. Trả lời bằng tiếng Việt hoặc tiếng Anh đối mấy từ kiểu hiện đại mix được với tiếng Việt. BẮT BUỘC chia câu trả lời thành các đoạn ngắn, thông thoáng, tối ưu hoàn toàn cho giao diện màn hình Mobile.
-3. TÔ ĐẬM & NHẤN MẠNH (BẮT BUỘC): Bắt buộc dùng cú pháp in đậm (\`**từ_khóa**\`) cho tất cả các con số, số tiền (VND), tỷ lệ %, tên danh mục, thời gian, tên công việc, cảnh báo đỏ, chỉ số GPA, và các từ khóa hành động cốt lõi. Hãy làm cho câu trả lời cực kỳ dễ quét (scan) nhanh bằng mắt trong vòng 3 giây. Tránh viết các đoạn văn dài thuần văn bản mà không có từ in đậm.
-4. QUY TẮC SỬ DỤNG EMOJI & ICON HỢP LÝ:
-   - Dùng emoji làm điểm nhấn ở đầu mỗi tiêu đề phần (ví dụ: \`📊 Tài chính\`, \`🎓 GPA\`, \`🔥 Thói quen\`, \`⏳ Đếm ngược\`) hoặc đầu dòng danh sách. Tránh chèn emoji lộn xộn ở giữa câu hoặc spam emoji gây rối mắt.
-   - Các chỉ báo trạng thái: Dùng \`🟢\` cho an toàn/thu nhập/tốt, \`🟡\` cho cảnh cáo/ngân sách sắp hết/trung bình, \`🔴\` cho báo động/vượt chi/cảnh báo học vụ/cần khắc phục gấp.
-   - Danh sách việc cần làm (Todo/Lịch trình): Dùng \`📝\` cho công việc, \`⏰\` hoặc \`📅\` cho thời gian/hạn chót, \`✅\` cho hoàn thành, \`❌\` cho thất bại/hủy.
-5. Khi vẽ biểu đồ, bạn PHẢI gọi công cụ (tool call) \`render_chart\`. Tuyệt đối KHÔNG viết mã JSON của biểu đồ hoặc văn bản thô của biểu đồ vào bên trong thẻ <artifact>. Thẻ <artifact> chỉ chứa văn bản báo cáo định dạng Markdown (như tiêu đề, bảng biểu Markdown, văn bản phân tích), còn biểu đồ sẽ được hệ thống vẽ tự động từ tool call.
-6. ƯU TIÊN dùng bảng (Table Markdown) để trình bày các dữ liệu liên quan đến tiền bạc (như thu nhập, chi tiêu, số dư, ngân sách, xu hướng tài chính) và các việc cần làm (như Todo list, nhiệm vụ, lịch trình, thời hạn, mức độ ưu tiên) cũng như thống kê điểm số GPA để người dùng quan sát trực quan và gọn gàng nhất.
-7. Khi người dùng yêu cầu dự đoán chi tiêu: phân tích mức chi tiêu trung bình các tháng trước, tính độ lệch và đưa ra dự đoán số tiền cho các tháng tới bằng một bảng (table) rõ ràng.
-8. Khi người dùng yêu cầu thêm lịch/việc/giao dịch, dùng tool tương ứng:
-   - Với việc cần làm có thời hạn hoặc danh sách việc, dùng \`add_todo\`.
-   - Với thời khóa biểu cố định lặp lại hàng tuần, dùng \`add_timetable\`.
-   - Với lịch hẹn, cuộc họp, sự kiện cụ thể vào ngày giờ cụ thể (lịch không cố định), dùng \`add_calendar_event\`. Mặc định khi thêm lịch hẹn qua AI, nếu người dùng không chỉ định thời gian nhắc nhở, hãy tự động cài đặt \`email_notify: true\` và \`email_notify_before_minutes: 30\` (báo trước 30 phút qua Gmail). Nếu người dùng nói thời gian cụ thể (ví dụ: báo trước 1 ngày), hãy đổi ra số phút tương ứng (ví dụ: 1 ngày = 1440 phút).
-   - Nếu người dùng liệt kê NHIỀU khoản thu chi trong 1 tin nhắn, LUÔN dùng tool \`batch_add_transactions\` thay vì gọi \`add_transaction\` nhiều lần.
-9. Giọng điệu chuyên nghiệp, ngắn gọn. Đầu ra phải dễ đọc trên giao diện mobile (tránh viết văn quá dài).
-10. Khi người dùng hỏi hoặc yêu cầu mô phỏng về một khoản chi phí phát sinh, hãy LUÔN gọi \`simulate_financial_impact\` để chạy thuật toán mô phỏng. Sau đó, hiển thị chi tiết kết quả mô phỏng bằng một báo cáo Markdown hoặc bảng đẹp mắt bên trong thẻ \`<artifact title="Mô phỏng Tác động Tài chính">\`, chỉ rõ: mức độ ảnh hưởng (🟢 Thấp, 🟡 Trung bình, hoặc 🔴 Cao), tóm tắt tác động, số dư ví sau phát sinh, % ngân sách bị tiêu hao, số ngày trì hoãn mục tiêu tiết kiệm và đề xuất hành động cụ thể để khắc phục.
-
-🔥 THÓI QUEN (habits):
-- Khi phân tích thói quen: đánh giá tỷ lệ hoàn thành, xu hướng streak, và đề xuất cải thiện. Sử dụng emoji \`🔥\` làm đại diện.
-
-⏳ ĐẾM NGƯỢC / ĐẾM TIẾN (countdown_items, countup_items):
-- Phân tích và ước lượng số ngày còn lại hoặc đã qua của các sự kiện quan trọng. Sử dụng emoji \`⏳\` hoặc \`📈\` làm đại diện.
-
-🎓 QUY CHẾ GPA ĐHQGHN 2022:
-- Thang điểm: 10 → Chữ (A+/A/B+/B/C+/C/D+/D/F) → Thang 4 (4.0/3.7/3.5/3.0/2.5/2.0/1.5/1.0/0.0)
-- 3 Template tính điểm:
-  • A: CC1(10%) + CC2(30%) + CK(60%)
-  • B: CC1(10%) + CC2(10%) + CC3(20%) + CK(60%)
-  • C: CC1(20%) + CC2(20%) + CK(60%)
-- GPA Học kỳ = Σ(thang4 × TC) / Σ(TC) — kể cả F
-- GPA Tích lũy = Σ(thang4 × TC) / Σ(TC) — chỉ môn đạt (D trở lên)
-- Xếp loại: Xuất sắc ≥3.6, Giỏi ≥3.2, Khá ≥2.5, TB ≥2.0, Yếu <2.0
-- Cảnh báo học vụ: GPA tích lũy < ngưỡng theo năm (Năm 1: 1.2, Năm 2: 1.4, Năm 3: 1.6, Năm 4+: 1.8)
-
-Khi tư vấn GPA:
-- Tính chính xác điểm cần bao nhiêu cuối kỳ để đạt hạng mong muốn.
-- Phân tích môn nào nên tập trung cải thiện (dựa trên tín chỉ và khả năng tăng điểm).
-- Cảnh báo nếu sinh viên gần ngưỡng cảnh báo học vụ.
-- Dùng tool \`calculate_needed_gpa\` và \`simulate_gpa\` khi cần tính toán.
-- **Tự động quét và import bảng điểm GPA**: Khi người dùng tải lên hình ảnh bảng điểm (transcript) hoặc cung cấp dữ liệu điểm số kèm theo yêu cầu nhập điểm, hãy đọc kỹ thông tin từng môn học (tên môn, số tín chỉ, điểm thành phần CC1, CC2, CC3, điểm cuối kỳ/tổng kết). Sau đó, hãy gọi công cụ \`import_gpa_data\` để tự động lưu thông tin này vào GPA Tracker của họ. Lưu ý nếu môn học thuộc diện không tính điểm trung bình (như Giáo dục quốc phòng, Thể dục), hãy đặt \`exclude_from_gpa: true\`.
-
-🧠 CÁ NHÂN HÓA PHONG CÁCH GIAO TIẾP (MBTI & DISC):
-Hãy đọc thông tin MBTI và DISC của người dùng sau khi gọi công cụ get_user_profile và thay đổi phong cách phản hồi cho phù hợp:
-1. ĐỊNH HÌNH TÔNG GIỌNG GIAO TIẾP theo nhóm DISC:
-   - Nhóm D (Thống trị): Trả lời cực kỳ ngắn gọn, trực diện, tập trung vào kết quả và số liệu. Tránh nói dông dài, hạn chế tối đa emoji.
-   - Nhóm I (Ảnh hưởng): Tràn đầy năng lượng, tích cực, sử dụng nhiều emoji, thường xuyên đưa ra lời khen và khích lệ người dùng.
-   - Nhóm S (Kiên định): Văn phong nhẹ nhàng, điềm đạm, ấm áp, kiên nhẫn hướng dẫn từng bước một để tạo cảm giác an tâm.
-   - Nhóm C (Tuân thủ): Chuyên nghiệp, nghiêm túc, tập trung vào số liệu chính xác, phân tích logic và ƯU TIÊN dùng bảng biểu so sánh dữ liệu.
-   * LƯU Ý HỖN HỢP: Nếu người dùng có 2 chữ cái DISC (ví dụ: "DI", "SC"), hãy khéo léo kết hợp cả hai phong cách giao tiếp, với chữ cái đầu tiên đóng vai trò chủ đạo và chữ cái thứ hai bổ trợ thêm. Nếu không chọn DISC (rỗng), hãy dùng giọng văn tiêu chuẩn, thân thiện và lịch sự.
-2. ĐỊNH HÌNH PHƯƠNG PHÁP TƯ VẤN theo nhóm MBTI:
-   - Lý trí (T) vs Cảm xúc (F): Người T cần các phân tích logic, thẳng thắn, không cảm tính. Người F cần sự thấu cảm, khích lệ và xem xét tác động cảm xúc.
-   - Nguyên tắc (J) vs Linh hoạt (P): Người J thích các kế hoạch chi tiết, check-list, Pomodoro cứng. Người P thích gợi ý linh hoạt, thời gian biểu dạng Timeblocking có khoảng đệm trống.
-   - Trực giác (N) vs Thực tế (S): Người N thích thảo luận về định hướng lâu dài, tầm nhìn mục tiêu sự nghiệp 5 năm. Người S thích giải quyết công việc và số dư chi tiêu trước mắt ngay hôm nay.`;
+// Prompt đầy đủ (giữ cho Insight nhanh). Trang chat dùng buildSystemPrompt() — chỉ nạp khối cần cho từng lượt.
+export const SYSTEM_INSTRUCTION = LEGACY_SYSTEM_INSTRUCTION;
 
 // ────────────────────────────────────────
 // Core API Call — single model, but cycles API keys on 429
 // ────────────────────────────────────────
-export async function callGeminiRaw(body: object, retryCount = 0, signal?: AbortSignal): Promise<any> {
+export async function proxyHeaders(): Promise<Record<string, string>> {
     const { data: { session } } = await supabase.auth.getSession();
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
     }
+    return headers;
+}
 
+// Chờ có thể huỷ (bấm Dừng trong lúc đang chờ thử lại)
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) return reject(new DOMException('Request aborted', 'AbortError'));
+        const timer = setTimeout(resolve, ms);
+        signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new DOMException('Request aborted', 'AbortError'));
+        }, { once: true });
+    });
+}
+
+// Phân loại lỗi HTTP của proxy: trả về 'retry' nếu nên thử lại, còn lại ném lỗi có thông điệp dễ hiểu
+async function handleProxyError(res: Response, retryCount: number): Promise<'retry'> {
+    const err = await res.json().catch(() => ({}));
+    const status = res.status;
+
+    // Nếu là lỗi quota_exceeded từ proxy
+    if (err?.error === 'quota_exceeded' || err?.type?.includes('exceeded') || err?.type?.includes('gate')) {
+        throw new Error(err.message || 'Giới hạn sử dụng AI của bạn đã hết.');
+    }
+
+    // Hết credit Google AI (402) hoặc model trả lời quá lâu — thử lại cũng vô ích
+    if (err?.type === 'provider_billing' || err?.type === 'timeout') {
+        throw new Error(err.message || err.error || `Gemini API Error ${status}`);
+    }
+
+    // Retry cho lỗi tạm thời (server đã xử lý key rotation) - chỉ retry nếu không phải lỗi quota
+    if ((status === 429 || status === 500 || status === 503 || status === 504) && retryCount < 3) {
+        console.warn(`[SmartLife] Proxy returned ${status}. Retrying (${retryCount + 1}/3)...`);
+        return 'retry';
+    }
+
+    if (status === 429) {
+        throw new Error('Hệ thống AI đang bị quá tải (429). Vui lòng đợi một lát rồi thử lại. 🔄');
+    }
+
+    console.error(`[SmartLife] Proxy Error ${status}:`, err);
+    throw new Error(err?.error || `Gemini API Error ${status}`);
+}
+
+export async function callGeminiRaw(body: object, retryCount = 0, signal?: AbortSignal): Promise<any> {
     const res = await fetch(GEMINI_PROXY_URL, {
         method: 'POST',
-        headers,
+        headers: await proxyHeaders(),
         body: JSON.stringify(body),
         signal,
     });
 
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        const status = res.status;
-
-        // Nếu là lỗi quota_exceeded từ proxy
-        if (err?.error === 'quota_exceeded' || err?.type?.includes('exceeded') || err?.type?.includes('gate')) {
-            throw new Error(err.message || 'Giới hạn sử dụng AI của bạn đã hết.');
-        }
-
-        // Retry cho lỗi tạm thời (server đã xử lý key rotation) - chỉ retry nếu không phải lỗi quota
-        if ((status === 429 || status === 500 || status === 503 || status === 504) && retryCount < 3) {
-            console.warn(`[SmartLife] Proxy returned ${status}. Retrying (${retryCount + 1}/3)...`);
-            const delay = 2000 * (retryCount + 1);
-            await new Promise(r => setTimeout(r, delay));
-            return callGeminiRaw(body, retryCount + 1, signal);
-        }
-
-        if (status === 429) {
-            throw new Error('Hệ thống AI đang bị quá tải (429). Vui lòng đợi một lát rồi thử lại. 🔄');
-        }
-
-        console.error(`[SmartLife] Proxy Error ${status}:`, err);
-        throw new Error(err?.error || `Gemini API Error ${status}`);
+        await handleProxyError(res, retryCount);
+        await abortableDelay(2000 * (retryCount + 1), signal);
+        return callGeminiRaw(body, retryCount + 1, signal);
     }
 
     return await res.json();
+}
+
+export interface StreamCallbacks {
+    signal?: AbortSignal;
+    onMeta?: (meta: StreamMeta) => void;
+    /** Mỗi gói JSON của Gemini (đã parse) — dùng để hiện chữ / suy nghĩ ngay khi tới */
+    onChunk?: (chunk: any) => void;
+}
+
+// Gọi proxy với stream: true (Server-Sent Events). Chỉ thử lại khi stream CHƯA bắt đầu;
+// lỗi giữa chừng (event: error) được ném ra để phía trên giữ phần chữ đã nhận.
+export async function streamGeminiRaw(body: object, cb: StreamCallbacks = {}, retryCount = 0): Promise<{ meta: StreamMeta | null; usageMetadata: any }> {
+    const { signal, onMeta, onChunk } = cb;
+    const res = await fetch(GEMINI_PROXY_URL, {
+        method: 'POST',
+        headers: await proxyHeaders(),
+        body: JSON.stringify({ ...body, stream: true }),
+        signal,
+    });
+
+    if (!res.ok) {
+        await handleProxyError(res, retryCount);
+        await abortableDelay(2000 * (retryCount + 1), signal);
+        return streamGeminiRaw(body, cb, retryCount + 1);
+    }
+
+    let meta: StreamMeta | null = null;
+    let usageMetadata: any = null;
+
+    // Proxy cũ / môi trường không stream được → trả JSON thường, coi như một gói duy nhất
+    const contentType = res.headers.get('Content-Type') || '';
+    if (!contentType.includes('text/event-stream') || !res.body) {
+        const data = await res.json();
+        const model = res.headers.get('X-SmartLife-Model');
+        if (model) {
+            meta = { model, tier: res.headers.get('X-SmartLife-Tier') || 'legacy', weight: Number(res.headers.get('X-SmartLife-Weight') || 1) };
+            onMeta?.(meta);
+        }
+        onChunk?.(data);
+        return { meta, usageMetadata: data?.usageMetadata ?? null };
+    }
+
+    let streamError: Error | null = null;
+    const parser = createSseParser(({ event, data }) => {
+        let payload: any;
+        try {
+            payload = JSON.parse(data);
+        } catch {
+            return;
+        }
+        if (event === 'meta') {
+            meta = payload;
+            onMeta?.(payload);
+        } else if (event === 'error') {
+            streamError = new Error(payload?.message || payload?.error || 'Mất kết nối với AI giữa chừng.');
+        } else if (event === 'done') {
+            if (payload?.usageMetadata) usageMetadata = payload.usageMetadata;
+        } else {
+            if (payload?.usageMetadata) usageMetadata = payload.usageMetadata;
+            onChunk?.(payload);
+        }
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            parser.push(decoder.decode(value, { stream: true }));
+            if (streamError) break;
+        }
+        parser.push(decoder.decode());
+        parser.flush();
+    } finally {
+        reader.releaseLock?.();
+    }
+
+    if (streamError) throw streamError;
+    return { meta, usageMetadata };
 }
 
 // Helper to estimate token usage cost in VND
@@ -650,6 +690,36 @@ export function estimateGeminiCost(promptTokens: number, candidatesTokens: numbe
 
     const costUsd = (promptTokens * inputPricePerMillion + candidatesTokens * outputPricePerMillion) / 1000000;
     return costUsd * USD_TO_VND;
+}
+
+// ────────────────────────────────────────
+// Router của chế độ Auto: phân loại bằng model siêu nhanh (tầng lite, purpose 'router' → không tính lượt).
+// Trước đây không gửi tier nên rơi về model cũ gemini-2.5-flash có suy nghĩ → chậm hơn cần thiết.
+// ────────────────────────────────────────
+export async function callRouterModel(prompt: string, signal?: AbortSignal): Promise<string> {
+    const data = await callGeminiRaw({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 256, responseMimeType: 'application/json' },
+        purpose: 'router',
+        tier: 'lite',
+    }, 0, signal);
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    return parts.filter((p: any) => typeof p.text === 'string' && !p.thought).map((p: any) => p.text).join('');
+}
+
+// ────────────────────────────────────────
+// Lời chào chủ động của Bạn đồng hành (purpose 'greeting', tầng fast không suy nghĩ, không tính lượt; mỗi ngày tối đa 1 lần)
+// ────────────────────────────────────────
+export async function callGreetingModel(systemPrompt: string, signal?: AbortSignal): Promise<string> {
+    const data = await callGeminiRaw({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: '(người dùng vừa mở ứng dụng)' }] }],
+        generationConfig: { temperature: 0.9, maxOutputTokens: 200 },
+        purpose: 'greeting',
+        tier: 'fast',
+    }, 0, signal);
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    return parts.filter((p: any) => typeof p.text === 'string' && !p.thought).map((p: any) => p.text).join('').trim();
 }
 
 // ────────────────────────────────────────

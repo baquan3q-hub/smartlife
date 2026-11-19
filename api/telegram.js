@@ -22,6 +22,7 @@
 import { TOOLS, TOOL_MAP, INSTRUCTIONS } from './_lib/tools.js';
 import { ApiError } from './_lib/authKey.js';
 import { formatApiError, keyErrorHelp, toolErrorText } from './_lib/apiErrorText.js';
+import { adaptThinkingConfig } from './_lib/aiModels.js';
 
 const MODEL = process.env.TELEGRAM_GEMINI_MODEL || 'gemini-2.5-flash';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -818,8 +819,17 @@ class GeminiError extends Error {
     }
 }
 
-// Model dự phòng có hạn mức riêng: dùng khi model chính bị 429 (hết lượt) / quá tải / quá chậm
-const FALLBACK_MODEL = process.env.TELEGRAM_GEMINI_FALLBACK_MODEL ?? 'gemini-2.5-flash-lite';
+// Model dự phòng có hạn mức riêng: dùng khi model chính bị 429 (hết lượt) / quá tải / quá chậm.
+// (gemini-2.5-flash-lite đã đóng với key mới → 404; dùng alias "latest" để không gãy lần nữa)
+const FALLBACK_MODEL = process.env.TELEGRAM_GEMINI_FALLBACK_MODEL ?? 'gemini-flash-lite-latest';
+
+// Cấu hình suy nghĩ viết cho model chính (thinkingBudget) → đổi cho hợp model đang gọi.
+// Họ 3.x từ chối thinkingBudget = 0 (lỗi 400), nên phải đổi sang thinkingLevel.
+function bodyForModel(body, model) {
+    const tc = body?.generationConfig?.thinkingConfig;
+    if (!tc) return body;
+    return { ...body, generationConfig: { ...body.generationConfig, thinkingConfig: adaptThinkingConfig(model, tc) } };
+}
 const RETRYABLE = new Set([429, 500, 503, 504]);
 const modelCooldown = new Map();   // model -> thời điểm được gọi lại sau khi bị 429
 
@@ -844,7 +854,7 @@ async function callGemini(body, deadline = Date.now() + 45_000) {
             res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
+                body: JSON.stringify(bodyForModel(body, model)),
                 // Model chính không được ăn hết thời gian → chừa chỗ cho model dự phòng
                 signal: AbortSignal.timeout(Math.min(model === MODEL && models.length > 1 ? 20_000 : 25_000, remaining)),
             });
@@ -882,6 +892,9 @@ function describeError(err) {
         if (err.status === 429) {
             const wait = err.retryAfterSec ? `khoảng ${err.retryAfterSec} giây` : 'khoảng 1 phút';
             return { title: '🚦 AI đang hết lượt gọi (giới hạn miễn phí của Gemini).', hint: `Chờ ${wait} rồi bấm Thử lại nhé.`, code: 'GEMINI_429' };
+        }
+        if (err.status === 402) {
+            return { title: '💳 Tài khoản Google AI của SmartLife đã hết tín dụng.', hint: 'Nạp thêm credit trong Google AI Studio (Billing) rồi thử lại.', code: 'GEMINI_402' };
         }
         if ([400, 401, 403, 404].includes(err.status)) {
             return { title: '🔑 Cấu hình Gemini có vấn đề (key hoặc tên model).', hint: 'Kiểm tra GEMINI_API_KEYS / TELEGRAM_GEMINI_MODEL trên Vercel.', code: `GEMINI_${err.status}` };
