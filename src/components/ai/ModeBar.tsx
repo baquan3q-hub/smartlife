@@ -1,11 +1,15 @@
 // File: src/components/ai/ModeBar.tsx
-// Thanh trạng thái dưới ô soạn tin: hai nút gọn (chuyên gia, tốc độ) — bấm mới mở popup ngay tại nút để chọn
+// Thanh trạng thái dưới ô soạn tin: hai nút gọn (chuyên gia, tốc độ) — bấm mới mở popup ngay tại nút để chọn.
+// Mục đầu popup chế độ là Bạn đồng hành (avatar + tên người dùng đặt), có nút bánh răng để sửa hồ sơ.
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Gauge } from 'lucide-react';
+import { Check, ChevronDown, Gauge, Settings2 } from 'lucide-react';
 import { GlassIcon } from '../icons/GlassIcon';
 import { EXPERT_LIST, type ExpertId } from '../../services/ai/experts';
 import { SPEED_OPTIONS, type SpeedChoice } from './tiers';
+import CompanionAvatar from './CompanionAvatar';
+import { getExpert } from '../../services/ai/experts';
+import { relationshipLabel, traitLabels, type CompanionProfile } from '../../services/ai/companion/types';
 
 interface ModeBarProps {
     speed: SpeedChoice;
@@ -13,6 +17,9 @@ interface ModeBarProps {
     expert: ExpertId;
     onExpertChange: (expert: ExpertId) => void;
     disabled?: boolean;
+    /** Hồ sơ bạn AI; null = chưa tạo (chọn chế độ sẽ mở trình thiết lập) */
+    companion?: CompanionProfile | null;
+    onEditCompanion?: () => void;
 }
 
 type MenuId = 'expert' | 'speed';
@@ -23,6 +30,8 @@ interface PickerItem {
     hint: string;
     icon?: React.ReactNode;
     badge?: string;
+    /** Nút phụ cạnh mục (vd. bánh răng sửa bạn AI) */
+    trailing?: { label: string; icon: React.ReactNode; onClick: () => void };
 }
 
 interface PickerProps {
@@ -136,8 +145,8 @@ const Picker: React.FC<PickerProps> = ({ menu, open, onToggle, onClose, title, a
                     {items.map((item, i) => {
                         const active = item.id === value;
                         return (
+                            <div key={item.id} className="relative">
                             <button
-                                key={item.id}
                                 ref={el => { itemRefs.current[i] = el; }}
                                 type="button"
                                 role="menuitemradio"
@@ -160,8 +169,20 @@ const Picker: React.FC<PickerProps> = ({ menu, open, onToggle, onClose, title, a
                                     </span>
                                     <span className="block text-[11px] leading-snug text-gray-500 dark:text-slate-400 mt-0.5">{item.hint}</span>
                                 </span>
-                                {active && <Check size={14} className="shrink-0 mt-0.5 text-indigo-600 dark:text-indigo-300" />}
+                                {active && <Check size={14} className={`shrink-0 mt-0.5 text-indigo-600 dark:text-indigo-300 ${item.trailing ? 'mr-7' : ''}`} />}
                             </button>
+                            {item.trailing && (
+                                <button
+                                    type="button"
+                                    aria-label={item.trailing.label}
+                                    title={item.trailing.label}
+                                    onClick={() => { onClose(); item.trailing!.onClick(); }}
+                                    className="absolute right-1.5 top-1.5 p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-white dark:text-slate-400 dark:hover:text-indigo-300 dark:hover:bg-slate-700"
+                                >
+                                    {item.trailing.icon}
+                                </button>
+                            )}
+                            </div>
                         );
                     })}
                 </div>
@@ -170,9 +191,19 @@ const Picker: React.FC<PickerProps> = ({ menu, open, onToggle, onClose, title, a
     );
 };
 
-const ModeBar: React.FC<ModeBarProps> = ({ speed, onSpeedChange, expert, onExpertChange, disabled }) => {
+const ModeBar: React.FC<ModeBarProps> = ({ speed, onSpeedChange, expert, onExpertChange, disabled, companion, onEditCompanion }) => {
     const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
-    const current = EXPERT_LIST.find(e => e.id === expert) || EXPERT_LIST[0];
+    const current = getExpert(expert);
+    const isCompanion = expert === 'companion';
+    const companionName = companion?.name || 'Bạn đồng hành';
+    const companionItem: PickerItem = {
+        id: 'companion',
+        label: companion ? `${companion.name} · ${relationshipLabel(companion.relationship).toLowerCase()}` : 'Bạn đồng hành',
+        hint: companion ? `Nhắn ngắn như bạn bè · ${traitLabels(companion.traits).join(', ').toLowerCase()}` : 'Tạo một người bạn AI có tên, giới tính, tính cách riêng',
+        icon: <CompanionAvatar avatar={companion?.avatar} size={22} />,
+        badge: companion ? undefined : 'Mới',
+        trailing: companion && onEditCompanion ? { label: `Chỉnh ${companion.name}`, icon: <Settings2 size={14} />, onClick: onEditCompanion } : undefined,
+    };
     const currentSpeed = SPEED_OPTIONS.find(s => s.id === speed) || SPEED_OPTIONS[0];
 
     const toggle = useCallback((menu: MenuId) => setOpenMenu(m => (m === menu ? null : menu)), []);
@@ -188,17 +219,19 @@ const ModeBar: React.FC<ModeBarProps> = ({ speed, onSpeedChange, expert, onExper
                 open={openMenu === 'expert'}
                 onToggle={toggle}
                 onClose={close}
-                title="Chế độ chuyên gia"
-                ariaLabel={`Chế độ chuyên gia: ${current.name}`}
-                items={EXPERT_LIST.map(e => ({
+                title="Chế độ trò chuyện"
+                ariaLabel={`Chế độ: ${isCompanion ? companionName : current.name}`}
+                items={[companionItem, ...EXPERT_LIST.map(e => ({
                     id: e.id,
                     label: e.name,
                     hint: e.tagline,
                     icon: <GlassIcon name={e.icon} size={22} muted={e.id !== expert} />,
-                }))}
+                }))]}
                 value={expert}
                 onSelect={id => onExpertChange(id as ExpertId)}
-                trigger={<><GlassIcon name={current.icon} size={18} />{current.name}</>}
+                trigger={isCompanion
+                    ? <><CompanionAvatar avatar={companion?.avatar} size={18} /><span className="max-w-[110px] truncate">{companionName}</span></>
+                    : <><GlassIcon name={current.icon} size={18} />{current.name}</>}
                 menuWidth={288}
                 disabled={disabled}
             />

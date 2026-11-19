@@ -7,7 +7,7 @@
 // Body (JSON) nhận từ client:
 //   contents, systemInstruction, generationConfig, safetySettings, tools, toolConfig — chuyển tiếp cho Gemini
 //   tier:       'fast' | 'balanced' | 'deep'  — server tự chọn model + mức suy nghĩ (bỏ trống = model cũ)
-//   purpose:    'chat' (mặc định) | 'router' | 'search' | 'memory' — lệnh nội bộ không tính lượt
+//   purpose:    'chat' (mặc định) | 'router' | 'search' | 'memory' | 'greeting' — lệnh nội bộ không tính lượt
 //   isToolCall: true với các lần gọi tiếp theo trong cùng một câu hỏi (không tính lượt)
 //   stream:     true để nhận Server-Sent Events (xem streamToClient)
 
@@ -16,7 +16,7 @@ import { authenticate, loadUsage, enforceQuota, recordUsage, FREE_GATE } from '.
 import { getApiKeys, openGemini, readGeminiSse, toClientError } from './_lib/geminiClient.js';
 import { handleWebSearch } from './_lib/webSearch.js';
 
-const PURPOSES = new Set(['chat', 'router', 'search', 'memory']);
+const PURPOSES = new Set(['chat', 'router', 'search', 'memory', 'greeting']);
 const LEGACY_TIMEOUT_MS = 55_000;
 
 // Chỉ chuyển tiếp function calling; công cụ có sẵn của Google (tìm web…) tính phí riêng → đi qua /api/search

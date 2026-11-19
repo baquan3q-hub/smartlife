@@ -705,6 +705,20 @@ export async function callRouterModel(prompt: string, signal?: AbortSignal): Pro
 }
 
 // ────────────────────────────────────────
+// Lời chào chủ động của Bạn đồng hành (purpose 'greeting' → tầng fast, không tính lượt; mỗi ngày tối đa 1 lần)
+// ────────────────────────────────────────
+export async function callGreetingModel(systemPrompt: string, signal?: AbortSignal): Promise<string> {
+    const data = await callGeminiRaw({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: '(người dùng vừa mở ứng dụng)' }] }],
+        generationConfig: { temperature: 0.9, maxOutputTokens: 200 },
+        purpose: 'greeting',
+    }, 0, signal);
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    return parts.filter((p: any) => typeof p.text === 'string' && !p.thought).map((p: any) => p.text).join('').trim();
+}
+
+// ────────────────────────────────────────
 // Simple chat (backward compat for Quick Insight — no function calling)
 // ────────────────────────────────────────
 export async function chatWithGeminiSimple(

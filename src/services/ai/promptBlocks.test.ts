@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { buildSystemPrompt, LEGACY_SYSTEM_INSTRUCTION } from './promptBlocks';
+import { DEFAULT_COMPANION } from './companion/types';
 
 describe('buildSystemPrompt', () => {
     it('prompt cũ ghép lại giống hệt bản gốc trước khi tách khối', () => {
@@ -56,5 +57,29 @@ describe('buildSystemPrompt', () => {
     it('cá nhân hoá MBTI/DISC chỉ khi hồ sơ có', () => {
         expect(buildSystemPrompt({}).blocks).not.toContain('personalization');
         expect(buildSystemPrompt({ hasPersonality: true }).blocks).toContain('personalization');
+    });
+});
+
+describe('buildSystemPrompt — Bạn đồng hành', () => {
+    const companion = { ...DEFAULT_COMPANION, name: 'Bơ', selfPronoun: 'tớ', userPronoun: 'cậu' };
+
+    it('danh tính + cách nhắn riêng, bỏ artifacts / reasoning / domain_notes / GPA', () => {
+        const p = buildSystemPrompt({ expert: 'companion', companion, userText: 'GPA của tớ bao nhiêu' });
+        expect(p.blocks).toEqual(['identity', 'tools', 'formatting', 'companion_persona', 'companion_safety', 'clarify']);
+        expect(p.text).toContain('**Bơ**');
+        expect(p.text).not.toContain('SmartLife Advisor');
+        expect(p.text).not.toContain('<artifact');
+        expect(p.text).not.toContain('QUY CHẾ GPA');
+        expect(p.text).toContain('KHÔNG dùng ask_user để hỏi thêm thông tin');
+    });
+
+    it('khủng hoảng → nạp giao thức an toàn; không có hồ sơ → dùng hồ sơ mặc định', () => {
+        const p = buildSystemPrompt({ expert: 'companion', crisis: true });
+        expect(p.blocks).toContain('crisis');
+        expect(p.text).toContain('**Mây**');
+    });
+
+    it('chế độ Chung không bị ảnh hưởng', () => {
+        expect(buildSystemPrompt({ expert: 'general', companion }).text).not.toContain('Bơ');
     });
 });

@@ -2,12 +2,12 @@
 // Kiểu chung cho "playbook chuyên gia" — bộ hướng dẫn biến AI thành một chuyên gia theo lĩnh vực.
 // File thuần (không import Supabase) để dùng được cả trong app, test và scripts/ai-eval.
 
-export type ExpertId = 'general' | 'planner' | 'psychology' | 'finance' | 'study' | 'relationship';
+export type ExpertId = 'general' | 'planner' | 'psychology' | 'finance' | 'study' | 'relationship' | 'companion';
 
-export const EXPERT_IDS: ExpertId[] = ['general', 'planner', 'psychology', 'finance', 'study', 'relationship'];
+export const EXPERT_IDS: ExpertId[] = ['general', 'planner', 'psychology', 'finance', 'study', 'relationship', 'companion'];
 
 // Tên icon kính 3D (src/components/icons/glassIcons.ts) — để chuỗi thường cho file này khỏi phụ thuộc UI
-export type ExpertIcon = 'ai' | 'goals' | 'journal' | 'finance' | 'gpa' | 'chat';
+export type ExpertIcon = 'ai' | 'goals' | 'journal' | 'finance' | 'gpa' | 'chat' | 'user';
 
 export interface ExpertExample {
     user: string;

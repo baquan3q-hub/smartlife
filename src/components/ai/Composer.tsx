@@ -7,6 +7,7 @@ import type { Lang } from '../../i18n/i18n';
 import type { ExpertId } from '../../services/ai/experts';
 import type { SpeedChoice } from './tiers';
 import ModeBar from './ModeBar';
+import type { CompanionProfile } from '../../services/ai/companion/types';
 
 export const MAX_FILE_SIZE = 30 * 1024 * 1024;
 
@@ -24,11 +25,13 @@ interface ComposerProps {
     onSend: () => void;
     onStop: () => void;
     inputRef: React.RefObject<HTMLTextAreaElement | null>;
+    companion?: CompanionProfile | null;
+    onEditCompanion?: () => void;
 }
 
 const Composer: React.FC<ComposerProps> = ({
     lang, input, setInput, attachedFiles, setAttachedFiles,
-    isLoading, speed, onSpeedChange, expert, onExpertChange, onSend, onStop, inputRef,
+    isLoading, speed, onSpeedChange, expert, onExpertChange, onSend, onStop, inputRef, companion, onEditCompanion,
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadMenuRef = useRef<HTMLDivElement>(null);
@@ -222,7 +225,7 @@ const Composer: React.FC<ComposerProps> = ({
                             if (!isLoading) onSend();
                         }
                     }}
-                    placeholder="Nhập đi bạn ơi, hoặc đính kèm ảnh, âm thanh, tài liệu...."
+                    placeholder={expert === 'companion' ? `Nhắn cho ${companion?.name || 'bạn AI'}…` : "Nhập đi bạn ơi, hoặc đính kèm ảnh, âm thanh, tài liệu...."}
                     className="flex-1 bg-transparent px-1 py-2.5 text-sm outline-none resize-none max-h-28 min-h-[44px] placeholder:text-gray-400"
                     rows={1}
                 />
@@ -240,7 +243,7 @@ const Composer: React.FC<ComposerProps> = ({
                 </button>
             </div>
 
-            <ModeBar speed={speed} onSpeedChange={onSpeedChange} expert={expert} onExpertChange={onExpertChange} />
+            <ModeBar speed={speed} onSpeedChange={onSpeedChange} expert={expert} onExpertChange={onExpertChange} companion={companion} onEditCompanion={onEditCompanion} />
         </div>
     );
 };

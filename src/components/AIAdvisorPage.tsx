@@ -13,7 +13,7 @@ import {
 import { GlassIcon } from './icons/GlassIcon';
 
 import { AppState, TransactionType } from '../types';
-import { callRouterModel, generateQuickInsight } from '../services/geminiService';
+import { callGreetingModel, callRouterModel, generateQuickInsight } from '../services/geminiService';
 import {
     chatWithAI,
     type ActionHandlers, type ActionResult, type AIAttachment, type AIRunMeta, type AIStep, type AIStreamEvent, type ChartData,
@@ -37,6 +37,11 @@ import { getExpert, isExpertId, type ExpertId } from '../services/ai/experts';
 import { routeTurn } from '../services/ai/router';
 import { countClarifyRounds, lastAskedConfirm, type ClarifyRequest } from '../services/ai/clarify';
 import type { WebSource } from '../services/ai/webSearch';
+import CompanionSetup from './ai/CompanionSetup';
+import CompanionAvatar from './ai/CompanionAvatar';
+import { relationshipLabel, type CompanionProfile } from '../services/ai/companion/types';
+import { buildGreetingContext, buildGreetingPrompt, fallbackGreeting, vnDateKey } from '../services/ai/companion/greeting';
+import { loadCompanion, markGreeted, saveCompanion, shouldGreet } from '../services/companionService';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Lang } from '../i18n/i18n';
@@ -71,6 +76,14 @@ interface Suggestion {
     prompt: string;
     gradient: string;
 }
+
+// Câu mở đầu kiểu nhắn tin với bạn (chế độ Bạn đồng hành)
+const COMPANION_STARTERS: Array<{ emoji: string; label: string; prompt: string }> = [
+    { emoji: '☀️', label: 'Kể nghe hôm nay thế nào', prompt: 'Hôm nay của mình cũng bình thường thôi, muốn kể chút chuyện.' },
+    { emoji: '😮‍💨', label: 'Đang hơi mệt', prompt: 'Dạo này mình thấy hơi mệt.' },
+    { emoji: '🎉', label: 'Có chuyện vui', prompt: 'Mình vừa có chuyện vui nè!' },
+    { emoji: '📝', label: 'Nhắc mình việc hôm nay', prompt: 'Hôm nay mình có việc gì cần làm không?' },
+];
 
 const SUGGESTIONS: Suggestion[] = [
     {
@@ -297,8 +310,22 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         saveSpeed(next);
     };
 
+    // Bạn đồng hành: hồ sơ nhân vật (null = chưa tạo) + cửa sổ thiết lập
+    const [companionProfile, setCompanionProfile] = useState<CompanionProfile | null>(null);
+    const [showCompanionSetup, setShowCompanionSetup] = useState(false);
+    const greetingStartedRef = useRef(false);
+
     const handleExpertChange = (next: ExpertId) => {
         if (next === expert) return;
+        // Lần đầu chọn Bạn đồng hành mà chưa có hồ sơ → mở trình thiết lập, lưu xong mới chuyển
+        if (next === 'companion' && !companionProfile) {
+            setShowCompanionSetup(true);
+            return;
+        }
+        applyExpert(next);
+    };
+
+    const applyExpert = (next: ExpertId) => {
         setExpert(next);
         const convId = conversationIdRef.current;
         if (!convId) return;
@@ -368,6 +395,65 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
     const [confirmDialog, setConfirmDialog] = useState<{
         isOpen: boolean; title: string; message: string; confirmText?: string; onConfirm: () => void;
     }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
+
+    useEffect(() => {
+        const userId = appState.profile?.id;
+        if (!userId) return;
+        let cancelled = false;
+        loadCompanion(userId, appState.profile?.age).then(p => { if (!cancelled) setCompanionProfile(p); });
+        return () => { cancelled = true; };
+    }, [appState.profile?.id, appState.profile?.age]);
+
+    const handleSaveCompanion = async (profile: CompanionProfile) => {
+        const userId = appState.profile?.id;
+        const saved = userId ? await saveCompanion(userId, profile, appState.profile?.age) : profile;
+        setCompanionProfile(saved);
+        setShowCompanionSetup(false);
+        if (expert !== 'companion') applyExpert('companion');
+    };
+
+    // Mỗi ngày (giờ VN) một lần: mở trang khi chưa vào cuộc trò chuyện nào → bạn AI nhắn trước
+    const sendGreeting = async (profile: CompanionProfile, userId: string, today: string) => {
+        const session = sessionRef.current;
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+        const id = newMessageId();
+        const startedAt = Date.now();
+        const meta: AIMessageMeta = { expert: 'companion', greeting: true };
+        setCompanionProfile(await markGreeted(userId, profile, today));
+        setExpert('companion');
+        setIsLoading(true);
+        setMessages([{ id, role: 'assistant', content: '', status: 'streaming', startedAt, meta }]);
+        const ctx = buildGreetingContext(appState, new Date());
+        let text = '';
+        try {
+            text = await callGreetingModel(buildGreetingPrompt(profile, ctx), controller.signal);
+        } catch (e) {
+            if (!controller.signal.aborted) console.warn('[SmartLife] Lời chào AI lỗi, dùng câu mẫu:', e);
+        } finally {
+            if (abortControllerRef.current === controller) abortControllerRef.current = null;
+            setIsLoading(false);
+        }
+        if (sessionRef.current !== session) return; // người dùng đã chuyển sang cuộc khác
+        if (!text) text = fallbackGreeting(profile, ctx);
+        patchMessage(id, { content: text, status: 'done' });
+        const conv = await chatHistoryService.createConversation(`${profile.name} nhắn cho bạn`, 'companion');
+        if (!conv || sessionRef.current !== session) return;
+        setConvId(conv.id);
+        const saved = await chatHistoryService.saveMessage(conv.id, 'assistant', text, { meta });
+        if (saved) patchMessage(id, { dbId: saved.id, createdAt: saved.created_at });
+    };
+
+    useEffect(() => {
+        const userId = appState.profile?.id;
+        if (!userId || !companionProfile || greetingStartedRef.current) return;
+        const today = vnDateKey();
+        if (!shouldGreet(companionProfile, today)) return;
+        if (conversationIdRef.current || isLoading || !messagesRef.current.every(m => m.local)) return;
+        greetingStartedRef.current = true;
+        void sendGreeting(companionProfile, userId, today);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [companionProfile, appState.profile?.id]);
 
     const [showPopupHint, setShowPopupHint] = useState(false);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -561,6 +647,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         tier: route.tier,
                         onEvent,
                         expert,
+                        companion: expert === 'companion' ? companionProfile : null,
                         auto: route.auto,
                         domain: route.domain,
                         crisis: route.crisis,
@@ -831,7 +918,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         });
     };
 
-    const showSuggestions = messages.every(m => m.local) && !isLoading && !isLoadingConversation;
+    const showSuggestions = messages.every(m => m.local || m.meta?.greeting) && !isLoading && !isLoadingConversation;
+    const isCompanion = expert === 'companion';
     const lastRun = [...messages].reverse().find(m => m.meta?.model)?.meta;
     const modelLabel = lastRun?.model ? lastRun.model.replace(/^gemini-/, '') : null;
 
@@ -941,16 +1029,20 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         </button>
                         <div className="flex items-center gap-3">
                             <div className="w-9 h-9 flex items-center justify-center">
-                                <GlassIcon name="ai" size={34} eager />
+                                {isCompanion
+                                    ? <CompanionAvatar avatar={companionProfile?.avatar} size={34} online />
+                                    : <GlassIcon name="ai" size={34} eager />}
                             </div>
                             <div>
-                                <h1 className="font-bold text-gray-800 text-sm leading-tight">SmartLife AI Advisor</h1>
+                                <h1 className="font-bold text-gray-800 text-sm leading-tight">
+                                    {isCompanion ? (companionProfile?.name || 'Bạn đồng hành') : 'SmartLife AI Advisor'}
+                                </h1>
                                 <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
                                     <span className="relative flex h-2 w-2">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                                     </span>
-                                    {getExpert(expert).name} · {SPEED_OPTIONS.find(o => o.id === speed)?.label}{modelLabel ? ` · ${modelLabel}` : ''}
+                                    {isCompanion ? relationshipLabel(companionProfile?.relationship || 'friend') : getExpert(expert).name} · {SPEED_OPTIONS.find(o => o.id === speed)?.label}{modelLabel ? ` · ${modelLabel}` : ''}
                                 </div>
                             </div>
                         </div>
@@ -1397,13 +1489,27 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                                         onFeedback={handleFeedback}
                                         isLast={m.id === lastId}
                                         onAnswerClarify={handleAnswerClarify}
+                                        companion={companionProfile}
                                     />
                                 );
                             });
                         })()}
 
                         {/* Suggestions */}
-                        {showSuggestions && (
+                        {showSuggestions && isCompanion && (
+                            <div className="pt-3 flex flex-wrap gap-2">
+                                {COMPANION_STARTERS.map(s => (
+                                    <button
+                                        key={s.label}
+                                        onClick={() => handleSend(s.prompt)}
+                                        className="px-3 py-1.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 transition-colors dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
+                                    >
+                                        <span aria-hidden="true">{s.emoji}</span> {s.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {showSuggestions && !isCompanion && (
                             <div className="pt-3">
                                 <p className="text-[11px] text-gray-400 font-semibold mb-3 uppercase tracking-wider flex items-center gap-1.5">
                                     <Lightbulb size={12} /> Gợi ý câu hỏi
@@ -1446,6 +1552,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                         onSpeedChange={handleSpeedChange}
                         expert={expert}
                         onExpertChange={handleExpertChange}
+                        companion={companionProfile}
+                        onEditCompanion={() => setShowCompanionSetup(true)}
                         onSend={() => handleSend()}
                         onStop={handleStopResponse}
                         inputRef={inputRef}
@@ -1457,6 +1565,14 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
                     <ArtifactPane artifact={activeArtifact} isDesktop={isDesktop} onClose={() => setActiveArtifact(null)} />
                 )}
             </div>
+            {showCompanionSetup && (
+                <CompanionSetup
+                    initial={companionProfile}
+                    profileAge={appState.profile?.age}
+                    onSave={handleSaveCompanion}
+                    onClose={() => setShowCompanionSetup(false)}
+                />
+            )}
             <ConfirmModal
                 isOpen={confirmDialog.isOpen}
                 title={confirmDialog.title}

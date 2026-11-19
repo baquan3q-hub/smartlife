@@ -9,6 +9,9 @@ import { getExpert, renderExpertBlock, VNU_GPA_RULES } from './experts';
 import { psychology } from './experts/psychology';
 import { maxClarifyRounds } from './clarify';
 import { MAX_WEB_SEARCHES } from './webSearch';
+import type { CompanionProfile } from './companion/types';
+import { DEFAULT_COMPANION } from './companion/types';
+import { companionFormatting, companionIdentity, companionSafetyBlock, renderCompanionBlock } from './companion/prompt';
 
 // ── Khối gốc (tách nguyên văn từ SYSTEM_INSTRUCTION cũ) ──────────────────────
 
@@ -134,6 +137,32 @@ export const WEB_SEARCH_BLOCK = `🌐 TÌM WEB (công cụ web_search):
 - Trích dẫn đúng số nguồn [n] mà kết quả trả về ngay sau thông tin lấy từ nguồn đó; không tự bịa nguồn, không tự viết danh sách link (giao diện tự hiện nguồn).
 - Nếu tìm không ra hoặc bị lỗi, nói rõ và trả lời phần chắc chắn.`;
 
+// Bạn đồng hành: hỏi lại bằng lời, ask_user chỉ để xác nhận ghi hàng loạt
+export const COMPANION_CLARIFY = `❓ HỎI LẠI:
+- Trước hết lấy dữ liệu bằng công cụ; KHÔNG hỏi điều đã có trong dữ liệu, hồ sơ hay bộ nhớ.
+- KHÔNG dùng ask_user để hỏi thêm thông tin — thiếu gì thì hỏi một câu tự nhiên trong tin nhắn.
+- Ngoại lệ duy nhất: trước khi ghi HÀNG LOẠT (> 3 việc / lịch trong một lượt) thì gọi ask_user purpose "confirm" liệt kê ngắn các mục.`;
+
+/** Prompt cho chế độ Bạn đồng hành: danh tính + cách nhắn riêng, bỏ artifacts / reasoning / domain_notes / GPA */
+function buildCompanionPrompt(opts: PromptOptions, expert: ExpertProfile): BuiltPrompt {
+    const p = opts.companion || DEFAULT_COMPANION;
+    const out: Array<[string, string]> = [
+        ['identity', companionIdentity(p)],
+        ['tools', `${TOOLS_BLOCK}\n${RESTRICTED_TOOLS_NOTE}`],
+        ['formatting', companionFormatting(p)],
+        ['companion_persona', renderCompanionBlock(p)],
+        ['companion_safety', companionSafetyBlock(p)],
+    ];
+    if (opts.crisis) {
+        out.push(['crisis', `⚠️ AN TOÀN (ưu tiên cao nhất cho lượt này — tin nhắn có dấu hiệu khủng hoảng; được phép dài hơn bình thường):\n${psychology.safety.join('\n')}`]);
+    }
+    const webAllowed = opts.webSearch !== false && expert.allowedTools !== 'all' && expert.allowedTools.includes('web_search');
+    if (webAllowed) out.push(['web_search', WEB_SEARCH_BLOCK]);
+    out.push(['clarify', COMPANION_CLARIFY]);
+    if (opts.hasPersonality) out.push(['personalization', PERSONALIZATION_BLOCK]);
+    return { text: out.map(([, t]) => t).join('\n\n'), blocks: out.map(([n]) => n) };
+}
+
 const RESTRICTED_TOOLS_NOTE = '- Trong chế độ chuyên gia này chỉ dùng các công cụ được khai báo cho lượt này; công cụ nào được nhắc ở trên mà không có thì bỏ qua.';
 
 export interface PromptOptions {
@@ -147,6 +176,8 @@ export interface PromptOptions {
     clarifyRoundsUsed?: number;
     confirmedBulk?: boolean;
     webSearch?: boolean;
+    /** Hồ sơ bạn AI (chế độ companion); bỏ trống thì dùng hồ sơ mặc định */
+    companion?: CompanionProfile | null;
     /** Hồ sơ có MBTI/DISC không — không có thì bỏ khối cá nhân hoá */
     hasPersonality?: boolean;
 }
@@ -160,6 +191,7 @@ export interface BuiltPrompt {
 /** Ghép system prompt cho một lượt (chưa gồm ngữ cảnh người dùng / bộ nhớ — engine nối thêm) */
 export function buildSystemPrompt(opts: PromptOptions = {}): BuiltPrompt {
     const expert: ExpertProfile = getExpert(opts.expert);
+    if (expert.id === 'companion') return buildCompanionPrompt(opts, expert);
     const isGeneral = expert.id === 'general';
     const conversational = CONVERSATIONAL_EXPERTS.includes(expert.id);
     const out: Array<[string, string]> = [];

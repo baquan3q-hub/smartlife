@@ -122,3 +122,22 @@ describe('routeTurn', () => {
         expect(r.source).toBe('fallback');
     });
 });
+
+describe('routeTurn — Bạn đồng hành', () => {
+    it('Auto luôn tầng nhanh, không gọi model router', async () => {
+        const call = vi.fn(async () => '{"tier":"deep","domain":"finance"}');
+        const r = await routeTurn({ text: 'Hôm nay tớ đi học về mệt quá, kể cậu nghe chuyện ở lớp nè, cả buổi cứ lo nghĩ mãi', expert: 'companion' }, 'auto', call);
+        expect(r.tier).toBe('fast');
+        expect(call).not.toHaveBeenCalled();
+    });
+
+    it('có dấu hiệu khủng hoảng → nâng lên cân bằng', async () => {
+        const r = await routeTurn({ text: 'tớ không muốn sống nữa', expert: 'companion' }, 'auto');
+        expect(r.tier).toBe('balanced');
+        expect(r.crisis).toBe(true);
+    });
+
+    it('người dùng chọn tầng cố định thì giữ nguyên', async () => {
+        expect((await routeTurn({ text: 'hi', expert: 'companion' }, 'deep')).tier).toBe('deep');
+    });
+});

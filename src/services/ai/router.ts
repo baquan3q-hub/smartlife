@@ -42,7 +42,7 @@ const CRUD = starts(['thêm', 'tạo', 'xoá', 'xóa', 'sửa', 'đổi', 'cập
 const ANALYTIC = words(['phân tích', 'lập kế hoạch', 'lên kế hoạch', 'kế hoạch', 'so sánh', 'đánh giá', 'dự đoán', 'dự báo', 'lộ trình', 'chiến lược', 'tối ưu', 'tư vấn', 'giải thích', 'tại sao', 'vì sao', 'làm sao', 'làm thế nào', 'nên .{1,40} hay', 'ưu nhược', 'cân nhắc']);
 const DEEP = words(['chi tiết', 'kỹ lưỡng', 'kĩ lưỡng', 'toàn diện', 'thật sâu', 'từng bước', 'nhiều phương án', 'dài hạn', '5 năm', '10 năm', 'cả năm', 'cả kỳ', 'cả học kỳ', 'toàn bộ']);
 
-const DOMAIN_WORDS: Record<Exclude<ExpertId, 'general'>, RegExp> = {
+const DOMAIN_WORDS: Record<Exclude<ExpertId, 'general' | 'companion'>, RegExp> = {
     finance: words(['tiền', 'chi tiêu', 'thu nhập', 'lương', 'ngân sách', 'tiết kiệm', 'khoản nợ', 'trả nợ', 'vay', 'đầu tư', 'cổ phiếu', 'chứng khoán', 'crypto', 'coin', 'giao dịch', 'tài chính', 'lãi suất', 'vàng', 'tỷ giá', String.raw`\d+\s?(?:k|tr|triệu|nghìn|ngàn)`, 'vnd', 'đồng'], 'gu'),
     study: words(['gpa', 'điểm', 'tín chỉ', 'môn học', 'môn', 'học kỳ', 'học kì', 'thi', 'ôn thi', 'ôn tập', 'bài tập', 'đại học', 'sinh viên', 'cuối kỳ', 'giữa kỳ', 'học bổng', 'tốt nghiệp', 'pomodoro', 'học bài'], 'gu'),
     psychology: words(['buồn', 'chán', 'mệt mỏi', 'áp lực', 'lo âu', 'lo lắng', 'stress', 'căng thẳng', 'trầm cảm', 'cô đơn', 'khóc', 'mất ngủ', 'tự ti', 'kiệt sức', 'tuyệt vọng', 'cảm xúc', 'bế tắc', 'hoảng loạn', 'vô dụng', 'tâm lý'], 'gu'),
@@ -142,6 +142,12 @@ export async function routeTurn(
     const crisis = detectCrisis(input.text);
     if (speed !== 'auto') {
         return { tier: speed, domain, crisis, auto: false, source: 'fixed', reason: 'người dùng chọn' };
+    }
+    // Bạn đồng hành: tin nhắn ngắn kiểu chat → luôn tầng nhanh, chỉ nâng lên khi có dấu hiệu khủng hoảng; không gọi model router
+    if (input.expert === 'companion') {
+        return crisis
+            ? { tier: 'balanced', domain, crisis, auto: true, source: 'heuristic', reason: 'chủ đề nhạy cảm cần trả lời cẩn thận' }
+            : { tier: 'fast', domain, crisis, auto: true, source: 'heuristic', reason: 'trò chuyện với bạn đồng hành' };
     }
     const h = routeHeuristic(input);
     if (h.confident || !callModel) {

@@ -20,6 +20,8 @@ export interface AIMessageMeta extends AIRunMeta {
     tokens_used?: number;
     feedback?: 'up' | 'down';
     files?: Array<{ name: string; type: string; size: number }>;
+    /** Lời chào chủ động của Bạn đồng hành (AI nhắn trước khi người dùng mở trang) */
+    greeting?: boolean;
 }
 
 export interface AIMessage {

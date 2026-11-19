@@ -24,6 +24,7 @@ describe('requestWeight', () => {
         expect(requestWeight({ tier: 'deep', isToolCall: true })).toBe(0);
         expect(requestWeight({ tier: 'fast', purpose: 'memory' })).toBe(0);
         expect(requestWeight({ tier: null, purpose: 'router' })).toBe(0);
+        expect(requestWeight({ tier: 'fast', purpose: 'greeting' })).toBe(0);
     });
 });
 

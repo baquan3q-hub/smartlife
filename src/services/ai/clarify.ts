@@ -30,8 +30,9 @@ export const MAX_OPTIONS = 4;
 /** Ghi quá số này trong một lượt thì phải xác nhận trước bằng ask_user purpose "confirm" */
 export const BULK_WRITE_LIMIT = 3;
 
-/** Số vòng hỏi lại tối đa cho một câu hỏi: 1, riêng Lên kế hoạch hoặc Nghĩ sâu được 2 */
+/** Số vòng hỏi lại tối đa cho một câu hỏi: 1, riêng Lên kế hoạch hoặc Nghĩ sâu được 2; Bạn đồng hành hỏi bằng lời nên 0 */
 export function maxClarifyRounds(expert: ExpertId | undefined, tier: AITier | undefined): number {
+    if (expert === 'companion') return 0;
     return expert === 'planner' || tier === 'deep' ? 2 : 1;
 }
 

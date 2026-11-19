@@ -8,16 +8,17 @@ import { psychology } from './psychology';
 import { finance } from './finance';
 import { study } from './study';
 import { relationship } from './relationship';
+import { companion } from './companion';
 
 export * from './types';
 export { CRISIS_RESOURCES, crisisResourcesText } from './crisis';
 export { VNU_GPA_RULES } from './study';
 
 export const EXPERTS: Record<ExpertId, ExpertProfile> = {
-    general, planner, psychology, finance, study, relationship,
+    general, planner, psychology, finance, study, relationship, companion,
 };
 
-// Thứ tự chip trên thanh chọn chế độ
+// Thứ tự trong popup chế độ (Bạn đồng hành được ModeBar vẽ riêng ở đầu danh sách)
 export const EXPERT_LIST: ExpertProfile[] = [general, planner, psychology, finance, study, relationship];
 
 export function isExpertId(v: unknown): v is ExpertId {
@@ -30,9 +31,9 @@ export function getExpert(id: string | null | undefined): ExpertProfile {
 
 const bullets = (items: string[]) => items.map(s => `- ${s}`).join('\n');
 
-/** Khối "CHẾ ĐỘ CHUYÊN GIA" chèn vào system prompt. Chế độ Chung không có khối riêng → trả chuỗi rỗng. */
+/** Khối "CHẾ ĐỘ CHUYÊN GIA" chèn vào system prompt. Chế độ Chung không có khối riêng, Bạn đồng hành dựng khối riêng từ hồ sơ (companion/prompt.ts) → trả chuỗi rỗng. */
 export function renderExpertBlock(expert: ExpertProfile): string {
-    if (expert.id === 'general') return '';
+    if (expert.id === 'general' || expert.id === 'companion') return '';
     const parts: string[] = [
         `🧭 CHẾ ĐỘ CHUYÊN GIA: ${expert.name.toUpperCase()}`,
         `Vai trò: ${expert.persona}`,

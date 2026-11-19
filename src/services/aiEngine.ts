@@ -19,6 +19,7 @@ import { buildSystemPrompt } from './ai/promptBlocks';
 import { getExpert, type ExpertId } from './ai/experts';
 import { normalizeAskUser, maxClarifyRounds, countWrites, BULK_WRITE_LIMIT, type ClarifyRequest } from './ai/clarify';
 import { fetchWebSearch, mergeSearchSources, MAX_WEB_SEARCHES, WEB_SEARCH_LIMIT_ERROR, type WebSource } from './ai/webSearch';
+import type { CompanionProfile } from './ai/companion/types';
 import { AppState } from '../types';
 import {
     computeAllCourses, calculateSemesterGPA, calculateCumulativeGPA,
@@ -105,6 +106,8 @@ export interface ChatOptions {
     confirmedBulk?: boolean;
     /** Bật công cụ web_search (mặc định bật) */
     webSearch?: boolean;
+    /** Hồ sơ bạn AI — dùng khi expert = 'companion' */
+    companion?: CompanionProfile | null;
 }
 
 export interface AIResponse {
@@ -834,6 +837,7 @@ export async function chatWithAI(
         clarifyRoundsUsed,
         confirmedBulk: options.confirmedBulk,
         webSearch: options.webSearch,
+        companion: options.companion,
         hasPersonality: !!(appState.profile?.personality_mbti || appState.profile?.personality_disc),
     }).text;
     const tools = toolsFor(expert, { webSearch: options.webSearch });

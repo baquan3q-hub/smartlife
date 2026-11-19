@@ -1,6 +1,6 @@
 // File: src/components/ai/MessageBubble.tsx
 // Một tin trong khung chat: khung suy nghĩ, nội dung (chạy chữ khi đang stream), báo cáo, thao tác đã làm,
-// biểu đồ, và hàng nút thao tác tin nhắn.
+// biểu đồ, và hàng nút thao tác tin nhắn. Tin của Bạn đồng hành: avatar + tên, tách thành bong bóng nhỏ kiểu nhắn tin.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, FileText, Globe, Paperclip, RefreshCw, Sparkles, Square, Zap } from 'lucide-react';
@@ -15,6 +15,8 @@ import { tierLabel } from './tiers';
 import ClarifyCard from './ClarifyCard';
 import { getExpert } from '../../services/ai/experts';
 import type { Artifact } from './ArtifactPane';
+import CompanionAvatar from './CompanionAvatar';
+import { DEFAULT_COMPANION, splitCompanionMessage, type CompanionProfile } from '../../services/ai/companion/types';
 
 export interface MessageBubbleProps {
     message: UIMessage;
@@ -36,6 +38,8 @@ export interface MessageBubbleProps {
     onRegenerate: (message: UIMessage) => void;
     onDelete: (message: UIMessage) => void;
     onFeedback: (message: UIMessage, value: 'up' | 'down') => void;
+    /** Hồ sơ bạn AI hiện tại — để vẽ avatar + tên cho tin ở chế độ Bạn đồng hành */
+    companion?: CompanionProfile | null;
 }
 
 const EditBox: React.FC<{
@@ -93,7 +97,7 @@ const EditBox: React.FC<{
 const MessageBubble: React.FC<MessageBubbleProps> = ({
     message, appState, busy, isEditing, canRegenerate, isLast, onAnswerClarify,
     onAddTransaction, onOpenImpactDetails, onOpenArtifact,
-    onStartEdit, onCancelEdit, onSubmitEdit, onRevert, onRegenerate, onDelete, onFeedback,
+    onStartEdit, onCancelEdit, onSubmitEdit, onRevert, onRegenerate, onDelete, onFeedback, companion,
 }) => {
     const isUser = message.role === 'user';
     const streaming = message.status === 'streaming';
@@ -112,13 +116,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     const hasText = displayContent.trim().length > 0;
     const sources = !isUser && !streaming ? meta?.sources || [] : [];
     const clarification = !isUser && !streaming ? meta?.clarification : undefined;
-    const expertName = meta?.expert && meta.expert !== 'general' ? getExpert(meta.expert).name : '';
+    const persona = !isUser && meta?.expert === 'companion' ? (companion || DEFAULT_COMPANION) : null;
+    const expertName = persona ? '' : meta?.expert && meta.expert !== 'general' ? getExpert(meta.expert).name : '';
     const modeText = meta?.tier ? `${meta.auto ? 'Auto → ' : ''}${tierLabel(meta.tier) || meta.tier}` : '';
-    const showThinking = !isUser && !message.local && (streaming || !!meta?.steps?.length || !!meta?.thoughts);
+    // Bạn đồng hành: không hiện khung suy nghĩ — chỉ "… đang nhắn" khi chưa có chữ
+    const showThinking = !persona && !isUser && !message.local && (streaming || !!meta?.steps?.length || !!meta?.thoughts);
+    const typing = !!persona && streaming && !hasText;
+    const chunks = persona && !artifact ? splitCompanionMessage(displayContent) : [displayContent];
 
     return (
         <div className={`group flex items-start gap-2.5 ${isUser ? 'flex-row-reverse' : ''} animate-fade-in`}>
-            {!isUser && (
+            {persona && <CompanionAvatar avatar={persona.avatar} size={30} className="mt-4" />}
+            {!isUser && !persona && (
                 <div className="w-7 h-7 md:w-8 md:h-8 mt-0.5 rounded-lg md:rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
                     <Sparkles size={12} className="text-white" />
                 </div>
@@ -136,7 +145,34 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     />
                 )}
 
-                {isEditing ? (
+                {persona && (
+                    <p className="mb-1 ml-1 text-[11px] font-semibold text-gray-500 dark:text-slate-400">
+                        {persona.name}{meta?.greeting ? <span className="font-normal text-gray-400 dark:text-slate-500"> · nhắn trước cho bạn</span> : null}
+                    </p>
+                )}
+                {typing && (
+                    <div className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl rounded-tl-md bg-gray-50 border border-gray-100 text-xs text-gray-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400" role="status">
+                        <span className="flex gap-0.5" aria-hidden="true">
+                            {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-slate-500 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
+                        </span>
+                        {persona.name} đang nhắn…
+                    </div>
+                )}
+
+                {persona && !isEditing && hasText ? (
+                    <div className="flex flex-col items-start gap-1">
+                        {chunks.map((chunk, i) => (
+                            <div
+                                key={i}
+                                className={`px-3.5 py-2 text-sm md:text-[15px] leading-relaxed bg-gray-50 text-gray-700 border border-gray-100 shadow-sm rounded-2xl ${i === 0 ? 'rounded-tl-md' : ''} dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700`}
+                            >
+                                <div className={streaming && i === chunks.length - 1 ? 'ai-streaming' : ''}>
+                                    <MarkdownMessage content={chunk} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : isEditing ? (
                     <EditBox message={message} onCancel={onCancelEdit} onSubmit={text => onSubmitEdit(message, text)} />
                 ) : (hasText || (files && files.length > 0)) && (
                     <div
@@ -290,7 +326,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {!message.local && !streaming && !isEditing && (
                     <div className={`flex items-center gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
                         {!isUser && (meta?.tokens_used || meta?.tier || expertName) && (
-                            <div className="text-[10px] text-gray-400 mt-1 ml-1 flex items-center gap-1 select-none">
+                            <div className={`text-[10px] text-gray-400 mt-1 ml-1 flex items-center gap-1 select-none ${persona ? 'opacity-0 group-hover:opacity-100 transition-opacity' : ''}`}>
                                 <Zap size={10} className="shrink-0" />
                                 {meta?.tokens_used ? <span><strong>{meta.tokens_used.toLocaleString('vi-VN')}</strong> tokens</span> : null}
                                 {modeText && <span title={meta?.auto ? 'Chế độ Auto đã chọn tốc độ này' : undefined}>{meta?.tokens_used ? '· ' : ''}{modeText}</span>}

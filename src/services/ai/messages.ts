@@ -62,7 +62,11 @@ export function toGeminiHistory(messages: UIMessage[]): ChatMessage[] {
         const text = (m.content + asked + (m.role === 'user' && m.fileContext ? m.fileContext : '')).trim();
         if (!text) continue;
         const role = m.role === 'user' ? 'user' : 'model';
-        if (!turns.length && role === 'model') continue;
+        if (!turns.length && role === 'model') {
+            // Lời chào chủ động của Bạn đồng hành: giữ lại, kèm lượt người dùng giả để lịch sử bắt đầu bằng 'user'
+            if (!m.meta?.greeting) continue;
+            turns.push({ role: 'user', texts: ['(người dùng vừa mở ứng dụng)'] });
+        }
         const last = turns[turns.length - 1];
         if (last && last.role === role) last.texts.push(text);
         else turns.push({ role, texts: [text] });
