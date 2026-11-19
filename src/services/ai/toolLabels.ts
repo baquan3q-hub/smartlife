@@ -65,6 +65,7 @@ export function describeToolCall(name: string, args: Record<string, any> = {}): 
         case 'get_google_calendar_events': return `Đang đọc Google Calendar${args.days_ahead ? ` ${args.days_ahead} ngày tới` : ''}`;
         case 'search_nearby_places': return `Đang tìm địa điểm${quote(args.query)}`;
         case 'web_search': return `Đang tìm trên web${quote(args.query)}`;
+        case 'ask_user': return args.purpose === 'confirm' ? 'Xin bạn xác nhận trước khi ghi' : 'Hỏi lại bạn để hiểu rõ hơn';
         case 'render_chart': return `Đang vẽ biểu đồ${quote(args.title)}`;
         case 'calculate_needed_gpa': return `Đang tính GPA cần đạt${args.target_gpa ? ` để lên ${args.target_gpa}` : ''}`;
         case 'simulate_gpa': return 'Đang mô phỏng GPA';
@@ -93,6 +94,9 @@ export function describeToolResult(name: string, result: any): { ok: boolean; de
     if (error) return { ok: false, detail: String(error).slice(0, 120) };
     if (name === 'query_database' && typeof result.count === 'number') {
         return { ok: true, detail: result.count === 0 ? 'không có bản ghi' : `${result.count} bản ghi` };
+    }
+    if (name === 'web_search' && Array.isArray(result.sources)) {
+        return { ok: true, detail: result.sources.length ? `${result.sources.length} nguồn` : 'không có nguồn' };
     }
     if (Array.isArray(result.places)) return { ok: true, detail: `${result.places.length} địa điểm` };
     if (Array.isArray(result.events)) return { ok: true, detail: `${result.events.length} sự kiện` };

@@ -5,6 +5,7 @@
 import type { ChatMessage } from '../geminiService';
 import type { AIAttachment, ActionResult, ChartData } from '../aiEngine';
 import type { AIMessage, AIMessageMeta } from '../chatHistoryService';
+import { clarificationToText } from './clarify';
 
 export type UIMessageStatus = 'streaming' | 'done' | 'stopped' | 'error';
 
@@ -56,7 +57,9 @@ export function toGeminiHistory(messages: UIMessage[]): ChatMessage[] {
     const turns: Array<{ role: 'user' | 'model'; texts: string[] }> = [];
     for (const m of messages) {
         if (!isContextual(m)) continue;
-        const text = (m.content + (m.role === 'user' && m.fileContext ? m.fileContext : '')).trim();
+        // Tin AI dừng lại để hỏi (ask_user): thêm câu hỏi + lựa chọn để lượt sau model biết mình đã hỏi gì
+        const asked = m.role === 'assistant' && m.meta?.clarification ? '\n\n' + clarificationToText(m.meta.clarification, m.content) : '';
+        const text = (m.content + asked + (m.role === 'user' && m.fileContext ? m.fileContext : '')).trim();
         if (!text) continue;
         const role = m.role === 'user' ? 'user' : 'model';
         if (!turns.length && role === 'model') continue;

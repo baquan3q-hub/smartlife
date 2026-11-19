@@ -9,6 +9,8 @@ export interface AIConversation {
     user_id: string;
     title: string;
     is_pinned?: boolean;
+    /** Chế độ chuyên gia của cuộc trò chuyện (sql/ai_companion_upgrade.sql); null = Chung */
+    expert_mode?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -73,20 +75,41 @@ export const chatHistoryService = {
     },
 
     // Tạo cuộc trò chuyện mới
-    async createConversation(title: string = 'Cuộc trò chuyện mới'): Promise<AIConversation | null> {
+    async createConversation(title: string = 'Cuộc trò chuyện mới', expertMode?: string | null): Promise<AIConversation | null> {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return null;
 
-            const { data, error } = await supabase
+            const row: Record<string, any> = { user_id: user.id, title };
+            if (expertMode && expertMode !== 'general') row.expert_mode = expertMode;
+            let { data, error } = await supabase
                 .from('ai_conversations')
-                .insert([{ user_id: user.id, title }])
+                .insert([row])
                 .select()
                 .single();
+            // DB chưa chạy migration thêm cột expert_mode → tạo lại không kèm cột này
+            if (error && row.expert_mode) {
+                ({ data, error } = await supabase
+                    .from('ai_conversations')
+                    .insert([{ user_id: user.id, title }])
+                    .select()
+                    .single());
+            }
 
             if (error) return null;
             return data;
         } catch { return null; }
+    },
+
+    // Lưu chế độ chuyên gia của cuộc trò chuyện (null = Chung)
+    async updateConversationExpert(id: string, expertMode: string | null): Promise<boolean> {
+        try {
+            const { error } = await supabase
+                .from('ai_conversations')
+                .update({ expert_mode: expertMode && expertMode !== 'general' ? expertMode : null })
+                .eq('id', id);
+            return !error;
+        } catch { return false; }
     },
 
     // Update tiêu đề cuộc trò chuyện
