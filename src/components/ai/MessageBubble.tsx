@@ -119,7 +119,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     const persona = !isUser && meta?.expert === 'companion' ? (companion || DEFAULT_COMPANION) : null;
     const expertName = persona ? '' : meta?.expert && meta.expert !== 'general' ? getExpert(meta.expert).name : '';
     const modeText = meta?.tier ? `${meta.auto ? 'Auto → ' : ''}${tierLabel(meta.tier) || meta.tier}` : '';
-    // Bạn đồng hành: không hiện khung suy nghĩ — chỉ "… đang nhắn" khi chưa có chữ
+    // Bạn đồng hành: không hiện khung suy nghĩ — chỉ "… đang soạn tin nhắn" khi chưa có chữ
     const showThinking = !persona && !isUser && !message.local && (streaming || !!meta?.steps?.length || !!meta?.thoughts);
     const typing = !!persona && streaming && !hasText;
     const chunks = persona && !artifact ? splitCompanionMessage(displayContent) : [displayContent];
@@ -155,7 +155,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                         <span className="flex gap-0.5" aria-hidden="true">
                             {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-slate-500 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
                         </span>
-                        {persona.name} đang nhắn…
+                        {persona.name} đang soạn tin nhắn…
                     </div>
                 )}
 

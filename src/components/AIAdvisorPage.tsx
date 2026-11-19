@@ -574,7 +574,7 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
         const replyId = newMessageId();
         const startedAt = Date.now();
 
-        setMessages([...base, { id: replyId, role: 'assistant', content: '', status: 'streaming', startedAt }]);
+        setMessages([...base, { id: replyId, role: 'assistant', content: '', status: 'streaming', startedAt, meta: { expert } }]);
         setIsLoading(true);
         setPinSignal(s => s + 1);
 
@@ -585,7 +585,8 @@ const AIAdvisorPage: React.FC<AIAdvisorPageProps> = ({
             steps: [] as AIStep[],
             charts: [] as ChartData[],
             actions: [] as ActionResult[],
-            run: {} as AIRunMeta,
+            // gắn chế độ ngay từ đầu: Bạn đồng hành hiện "… đang soạn tin nhắn" thay vì khung phân tích
+            run: { expert } as AIRunMeta,
             clarification: undefined as ClarifyRequest | undefined,
             sources: [] as WebSource[],
         };
