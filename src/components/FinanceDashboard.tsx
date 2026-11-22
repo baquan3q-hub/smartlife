@@ -3979,7 +3979,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
                             <div className="p-6 text-center">
-                                <div className="bg-sky-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-sky-600">
+                                <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
                                     <GlassIcon name="finance" size={44} />
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-800 mb-2">Điều chỉnh số dư</h3>

@@ -16,8 +16,9 @@ function loadEnvFile(path) {
 loadEnvFile('.env.local');
 loadEnvFile('.env');
 
-const key = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').split(',')[0].trim();
-if (!key) {
+const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
+const keys = rawKeys.split(',').map((k) => k.trim()).filter(Boolean);
+if (keys.length === 0) {
     console.error('Thiếu GEMINI_API_KEYS trong .env.local');
     process.exit(1);
 }
@@ -36,7 +37,7 @@ const models = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_CA
 
 const is3x = (m) => !/gemini-2\./.test(m);
 
-async function call(model, extra = {}) {
+async function call(key, model, extra = {}) {
     const started = Date.now();
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
         method: 'POST',
@@ -49,7 +50,10 @@ async function call(model, extra = {}) {
     }).catch((e) => ({ ok: false, status: 'ERR', json: async () => ({ error: { message: e.message } }) }));
     const ms = Date.now() - started;
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, status: res.status, ms, msg: (data?.error?.message || '').slice(0, 90) };
+    if (!res.ok) {
+        const msg = data?.error?.message || '';
+        return { ok: false, status: res.status, ms, msg: msg.slice(0, 100), isSpendingCap: /spending cap|spend cap/i.test(msg) };
+    }
     const parts = data?.candidates?.[0]?.content?.parts || [];
     return {
         ok: true,
@@ -68,32 +72,51 @@ function fmt(label, r) {
     return `  ${label.padEnd(22)} ✓ ${String(r.ms).padStart(6)}ms  thought-parts=${r.thoughts} thought-tok=${r.thoughtTokens} total=${r.total}${r.grounded ? ' grounded' : ''}  "${r.text}"`;
 }
 
-for (const model of models) {
-    console.log(`\n▶ ${model}`);
-    const base = await call(model);
-    console.log(fmt('mặc định', base));
-    if (!base.ok) continue;
+for (let kIdx = 0; kIdx < keys.length; kIdx++) {
+    const key = keys[kIdx];
+    const masked = `${key.slice(0, 8)}...${key.slice(-4)}`;
+    console.log(`\n==================================================`);
+    console.log(`🔑 Key #${kIdx + 1}/${keys.length}: ${masked}`);
+    console.log(`==================================================`);
 
-    if (is3x(model)) {
-        for (const level of ['minimal', 'low', 'medium', 'high']) {
-            const r = await call(model, { generationConfig: { thinkingConfig: { thinkingLevel: level, includeThoughts: true } } });
-            console.log(fmt(`thinkingLevel=${level}`, r));
+    let spendCapHit = false;
+    for (const model of models) {
+        console.log(`\n▶ ${model}`);
+        const base = await call(key, model);
+        console.log(fmt('mặc định', base));
+        if (!base.ok) {
+            if (base.isSpendingCap) {
+                spendCapHit = true;
+            }
+            continue;
         }
-    } else {
-        for (const budget of [0, 2048]) {
-            const r = await call(model, { generationConfig: { thinkingConfig: { thinkingBudget: budget, includeThoughts: budget > 0 } } });
-            console.log(fmt(`thinkingBudget=${budget}`, r));
+
+        if (is3x(model)) {
+            for (const level of ['minimal', 'low', 'medium', 'high']) {
+                const r = await call(key, model, { generationConfig: { thinkingConfig: { thinkingLevel: level, includeThoughts: true } } });
+                console.log(fmt(`thinkingLevel=${level}`, r));
+            }
+        } else {
+            for (const budget of [0, 2048]) {
+                const r = await call(key, model, { generationConfig: { thinkingConfig: { thinkingBudget: budget, includeThoughts: budget > 0 } } });
+                console.log(fmt(`thinkingBudget=${budget}`, r));
+            }
         }
+
+        const search = await call(key, model, { tools: [{ google_search: {} }] });
+        console.log(fmt('google_search', search));
+
+        const mixed = await call(key, model, {
+            tools: [
+                { google_search: {} },
+                { functionDeclarations: [{ name: 'noop', description: 'không làm gì', parameters: { type: 'OBJECT', properties: {} } }] },
+            ],
+        });
+        console.log(fmt('search + function', mixed));
     }
 
-    const search = await call(model, { tools: [{ google_search: {} }] });
-    console.log(fmt('google_search', search));
-
-    const mixed = await call(model, {
-        tools: [
-            { google_search: {} },
-            { functionDeclarations: [{ name: 'noop', description: 'không làm gì', parameters: { type: 'OBJECT', properties: {} } }] },
-        ],
-    });
-    console.log(fmt('search + function', mixed));
+    if (spendCapHit) {
+        console.log(`\n⚠️  LƯU Ý: Key #${kIdx + 1} (${masked}) đã chạm hạn mức chi tiêu tháng (Spending Cap) của Google AI!`);
+        console.log(`👉 Truy cập: https://ai.studio/spend để nâng hạn mức hoặc tạo API Key mới.`);
+    }
 }

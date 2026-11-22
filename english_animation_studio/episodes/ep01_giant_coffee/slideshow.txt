@@ -1,0 +1,19 @@
+file 'c:/Users/Baquan/OneDrive/Máy tính/C_SmartLifeApp/english_animation_studio/episodes/ep01_giant_coffee/scenes/scene_01_sleepy_cafe.png'
+duration 11.464
+file 'c:/Users/Baquan/OneDrive/Máy tính/C_SmartLifeApp/english_animation_studio/episodes/ep01_giant_coffee/scenes/scene_02_ordering.png'
+duration 25.720
+file 'c:/Users/Baquan/OneDrive/Máy tính/C_SmartLifeApp/english_animation_studio/episodes/ep01_giant_coffee/scenes/scene_03_giant_latte.png'
+duration 20.004
+file 'c:/Users/Baquan/OneDrive/Máy tính/C_SmartLifeApp/english_animation_studio/episodes/ep01_giant_coffee/scenes/card_01_intro.png'
+duration 12.672
+file 'c:/Users/Baquan/OneDrive/Máy tính/C_SmartLifeApp/english_animation_studio/episodes/ep01_giant_coffee/scenes/card_02_phrase1.png'
+duration 19.520
+file 'c:/Users/Baquan/OneDrive/Máy tính/C_SmartLifeApp/english_animation_studio/episodes/ep01_giant_coffee/scenes/card_03_phrase2.png'
+duration 14.552
+file 'c:/Users/Baquan/OneDrive/Máy tính/C_SmartLifeApp/english_animation_studio/episodes/ep01_giant_coffee/scenes/card_04_phrase3.png'
+duration 15.428
+file 'c:/Users/Baquan/OneDrive/Máy tính/C_SmartLifeApp/english_animation_studio/episodes/ep01_giant_coffee/scenes/card_05_roleplay.png'
+duration 29.800
+file 'c:/Users/Baquan/OneDrive/Máy tính/C_SmartLifeApp/english_animation_studio/episodes/ep01_giant_coffee/scenes/card_06_quiz_outro.png'
+duration 20.584
+file 'c:/Users/Baquan/OneDrive/Máy tính/C_SmartLifeApp/english_animation_studio/episodes/ep01_giant_coffee/scenes/card_06_quiz_outro.png'

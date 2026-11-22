@@ -560,8 +560,8 @@ async function handleProxyError(res: Response, retryCount: number): Promise<'ret
         throw new Error(err.message || 'Giới hạn sử dụng AI của bạn đã hết.');
     }
 
-    // Hết credit Google AI (402) hoặc model trả lời quá lâu — thử lại cũng vô ích
-    if (err?.type === 'provider_billing' || err?.type === 'timeout') {
+    // Hết credit Google AI (402), vượt spending cap (429) hoặc model trả lời quá lâu — thử lại cũng vô ích
+    if (err?.type === 'provider_billing' || err?.type === 'provider_spending_cap' || err?.type === 'timeout') {
         throw new Error(err.message || err.error || `Gemini API Error ${status}`);
     }
 
@@ -572,7 +572,7 @@ async function handleProxyError(res: Response, retryCount: number): Promise<'ret
     }
 
     if (status === 429) {
-        throw new Error('Hệ thống AI đang bị quá tải (429). Vui lòng đợi một lát rồi thử lại. 🔄');
+        throw new Error(err?.message || err?.error || 'Hệ thống AI đang bị quá tải (429). Vui lòng đợi một lát rồi thử lại. 🔄');
     }
 
     console.error(`[SmartLife] Proxy Error ${status}:`, err);

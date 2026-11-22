@@ -18,11 +18,15 @@ export class GeminiUpstreamError extends Error {
 }
 
 export const BILLING_MESSAGE = 'Dịch vụ AI đang tạm ngưng vì tài khoản Google AI của SmartLife hết tín dụng. Vui lòng báo quản trị viên hoặc thử lại sau. 🙏';
+export const SPENDING_CAP_MESSAGE = 'Dịch vụ AI đang tạm ngưng vì tài khoản Google AI đã vượt hạn mức chi tiêu hàng tháng (spending cap). Quản trị viên vui lòng kiểm tra tại https://ai.studio/spend hoặc bổ sung API key mới vào GEMINI_API_KEYS. 🙏';
 
 // Lỗi trả cho client (không bao giờ kèm API key)
 export function toClientError(err) {
     if (err?.type === 'provider_billing') {
         return { status: 402, body: { error: 'provider_billing', type: 'provider_billing', message: err.message } };
+    }
+    if (err?.type === 'provider_spending_cap') {
+        return { status: 429, body: { error: 'provider_spending_cap', type: 'provider_spending_cap', message: err.message } };
     }
     if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
         return { status: 504, body: { error: 'Gemini phản hồi quá lâu. Hãy thử lại hoặc chọn chế độ Nhanh.', type: 'timeout' } };
@@ -51,16 +55,21 @@ export async function openGemini({ model, body, stream = false, signal, retryCou
 
     const status = res.status;
     const err = await res.json().catch(() => ({}));
+    const errMsg = err?.error?.message || '';
+    const isSpendingCap = status === 429 && /spending cap|spend cap/i.test(errMsg);
 
-    // 402 = project của key này hết credit trả trước → thử key khác (có thể khác project), không chờ
-    if (status === 402) {
+    // 402 = project của key này hết credit trả trước, hoặc 429 do vượt spending cap → thử key khác, không chờ
+    if (status === 402 || isSpendingCap) {
+        const errType = isSpendingCap ? 'provider_spending_cap' : 'provider_billing';
+        const label = isSpendingCap ? '429 vượt spending cap' : '402 hết credit';
+        const failMsg = isSpendingCap ? SPENDING_CAP_MESSAGE : BILLING_MESSAGE;
         if (keys.length > 1 && billingTried + 1 < keys.length) {
             currentKeyIndex++;
-            console.warn(`[SmartLife AI] 402 hết credit. Chuyển sang key #${(currentKeyIndex % keys.length) + 1}...`);
+            console.warn(`[SmartLife AI] ${label}. Chuyển sang key #${(currentKeyIndex % keys.length) + 1}...`);
             return openGemini({ model, body, stream, signal, retryCount, billingTried: billingTried + 1 });
         }
-        console.error('[SmartLife AI] ❌ 402: mọi key đều hết credit Google AI.');
-        throw new GeminiUpstreamError(402, BILLING_MESSAGE, 'provider_billing');
+        console.error(`[SmartLife AI] ❌ ${status}: mọi key đều ${isSpendingCap ? 'vượt spending cap Google AI' : 'hết credit Google AI'}.`);
+        throw new GeminiUpstreamError(status, failMsg, errType);
     }
 
     if (RETRYABLE.has(status) && retryCount < Math.max(3, keys.length)) {

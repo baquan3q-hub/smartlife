@@ -22,7 +22,6 @@ const EXPAND_ITEMS = [
         desc: 'Ghi nhanh, đồng bộ mọi thiết bị, AI tách task',
         glass: "sticky" as GlassIconName,
         gradient: 'from-amber-400 to-yellow-500',
-        bg: 'bg-amber-50',
         iconColor: 'text-amber-600',
         shadowColor: 'shadow-amber-200/60',
         action: 'navigate',
@@ -33,7 +32,6 @@ const EXPAND_ITEMS = [
         desc: 'Theo dõi điểm số & kế hoạch học tập',
         glass: "gpa" as GlassIconName,
         gradient: 'from-blue-500 to-indigo-600',
-        bg: 'bg-blue-50',
         iconColor: 'text-blue-600',
         shadowColor: 'shadow-blue-200/60',
         action: 'navigate',
@@ -44,7 +42,6 @@ const EXPAND_ITEMS = [
         desc: 'Quản lý mục tiêu & lộ trình sự nghiệp',
         glass: "goals" as GlassIconName,
         gradient: 'from-purple-500 to-violet-600',
-        bg: 'bg-purple-50',
         iconColor: 'text-purple-600',
         shadowColor: 'shadow-purple-200/60',
         action: 'navigate',
@@ -55,7 +52,6 @@ const EXPAND_ITEMS = [
         desc: 'Nghe nhạc & quản lý playlist cá nhân',
         glass: "music" as GlassIconName,
         gradient: 'from-emerald-500 to-green-600',
-        bg: 'bg-emerald-50',
         iconColor: 'text-emerald-600',
         shadowColor: 'shadow-emerald-200/60',
         action: 'spotify',
@@ -66,7 +62,6 @@ const EXPAND_ITEMS = [
         desc: 'Ghi chép suy nghĩ & theo dõi cảm xúc',
         glass: "journal" as GlassIconName,
         gradient: 'from-amber-400 to-orange-500',
-        bg: 'bg-amber-50',
         iconColor: 'text-amber-600',
         shadowColor: 'shadow-amber-200/60',
         action: 'navigate',
@@ -77,7 +72,6 @@ const EXPAND_ITEMS = [
         desc: 'Xây dựng & duy trì thói quen hàng ngày',
         glass: "habit" as GlassIconName,
         gradient: 'from-orange-500 to-red-500',
-        bg: 'bg-orange-50',
         iconColor: 'text-orange-600',
         shadowColor: 'shadow-orange-200/60',
         action: 'navigate',
@@ -88,7 +82,6 @@ const EXPAND_ITEMS = [
         desc: 'Tùy chỉnh hồ sơ & cấu hình ứng dụng',
         glass: "settings" as GlassIconName,
         gradient: 'from-gray-500 to-slate-600',
-        bg: 'bg-gray-50',
         iconColor: 'text-gray-600',
         shadowColor: 'shadow-gray-200/60',
         action: 'settings',
@@ -431,7 +424,7 @@ const ExpandSection: React.FC<ExpandSectionProps> = ({
                                     onClick={() => handleItemClick(item)}
                                     className={`flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-white hover:shadow-md ${item.shadowColor} transition-all duration-200 active:scale-95 group relative overflow-hidden`}
                                 >
-                                    <div className={`w-12 h-12 rounded-2xl ${item.bg} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
+                                    <div className={`w-12 h-12 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
                                         <GlassIcon name={item.glass} size={36} />
                                     </div>
                                     <span className="text-[10px] font-bold text-gray-800 text-center leading-tight tracking-tight">

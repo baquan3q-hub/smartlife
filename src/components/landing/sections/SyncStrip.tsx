@@ -19,7 +19,7 @@ const google = [
 ];
 
 export const SyncStrip: React.FC<SyncStripProps> = ({ c, scrollTo }) => (
-    <section className="py-20 sm:py-24">
+    <section id="google-ecosystem" className="py-16 sm:py-20 border-t border-zinc-100 bg-white/50">
         <Reveal className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-4 sm:px-6">
             <p className="text-[13px] font-medium text-zinc-500">{c.syncWith}</p>
             <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">

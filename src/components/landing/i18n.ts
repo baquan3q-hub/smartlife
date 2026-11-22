@@ -30,6 +30,28 @@ export interface LandingCopy {
     previewBadge: string;
     syncWith: string;
     syncStatus: string;
+    syncStage: {
+        eyebrow: string;
+        title: string;
+        desc: string;
+        statusLive: string;
+        cleanBadge: string;
+        colDoing: string;
+        colDone: string;
+        taskTitle: string;
+        taskSub: string;
+        tasksSynced: string;
+        calendarSynced: string;
+    };
+    ecosystem: {
+        eyebrow: string;
+        title: string;
+        desc: string;
+        items: Record<
+            'gpa' | 'career' | 'cv' | 'finance' | 'google' | 'kanban' | 'journal' | 'pomodoro' | 'habits' | 'storage',
+            { tag: string; title: string; desc: string }
+        >;
+    };
     stories: Record<StoryKey, Story>;
     bentoEyebrow: string;
     bentoTitle: string;
@@ -68,6 +90,36 @@ export const copy: Record<Lang, LandingCopy> = {
         previewBadge: 'Life OS 2026',
         syncWith: 'Đồng bộ 2 chiều với',
         syncStatus: 'Đang đồng bộ realtime',
+        syncStage: {
+            eyebrow: 'Bản lĩnh công nghệ • The Realtime Core',
+            title: 'Đồng bộ 2 chiều tức thì với Google',
+            desc: 'Kéo thả thẻ trên Kanban, toàn bộ Google Tasks và Google Calendar khớp lệnh ngay lập tức mà không cần bấm lưu.',
+            statusLive: 'Đang đồng bộ trực tiếp',
+            cleanBadge: 'Deep Clean Engine: 0 task trùng lặp • Tối ưu 95% re-render',
+            colDoing: 'Đang làm (Doing)',
+            colDone: 'Đã xong (Done)',
+            taskTitle: 'Chuẩn bị đồ án tốt nghiệp VNU',
+            taskSub: 'Subtasks phân cấp: 3 việc con',
+            tasksSynced: 'Google Tasks: Danh sách "Doing" ➔ "Done"',
+            calendarSynced: 'Google Calendar: Khớp slot 14:00 - 16:30'
+        },
+        ecosystem: {
+            eyebrow: 'Hệ sinh thái All-in-One',
+            title: '10 Phân hệ chuyên sâu cho sinh viên & tự học',
+            desc: 'Cuộn ngang để khám phá cách SmartLife liên kết học vụ, tài chính, sự nghiệp và cảm xúc thành một thể thống nhất.',
+            items: {
+                gpa: { tag: '01 / Academic', title: 'GPA VNU & Mô phỏng điểm', desc: 'Quy đổi hệ 4 và 10 chuẩn ĐHQGHN. Tính điểm kỳ tới để đạt bằng Giỏi/Xuất sắc.' },
+                career: { tag: '02 / AI Advisor', title: 'Cố vấn nghề nghiệp AI', desc: 'Kết hợp điểm GPA với trắc nghiệm MBTI/DISC để gợi ý 3 vị trí việc làm tối ưu.' },
+                cv: { tag: '03 / Career Builder', title: 'Tự tạo CV chuẩn ATS', desc: 'Đồng bộ kết quả học tập và mục tiêu vào template CV chuyên nghiệp, xuất PDF 1-click.' },
+                finance: { tag: '04 / Finance', title: 'Bàn phím toán học & Ví quỹ', desc: 'Gõ biểu thức "50k + 1.5tr" trực tiếp. Quản lý ví, quỹ mục đích và sổ ghi nợ liên kết.' },
+                google: { tag: '05 / Google Sync', title: 'Google Tasks & Calendar 2 chiều', desc: 'Ánh xạ 4 cột Kanban sang Google Tasks, hỗ trợ native child tasks và dọn dẹp Deep Clean.' },
+                kanban: { tag: '06 / Schedule', title: 'Bảng Kanban & Thời khóa biểu', desc: 'Kéo thả siêu tốc tối ưu 95% re-render. Xuất thời khóa biểu thành hình nền điện thoại.' },
+                journal: { tag: '07 / Emotional Health', title: 'Nhật ký chữa lành có mã PIN', desc: 'Chấm điểm tâm trạng, ghi lời biết ơn, bảo vệ riêng tư tuyệt đối bằng mã PIN cục bộ.' },
+                pomodoro: { tag: '08 / Focus Space', title: 'Pomodoro & Nhạc Lo-Fi', desc: 'Đồng hồ đếm ngược học tập tích hợp tiếng mưa rơi, sóng biển và My Spotify tự do.' },
+                habits: { tag: '09 / Habit Streak', title: 'Rèn luyện thói quen & StarBrain', desc: 'Duy trì chuỗi ngày streak liên tục, tích lũy điểm thưởng đổi phần quà động lực.' },
+                storage: { tag: '10 / Security Vault', title: 'Ví tài liệu số cá nhân', desc: 'Lưu trữ CCCD, thẻ sinh viên, QR thanh toán xem nhanh với Lightbox zoom bảo mật.' }
+            }
+        },
         stories: {
             google: {
                 eyebrow: 'Google Ecosystem',
@@ -161,6 +213,36 @@ export const copy: Record<Lang, LandingCopy> = {
         previewBadge: 'Life OS 2026',
         syncWith: 'Two-way sync with',
         syncStatus: 'Syncing in realtime',
+        syncStage: {
+            eyebrow: 'Engineered Precision • The Realtime Core',
+            title: 'Two-Way Instant Sync with Google Ecosystem',
+            desc: 'Drag a card across Kanban, and Google Tasks & Calendar instantly reflect the shift without touching a save button.',
+            statusLive: 'Realtime Live Syncing',
+            cleanBadge: 'Deep Clean Engine: 0 orphan duplicates • 95% re-render reduction',
+            colDoing: 'In Progress (Doing)',
+            colDone: 'Completed (Done)',
+            taskTitle: 'Prepare VNU Graduation Thesis',
+            taskSub: 'Hierarchical subtasks: 3 child items',
+            tasksSynced: 'Google Tasks: "Doing" ➔ "Done" matched',
+            calendarSynced: 'Google Calendar: Synced to slot 14:00 - 16:30'
+        },
+        ecosystem: {
+            eyebrow: 'All-in-One Life OS',
+            title: '10 Tailored Modules for Academic & Personal Mastery',
+            desc: 'Scroll horizontally to see how SmartLife weaves academics, personal finances, career development and mental wellbeing into one calm canvas.',
+            items: {
+                gpa: { tag: '01 / Academic', title: 'GPA VNU & Grade Projection', desc: 'Accurate 4.0 / 10.0 scale conversion. Simulates remaining semesters for graduation honors.' },
+                career: { tag: '02 / AI Advisor', title: 'AI Career Coach', desc: 'Synthesizes GPA trends with MBTI/DISC assessments to identify 3 top career pathways.' },
+                cv: { tag: '03 / Career Builder', title: 'Auto ATS-Optimized CV', desc: 'Syncs GPA and milestone achievements directly into professional templates, export PDF in 1 click.' },
+                finance: { tag: '04 / Finance', title: 'Math Expressions & Wallet Mesh', desc: 'Type "50k + 1.5tr" arithmetic directly. Oversee accounts, goal funds, and linked debts.' },
+                google: { tag: '05 / Google Sync', title: 'Google Tasks & Calendar 2-Way', desc: 'Direct 4-column Kanban mapping, native hierarchical child tasks, and Deep Clean sweep.' },
+                kanban: { tag: '06 / Schedule', title: 'Fluid Kanban & Timetable', desc: 'Fluid drag-and-drop with 95% re-render optimization. Export high-res phone lockscreen wallpapers.' },
+                journal: { tag: '07 / Emotional Health', title: 'Healing Journal with PIN Lock', desc: 'Track moods, gratitude prompts, and biometric/local 4-digit PIN security.' },
+                pomodoro: { tag: '08 / Focus Space', title: 'Pomodoro & Ambient Lo-Fi', desc: 'Focus timer backed with gentle rain, ocean waves, and standalone Spotify integration.' },
+                habits: { tag: '09 / Habit Streak', title: 'Habit Streaks & StarBrain', desc: 'Build unbroken routines, earn motivational reward tokens, and celebrate progress.' },
+                storage: { tag: '10 / Security Vault', title: 'Personal Digital Vault', desc: 'Store student IDs, citizen cards, and instant payment QR codes with secured lightbox preview.' }
+            }
+        },
         stories: {
             google: {
                 eyebrow: 'Google Ecosystem',
@@ -254,6 +336,36 @@ export const copy: Record<Lang, LandingCopy> = {
         previewBadge: 'Life OS 2026',
         syncWith: '양방향 동기화',
         syncStatus: '실시간 동기화 중',
+        syncStage: {
+            eyebrow: '실시간 코어 엔진 • The Realtime Core',
+            title: '구글과 완벽한 양방향 실시간 동기화',
+            desc: '칸반 카드를 이동하면 구글 태스크와 캘린더가 저장 버튼 없이도 즉시 자동 반영됩니다.',
+            statusLive: '실시간 라이브 동기화 중',
+            cleanBadge: '딥클린 엔진: 중복 태스크 0건 • 95% 렌더링 최적화',
+            colDoing: '진행 중 (Doing)',
+            colDone: '완료 (Done)',
+            taskTitle: 'VNU 졸업 논문 최종 준비',
+            taskSub: '계층형 하위 작업: 3개 세부 태스크',
+            tasksSynced: '구글 태스크: "진행 중" ➔ "완료" 동기화됨',
+            calendarSynced: '구글 캘린더: 14:00 - 16:30 일정 연동 완료'
+        },
+        ecosystem: {
+            eyebrow: '올인원 라이프 OS 생태계',
+            title: '학습과 일상을 위한 10가지 맞춤 모듈',
+            desc: '가로 스크롤을 통해 스마트라이프가 학업, 재정, 커리어, 감정 관리를 어떻게 하나로 연결하는지 살펴보세요.',
+            items: {
+                gpa: { tag: '01 / Academic', title: 'GPA VNU & 학점 시뮬레이션', desc: '4.0/10.0 스케일 완벽 변환. 졸업 우등 학점을 위한 남은 학기 목표 계산.' },
+                career: { tag: '02 / AI Advisor', title: 'AI 커리어 코칭', desc: 'GPA 추이와 MBTI/DISC 성격 분석을 결합하여 최적의 3가지 진로 추천.' },
+                cv: { tag: '03 / Career Builder', title: 'ATS 최적화 자동 이력서', desc: '학업 결과와 프로젝트 성과를 전문 템플릿에 자동 반영, 원클릭 PDF 출력.' },
+                finance: { tag: '04 / Finance', title: '수식 계산기 & 다중 지갑 관리', desc: '"50k + 1.5tr" 등 복합 수식 직접 입력. 목적별 자금과 연동된 채무 관리.' },
+                google: { tag: '05 / Google Sync', title: '구글 태스크 & 캘린더 2-Way', desc: '칸반 4열 직관 매핑, 네이티브 계층 하위 작업 및 딥클린 중복 제거.' },
+                kanban: { tag: '06 / Schedule', title: '부드러운 칸반 & 시간표', desc: '95% 리렌더링 최적화된 드래그 앤 드롭. 고화질 잠금화면 시간표 생성.' },
+                journal: { tag: '07 / Emotional Health', title: 'PIN 보안 힐링 다이어리', desc: '기분 추적, 감사 일기, 4자리 PIN 코드로 보호되는 안전한 프라이버시.' },
+                pomodoro: { tag: '08 / Focus Space', title: '뽀모도로 & 앰비언트 로파이', desc: '빗소리, 파도 소리 등 집중 사운드와 독립형 Spotify 음악 재생.' },
+                habits: { tag: '09 / Habit Streak', title: '습관 스트릭 & StarBrain', desc: '연속 달성 스트릭 유지 및 동기부여 보상 포인트를 통한 자기개발.' },
+                storage: { tag: '10 / Security Vault', title: '개인 디지털 문서 보관함', desc: '학생증, 신분증, 결제 QR 코드를 라이트박스로 안전하고 신속하게 조회.' }
+            }
+        },
         stories: {
             google: {
                 eyebrow: 'Google Ecosystem',

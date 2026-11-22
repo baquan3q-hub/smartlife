@@ -37,16 +37,16 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
   const bestValuePlan = SUBSCRIPTION_PLANS.find(p => p.is_best_value);
 
   const features = [
-    { icon: <GlassIcon name="ai" size={26} />, color: 'text-violet-600', bgColor: 'bg-violet-50', text: 'AI Cố vấn riêng — 600.000 token/tháng included' },
-    { icon: <GlassIcon name="growth" size={26} />, color: 'text-rose-600', bgColor: 'bg-rose-50', text: 'AI Career Analyzer — Phân tích ngành học & tính cách đề xuất nghề nghiệp' },
-    { icon: <GlassIcon name="cv" size={26} />, color: 'text-sky-600', bgColor: 'bg-sky-50', text: 'CV Builder — Tự động điền học vấn & kỹ năng, export PDF chuyên nghiệp' },
-    { icon: <GlassIcon name="goals" size={26} />, color: 'text-purple-600', bgColor: 'bg-purple-50', text: 'Lộ trình Sự nghiệp & Mục tiêu 5 năm — AI cố vấn kỹ năng dựa trên GPA' },
-    { icon: <GlassIcon name="gpa" size={26} />, color: 'text-cyan-600', bgColor: 'bg-cyan-50', text: 'GPA Tracker nâng cao — dự đoán GPA tốt nghiệp & lộ trình học tập' },
-    { icon: <GlassIcon name="overview" size={26} />, color: 'text-indigo-600', bgColor: 'bg-indigo-50', text: 'Visual Board — toàn cảnh cuộc sống đại học trong 1 giao diện' },
-    { icon: <GlassIcon name="cashflow" size={26} />, color: 'text-emerald-600', bgColor: 'bg-emerald-50', text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },
-    { icon: <GlassIcon name="book" size={26} />, color: 'text-teal-600', bgColor: 'bg-teal-50', text: 'Nhật ký cá nhân — không gian chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
-    { icon: <GlassIcon name="habit" size={26} />, color: 'text-orange-600', bgColor: 'bg-orange-50', text: 'Habit Tracker không giới hạn — theo dõi thói quen với streak & count-up' },
-    { icon: <GlassIcon name="gift" size={26} />, color: 'text-amber-500', bgColor: 'bg-amber-50', text: 'StarBrain 🌟 — hệ thống sao thưởng & cửa hàng đổi quà' },
+    { icon: <GlassIcon name="ai" size={26} />, text: 'AI Cố vấn riêng — 600.000 token/tháng included' },
+    { icon: <GlassIcon name="growth" size={26} />, text: 'AI Career Analyzer — Phân tích ngành học & tính cách đề xuất nghề nghiệp' },
+    { icon: <GlassIcon name="cv" size={26} />, text: 'CV Builder — Tự động điền học vấn & kỹ năng, export PDF chuyên nghiệp' },
+    { icon: <GlassIcon name="goals" size={26} />, text: 'Lộ trình Sự nghiệp & Mục tiêu 5 năm — AI cố vấn kỹ năng dựa trên GPA' },
+    { icon: <GlassIcon name="gpa" size={26} />, text: 'GPA Tracker nâng cao — dự đoán GPA tốt nghiệp & lộ trình học tập' },
+    { icon: <GlassIcon name="overview" size={26} />, text: 'Visual Board — toàn cảnh cuộc sống đại học trong 1 giao diện' },
+    { icon: <GlassIcon name="cashflow" size={26} />, text: 'Quản lý tài chính & Cashflow — theo dõi thu chi thông minh' },
+    { icon: <GlassIcon name="book" size={26} />, text: 'Nhật ký cá nhân — không gian chữa lành, mood tracker & đồng bộ dữ liệu với AI' },
+    { icon: <GlassIcon name="habit" size={26} />, text: 'Habit Tracker không giới hạn — theo dõi thói quen với streak & count-up' },
+    { icon: <GlassIcon name="gift" size={26} />, text: 'StarBrain 🌟 — hệ thống sao thưởng & cửa hàng đổi quà' },
   ];
 
   return (
@@ -89,7 +89,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onSelectPl
           <div className="space-y-3.5 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
             {features.map((f, i) => (
               <div key={i} className="flex items-start gap-3 text-sm text-gray-700">
-                <div className={`w-8 h-8 rounded-lg ${f.bgColor} flex items-center justify-center ${f.color} shrink-0 mt-0.5`}>
+                <div className={`w-8 h-8 flex items-center justify-center shrink-0 mt-0.5`}>
                   {f.icon}
                 </div>
                 <div className="flex-1 min-w-0">

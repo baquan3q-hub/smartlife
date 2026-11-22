@@ -409,7 +409,7 @@ const GPADashboard: React.FC<GPADashboardProps> = ({
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
           {/* Header gradient */}
           <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600 p-8 text-white text-center">
-            <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="w-20 h-20 flex items-center justify-center mx-auto mb-4">
               <GlassIcon name="gpa" size={60} />
             </div>
             <h2 className="text-2xl font-bold mb-2">Chào mừng đến với GPA Tracker!</h2>

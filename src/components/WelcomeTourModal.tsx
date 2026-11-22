@@ -99,7 +99,7 @@ const WelcomeTourModal: React.FC<WelcomeTourModalProps> = ({ isOpen, onClose }) 
                                 style={{ animationDelay: `${idx * 50}ms` }}
                             >
                                 <div className="flex items-center gap-3 mb-2">
-                                    <div className="p-2 rounded-xl bg-white shadow-sm group-hover:scale-110 transition-transform">
+                                    <div className="p-1 group-hover:scale-110 transition-transform">
                                         {feat.icon}
                                     </div>
                                     <h3 className="font-bold text-gray-800 text-sm">{feat.title}</h3>

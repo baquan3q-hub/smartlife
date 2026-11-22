@@ -1,10 +1,10 @@
 import React from 'react';
 import { Lang } from '../../i18n/i18n';
-import { stories } from './data';
 import { SiteShell } from './SiteShell';
 import { Hero } from './sections/Hero';
 import { SyncStrip } from './sections/SyncStrip';
-import { StoryFeature } from './sections/StoryFeature';
+import { SyncEngineStage } from './sections/SyncEngineStage';
+import { EcosystemRail } from './sections/EcosystemRail';
 import { BentoGrid } from './sections/BentoGrid';
 import { FinalCTA } from './sections/FinalCTA';
 
@@ -21,9 +21,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigate, lang, se
             <>
                 <Hero c={c} onLogin={onLogin} scrollTo={scrollTo} />
                 <SyncStrip c={c} scrollTo={scrollTo} />
-                {stories.map((story, i) => (
-                    <StoryFeature key={story.key} c={c} story={story} index={i} total={stories.length} />
-                ))}
+                <SyncEngineStage c={c} />
+                <EcosystemRail c={c} scrollTo={scrollTo} />
                 <BentoGrid c={c} onLogin={onLogin} />
                 <FinalCTA c={c} onLogin={onLogin} onInstall={openInstall} />
             </>

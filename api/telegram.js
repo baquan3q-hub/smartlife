@@ -868,13 +868,18 @@ async function callGemini(body, deadline = Date.now() + 45_000) {
             return res.json();
         }
         const errBody = await res.json().catch(() => ({}));
+        const errMsg = errBody?.error?.message || '';
+        const isSpendingCap = res.status === 429 && /spending cap|spend cap/i.test(errMsg);
         const retryDelay = errBody?.error?.details?.find((d) => d.retryDelay)?.retryDelay;
         lastError = new GeminiError(
             res.status,
-            `${model}: ${errBody?.error?.status || 'HTTP'} ${res.status}${errBody?.error?.message ? ` — ${String(errBody.error.message).slice(0, 160)}` : ''}`,
+            `${model}: ${errBody?.error?.status || 'HTTP'} ${res.status}${errMsg ? ` — ${String(errMsg).slice(0, 160)}` : ''}`,
             retryDelay ? parseInt(retryDelay, 10) : null,
         );
         console.warn('[telegram] gemini error', lastError.message);
+        if (isSpendingCap && keys.length === 1) {
+            throw new GeminiError(429, 'Tài khoản Google AI đã vượt hạn mức chi tiêu hàng tháng (spending cap). Vui lòng kiểm tra https://ai.studio/spend');
+        }
         if (res.status === 429) modelCooldown.set(model, Date.now() + Math.min(120, lastError.retryAfterSec || 60) * 1000);
         if (!RETRYABLE.has(res.status)) throw lastError; // sai key / request lỗi → thử tiếp vô ích
         keyIndex++;

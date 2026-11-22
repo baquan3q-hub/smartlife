@@ -683,7 +683,7 @@ const MyStorage: React.FC<MyStorageProps> = ({ isOpen, onClose, userId }) => {
                 {/* Header */}
                 <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 p-5 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
+                        <div className="w-10 h-10 flex items-center justify-center">
                             <GlassIcon name="storage" size={30} />
                         </div>
                         <div>

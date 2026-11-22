@@ -2220,31 +2220,31 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ lang, setLang }) =>
                         <div className="flex gap-1.5 items-center">
                             {/* Habit Shortcut — toggleable in Settings */}
                             {headerShortcuts.habit && (
-                                <button onClick={() => setActiveTab('habit')} className={`p-2 rounded-xl transition-all ${activeTab === 'habit' ? 'text-orange-600 bg-orange-100 dark:bg-orange-950/50' : 'text-orange-500 bg-orange-50/80 dark:bg-slate-800/80 hover:bg-orange-100'}`} title="Thói quen">
+                                <button onClick={() => setActiveTab('habit')} className={`p-2 rounded-xl transition-all ${activeTab === 'habit' ? 'text-orange-600 bg-orange-100 dark:bg-orange-950/50' : 'hover:bg-orange-50 dark:hover:bg-slate-800/60'}`} title="Thói quen">
                                     <GlassIcon name="habit" size={20} eager />
                                 </button>
                             )}
                             {/* Spotify Shortcut — toggleable in Settings */}
                             {headerShortcuts.spotify && (
-                                <button onClick={() => setIsSpotifyOpen(true)} className="p-2 text-emerald-600 bg-emerald-50/80 dark:bg-slate-800/80 dark:text-emerald-400 hover:bg-emerald-100 rounded-xl transition-colors" title="My Spotify">
+                                <button onClick={() => setIsSpotifyOpen(true)} className="p-2 hover:bg-emerald-50 dark:hover:bg-slate-800/60 rounded-xl transition-colors" title="My Spotify">
                                     <GlassIcon name="music" size={20} eager />
                                 </button>
                             )}
                             {/* Admin Panel — always visible for admin */}
                             {user?.email === 'baquan3q@gmail.com' && (
-                                <button onClick={() => setActiveTab('admin')} className={`p-2 rounded-xl transition-colors ${activeTab === 'admin' ? 'text-red-600 bg-red-100 dark:bg-red-950/50' : 'text-red-500 bg-red-50/80 dark:bg-slate-800/80 hover:bg-red-100'}`} title="Admin Panel">
+                                <button onClick={() => setActiveTab('admin')} className={`p-2 rounded-xl transition-colors ${activeTab === 'admin' ? 'text-red-600 bg-red-100 dark:bg-red-950/50' : 'hover:bg-red-50 dark:hover:bg-slate-800/60'}`} title="Admin Panel">
                                     <GlassIcon name="admin" size={20} eager />
                                 </button>
                             )}
                             {/* Pro Upgrade */}
                             {!proAccess.isProActive && !proAccess.isLifetime && (
-                                <button onClick={handleOpenPricing} className="relative p-2 rounded-xl bg-amber-50/80 dark:bg-slate-800/80 hover:bg-amber-100 transition-colors" title="Nâng cấp Pro">
+                                <button onClick={handleOpenPricing} className="relative p-2 rounded-xl hover:bg-amber-50 dark:hover:bg-slate-800/60 transition-colors" title="Nâng cấp Pro">
                                     <GlassIcon name="pro" size={20} eager />
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse border-2 border-white dark:border-slate-900" />
                                 </button>
                             )}
                             {/* Settings — always visible */}
-                            <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 dark:text-slate-400 bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200/80 rounded-xl transition-colors" title="Cài đặt">
+                            <button onClick={() => setIsSettingsOpen(true)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl transition-colors" title="Cài đặt">
                                 <GlassIcon name="settings" size={20} eager />
                             </button>
                         </div>

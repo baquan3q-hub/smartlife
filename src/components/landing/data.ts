@@ -75,3 +75,37 @@ export const marquee: { key: MarqueeKey; icon: GlassIconName; target: string }[]
     { key: 'focus', icon: 'timer', target: 'focus-music' },
     { key: 'storage', icon: 'storage', target: 'secure-storage' }
 ];
+
+export type EcosystemKey =
+    | 'gpa'
+    | 'career'
+    | 'cv'
+    | 'finance'
+    | 'google'
+    | 'kanban'
+    | 'journal'
+    | 'pomodoro'
+    | 'habits'
+    | 'storage';
+
+export interface EcosystemDef {
+    key: EcosystemKey;
+    id: string;
+    icon: GlassIconName;
+    img?: Img;
+    color: string;
+}
+
+export const ecosystemModules: EcosystemDef[] = [
+    { key: 'gpa', id: 'gpa-tracker', icon: 'gpa', img: images['bento-gpa'], color: '#0284c7' },
+    { key: 'career', id: 'ai-advisor', icon: 'ai', img: images['story-ai'], color: '#8b5cf6' },
+    { key: 'cv', id: 'ai-advisor', icon: 'cv', img: images['story-ai-sub'], color: '#06b6d4' },
+    { key: 'finance', id: 'finance', icon: 'finance', img: images['story-finance'], color: '#10b981' },
+    { key: 'google', id: 'google-ecosystem', icon: 'sync', img: images['story-google'], color: '#f59e0b' },
+    { key: 'kanban', id: 'schedule', icon: 'kanban', img: images['story-kanban'], color: '#3b82f6' },
+    { key: 'journal', id: 'journal', icon: 'journal', img: images['bento-journal'], color: '#ec4899' },
+    { key: 'pomodoro', id: 'focus-music', icon: 'focus', img: images['bento-focus'], color: '#f97316' },
+    { key: 'habits', id: 'habit-tracker', icon: 'habit', img: images['bento-habit'], color: '#eab308' },
+    { key: 'storage', id: 'secure-storage', icon: 'storage', img: images['bento-storage'], color: '#6366f1' }
+];
+
