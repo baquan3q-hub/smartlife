@@ -19,10 +19,10 @@ interface HeaderProps {
     goTo: (target: string | number) => void;
 }
 
-const SPY_IDS = ['top', 'dashboard-preview', 'google-ecosystem'];
+const SPY_IDS = ['day', 'sync-engine', 'companion'];
 
 export const Header: React.FC<HeaderProps> = ({ c, page, lang, onToggleLang, onInstall, onLogin, onNavigate, scrollTo, goTo }) => {
-    const { scrollY } = useScroll();
+    const { scrollY, scrollYProgress } = useScroll();
     const [scrolled, setScrolled] = useState(false);
     const spy = useScrollSpy(SPY_IDS);
     const active = page === 'home' ? spy : page;
@@ -30,9 +30,9 @@ export const Header: React.FC<HeaderProps> = ({ c, page, lang, onToggleLang, onI
     useMotionValueEvent(scrollY, 'change', (v) => setScrolled(v > 24));
 
     const items: { label: string; spy?: string; onClick: () => void }[] = [
-        { label: c.nav.home, spy: 'top', onClick: () => goTo(0) },
-        { label: c.nav.overview, spy: 'dashboard-preview', onClick: () => goTo('dashboard-preview') },
-        { label: c.nav.google, spy: 'google-ecosystem', onClick: () => goTo('google-ecosystem') },
+        { label: c.nav.overview, spy: 'day', onClick: () => goTo('day') },
+        { label: c.nav.google, spy: 'sync-engine', onClick: () => goTo('sync-engine') },
+        { label: c.nav.ai, spy: 'companion', onClick: () => goTo('companion') },
         { label: c.nav.features, spy: 'features', onClick: () => (page === 'features' ? scrollTo(0) : onNavigate('features')) },
         { label: c.nav.pricing, spy: 'pricing', onClick: () => (page === 'pricing' ? scrollTo(0) : onNavigate('pricing')) },
         { label: c.nav.contact, spy: 'contact', onClick: () => (page === 'contact' ? scrollTo(0) : onNavigate('contact')) }
@@ -40,6 +40,13 @@ export const Header: React.FC<HeaderProps> = ({ c, page, lang, onToggleLang, onI
 
     return (
         <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-3 sm:px-4">
+            {page === 'home' && (
+                <motion.div
+                    aria-hidden
+                    style={{ scaleX: scrollYProgress }}
+                    className="absolute inset-x-0 top-0 h-[2px] origin-left bg-[var(--l-warm)]"
+                />
+            )}
             <div
                 className={`mt-0 flex w-full items-center justify-between gap-3 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                     scrolled
@@ -50,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({ c, page, lang, onToggleLang, onI
                 <button
                     type="button"
                     onClick={() => goTo(0)}
-                    className="flex shrink-0 items-center gap-2.5 rounded-full pr-2"
+                    className="flex shrink-0 items-center gap-2 rounded-full pr-1 sm:gap-2.5 sm:pr-2"
                     aria-label="SmartLife"
                 >
                     <img src="/pwa-192x192.png" alt="" className="h-8 w-8 rounded-[10px] border border-zinc-900/5" />
@@ -82,11 +89,11 @@ export const Header: React.FC<HeaderProps> = ({ c, page, lang, onToggleLang, onI
                     })}
                 </nav>
 
-                <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
                     <button
                         type="button"
                         onClick={onToggleLang}
-                        className="flex h-10 items-center gap-1.5 rounded-full px-3 text-xs font-medium uppercase tracking-wider text-zinc-600 transition-colors hover:bg-zinc-900/5 hover:text-zinc-950"
+                        className="flex h-10 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium uppercase sm:px-3 tracking-wider text-zinc-600 transition-colors hover:bg-zinc-900/5 hover:text-zinc-950"
                         title={c.langName}
                     >
                         <Globe size={16} />
@@ -95,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({ c, page, lang, onToggleLang, onI
                     <button
                         type="button"
                         onClick={onInstall}
-                        className="flex h-10 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-900/5 hover:text-zinc-950"
+                        className="flex h-10 items-center gap-1.5 rounded-full px-2.5 text-sm font-medium text-zinc-700 sm:px-3 transition-colors hover:bg-zinc-900/5 hover:text-zinc-950"
                         title={c.install}
                     >
                         <Download size={16} />
@@ -104,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({ c, page, lang, onToggleLang, onI
                     <button
                         type="button"
                         onClick={onLogin}
-                        className="h-10 rounded-full bg-zinc-950 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+                        className="h-10 whitespace-nowrap rounded-full bg-zinc-950 px-3.5 text-sm font-medium text-white sm:px-4 transition-colors hover:bg-zinc-800"
                     >
                         {c.login}
                     </button>

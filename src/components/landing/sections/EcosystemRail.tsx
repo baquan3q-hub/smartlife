@@ -1,11 +1,10 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { motion, useScroll, useSpring, useTransform } from 'motion/react';
-import { ArrowRight, Compass, Sparkles, ChevronRight, Layers } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import { motion, useMotionValue, useScroll, useSpring, useTransform } from 'motion/react';
+import { ChevronRight } from 'lucide-react';
 import { LandingCopy } from '../i18n';
 import { ecosystemModules } from '../data';
 import { GlassIcon } from '../../icons/GlassIcon';
 import { ResponsiveImage } from '../motion/Media';
-import { TiltCard } from '../motion/TiltCard';
 
 interface EcosystemRailProps {
     c: LandingCopy;
@@ -15,7 +14,8 @@ interface EcosystemRailProps {
 export const EcosystemRail: React.FC<EcosystemRailProps> = ({ c, scrollTo }) => {
     const containerRef = useRef<HTMLElement>(null);
     const railRef = useRef<HTMLDivElement>(null);
-    const [overflowDist, setOverflowDist] = useState(0);
+    // How far the rail must travel; a motion value so the transform below always reads the latest width.
+    const overflowDist = useMotionValue(0);
 
     const { scrollYProgress } = useScroll({
         target: containerRef,
@@ -25,21 +25,22 @@ export const EcosystemRail: React.FC<EcosystemRailProps> = ({ c, scrollTo }) => 
     const smoothP = useSpring(scrollYProgress, { stiffness: 90, damping: 26, mass: 0.3 });
 
     useEffect(() => {
-        const updateWidth = () => {
-            if (railRef.current) {
-                const scrollW = railRef.current.scrollWidth;
-                const clientW = window.innerWidth;
-                const diff = Math.max(0, scrollW - clientW + 96);
-                setOverflowDist(diff);
-            }
+        const rail = railRef.current;
+        if (!rail) return;
+        const update = () => overflowDist.set(Math.max(0, rail.scrollWidth - window.innerWidth + 96));
+        update();
+        const ro = new ResizeObserver(update);
+        ro.observe(rail);
+        window.addEventListener('resize', update);
+        return () => {
+            ro.disconnect();
+            window.removeEventListener('resize', update);
         };
-        updateWidth();
-        window.addEventListener('resize', updateWidth);
-        return () => window.removeEventListener('resize', updateWidth);
-    }, []);
+    }, [overflowDist]);
 
     // Drive horizontal translation from vertical scroll progress
-    const railX = useTransform(smoothP, [0.05, 0.92], [0, -overflowDist]);
+    const travel = useTransform(smoothP, [0.05, 0.92], [0, 1]);
+    const railX = useTransform(() => -travel.get() * overflowDist.get());
     const progressWidth = useTransform(smoothP, [0, 1], ['0%', '100%']);
 
     const copy = c.ecosystem;
@@ -48,33 +49,15 @@ export const EcosystemRail: React.FC<EcosystemRailProps> = ({ c, scrollTo }) => 
         <section
             ref={containerRef}
             id="ecosystem"
-            className="relative min-h-[280vh] bg-zinc-950 text-white selection:bg-sky-500 selection:text-white"
+            className="relative bg-[var(--l-night)] py-20 text-white selection:bg-sky-500 selection:text-white md:min-h-[280vh] md:py-0"
         >
             {/* Sticky Viewport Container */}
-            <div className="sticky top-0 flex h-screen flex-col justify-center overflow-hidden py-8">
-                {/* Background Subtle Gradient Grid */}
-                <div
-                    className="pointer-events-none absolute inset-0 opacity-20"
-                    style={{
-                        backgroundImage: 'radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1px)',
-                        backgroundSize: '28px 28px'
-                    }}
-                    aria-hidden
-                />
-                <div
-                    className="pointer-events-none absolute -top-40 left-1/3 h-96 w-[600px] rounded-full blur-3xl opacity-25"
-                    style={{ background: 'radial-gradient(circle, rgba(2,132,199,0.5), transparent 70%)' }}
-                    aria-hidden
-                />
-
+            <div className="flex flex-col justify-center overflow-hidden md:sticky md:top-0 md:h-screen md:py-8">
                 {/* Header Information */}
-                <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6 mb-8 sm:mb-12">
+                <div className="relative mx-auto mb-8 w-full max-w-[1240px] px-4 sm:mb-12 sm:px-6">
                     <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                         <div>
-                            <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-500/10 px-3.5 py-1 text-xs font-semibold text-sky-400">
-                                <Compass size={13} />
-                                <span>{copy.eyebrow}</span>
-                            </div>
+                            <p className="l-mono text-zinc-400">{copy.eyebrow}</p>
                             <h2 className="l-h2 mt-3 text-white max-w-2xl">
                                 {copy.title}
                             </h2>
@@ -89,10 +72,10 @@ export const EcosystemRail: React.FC<EcosystemRailProps> = ({ c, scrollTo }) => 
                         <div className="h-1 flex-1 bg-white/10 rounded-full overflow-hidden">
                             <motion.div
                                 style={{ width: progressWidth }}
-                                className="h-full bg-gradient-to-r from-sky-400 via-indigo-400 to-emerald-400 rounded-full"
+                                className="h-full rounded-full bg-[var(--l-warm)]"
                             />
                         </div>
-                        <span className="text-xs font-mono text-zinc-400 shrink-0">10 Modules • Lateral Travel</span>
+                        <span className="l-mono shrink-0 text-zinc-500">{String(ecosystemModules.length).padStart(2, '0')}</span>
                     </div>
                 </div>
 
@@ -102,14 +85,13 @@ export const EcosystemRail: React.FC<EcosystemRailProps> = ({ c, scrollTo }) => 
                     <motion.div
                         ref={railRef}
                         style={{ x: railX }}
-                        className="hidden md:flex gap-6 pl-[max(2rem,calc((100vw-72rem)/2+1.5rem))] pr-16 items-stretch"
+                        className="hidden md:flex gap-6 pl-[max(2rem,calc((100vw-1240px)/2+1.5rem))] pr-16 items-stretch"
                     >
-                        {ecosystemModules.map((item, idx) => {
+                        {ecosystemModules.map((item) => {
                             const modCopy = copy.items[item.key];
                             return (
                                 <article
                                     key={item.key}
-                                    id={item.id}
                                     className="group relative flex w-[380px] shrink-0 flex-col justify-between overflow-hidden rounded-[26px] border border-white/10 bg-zinc-900/90 p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-white/25 hover:bg-zinc-900"
                                 >
                                     {/* Top Tag & Glass Icon */}
@@ -148,14 +130,13 @@ export const EcosystemRail: React.FC<EcosystemRailProps> = ({ c, scrollTo }) => 
                                     </div>
 
                                     {/* Micro Action */}
-                                    <div className="mt-5 flex items-center justify-between border-t border-white/5 pt-3 text-xs text-zinc-400">
-                                        <span className="font-medium text-zinc-500">Life OS Native</span>
-                                        <button
+                                    <div className="mt-5 flex items-center justify-end border-t border-white/5 pt-3 text-xs text-zinc-400">
+                                                                                <button
                                             type="button"
                                             onClick={() => scrollTo(item.id)}
                                             className="inline-flex items-center gap-1 font-semibold text-sky-400 hover:text-sky-300 transition-colors"
                                         >
-                                            Chi tiết
+                                            {c.ui.detail}
                                             <ChevronRight size={13} />
                                         </button>
                                     </div>

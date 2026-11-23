@@ -1,5 +1,5 @@
 import type { GlassIconName } from '../icons/glassIcons';
-import type { BentoKey, MarqueeKey, StoryKey } from './i18n';
+import type { BentoKey, MarqueeKey, ProblemApp, StoryKey } from './i18n';
 import { images } from './media.gen';
 import type { Img } from './motion/Media';
 
@@ -109,3 +109,24 @@ export const ecosystemModules: EcosystemDef[] = [
     { key: 'storage', id: 'secure-storage', icon: 'storage', img: images['bento-storage'], color: '#6366f1' }
 ];
 
+
+// The scattered apps a student juggles before SmartLife, with where each tile starts (% offset from the stage centre).
+export const problemApps: { key: ProblemApp; icon: GlassIconName; x: number; y: number }[] = [
+    { key: 'notes', icon: 'sticky', x: -34, y: -30 },
+    { key: 'timetable', icon: 'schedule', x: 4, y: -40 },
+    { key: 'sheet', icon: 'chart', x: 34, y: -26 },
+    { key: 'todo', icon: 'tasks', x: 40, y: 6 },
+    { key: 'music', icon: 'music', x: 28, y: 34 },
+    { key: 'timer', icon: 'timer', x: -6, y: 40 },
+    { key: 'diary', icon: 'book', x: -36, y: 26 },
+    { key: 'gpa', icon: 'gpa', x: -42, y: -2 }
+];
+
+// The day runs morning → night; each chapter reuses a story (copy + screenshots) and keeps its old anchor id.
+export const dayOrder: StoryKey[] = ['kanban', 'google', 'finance', 'ai'];
+export const dayGround: Record<StoryKey, string> = {
+    kanban: '#f6f4ef',
+    google: '#ffffff',
+    finance: '#efe7da',
+    ai: '#0b0d12'
+};
