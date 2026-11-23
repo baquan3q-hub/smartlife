@@ -748,14 +748,24 @@ html.dark .kanban-column {
    Landing page (src/components/landing)
    ==================================== */
 .landing {
-  --l-bg: #fafafa;
+  /* Ground colours follow the hours of a student's day: one warm ground, white, sand, night. */
+  --l-bg: #f6f4ef;
+  --l-dawn: #f6f4ef;
+  --l-day: #ffffff;
+  --l-dusk: #efe7da;
+  --l-night: #0b0d12;
   --l-surface: #ffffff;
   --l-border: rgba(24, 24, 27, 0.08);
-  --l-text: #09090b;
+  --l-text: #0b0b0c;
   --l-muted: #52525b;
   --l-subtle: #71717a;
   --l-accent: #0284c7;
+  /* The one warm accent: used for the clock and time marks only. */
+  --l-warm: #e8890c;
   --l-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --l-r-sm: 12px;
+  --l-r-md: 20px;
+  --l-r-lg: 28px;
   font-family: 'Inter', 'Roboto', system-ui, sans-serif;
   font-feature-settings: 'cv11', 'ss01';
   background: var(--l-bg);
@@ -763,18 +773,42 @@ html.dark .kanban-column {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Display type: roughly 6-7x body. Line-height stays above 1 so Vietnamese stacked marks (ể, ỗ) are not clipped. */
+.landing .l-display {
+  font-size: clamp(3rem, 7.4vw, 7rem);
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+  font-weight: 650;
+}
+
 .landing .l-h1 {
-  font-size: clamp(2.5rem, 6vw, 4.75rem);
+  font-size: clamp(2.75rem, 6.5vw, 5.5rem);
   line-height: 1.04;
   letter-spacing: -0.045em;
   font-weight: 600;
 }
 
 .landing .l-h2 {
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1.1;
-  letter-spacing: -0.035em;
+  font-size: clamp(2.25rem, 4.6vw, 3.75rem);
+  line-height: 1.06;
+  letter-spacing: -0.04em;
   font-weight: 600;
+}
+
+/* Small mono label: section numbers, times, metadata. */
+.landing .l-mono {
+  font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.landing .l-clock {
+  font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.06em;
+  font-weight: 500;
 }
 
 .landing .l-h3 {
@@ -914,3 +948,59 @@ html.dark .journal-prose font[color="#1F2937"] { color: inherit; }
   .ui-shake { animation: none; }
 }
 html.dark .ui-zinc .ring-zinc-900\/15 { --tw-ring-color: rgba(148, 163, 184, 0.35); }
+
+/* Sticky Notes: thanh cuộn siêu mảnh, chỉ hiện khi rê chuột vào */
+.sticky-scroll {
+  scrollbar-gutter: stable;
+}
+.sticky-scroll::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+.sticky-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.sticky-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sticky-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+.sticky-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.28);
+}
+.dark .sticky-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* AI đồng hành: con trỏ nhấp nháy cuối đoạn chữ đang stream, nhãn "đang suy nghĩ" lấp lánh */
+@keyframes ai-caret-blink { 0%, 45% { opacity: 1; } 55%, 100% { opacity: 0; } }
+.ai-streaming > :is(p, h1, h2, h3, h4, h5, h6, blockquote, pre):last-child::after,
+.ai-streaming > :is(ul, ol):last-child > li:last-child::after {
+  content: '\258D';
+  display: inline-block;
+  margin-left: 2px;
+  font-weight: 400;
+  color: #3b82f6;
+  animation: ai-caret-blink 1s steps(1) infinite;
+}
+@keyframes ai-shimmer { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+.ai-shimmer-text {
+  background-image: linear-gradient(90deg, #6b7280 0%, #6b7280 38%, #d1d5db 50%, #6b7280 62%, #6b7280 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ai-shimmer 1.8s linear infinite;
+}
+html.dark .ai-shimmer-text {
+  background-image: linear-gradient(90deg, #94a3b8 0%, #94a3b8 38%, #f1f5f9 50%, #94a3b8 62%, #94a3b8 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-shimmer-text { animation: none; }
+  .ai-streaming > :is(p, h1, h2, h3, h4, h5, h6, blockquote, pre):last-child::after,
+  .ai-streaming > :is(ul, ol):last-child > li:last-child::after { animation: none; }
+}

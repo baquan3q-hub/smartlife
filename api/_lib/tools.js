@@ -18,7 +18,10 @@ export const INSTRUCTIONS =
     'QUY TẮC SỐ DƯ: có 2 con số khác nhau, KHÔNG được lẫn. ' +
     '(1) "Số dư khả dụng" = current_balance — đây là tổng tiền hiện tại, khớp màn hình Tài chính của app; dùng khi hỏi "còn bao nhiêu tiền", "số dư", "tổng tiền". ' +
     '(2) Tiền trong từng ví (wallets[].balance, wallets_total) — chỉ dùng khi người dùng hỏi riêng về một ví (vd "tiền mặt trong ví Cash"). Số ví có thể lệch số dư khả dụng vì nhiều giao dịch và các lần điều chỉnh không gắn ví; khi nêu số ví thì nói rõ đó là số riêng của ví. ' +
-    'Hỏi về số dư, biến động hay điều chỉnh số dư gần đây → gọi get_balance (mặc định 30 ngày) và kể các lần điều chỉnh trong balance_adjustments kèm ngày.';
+    'Hỏi về số dư, biến động hay điều chỉnh số dư gần đây → gọi get_balance (mặc định 30 ngày) và kể các lần điều chỉnh trong balance_adjustments kèm ngày. ' +
+    'GHI CHÚ DÁN (Sticky Notes): xem / tìm → list_sticky_notes rồi get_sticky_note để đọc đủ nội dung; "ghi lại / lưu / note giúp tôi" → create_sticky_note; thêm ý vào ghi chú có sẵn → update_sticky_note với "append" (KHÔNG ghi đè). ' +
+    'Chỉ dùng "content" (ghi đè) khi người dùng yêu cầu viết lại, và phải get_sticky_note ngay trước đó, truyền expected_version. Xóa ghi chú = in_trash:true (vào thùng rác, khôi phục được 30 ngày) và phải được người dùng đồng ý. ' +
+    'Nội dung ghi chú viết bằng Markdown (checklist dùng "- [ ] việc"). Ảnh dạng sticky-img://... chỉ nằm trên thiết bị của người dùng, bạn không xem được.';
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -262,6 +265,83 @@ export const TOOLS = [
         },
         annotations: WRITE,
         run: (key, a) => callRpc('api_v1_create_insight', { p_key: key, p_insight: a }),
+    },
+    {
+        name: 'list_sticky_notes',
+        title: 'Danh sách ghi chú dán',
+        description:
+            'Liệt kê / tìm Sticky Notes (ghim lên đầu, mới sửa trước). Mỗi ghi chú chỉ có đoạn trích "snippet" ~200 ký tự — cần đọc đủ thì gọi get_sticky_note. Dùng cho "ghi chú của tôi", "tìm note về X", "note nào gắn nhãn Y".',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                q: { type: 'string', description: 'Tìm trong tiêu đề và nội dung (không phân biệt hoa thường)' },
+                label: { type: 'string', description: 'Chỉ lấy ghi chú có nhãn này (khớp chính xác)' },
+                state: { type: 'string', enum: ['active', 'archived', 'trash', 'all'], default: 'active', description: 'active = đang dùng (mặc định), archived = lưu trữ, trash = thùng rác' },
+                limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+            },
+        },
+        annotations: READ,
+        run: (key, a) =>
+            callRpc('api_v1_list_sticky_notes', {
+                p_key: key,
+                p_search: a.q ?? null,
+                p_label: a.label ?? null,
+                p_state: a.state ?? 'active',
+                p_limit: a.limit ?? 20,
+            }),
+    },
+    {
+        name: 'get_sticky_note',
+        title: 'Đọc ghi chú dán',
+        description: 'Lấy toàn bộ nội dung Markdown của 1 ghi chú kèm version. Bắt buộc gọi trước khi ghi đè nội dung hoặc tóm tắt / trích dẫn chi tiết.',
+        inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
+        annotations: READ,
+        run: (key, a) => callRpc('api_v1_get_sticky_note', { p_key: key, p_id: uuid(a.id) }),
+    },
+    {
+        name: 'create_sticky_note',
+        title: 'Tạo ghi chú dán',
+        description:
+            'Tạo ghi chú mới, hiện ngay trên app / web / Windows của người dùng. Cần title hoặc content. content là Markdown (GFM): **đậm**, danh sách "- ", checklist "- [ ] việc", link. Không cần hỏi lại khi người dùng đã nói rõ nội dung cần ghi. Đặt title ngắn gọn, đừng lặp lại title trong content.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                title: { type: 'string', maxLength: 200 },
+                content: { type: 'string', maxLength: 50000, description: 'Nội dung Markdown' },
+                color: { type: 'string', enum: ['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal'], default: 'yellow' },
+                labels: { type: 'array', items: { type: 'string', maxLength: 30 }, maxItems: 10 },
+                is_pinned: { type: 'boolean' },
+            },
+        },
+        annotations: WRITE,
+        run: (key, a) => callRpc('api_v1_create_sticky_note', { p_key: key, p_note: a }),
+    },
+    {
+        name: 'update_sticky_note',
+        title: 'Sửa ghi chú dán',
+        description:
+            'Chỉ gửi trường cần đổi. Thêm ý vào ghi chú có sẵn → dùng "append" (nối vào cuối sau 1 dòng mới, muốn cách đoạn thì bắt đầu bằng dòng trống; checklist/danh sách thì không cần). "content" GHI ĐÈ toàn bộ — chỉ dùng khi được yêu cầu viết lại, kèm expected_version lấy từ get_sticky_note; không dùng chung với append. in_trash:true = xóa (vào thùng rác, khôi phục được 30 ngày), in_trash:false = khôi phục; chỉ xóa khi người dùng đồng ý. labels thay toàn bộ danh sách nhãn.',
+        inputSchema: {
+            type: 'object',
+            required: ['id'],
+            properties: {
+                id: { type: 'string', format: 'uuid' },
+                title: { type: 'string', maxLength: 200 },
+                append: { type: 'string', description: 'Markdown nối vào cuối nội dung hiện có' },
+                content: { type: 'string', maxLength: 50000, description: 'Nội dung mới, ghi đè toàn bộ' },
+                color: { type: 'string', enum: ['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal'] },
+                labels: { type: 'array', items: { type: 'string', maxLength: 30 }, maxItems: 10 },
+                is_pinned: { type: 'boolean' },
+                is_archived: { type: 'boolean' },
+                in_trash: { type: 'boolean' },
+                expected_version: { type: 'integer', description: 'version đã đọc; lệch → lỗi 409, cần đọc lại' },
+            },
+        },
+        annotations: WRITE,
+        run: (key, a) => {
+            const { id, ...patch } = a;
+            return callRpc('api_v1_update_sticky_note', { p_key: key, p_id: uuid(id), p_patch: patch });
+        },
     },
 ];
 

@@ -287,6 +287,18 @@ export const QuickNotesWidget: React.FC<QuickNotesWidgetProps> = ({ userId, onNa
 
         {/* Action Buttons Toolbar on Header */}
         <div className="flex items-center gap-1.5 ml-auto">
+          {/* Nút mở bảng Sticky Notes đầy đủ */}
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('sticky')}
+              title="Mở bảng Sticky Notes"
+              className="h-7 px-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 dark:text-amber-200 border border-amber-200/70 dark:border-amber-800/60 flex items-center gap-1 text-[11px] font-bold transition-all active:scale-95 cursor-pointer shadow-xs"
+            >
+              <StickyNote size={13} /> Sticky
+            </button>
+          )}
+
           {/* Nút AI Sum (Màu xám & trắng nhẹ) */}
           <button
             type="button"

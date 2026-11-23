@@ -1,0 +1,114 @@
+1
+00:00:00,000 --> 00:00:05,208
+Wake up, Leo! We have an important meeting in ten minutes.
+Dậy đi Leo! Mười phút nữa là bọn mình có cuộc họp quan trọng rồi đấy.
+
+2
+00:00:06,008 --> 00:00:10,664
+Ugh, I need coffee right now. Let me order.
+Ôi trời, tớ cần cà phê ngay lập tức. Để tớ đi gọi nước.
+
+3
+00:00:11,464 --> 00:00:13,864
+Good morning! What can I get for you today?
+Chào buổi sáng! Bạn muốn gọi món gì hôm nay ạ?
+
+4
+00:00:14,664 --> 00:00:19,248
+Good morning! Can I get one iced latte, please?
+Chào buổi sáng! Cho tôi một ly latte đá với?
+
+5
+00:00:20,048 --> 00:00:24,824
+Sure thing! What size would you like? Small, medium, or large?
+Dạ được chứ! Bạn chọn kích cỡ nào? Nhỏ, vừa hay lớn?
+
+6
+00:00:25,624 --> 00:00:30,784
+I am super sleepy today. Give me the biggest one you have!
+Hôm nay tôi buồn ngủ quá. Cho tôi cốc bự nhất các bạn có luôn!
+
+7
+00:00:31,784 --> 00:00:35,984
+Haha, you got it! One Extra-Giant Latte coming right up!
+Haha, có ngay! Một ly Latte Siêu Khổng Lồ nhé!
+
+8
+00:00:37,184 --> 00:00:41,696
+Here is your drink, sir! For here or to go?
+Đồ uống của bạn đây ạ! Dùng tại quán hay mang về?
+
+9
+00:00:42,696 --> 00:00:49,344
+Oh my gosh! This is huge! I think I need a bucket to take it home!
+Ôi trời đất ơi! To thế này! Chắc tôi cần một cái xô mới mang về nổi!
+
+10
+00:00:50,144 --> 00:00:55,688
+Haha, Leo! On second thought, maybe share half of that with me?
+Haha, Leo ơi! Nghĩ lại thì, hay là chia một nửa cho tớ nhé?
+
+11
+00:00:57,188 --> 00:01:08,660
+Chào các bạn! Vừa rồi Leo đã có một trải nghiệm gọi món thật hài hước. Bây giờ, hãy cùng Mia bóc tách ba cụm từ giao tiếp tự nhiên nhất mà người bản xứ hay dùng nhé!
+Chào các bạn! Hãy cùng bóc tách 3 cụm từ giao tiếp tự nhiên nhất!
+
+12
+00:01:09,860 --> 00:01:13,124
+Phrase number one: What can I get for you?
+Cụm từ số một: What can I get for you?
+
+13
+00:01:13,924 --> 00:01:28,180
+Đây là cách nhân viên bán hàng hỏi: 'Bạn muốn gọi món gì?' lịch sự và tự nhiên hơn rất nhiều so với câu 'What do you want?'. Khi trả lời, bạn chỉ cần nói: 'Can I get...' kèm tên món đồ bạn muốn.
+Cách hỏi gọi món lịch sự. Trả lời: Can I get + tên món.
+
+14
+00:01:29,380 --> 00:01:32,812
+Phrase number two: For here or to go?
+Cụm từ số hai: For here or to go?
+
+15
+00:01:33,612 --> 00:01:42,732
+Dùng ở quán hay mang về? Bạn chỉ cần đáp nhanh: 'For here, please' nếu ngồi lại, hoặc 'To go, please' nếu muốn đem đi nhé!
+Dùng ở quán: For here, please. Mang về: To go, please.
+
+16
+00:01:43,932 --> 00:01:47,196
+Phrase number three: On second thought...
+Cụm từ số ba: On second thought...
+
+17
+00:01:47,996 --> 00:01:57,860
+Cụm này nghĩa là: 'Nghĩ lại thì...'. Dùng ngay khi bạn vừa nói điều gì đó nhưng muốn đổi ý định. Rất tự nhiên và giống hệt người bản ngữ!
+Nghĩa là: Nghĩ lại thì... (dùng khi muốn đổi ý).
+
+18
+00:01:59,360 --> 00:02:09,488
+Bây giờ đến phần quan trọng nhất: Thực hành phản xạ! Bạn sẽ đóng vai Leo để trò chuyện cùng Barista. Hãy đọc to khi đồng hồ đếm ngược nhé!
+Đến lượt bạn đóng vai Leo! Đọc to khi đồng hồ đếm ngược nhé!
+
+19
+00:02:10,488 --> 00:02:14,280
+Good morning! What can I get for you today?
+Chào buổi sáng! Bạn muốn gọi món gì hôm nay ạ?
+
+20
+00:02:17,280 --> 00:02:19,344
+For here or to go?
+Dùng tại quán hay mang về ạ?
+
+21
+00:02:22,344 --> 00:02:27,960
+Tuyệt vời! Bạn vừa hoàn thành xuất sắc đoạn hội thoại gọi món đầu tiên!
+Tuyệt vời! Bạn vừa hoàn thành bài tập phản xạ!
+
+22
+00:02:29,160 --> 00:02:34,440
+Quick quiz time! When you want to change your mind, what do you say?
+Câu hỏi nhanh! Khi muốn đổi ý, bạn sẽ nói cụm từ nào?
+
+23
+00:02:35,240 --> 00:02:47,744
+Đáp án là B: On second thought! Hãy bình luận bên dưới xem bạn làm đúng không nhé. Nhớ bấm đăng ký kênh để đón xem Tập 2: Buổi phỏng vấn xin việc của Leo!
+Đáp án là B! Hãy đăng ký kênh để đón xem Tập 2 nhé!

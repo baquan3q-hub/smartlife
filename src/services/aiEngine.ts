@@ -4,14 +4,22 @@
 
 import { supabase } from './supabase';
 import {
-    callGeminiRaw, enqueue, buildFullContext, buildFullContextAsync,
+    callGeminiRaw, streamGeminiRaw, enqueue, buildFullContext, buildFullContextAsync,
     buildProfileContext, buildFinanceContext, buildGoalsContext,
     buildScheduleContext, buildGPAContext, buildHabitContext,
     buildCountdownContext, buildJournalContext,
-    SYSTEM_INSTRUCTION,
+    proxyHeaders,
     estimateGeminiCost,
-    type ChatMessage, type MessagePart, type ToolDeclaration
+    type ChatMessage, type MessagePart, type ToolDeclaration, type AITier, type StreamMeta
 } from './geminiService';
+import { createResponseAccumulator } from './ai/streamParser';
+import { describeToolCall, describeToolResult } from './ai/toolLabels';
+import { toolsFor } from './ai/toolDeclarations';
+import { buildSystemPrompt } from './ai/promptBlocks';
+import { getExpert, type ExpertId } from './ai/experts';
+import { normalizeAskUser, maxClarifyRounds, countWrites, BULK_WRITE_LIMIT, type ClarifyRequest } from './ai/clarify';
+import { fetchWebSearch, mergeSearchSources, MAX_WEB_SEARCHES, WEB_SEARCH_LIMIT_ERROR, type WebSource } from './ai/webSearch';
+import type { CompanionProfile } from './ai/companion/types';
 import { AppState } from '../types';
 import {
     computeAllCourses, calculateSemesterGPA, calculateCumulativeGPA,
@@ -35,12 +43,80 @@ export interface ActionResult {
     data?: any;
 }
 
+// Một bước AI làm trong lúc trả lời (gọi công cụ) — hiện trong ThinkingPanel
+export interface AIStep {
+    id: string;
+    tool: string;
+    label: string;
+    status: 'running' | 'done' | 'error';
+    detail?: string;
+    startedAt: number;
+    endedAt?: number;
+}
+
+// Thông tin về một lượt trả lời, lưu vào ai_messages.meta
+export interface AIRunMeta {
+    model?: string;
+    tier?: string;
+    weight?: number;
+    thoughts?: string;
+    steps?: AIStep[];
+    durationMs?: number;
+    stopped?: boolean;
+    error?: string;
+    /** Chuyên gia đang chọn ở lượt này */
+    expert?: ExpertId;
+    /** true nếu tầng do chế độ Auto chọn */
+    auto?: boolean;
+    /** Lĩnh vực router đoán được */
+    domain?: ExpertId;
+    /** AI dừng lại để hỏi người dùng (ask_user) */
+    clarification?: ClarifyRequest;
+    /** Nguồn web đã dùng (web_search), đánh số liên tục [1], [2]… */
+    sources?: WebSource[];
+}
+
+// Sự kiện engine phát ra trong lúc trả lời để UI hiện ngay
+export type AIStreamEvent =
+    | { type: 'meta'; meta: StreamMeta }
+    | { type: 'text'; delta: string }
+    | { type: 'thought'; delta: string }
+    | { type: 'step'; step: AIStep }
+    | { type: 'chart'; chart: ChartData }
+    | { type: 'action'; action: ActionResult }
+    | { type: 'clarify'; request: ClarifyRequest }
+    | { type: 'sources'; sources: WebSource[] };
+
+export interface ChatOptions {
+    tier?: AITier;
+    onEvent?: (event: AIStreamEvent) => void;
+    /** Chế độ chuyên gia (mặc định 'general') */
+    expert?: ExpertId;
+    /** Tầng do Auto chọn (chỉ để ghi vào meta) */
+    auto?: boolean;
+    /** Lĩnh vực router đoán — chế độ Chung dùng để nạp khối kiến thức phù hợp */
+    domain?: ExpertId;
+    /** Câu hỏi có dấu hiệu khủng hoảng → nạp giao thức an toàn */
+    crisis?: boolean;
+    /** Chữ câu hỏi hiện tại (để chọn khối prompt, làm bối cảnh tìm web) */
+    userText?: string;
+    /** Số vòng hỏi lại đã dùng liên tiếp cho câu hỏi này */
+    clarifyRoundsUsed?: number;
+    /** Người dùng vừa trả lời thẻ xác nhận ghi hàng loạt */
+    confirmedBulk?: boolean;
+    /** Bật công cụ web_search (mặc định bật) */
+    webSearch?: boolean;
+    /** Hồ sơ bạn AI — dùng khi expert = 'companion' */
+    companion?: CompanionProfile | null;
+}
+
 export interface AIResponse {
     text: string;
     charts: ChartData[];
     actions: ActionResult[];
     updatedHistory?: ChatMessage[];
     tokens_used?: number;
+    meta?: AIRunMeta;
 }
 
 // Action handlers passed from App.tsx
@@ -55,441 +131,6 @@ export interface ActionHandlers {
     onUpdateCalendarEvent?: (event: any) => Promise<void>;
     onDeleteCalendarEvent?: (id: string) => Promise<void>;
 }
-
-// ────────────────────────────────────────
-// Tool Declarations for Gemini Function Calling
-// ────────────────────────────────────────
-const TOOL_DECLARATIONS: ToolDeclaration[] = [
-    {
-        name: 'query_database',
-        description: 'Truy vấn dữ liệu chi tiết từ database Supabase. Dùng khi cần lọc, phân tích dữ liệu cụ thể ngoài context tóm tắt để cá nhân hóa. Các bảng khả dụng: transactions (giao dịch), goals (mục tiêu), budgets (ngân sách), timetable (lịch trình), todos (việc cần làm), profiles (hồ sơ), calendar_events (sự kiện lịch), wallets (danh sách ví), debts (khoản nợ và cho vay), debt_repayments (lịch sử trả nợ).',
-        parameters: {
-            type: 'object',
-            properties: {
-                table: {
-                    type: 'string',
-                    description: 'Tên bảng cần truy vấn',
-                    enum: ['transactions', 'goals', 'budgets', 'timetable', 'todos', 'profiles', 'calendar_events', 'gpa_semesters', 'gpa_courses', 'habits', 'habit_logs', 'countdown_items', 'countup_items', 'journal_entries', 'journal_tags', 'wallets', 'debts', 'debt_repayments', 'my_storage']
-                },
-                select: {
-                    type: 'string',
-                    description: 'Các cột cần lấy, mặc định "*". VD: "amount,category,date"'
-                },
-                filters: {
-                    type: 'object',
-                    description: 'Bộ lọc dạng {column: value}. VD: {"type": "expense", "category": "Ăn uống"}'
-                },
-                date_from: {
-                    type: 'string',
-                    description: 'Lọc từ ngày (inclusive). Format: YYYY-MM-DD'
-                },
-                date_to: {
-                    type: 'string',
-                    description: 'Lọc đến ngày (inclusive). Format: YYYY-MM-DD'
-                },
-                order_by: {
-                    type: 'string',
-                    description: 'Cột sắp xếp. VD: "date" hoặc "amount"'
-                },
-                ascending: {
-                    type: 'boolean',
-                    description: 'true = tăng dần, false = giảm dần. Mặc định false.'
-                },
-                limit: {
-                    type: 'integer',
-                    description: 'Số record tối đa. Mặc định 50, tối đa 200.'
-                }
-            },
-            required: ['table']
-        }
-    },
-    {
-        name: 'add_timetable',
-        description: 'Thêm sự kiện mới vào lịch trình cố định hàng tuần. Xác nhận với người dùng trước khi thêm.',
-        parameters: {
-            type: 'object',
-            properties: {
-                title: { type: 'string', description: 'Tên sự kiện. VD: "Học IELTS"' },
-                day_of_week: { type: 'integer', description: 'Ngày trong tuần: 0=Chủ nhật, 1=Thứ 2, 2=Thứ 3, 3=Thứ 4, 4=Thứ 5, 5=Thứ 6, 6=Thứ 7' },
-                start_time: { type: 'string', description: 'Giờ bắt đầu, format HH:mm. VD: "19:00"' },
-                end_time: { type: 'string', description: 'Giờ kết thúc, format HH:mm. VD: "20:30"' },
-                location: { type: 'string', description: 'Địa điểm (tuỳ chọn)' }
-            },
-            required: ['title', 'day_of_week', 'start_time']
-        }
-    },
-    {
-        name: 'add_todo',
-        description: 'Thêm một việc cần làm (todo) mới. Xác nhận với người dùng trước khi thêm.',
-        parameters: {
-            type: 'object',
-            properties: {
-                content: { type: 'string', description: 'Nội dung việc cần làm' },
-                priority: { type: 'string', description: 'Mức ưu tiên', enum: ['high', 'medium', 'low'] },
-                deadline: { type: 'string', description: 'Hạn hoàn thành, format YYYY-MM-DD' },
-                status: { type: 'string', description: 'Trạng thái cột của task', enum: ['backlog', 'todo', 'doing', 'done'] },
-                description: { type: 'string', description: 'Mô tả chi tiết việc cần làm' }
-            },
-            required: ['content']
-        }
-    },
-    {
-        name: 'add_transaction',
-        description: 'Thêm giao dịch thu nhập hoặc chi tiêu mới.',
-        parameters: {
-            type: 'object',
-            properties: {
-                amount: { type: 'number', description: 'Số tiền (VND)' },
-                category: { type: 'string', description: 'Danh mục. Chi tiêu: Ăn uống, Di chuyển, Nhà cửa, Điện nước, Mua sắm, Giải trí, Sức khỏe, Giáo dục, Đầu tư, Trả nợ, Cho vay, Hiếu hỉ, Dating, Du lịch, Khác. Thu nhập: Lương, Thưởng, Bán hàng, Đầu tư, Được tặng, Khác.' },
-                type: { type: 'string', description: 'Loại giao dịch', enum: ['income', 'expense'] },
-                date: { type: 'string', description: 'Ngày giao dịch, format YYYY-MM-DD. Mặc định hôm nay.' },
-                description: { type: 'string', description: 'Ghi chú (tuỳ chọn)' }
-            },
-            required: ['amount', 'category', 'type']
-        }
-    },
-    {
-        name: 'render_chart',
-        description: 'Vẽ biểu đồ trực quan để hiển thị cho người dùng. Dùng khi cần trực quan hóa dữ liệu chi tiêu, xu hướng, so sánh, v.v.',
-        parameters: {
-            type: 'object',
-            properties: {
-                chartType: { type: 'string', description: 'Loại biểu đồ. Khuyến khích dùng bar (cột) hoặc line (đường). TUYỆT ĐỐI KHÔNG vẽ biểu đồ tròn (pie).', enum: ['bar', 'line'] },
-                title: { type: 'string', description: 'Tiêu đề biểu đồ' },
-                data: {
-                    type: 'array',
-                    description: 'Dữ liệu biểu đồ. Mỗi phần tử có label (tên), value (giá trị số), color (màu hex tuỳ chọn)',
-                    items: {
-                        type: 'object',
-                        properties: {
-                            label: { type: 'string' },
-                            value: { type: 'number' },
-                            color: { type: 'string', description: 'Mã màu hex. VD: "#6366f1"' }
-                        },
-                        required: ['label', 'value']
-                    }
-                }
-            },
-            required: ['chartType', 'title', 'data']
-        }
-    },
-    {
-        name: 'calculate_needed_gpa',
-        description: 'Tính ngược: cần GPA bao nhiêu trong N tín chỉ còn lại để đạt GPA tích lũy mục tiêu. Dùng khi sinh viên hỏi "cần bao nhiêu điểm để đạt Giỏi/Xuất sắc".',
-        parameters: {
-            type: 'object',
-            properties: {
-                target_gpa: {
-                    type: 'number',
-                    description: 'GPA tích lũy mục tiêu cần đạt. VD: 3.2 (Giỏi), 3.6 (Xuất sắc)'
-                },
-                remaining_credits: {
-                    type: 'integer',
-                    description: 'Số tín chỉ còn lại phải học. Nếu không biết, dùng tổng TC yêu cầu trừ TC đã tích lũy.'
-                }
-            },
-            required: ['target_gpa']
-        }
-    },
-    {
-        name: 'simulate_gpa',
-        description: 'Mô phỏng "what-if": nếu đạt GPA X trong học kỳ tới với Y tín chỉ, GPA tích lũy sẽ thay đổi thế nào? Dùng để tư vấn kịch bản cho sinh viên.',
-        parameters: {
-            type: 'object',
-            properties: {
-                scenarios: {
-                    type: 'array',
-                    description: 'Danh sách kịch bản. Mỗi kịch bản có semester_gpa (GPA dự kiến) và credits (số TC).',
-                    items: {
-                        type: 'object',
-                        properties: {
-                            semester_gpa: { type: 'number', description: 'GPA dự kiến cho học kỳ tới. VD: 3.5' },
-                            credits: { type: 'integer', description: 'Số tín chỉ đăng ký. VD: 18' },
-                            label: { type: 'string', description: 'Tên kịch bản. VD: "Kịch bản lạc quan"' }
-                        },
-                        required: ['semester_gpa', 'credits']
-                    }
-                }
-            },
-            required: ['scenarios']
-        }
-    },
-    {
-        name: 'batch_add_transactions',
-        description: 'Thêm nhiều giao dịch thu nhập/chi tiêu cùng lúc. Dùng khi người dùng liệt kê nhiều khoản chi tiêu hoặc thu nhập trong một tin nhắn. VD: "Hôm nay tôi chi: ăn sáng 30k, grab 25k, mua sách 150k"',
-        parameters: {
-            type: 'object',
-            properties: {
-                transactions: {
-                    type: 'array',
-                    description: 'Danh sách giao dịch cần thêm.',
-                    items: {
-                        type: 'object',
-                        properties: {
-                            amount: { type: 'number', description: 'Số tiền (VND). Lưu ý: 30k = 30000, 1tr = 1000000' },
-                            category: { type: 'string', description: 'Danh mục phù hợp nhất' },
-                            type: { type: 'string', enum: ['income', 'expense'] },
-                            date: { type: 'string', description: 'Ngày giao dịch YYYY-MM-DD. Mặc định hôm nay.' },
-                            description: { type: 'string', description: 'Mô tả ngắn gọn' }
-                        },
-                        required: ['amount', 'category', 'type']
-                    }
-                }
-            },
-            required: ['transactions']
-        }
-    },
-    {
-        name: 'simulate_financial_impact',
-        description: 'Mô phỏng và cố vấn tác động tài chính khi phát sinh chi phí hoặc sự kiện đột xuất giả định (ví dụ: đi đám cưới, bị phạt giao thông, mua điện thoại, hỏng xe, đầu tư công nghệ...). Trả về chi tiết ảnh hưởng tới số dư ví, ngân sách chi tiêu và tiến độ đạt các mục tiêu tiết kiệm.',
-        parameters: {
-            type: 'object',
-            properties: {
-                description: {
-                    type: 'string',
-                    description: 'Mô tả chi tiết hoặc tên sự kiện phát sinh. VD: "bị phạt giao thông", "đi đám cưới bạn thân", "mua laptop mới"'
-                },
-                amount: {
-                    type: 'number',
-                    description: 'Số tiền phát sinh dự kiến (VND). VD: 1000000'
-                }
-            },
-            required: ['description', 'amount']
-        }
-    },
-    {
-        name: 'get_user_profile',
-        description: 'Lấy thông tin cá nhân của người dùng (tên, tuổi, DISC, MBTI, sở thích, nghề nghiệp, định hướng...).',
-        parameters: { type: 'object', properties: {} }
-    },
-    {
-        name: 'get_financial_report',
-        description: 'Lấy báo cáo chi tiết tài chính của người dùng (số dư hiện tại, tổng thu chi tháng, chi tiêu chi tiết theo danh mục, trạng thái ngân sách, xu hướng 6 tháng và 10 giao dịch gần nhất).',
-        parameters: { type: 'object', properties: {} }
-    },
-    {
-        name: 'get_todos_and_schedule',
-        description: 'Lấy toàn bộ Kanban board (4 cột: Backlog, Todo, Doing, Done) với chi tiết từng nhiệm vụ (mô tả, subtasks, hạn chót) và lịch trình cố định hàng tuần.',
-        parameters: { type: 'object', properties: {} }
-    },
-    {
-        name: 'get_academic_gpa_record',
-        description: 'Lấy bảng điểm chi tiết, tín chỉ tích lũy, cảnh báo học vụ, dự báo xếp loại tốt nghiệp và GPA tích lũy.',
-        parameters: { type: 'object', properties: {} }
-    },
-    {
-        name: 'get_habits_tracker',
-        description: 'Lấy danh sách thói quen đang hoạt động, streak ngày, tần suất, tỷ lệ hoàn thành và check-in hôm nay.',
-        parameters: { type: 'object', properties: {} }
-    },
-    {
-        name: 'get_countdown_events',
-        description: 'Lấy danh sách sự kiện đếm ngược hoặc mốc đếm tiến.',
-        parameters: { type: 'object', properties: {} }
-    },
-    {
-        name: 'get_journal_entries',
-        description: 'Lấy nội dung các bài viết nhật ký, mood (cảm xúc), và lòng biết ơn của người dùng trong 5 ngày gần nhất.',
-        parameters: { type: 'object', properties: {} }
-    },
-    {
-        name: 'import_gpa_data',
-        description: 'Tự động thêm dữ liệu bảng điểm học kỳ và các môn học vào GPA Tracker dựa trên kết quả phân tích hình ảnh bảng điểm hoặc văn bản do người dùng cung cấp.',
-        parameters: {
-            type: 'object',
-            properties: {
-                semesters: {
-                    type: 'array',
-                    description: 'Danh sách các học kỳ kèm môn học.',
-                    items: {
-                        type: 'object',
-                        properties: {
-                            name: { type: 'string', description: 'Tên học kỳ. VD: "Học kỳ 1", "Học kỳ 2", "Học kỳ phụ (Hè)"' },
-                            academic_year: { type: 'string', description: 'Năm học theo định dạng YYYY-YYYY. VD: "2023-2024", "2024-2025"' },
-                            semester_type: { type: 'string', enum: ['HK1', 'HK2', 'HocHe'], description: 'Loại học kỳ: HK1, HK2, HocHe' },
-                            year_of_study: { type: 'integer', description: 'Năm học thứ mấy của sinh viên. VD: 1, 2, 3, 4' },
-                            courses: {
-                                type: 'array',
-                                description: 'Danh sách các môn học trong học kỳ này.',
-                                items: {
-                                    type: 'object',
-                                    properties: {
-                                        name: { type: 'string', description: 'Tên môn học/học phần' },
-                                        credits: { type: 'integer', description: 'Số tín chỉ của môn học. VD: 2, 3, 4' },
-                                        template: { type: 'string', enum: ['A', 'B', 'C'], description: 'Mẫu tính điểm (A: CC1 10%, CC2 30%, CK 60%; B: CC1 10%, CC2 10%, CC3 20%, CK 60%; C: CC1 20%, CC2 20%, CK 60%). Mặc định "A" nếu không chắc chắn.' },
-                                        score_cc1: { type: 'number', description: 'Điểm thành phần 1 (thang 10), nếu có.' },
-                                        score_cc2: { type: 'number', description: 'Điểm thành phần 2 (thang 10), nếu có.' },
-                                        score_cc3: { type: 'number', description: 'Điểm thành phần 3 (thang 10), nếu có.' },
-                                        score_final: { type: 'number', description: 'Điểm cuối kỳ hoặc điểm tổng kết thang 10. Nếu là điểm tổng kết môn học thang 10, hãy gán vào score_final và đặt template phù hợp.' },
-                                        exclude_from_gpa: { type: 'boolean', description: 'Đặt true nếu môn học này không tính vào GPA (ví dụ: Thể dục, Giáo dục quốc phòng).' }
-                                    },
-                                    required: ['name', 'credits']
-                                }
-                            }
-                        },
-                        required: ['name', 'academic_year', 'semester_type', 'year_of_study', 'courses']
-                    }
-                }
-            },
-            required: ['semesters']
-        }
-    },
-    {
-        name: 'update_todo',
-        description: 'Cập nhật thông tin hoặc trạng thái phân loại cột (backlog, todo, doing, done) của một việc cần làm (todo) hiện tại theo ID. Xác nhận với người dùng trước khi thay đổi.',
-        parameters: {
-            type: 'object',
-            properties: {
-                id: { type: 'string', description: 'ID của việc cần làm cần cập nhật (ví dụ: uuid)' },
-                content: { type: 'string', description: 'Nội dung mới của việc cần làm (tuỳ chọn)' },
-                priority: { type: 'string', description: 'Mức ưu tiên mới (tuỳ chọn)', enum: ['high', 'medium', 'low'] },
-                deadline: { type: 'string', description: 'Hạn hoàn thành mới (tuỳ chọn), format YYYY-MM-DD' },
-                status: { type: 'string', description: 'Trạng thái cột phân loại mới (tuỳ chọn)', enum: ['backlog', 'todo', 'doing', 'done'] },
-                description: { type: 'string', description: 'Mô tả chi tiết mới (tuỳ chọn)' }
-            },
-            required: ['id']
-        }
-    },
-    {
-        name: 'delete_todo',
-        description: 'Xóa một việc cần làm (todo) theo ID. Hỏi xác nhận người dùng trước khi xóa.',
-        parameters: {
-            type: 'object',
-            properties: {
-                id: { type: 'string', description: 'ID của việc cần làm cần xóa' }
-            },
-            required: ['id']
-        }
-    },
-    {
-        name: 'get_bookmarks',
-        description: 'Lấy danh sách tất cả các liên kết (bookmarks/links) đã lưu của người dùng.',
-        parameters: { type: 'object', properties: {} }
-    },
-    {
-        name: 'add_bookmark',
-        description: 'Thêm một liên kết (bookmark) mới. Xác nhận với người dùng trước khi thêm.',
-        parameters: {
-            type: 'object',
-            properties: {
-                title: { type: 'string', description: 'Tiêu đề hoặc mô tả ngắn của liên kết. VD: "Tài liệu học React"' },
-                url: { type: 'string', description: 'Đường dẫn URL của liên kết. VD: "https://react.dev"' },
-                group: { type: 'string', description: 'Tên nhóm phân loại bookmark (tuỳ chọn). VD: "dự án", "Sách", "học tập"' }
-            },
-            required: ['title', 'url']
-        }
-    },
-    {
-        name: 'update_bookmark',
-        description: 'Cập nhật thông tin hoặc nhóm phân loại của một bookmark hiện có. Xác nhận với người dùng trước khi cập nhật.',
-        parameters: {
-            type: 'object',
-            properties: {
-                id: { type: 'string', description: 'ID của bookmark cần cập nhật' },
-                title: { type: 'string', description: 'Tiêu đề mới (tuỳ chọn)' },
-                url: { type: 'string', description: 'URL mới (tuỳ chọn)' },
-                group: { type: 'string', description: 'Nhóm phân loại mới (tuỳ chọn)' }
-            },
-            required: ['id']
-        }
-    },
-    {
-        name: 'delete_bookmark',
-        description: 'Xóa một liên kết (bookmark) theo ID. Hỏi xác nhận trước khi xóa.',
-        parameters: {
-            type: 'object',
-            properties: {
-                id: { type: 'string', description: 'ID của bookmark cần xóa' }
-            },
-            required: ['id']
-        }
-    },
-    {
-        name: 'add_calendar_event',
-        description: 'Thêm lịch hẹn hoặc cuộc họp cụ thể theo ngày vào lịch (Calendar). Thích hợp cho các cuộc hẹn diễn ra một lần hoặc vào một ngày cụ thể (không cố định hàng tuần). Mặc định nếu không chỉ định gì sẽ bật thông báo báo trước 30 phút qua Gmail.',
-        parameters: {
-            type: 'object',
-            properties: {
-                title: { type: 'string', description: 'Tiêu đề lịch hẹn. VD: "Đi ăn chè"' },
-                date: { type: 'string', description: 'Ngày diễn ra lịch hẹn, format YYYY-MM-DD. VD: "2026-06-24"' },
-                time: { type: 'string', description: 'Giờ diễn ra, format HH:mm. VD: "01:00" hoặc "18:30" (tuỳ chọn)' },
-                location: { type: 'string', description: 'Địa điểm (tuỳ chọn)' },
-                description: { type: 'string', description: 'Mô tả chi tiết hoặc ghi chú lịch hẹn (tuỳ chọn)' },
-                email_notify: { type: 'boolean', description: 'Có gửi email thông báo nhắc nhở qua Gmail không. Mặc định là true.' },
-                email_notify_before_minutes: { type: 'integer', description: 'Thời gian gửi thông báo trước khi diễn ra sự kiện (phút). Mặc định là 30. Nếu báo trước 1 ngày thì truyền 1440 (24 * 60).' }
-            },
-            required: ['title', 'date']
-        }
-    },
-    {
-        name: 'update_calendar_event',
-        description: 'Cập nhật thông tin chi tiết của một lịch hẹn/sự kiện lịch hiện có theo ID. Hỏi xác nhận trước khi cập nhật.',
-        parameters: {
-            type: 'object',
-            properties: {
-                id: { type: 'string', description: 'ID của lịch hẹn cần cập nhật' },
-                title: { type: 'string', description: 'Tiêu đề mới (tuỳ chọn)' },
-                date: { type: 'string', description: 'Ngày mới format YYYY-MM-DD (tuỳ chọn)' },
-                time: { type: 'string', description: 'Giờ mới format HH:mm (tuỳ chọn)' },
-                location: { type: 'string', description: 'Địa điểm mới (tuỳ chọn)' },
-                description: { type: 'string', description: 'Mô tả/ghi chú mới (tuỳ chọn)' },
-                email_notify: { type: 'boolean', description: 'Bật/tắt gửi email thông báo (tuỳ chọn)' },
-                email_notify_before_minutes: { type: 'integer', description: 'Thời gian gửi thông báo trước (phút) (tuỳ chọn)' }
-            },
-            required: ['id']
-        }
-    },
-    {
-        name: 'delete_calendar_event',
-        description: 'Xóa một lịch hẹn/sự kiện lịch theo ID. Hỏi xác nhận trước khi xóa.',
-        parameters: {
-            type: 'object',
-            properties: {
-                id: { type: 'string', description: 'ID của lịch hẹn cần xóa' }
-            },
-            required: ['id']
-        }
-    },
-    {
-        name: 'search_nearby_places',
-        description: 'Tìm kiếm và gợi ý địa điểm gần vị trí hiện tại của người dùng. Dùng khi người dùng hỏi về: cây xăng, quán ăn, quán café, tiệm sửa xe, nhà thuốc, bệnh viện, ATM, siêu thị, hoặc bất kỳ địa điểm nào gần đây. Trả về danh sách gợi ý kèm link Google Maps để chỉ đường. QUAN TRỌNG: Luôn gọi tool này khi người dùng cần tìm địa điểm — tool sẽ cung cấp GPS và link Maps.',
-        parameters: {
-            type: 'object',
-            properties: {
-                query: {
-                    type: 'string',
-                    description: 'Loại địa điểm cần tìm. VD: "cây xăng", "quán phở", "tiệm sửa xe máy", "nhà thuốc Long Châu", "quán cafe yên tĩnh có wifi"'
-                },
-                is_emergency: {
-                    type: 'boolean',
-                    description: 'True nếu là tình huống khẩn cấp (xe hỏng, cần cứu hộ, tai nạn). Sẽ ưu tiên kết quả gần nhất.'
-                },
-                additional_context: {
-                    type: 'string',
-                    description: 'Thông tin bổ sung từ người dùng. VD: "giá sinh viên", "mở cửa sau 22h", "có chỗ để xe"'
-                }
-            },
-            required: ['query']
-        }
-    },
-    {
-        name: 'get_google_calendar_events',
-        description: 'Lấy danh sách sự kiện từ Google Calendar của người dùng trong một khoảng thời gian. Dùng khi người dùng hỏi về lịch Google, sự kiện sắp tới, hoặc muốn kiểm tra lịch trình từ Google Calendar.',
-        parameters: {
-            type: 'object',
-            properties: {
-                days_ahead: {
-                    type: 'integer',
-                    description: 'Số ngày tới cần lấy sự kiện. Mặc định 7. VD: 1 = hôm nay, 7 = tuần này, 30 = tháng này.'
-                },
-                days_back: {
-                    type: 'integer',
-                    description: 'Số ngày trước cần lấy sự kiện. Mặc định 0.'
-                }
-            }
-        }
-    }
-];
 
 // ────────────────────────────────────────
 // Tool Execution
@@ -550,7 +191,13 @@ async function executeQueryDatabase(args: any): Promise<any> {
 
     const { data, error } = await query;
     if (error) {
-        return { error: error.message, count: 0 };
+        // Model hay đoán tên cột (vd. goals.category) → PostgREST trả 400; gợi ý cách xem cột thật để tự sửa
+        const badColumn = error.code === '42703' || /column .* does not exist/i.test(error.message || '');
+        return {
+            error: error.message,
+            count: 0,
+            ...(badColumn ? { hint: `Bảng ${table} không có cột đó. Gọi lại với limit=1, không filters, để xem các cột có thật rồi lọc lại.` } : {}),
+        };
     }
     return { data, count: data?.length || 0 };
 }
@@ -1102,13 +749,16 @@ async function executeBatchAddTransactions(
 // ────────────────────────────────────────
 // Main Orchestrator — Chat with Function Calling loop
 // ────────────────────────────────────────
+// Chỉ giữ chữ người dùng + câu trả lời cuối của AI (bỏ suy nghĩ, chữ ký, lượt gọi hàm) cho lịch sử nhiều lượt
 function cleanChatHistory(contents: ChatMessage[]): ChatMessage[] {
     return contents.map(m => {
         if (m.role === 'user') {
             return m;
         }
         if (m.role === 'model') {
-            const textPartsOnly = m.parts.filter(p => 'text' in p);
+            const textPartsOnly = m.parts
+                .filter((p: any) => typeof p.text === 'string' && p.text && !p.thought)
+                .map((p: any) => ({ text: p.text }));
             if (textPartsOnly.length > 0) {
                 return { role: 'model' as const, parts: textPartsOnly };
             }
@@ -1118,6 +768,42 @@ function cleanChatHistory(contents: ChatMessage[]): ChatMessage[] {
 }
 
 const MAX_TOOL_CALLS = 10; // Safety limit to prevent infinite loops
+const TOOL_ROUND_GAP_MS = 500; // nghỉ ngắn giữa các vòng gọi công cụ để tránh nghẽn burst (503)
+
+function abortError() {
+    return new DOMException('Request aborted', 'AbortError');
+}
+
+function waitOrAbort(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) return reject(abortError());
+        const timer = setTimeout(resolve, ms);
+        signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(abortError());
+        }, { once: true });
+    });
+}
+
+function logChatTokens(usage: any, model: string) {
+    if (!usage?.totalTokenCount) return;
+    supabase.auth.getUser().then(({ data: authData }) => {
+        const uid = authData?.user?.id;
+        if (!uid) { console.warn('[SmartLife] Token log skipped: no user'); return; }
+        supabase.from('api_logs').insert([{
+            user_id: uid,
+            action: 'chat',
+            tokens_used: usage.totalTokenCount,
+            prompt_tokens: usage.promptTokenCount || 0,
+            candidates_tokens: usage.candidatesTokenCount || 0,
+            thoughts_tokens: usage.thoughtsTokenCount || usage.thinkingTokenCount || 0,
+            estimated_cost_vnd: estimateGeminiCost(usage.promptTokenCount || 0, usage.candidatesTokenCount || 0, model),
+            model
+        }]).then(({ error }) => {
+            if (error) console.error('[SmartLife] ❌ Token log failed:', error.message);
+        });
+    });
+}
 
 export async function chatWithAI(
     history: ChatMessage[],
@@ -1125,26 +811,58 @@ export async function chatWithAI(
     handlers: ActionHandlers = {},
     memoryContext: string = '',
     attachments?: AIAttachment[],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options: ChatOptions = {}
 ): Promise<AIResponse> {
+    const { tier, onEvent } = options;
+    const expert = getExpert(options.expert);
+    const clarifyRoundsUsed = options.clarifyRoundsUsed || 0;
+    const clarifyAllowed = clarifyRoundsUsed < maxClarifyRounds(expert.id, tier);
+    const emit = (event: AIStreamEvent) => {
+        try { onEvent?.(event); } catch (e) { console.error('[SmartLife AI] onEvent error:', e); }
+    };
+
     const userName = appState.profile?.full_name || 'Người dùng';
     const now = new Date();
     const minimalContext = `\n👤 NGƯỜI DÙNG HIỆN TẠI: ${userName}\n📅 THỜI GIAN HỆ THỐNG: ${now.toLocaleString('vi-VN')} (Thứ ${now.getDay() === 0 ? 'Chủ Nhật' : now.getDay() + 1}, ngày ${now.getDate()} tháng ${now.getMonth() + 1} năm ${now.getFullYear()})`;
 
     const profileContext = buildProfileContext(appState);
-    const fullSystemPrompt = SYSTEM_INSTRUCTION
+    // Chỉ nạp các khối prompt cần cho lượt này (chuyên gia, lĩnh vực, công cụ, số lượt hỏi lại còn lại)
+    const basePrompt = buildSystemPrompt({
+        expert: expert.id,
+        tier,
+        domain: options.domain,
+        userText: options.userText,
+        crisis: options.crisis,
+        clarifyRoundsUsed,
+        confirmedBulk: options.confirmedBulk,
+        webSearch: options.webSearch,
+        companion: options.companion,
+        hasPersonality: !!(appState.profile?.personality_mbti || appState.profile?.personality_disc),
+    }).text;
+    const tools = toolsFor(expert, { webSearch: options.webSearch });
+    const fullSystemPrompt = basePrompt
         + minimalContext
         + (profileContext ? '\n\n--- HỒ SƠ CÁ NHÂN NGƯỜI DÙNG ---\n' + profileContext : '')
         + (memoryContext ? '\n\n--- BỘ NHỚ DÀI HẠN ---\n' + memoryContext : '');
 
     const charts: ChartData[] = [];
     const actions: ActionResult[] = [];
+    const steps: AIStep[] = [];
+    let thoughts = '';
+    let answer = '';
+    let runModel: StreamMeta | null = null;
+    const startedAt = Date.now();
+    let clarification: ClarifyRequest | undefined;
+    let sources: WebSource[] = [];
+    let webSearches = 0;
+    let writesDone = 0; // số mục đã ghi trong lượt (chặn ghi hàng loạt chưa xác nhận)
 
     // Build request with tools
     const buildRequest = (contents: any[]) => ({
         systemInstruction: { parts: [{ text: fullSystemPrompt }] },
         contents,
-        tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
+        tools: [{ functionDeclarations: tools }],
         toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
         generationConfig: { temperature: 0.7, topP: 0.95, topK: 40, maxOutputTokens: 4096 },
         safetySettings: [
@@ -1153,12 +871,14 @@ export async function chatWithAI(
             { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
             { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
         ],
+        ...(tier ? { tier } : {}),
+        purpose: 'chat',
     });
 
     return enqueue(async () => {
-        // Convert to Gemini format (only user/model roles, skip function roles for initial)
+        // Gemini chỉ nhận vai user/model (họ 3.x từ chối vai 'function') — kết quả công cụ gửi bằng vai user
         let contents: ChatMessage[] = history.map(m => ({
-            role: m.role === 'function' ? 'function' : m.role,
+            role: m.role === 'function' ? 'user' : m.role,
             parts: [...m.parts] // shallow copy to preserve original history parts
         }));
 
@@ -1177,89 +897,107 @@ export async function chatWithAI(
         }
 
         let toolCallCount = 0;
+        let round = 0;
         let totalTokensConsumed = 0;
 
-        while (toolCallCount < MAX_TOOL_CALLS) {
-            if (signal?.aborted) {
-                throw new DOMException('Request aborted', 'AbortError');
-            }
+        const finish = (text: string): AIResponse => ({
+            text,
+            charts,
+            actions,
+            updatedHistory: cleanChatHistory(contents),
+            tokens_used: totalTokensConsumed,
+            meta: {
+                model: runModel?.model,
+                tier: runModel?.tier,
+                weight: runModel?.weight,
+                thoughts: thoughts || undefined,
+                steps: steps.length ? steps : undefined,
+                durationMs: Date.now() - startedAt,
+                expert: expert.id,
+                auto: options.auto || undefined,
+                domain: options.domain,
+                clarification,
+                sources: sources.length ? sources : undefined,
+            },
+        });
 
-            if (toolCallCount > 0) {
-                // Tránh gọi API liên tục quá nhanh gây nghẽn burst limit (lỗi 503)
-                await new Promise<void>((resolve, reject) => {
-                    const timer = setTimeout(resolve, 1200);
-                    if (signal) {
-                        signal.addEventListener('abort', () => {
-                            clearTimeout(timer);
-                            reject(new DOMException('Request aborted', 'AbortError'));
-                        });
-                    }
-                });
-            }
+        while (toolCallCount < MAX_TOOL_CALLS) {
+            if (signal?.aborted) throw abortError();
+            if (round > 0) await waitOrAbort(TOOL_ROUND_GAP_MS, signal);
 
             const body = {
                 ...buildRequest(contents),
-                isToolCall: toolCallCount > 0
+                isToolCall: round > 0
             };
-            const data = await callGeminiRaw(body, 0, signal);
 
-            // Log token usage with detailed tracking (Phase 1)
-            if (data?.usageMetadata?.totalTokenCount) {
-                totalTokensConsumed += data.usageMetadata.totalTokenCount;
-                supabase.auth.getUser().then(({ data: authData }) => {
-                    const uid = authData?.user?.id;
-                    if (!uid) { console.warn('[SmartLife] Token log skipped: no user'); return; }
-                    supabase.from('api_logs').insert([{
-                        user_id: uid,
-                        action: 'chat',
-                        tokens_used: data.usageMetadata.totalTokenCount,
-                        prompt_tokens: data.usageMetadata.promptTokenCount || 0,
-                        candidates_tokens: data.usageMetadata.candidatesTokenCount || 0,
-                        thoughts_tokens: data.usageMetadata.thoughtsTokenCount || data.usageMetadata.thinkingTokenCount || 0,
-                        estimated_cost_vnd: estimateGeminiCost(data.usageMetadata.promptTokenCount || 0, data.usageMetadata.candidatesTokenCount || 0),
-                        model: 'gemini-2.5-flash'
-                    }]).then(({ error }) => {
-                        if (error) console.error('[SmartLife] ❌ Token log failed:', error.message);
-                        else console.info(`[SmartLife] ✅ Logged ${data.usageMetadata.totalTokenCount} tokens`);
-                    });
+            // Có onEvent → stream để hiện chữ/suy nghĩ ngay; không thì gọi thường như trước
+            let data: any;
+            if (onEvent) {
+                const acc = createResponseAccumulator();
+                let roundHasText = false;
+                let roundHasThought = false;
+                await streamGeminiRaw(body, {
+                    signal,
+                    onMeta: (meta) => {
+                        if (!runModel) {
+                            runModel = meta;
+                            emit({ type: 'meta', meta });
+                        }
+                    },
+                    onChunk: (chunk) => {
+                        const delta = acc.add(chunk);
+                        if (delta.thought) {
+                            const sep = !roundHasThought && thoughts ? '\n\n' : '';
+                            roundHasThought = true;
+                            thoughts += sep + delta.thought;
+                            emit({ type: 'thought', delta: sep + delta.thought });
+                        }
+                        if (delta.text) {
+                            const sep = !roundHasText && answer ? '\n\n' : '';
+                            roundHasText = true;
+                            answer += sep + delta.text;
+                            emit({ type: 'text', delta: sep + delta.text });
+                        }
+                    },
                 });
+                data = acc.result();
+            } else {
+                data = await callGeminiRaw(body, 0, signal);
+                const parts = data?.candidates?.[0]?.content?.parts || [];
+                const roundText = parts.filter((p: any) => typeof p.text === 'string' && !p.thought).map((p: any) => p.text).join('');
+                const roundThought = parts.filter((p: any) => p.thought && p.text).map((p: any) => p.text).join('');
+                if (roundThought) thoughts += (thoughts ? '\n\n' : '') + roundThought;
+                if (roundText) answer += (answer ? '\n\n' : '') + roundText;
+            }
+            round++;
+
+            const usage = data?.usageMetadata;
+            if (usage?.totalTokenCount) {
+                totalTokensConsumed += usage.totalTokenCount;
+                logChatTokens(usage, runModel?.model || 'gemini-2.5-flash');
             }
 
             const candidate = data?.candidates?.[0];
-            
+
             // Kiểm tra trường hợp Prompt bị hệ thống Google chặn ngay lập tức (Safety / Policy Block)
             if (!candidate) {
-                let blockMsg = 'Không nhận được phản hồi từ AI.';
+                let blockMsg = answer || 'Không nhận được phản hồi từ AI.';
                 if (data?.promptFeedback?.blockReason) {
                     blockMsg = `⚠️ Yêu cầu bị hệ thống kiểm duyệt tự động chặn (Lý do: ${data.promptFeedback.blockReason}). Vui lòng điều chỉnh hoặc diễn đạt lại câu hỏi phù hợp hơn.`;
                 }
-                return { text: blockMsg, charts, actions, updatedHistory: cleanChatHistory(contents), tokens_used: totalTokensConsumed };
+                return finish(blockMsg);
             }
 
             // Kiểm tra finishReason của candidate
-            if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-                if (candidate.finishReason === 'SAFETY') {
-                    return {
-                        text: '⚠️ Phản hồi bị chặn bởi bộ lọc an toàn tự động của Google (Lý do: SAFETY). Điều này có thể xảy ra nếu thông tin thói quen, nhật ký hoặc dữ liệu liên quan của bạn có từ ngữ quá nhạy cảm. Vui lòng kiểm tra lại dữ liệu hoặc diễn đạt câu hỏi theo cách khác.',
-                        charts,
-                        actions,
-                        updatedHistory: cleanChatHistory(contents),
-                        tokens_used: totalTokensConsumed
-                    };
-                }
-                if (candidate.finishReason === 'RECITATION') {
-                    return {
-                        text: '⚠️ Phản hồi bị chặn do phát hiện nội dung sao chép tài liệu có bản quyền (Lý do: RECITATION). Vui lòng đặt câu hỏi khác hoặc diễn đạt theo cách khác.',
-                        charts,
-                        actions,
-                        updatedHistory: cleanChatHistory(contents),
-                        tokens_used: totalTokensConsumed
-                    };
-                }
+            if (candidate.finishReason === 'SAFETY') {
+                return finish('⚠️ Phản hồi bị chặn bởi bộ lọc an toàn tự động của Google (Lý do: SAFETY). Điều này có thể xảy ra nếu thông tin thói quen, nhật ký hoặc dữ liệu liên quan của bạn có từ ngữ quá nhạy cảm. Vui lòng kiểm tra lại dữ liệu hoặc diễn đạt câu hỏi theo cách khác.');
+            }
+            if (candidate.finishReason === 'RECITATION') {
+                return finish('⚠️ Phản hồi bị chặn do phát hiện nội dung sao chép tài liệu có bản quyền (Lý do: RECITATION). Vui lòng đặt câu hỏi khác hoặc diễn đạt theo cách khác.');
             }
 
-            if (!candidate.content?.parts) {
-                return { text: 'Không nhận được phản hồi từ AI.', charts, actions, updatedHistory: cleanChatHistory(contents), tokens_used: totalTokensConsumed };
+            if (!candidate.content?.parts?.length) {
+                return finish(answer || 'Không nhận được phản hồi từ AI.');
             }
 
             const responseParts: MessagePart[] = candidate.content.parts;
@@ -1270,192 +1008,278 @@ export async function chatWithAI(
             ) as Array<{ functionCall: { name: string; args: Record<string, any> } }>;
 
             if (functionCalls.length === 0) {
-                // No function calls — extract text and return
+                // No function calls — trả lời xong
                 contents.push({ role: 'model', parts: responseParts });
-                const textParts = responseParts
-                    .filter((p: any) => p.text)
-                    .map((p: any) => p.text);
-                return {
-                    text: textParts.join('\n') || 'Không có phản hồi.',
-                    charts,
-                    actions,
-                    updatedHistory: cleanChatHistory(contents),
-                    tokens_used: totalTokensConsumed
-                };
+                return finish(answer || 'Không có phản hồi.');
             }
 
             // Process each function call
             const functionResponses: any[] = [];
-            
-            // Append the model's function call message to contents
+
+            // Giữ nguyên các phần của model (kể cả thoughtSignature) — họ Gemini 3 bắt buộc khi gửi kết quả hàm
             contents.push({ role: 'model', parts: responseParts });
 
+            // ask_user hợp lệ → dừng ngay, không chạy công cụ khác trong vòng này; giao diện hiện thẻ hỏi lại
+            const askCall = functionCalls.find(fc => fc.functionCall.name === 'ask_user');
+            let askError: string | null = null;
+            if (askCall) {
+                const parsed = normalizeAskUser(askCall.functionCall.args);
+                if ('error' in parsed) {
+                    askError = parsed.error;
+                } else if (parsed.request.purpose === 'clarify' && !clarifyAllowed) {
+                    askError = 'Đã hết lượt hỏi lại cho câu hỏi này. Hãy trả lời luôn và mở đầu bằng dòng "**Giả định:** …".';
+                } else {
+                    clarification = parsed.request;
+                    const now = Date.now();
+                    const step: AIStep = {
+                        id: `${round}-${steps.length}`,
+                        tool: 'ask_user',
+                        label: describeToolCall('ask_user', askCall.functionCall.args),
+                        status: 'done',
+                        startedAt: now,
+                        endedAt: now,
+                    };
+                    steps.push(step);
+                    emit({ type: 'step', step: { ...step } });
+                    emit({ type: 'clarify', request: clarification });
+                    const intro = clarification.intro || (clarification.purpose === 'confirm' ? 'Bạn xác nhận giúp mình nhé:' : 'Mình cần hỏi thêm một chút:');
+                    return finish(answer.trim() ? answer : intro);
+                }
+            }
+
+            // Ghi hàng loạt (> BULK_WRITE_LIMIT mục) phải được xác nhận bằng ask_user purpose "confirm" trước
+            const writesThisRound = functionCalls.reduce((n, fc) => n + countWrites(fc.functionCall.name, fc.functionCall.args), 0);
+            const blockWrites = !options.confirmedBulk && writesDone + writesThisRound > BULK_WRITE_LIMIT;
+
             for (const fc of functionCalls) {
-                const { name, args } = fc.functionCall;
+                if (signal?.aborted) throw abortError();
+                const { name, args = {} } = fc.functionCall;
                 console.info(`[SmartLife AI] Tool call: ${name}`, args);
                 let result: any;
 
-                switch (name) {
-                    case 'query_database':
-                        result = await executeQueryDatabase(args);
-                        break;
-                    case 'add_timetable': {
-                        const actionResult = await executeAddTimetable(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'add_todo': {
-                        const actionResult = await executeAddTodo(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'update_todo': {
-                        const actionResult = await executeUpdateTodo(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'delete_todo': {
-                        const actionResult = await executeDeleteTodo(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'get_bookmarks': {
-                        result = await executeGetBookmarks(appState);
-                        break;
-                    }
-                    case 'add_bookmark': {
-                        const actionResult = await executeAddBookmark(args, appState);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'update_bookmark': {
-                        const actionResult = await executeUpdateBookmark(args, appState);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'delete_bookmark': {
-                        const actionResult = await executeDeleteBookmark(args, appState);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'add_calendar_event': {
-                        const actionResult = await executeAddCalendarEvent(args, appState, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'update_calendar_event': {
-                        const actionResult = await executeUpdateCalendarEvent(args, appState, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'delete_calendar_event': {
-                        const actionResult = await executeDeleteCalendarEvent(args, appState, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'add_transaction': {
-                        const actionResult = await executeAddTransaction(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'render_chart': {
-                        charts.push({
-                            chart_type: args.chartType || args.chart_type || 'bar',
-                            title: args.title,
-                            data: args.data || []
-                        });
-                        result = { success: true, message: `Biểu đồ "${args.title}" đã được tạo và hiển thị cho người dùng.` };
-                        break;
-                    }
-                    case 'calculate_needed_gpa': {
-                        result = executeCalculateNeededGPA(args, appState);
-                        break;
-                    }
-                    case 'simulate_gpa': {
-                        result = executeSimulateGPA(args, appState);
-                        break;
-                    }
-                    case 'batch_add_transactions': {
-                        const actionResult = await executeBatchAddTransactions(args, handlers);
-                        actions.push(actionResult);
-                        result = { success: actionResult.success, message: actionResult.message };
-                        break;
-                    }
-                    case 'import_gpa_data': {
-                        if (handlers.onImportGPAData) {
+                const step: AIStep = {
+                    id: `${round}-${steps.length}`,
+                    tool: name,
+                    label: describeToolCall(name, args),
+                    status: 'running',
+                    startedAt: Date.now(),
+                };
+                steps.push(step);
+                emit({ type: 'step', step: { ...step } });
+                const chartsBefore = charts.length;
+                const actionsBefore = actions.length;
+
+                try {
+                    if (name === 'ask_user') {
+                        result = { error: askError || 'Không thể hỏi lại lúc này.' };
+                    } else if (blockWrites && countWrites(name, args) > 0) {
+                        result = {
+                            success: false,
+                            error: `Chưa ghi: lượt này định ghi ${writesDone + writesThisRound} mục (> ${BULK_WRITE_LIMIT}). Hãy gọi ask_user purpose "confirm" liệt kê các mục để người dùng xác nhận trước.`,
+                        };
+                    } else switch (name) {
+                        case 'web_search': {
+                            if (webSearches >= MAX_WEB_SEARCHES) {
+                                result = WEB_SEARCH_LIMIT_ERROR;
+                                break;
+                            }
+                            webSearches++;
+                            const found = await fetchWebSearch(String(args.query || ''), {
+                                headers: await proxyHeaders(),
+                                signal,
+                                context: options.userText,
+                            });
+                            if ('error' in found) {
+                                result = found;
+                                break;
+                            }
+                            const merged = mergeSearchSources(sources, found);
+                            sources = merged.sources;
+                            const used = new Set(found.sources.map(x => x.url));
+                            result = {
+                                summary: merged.summary,
+                                sources: sources.filter(x => used.has(x.url)).map(x => ({ n: x.n, title: x.title, domain: x.domain })),
+                                note: 'Trích dẫn bằng đúng số [n] ở trên.',
+                            };
+                            emit({ type: 'sources', sources: [...sources] });
+                            break;
+                        }
+                        case 'query_database':
+                            result = await executeQueryDatabase(args);
+                            break;
+                        case 'add_timetable': {
+                            const actionResult = await executeAddTimetable(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'add_todo': {
+                            const actionResult = await executeAddTodo(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'update_todo': {
+                            const actionResult = await executeUpdateTodo(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'delete_todo': {
+                            const actionResult = await executeDeleteTodo(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'get_bookmarks': {
+                            result = await executeGetBookmarks(appState);
+                            break;
+                        }
+                        case 'add_bookmark': {
+                            const actionResult = await executeAddBookmark(args, appState);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'update_bookmark': {
+                            const actionResult = await executeUpdateBookmark(args, appState);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'delete_bookmark': {
+                            const actionResult = await executeDeleteBookmark(args, appState);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'add_calendar_event': {
+                            const actionResult = await executeAddCalendarEvent(args, appState, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'update_calendar_event': {
+                            const actionResult = await executeUpdateCalendarEvent(args, appState, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'delete_calendar_event': {
+                            const actionResult = await executeDeleteCalendarEvent(args, appState, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'add_transaction': {
+                            const actionResult = await executeAddTransaction(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'render_chart': {
+                            charts.push({
+                                chart_type: args.chartType || args.chart_type || 'bar',
+                                title: args.title,
+                                data: args.data || []
+                            });
+                            result = { success: true, message: `Biểu đồ "${args.title}" đã được tạo và hiển thị cho người dùng.` };
+                            break;
+                        }
+                        case 'calculate_needed_gpa': {
+                            result = executeCalculateNeededGPA(args, appState);
+                            break;
+                        }
+                        case 'simulate_gpa': {
+                            result = executeSimulateGPA(args, appState);
+                            break;
+                        }
+                        case 'batch_add_transactions': {
+                            const actionResult = await executeBatchAddTransactions(args, handlers);
+                            actions.push(actionResult);
+                            result = { success: actionResult.success, message: actionResult.message };
+                            break;
+                        }
+                        case 'import_gpa_data': {
+                            if (handlers.onImportGPAData) {
+                                try {
+                                    await handlers.onImportGPAData(args.semesters);
+                                    result = { success: true, message: `✅ Đã import thành công ${args.semesters.length} học kỳ vào GPA Tracker.` };
+                                } catch (e: any) {
+                                    result = { success: false, error: e.message };
+                                }
+                            } else {
+                                result = { success: false, error: 'GPA Import handler is not registered.' };
+                            }
+                            break;
+                        }
+                        case 'simulate_financial_impact': {
                             try {
-                                await handlers.onImportGPAData(args.semesters);
-                                result = { success: true, message: `✅ Đã import thành công ${args.semesters.length} học kỳ vào GPA Tracker.` };
+                                const simResult = await simulateFinancialImpact(args.description, args.amount, appState, 'vi');
+                                result = { success: true, ...simResult };
+                                actions.push({
+                                    type: 'financial_impact' as any,
+                                    success: true,
+                                    message: `Đã mô phỏng tác động tài chính của kịch bản "${args.description}" với số tiền ${args.amount.toLocaleString('vi-VN')}đ.`,
+                                    data: {
+                                        description: args.description,
+                                        amount: args.amount,
+                                        simulation: simResult
+                                    }
+                                });
                             } catch (e: any) {
                                 result = { success: false, error: e.message };
                             }
-                        } else {
-                            result = { success: false, error: 'GPA Import handler is not registered.' };
+                            break;
                         }
-                        break;
-                    }
-                    case 'simulate_financial_impact': {
-                        try {
-                            const simResult = await simulateFinancialImpact(args.description, args.amount, appState, 'vi');
-                            result = { success: true, ...simResult };
-                            actions.push({
-                                type: 'financial_impact' as any,
-                                success: true,
-                                message: `Đã mô phỏng tác động tài chính của kịch bản "${args.description}" với số tiền ${args.amount.toLocaleString('vi-VN')}đ.`,
-                                data: {
-                                    description: args.description,
-                                    amount: args.amount,
-                                    simulation: simResult
-                                }
-                            });
-                        } catch (e: any) {
-                            result = { success: false, error: e.message };
+                        case 'get_user_profile':
+                            result = { result: buildProfileContext(appState) };
+                            break;
+                        case 'get_financial_report':
+                            result = { result: buildFinanceContext(appState) };
+                            break;
+                        case 'get_todos_and_schedule':
+                            result = { result: buildScheduleContext(appState) };
+                            break;
+                        case 'get_academic_gpa_record':
+                            result = { result: buildGPAContext(appState) };
+                            break;
+                        case 'get_habits_tracker':
+                            result = { result: await buildHabitContext() };
+                            break;
+                        case 'get_countdown_events':
+                            result = { result: await buildCountdownContext() };
+                            break;
+                        case 'get_journal_entries':
+                            result = { result: await buildJournalContext() };
+                            break;
+                        case 'search_nearby_places': {
+                            result = await executeSearchNearbyPlaces(args);
+                            break;
                         }
-                        break;
+                        case 'get_google_calendar_events': {
+                            result = await executeGetGoogleCalendarEvents(args);
+                            break;
+                        }
+                        default:
+                            result = { error: `Unknown tool: ${name}` };
                     }
-                    case 'get_user_profile':
-                        result = { result: buildProfileContext(appState) };
-                        break;
-                    case 'get_financial_report':
-                        result = { result: buildFinanceContext(appState) };
-                        break;
-                    case 'get_todos_and_schedule':
-                        result = { result: buildScheduleContext(appState) };
-                        break;
-                    case 'get_academic_gpa_record':
-                        result = { result: buildGPAContext(appState) };
-                        break;
-                    case 'get_habits_tracker':
-                        result = { result: await buildHabitContext() };
-                        break;
-                    case 'get_countdown_events':
-                        result = { result: await buildCountdownContext() };
-                        break;
-                    case 'get_journal_entries':
-                        result = { result: await buildJournalContext() };
-                        break;
-                    case 'search_nearby_places': {
-                        result = await executeSearchNearbyPlaces(args);
-                        break;
-                    }
-                    case 'get_google_calendar_events': {
-                        result = await executeGetGoogleCalendarEvents(args);
-                        break;
-                    }
-                    default:
-                        result = { error: `Unknown tool: ${name}` };
+                } catch (e: any) {
+                    if (e?.name === 'AbortError') throw e;
+                    console.error(`[SmartLife AI] Tool ${name} failed:`, e);
+                    result = { success: false, error: e?.message || 'Công cụ gặp lỗi.' };
                 }
+
+                if (countWrites(name, args) > 0 && result?.success !== false && !result?.error) {
+                    writesDone += countWrites(name, args);
+                }
+                const outcome = describeToolResult(name, result);
+                step.status = outcome.ok ? 'done' : 'error';
+                step.detail = outcome.detail;
+                step.endedAt = Date.now();
+                emit({ type: 'step', step: { ...step } });
+                for (const chart of charts.slice(chartsBefore)) emit({ type: 'chart', chart });
+                for (const action of actions.slice(actionsBefore)) emit({ type: 'action', action });
 
                 functionResponses.push({
                     functionResponse: { name, response: { result } }
@@ -1463,18 +1287,13 @@ export async function chatWithAI(
                 toolCallCount++;
             }
 
-            // Append the function response message to contents
-            contents.push({ role: 'function', parts: functionResponses });
+            // Kết quả công cụ trả về bằng vai 'user' (Gemini 3.x không nhận vai 'function')
+            contents.push({ role: 'user', parts: functionResponses });
         }
 
         // If we hit the limit, return what we have
-        return {
-            text: '⚠️ AI đã thực hiện quá nhiều truy vấn. Vui lòng thử câu hỏi đơn giản hơn.',
-            charts,
-            actions,
-            updatedHistory: cleanChatHistory(contents),
-            tokens_used: totalTokensConsumed
-        };
+        const limitNote = '⚠️ AI đã thực hiện quá nhiều truy vấn. Vui lòng thử câu hỏi đơn giản hơn.';
+        return finish(answer ? `${answer}\n\n${limitNote}` : limitNote);
     });
 }
 

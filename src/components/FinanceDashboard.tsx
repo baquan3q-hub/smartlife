@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AppState, TransactionType, Transaction, Goal, BudgetConfig, Wallet, Debt, DebtRepayment, SavingsLog, RecurringTransaction } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area, LineChart, Line } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, Plus, X, CalendarDays, Edit2, Trash2, List, LayoutDashboard, Wallet as WalletIcon, StickyNote, Calculator as CalculatorIcon, Sparkles, Bot, Filter, ChevronDown, ChevronUp, Maximize2, Minimize2, ExternalLink, FileBarChart, Loader2, Utensils, Car, ShoppingBag, FileText, Tv, Heart, BookOpen, Coffee, Gift, Briefcase, Coins, PiggyBank, GraduationCap, Home, Droplets, Landmark, Plane, Eye, EyeOff, ArrowRightLeft, CreditCard, History, Flame, Target, Sliders, BarChart2, Repeat, Pin } from 'lucide-react';
+import { GlassIcon } from './icons/GlassIcon';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 import Calculator from './Calculator';
 import { Lang } from '../i18n/i18n';
@@ -1663,7 +1664,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
                     {filteredTx.length === 0 && (
                         <div className="py-16 text-center text-gray-400">
-                            <FileBarChart size={40} className="mx-auto mb-3 opacity-30" />
+                            <GlassIcon name="chart" size={64} className="mx-auto mb-3" />
                             <p className="font-medium">Không có giao dịch nào trong {getPeriodLabel()}</p>
                         </div>
                     )}
@@ -2771,7 +2772,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
 
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                                    <Bot size={24} className="text-sky-600" />
+                                    <GlassIcon name="ai" size={30} />
                                     Trợ lý Tài chính AI
                                 </h3>
                                 <button onClick={() => { setAiInsight(null); setIsAnalyzing(false); }} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={24} /></button>
@@ -3978,8 +3979,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
                             <div className="p-6 text-center">
-                                <div className="bg-sky-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-sky-600">
-                                    <WalletIcon size={32} />
+                                <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                                    <GlassIcon name="finance" size={44} />
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-800 mb-2">Điều chỉnh số dư</h3>
                                 <p className="text-sm text-gray-500 mb-6">Nhập số tiền thực tế bạn đang có. Hệ thống sẽ tự tạo giao dịch điều chỉnh.</p>
@@ -4939,7 +4940,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ state, onAddTransac
                                 if (walletTransactions.length === 0) {
                                     return (
                                         <div className="py-16 text-center text-gray-400">
-                                            <FileText size={40} className="mx-auto mb-3 opacity-30" />
+                                            <GlassIcon name="coins" size={64} className="mx-auto mb-3" />
                                             <p className="font-semibold text-sm">Chưa có giao dịch nào liên kết với ví/quỹ này</p>
                                         </div>
                                     );

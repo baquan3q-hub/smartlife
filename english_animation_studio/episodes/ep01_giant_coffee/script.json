@@ -1,0 +1,220 @@
+{
+  "episode_id": "EP01",
+  "title": "The Giant Coffee",
+  "topic": "Ordering at a Coffee Shop",
+  "level": "A1-A2",
+  "target_duration": "3:30",
+  "characters": {
+    "Leo": {
+      "voice": "en-US-GuyNeural",
+      "rate": "+0%",
+      "pitch": "+0Hz",
+      "description": "Energetic, clumsy young guy, learns English through funny mistakes"
+    },
+    "Mia": {
+      "voice": "en-US-JennyNeural",
+      "rate": "-2%",
+      "pitch": "+2Hz",
+      "description": "Helpful, witty friend, native English speaker"
+    },
+    "Barista": {
+      "voice": "en-US-ChristopherNeural",
+      "rate": "+0%",
+      "pitch": "-3Hz",
+      "description": "Friendly coffee shop cashier with a warm smile"
+    },
+    "Narrator_VN": {
+      "voice": "vi-VN-NamMinhNeural",
+      "rate": "+0%",
+      "pitch": "+0Hz",
+      "description": "Bilingual host explaining key phrases and guiding learner"
+    }
+  },
+  "sections": [
+    {
+      "section_type": "story",
+      "title": "Part 1: The Funny Story",
+      "lines": [
+        {
+          "speaker": "Mia",
+          "text": "Wake up, Leo! We have an important meeting in ten minutes.",
+          "vietsub": "Dậy đi Leo! Mười phút nữa là bọn mình có cuộc họp quan trọng rồi đấy.",
+          "visual": "Mia vỗ vai Leo đang gà gật trên bàn. Icon đồng hồ tích tắc báo 10 phút.",
+          "pause_after": 0.8
+        },
+        {
+          "speaker": "Leo",
+          "text": "Ugh, I need coffee right now. Let me order.",
+          "vietsub": "Ôi trời, tớ cần cà phê ngay lập tức. Để tớ đi gọi nước.",
+          "visual": "Leo bật dậy, mắt lim dim nhưng cố tỏ vẻ tự tin bước tới quầy thu ngân.",
+          "pause_after": 0.8
+        },
+        {
+          "speaker": "Barista",
+          "text": "Good morning! What can I get for you today?",
+          "vietsub": "Chào buổi sáng! Bạn muốn gọi món gì hôm nay ạ?",
+          "visual": "Barista mỉm cười thân thiện, tay chuẩn bị bút và cốc giấy.",
+          "pause_after": 0.8
+        },
+        {
+          "speaker": "Leo",
+          "text": "Good morning! Can I get one iced latte, please?",
+          "vietsub": "Chào buổi sáng! Cho tôi một ly latte đá với?",
+          "visual": "Leo chỉ tay vào menu. Cửa sổ phụ đề hiện sáng dòng chữ 'Can I get... please?'.",
+          "pause_after": 0.8
+        },
+        {
+          "speaker": "Barista",
+          "text": "Sure thing! What size would you like? Small, medium, or large?",
+          "vietsub": "Dạ được chứ! Bạn chọn kích cỡ nào? Nhỏ, vừa hay lớn?",
+          "visual": "Barista chỉ vào 3 chiếc cốc nhỏ, vừa, lớn trên quầy.",
+          "pause_after": 0.8
+        },
+        {
+          "speaker": "Leo",
+          "text": "I am super sleepy today. Give me the biggest one you have!",
+          "vietsub": "Hôm nay tôi buồn ngủ quá. Cho tôi cốc bự nhất các bạn có luôn!",
+          "visual": "Leo giang hai tay làm cử chỉ siêu to khổng lồ, vẻ mặt tự hào.",
+          "pause_after": 1.0
+        },
+        {
+          "speaker": "Barista",
+          "text": "Haha, you got it! One Extra-Giant Latte coming right up!",
+          "vietsub": "Haha, có ngay! Một ly Latte Siêu Khổng Lồ nhé!",
+          "visual": "Barista nháy mắt cười tinh nghịch, quay vào trong pha chế.",
+          "pause_after": 1.2
+        },
+        {
+          "speaker": "Barista",
+          "text": "Here is your drink, sir! For here or to go?",
+          "vietsub": "Đồ uống của bạn đây ạ! Dùng tại quán hay mang về?",
+          "visual": "Barista bê ra một cốc cà phê khổng lồ to như chiếc xô! Bốc khói đá nghi ngút.",
+          "pause_after": 1.0
+        },
+        {
+          "speaker": "Leo",
+          "text": "Oh my gosh! This is huge! I think I need a bucket to take it home!",
+          "vietsub": "Ôi trời đất ơi! To thế này! Chắc tôi cần một cái xô mới mang về nổi!",
+          "visual": "Mắt Leo mở to như quả trứng gà, mồ hôi hột toát ra vì ngỡ ngàng.",
+          "pause_after": 0.8
+        },
+        {
+          "speaker": "Mia",
+          "text": "Haha, Leo! On second thought, maybe share half of that with me?",
+          "vietsub": "Haha, Leo ơi! Nghĩ lại thì, hay là chia một nửa cho tớ nhé?",
+          "visual": "Mia ôm bụng cười sặc sụa, chỉ tay vào chiếc cốc khổng lồ.",
+          "pause_after": 1.5
+        }
+      ]
+    },
+    {
+      "section_type": "breakdown",
+      "title": "Part 2: 3 Survival Phrases",
+      "lines": [
+        {
+          "speaker": "Narrator_VN",
+          "text": "Chào các bạn! Vừa rồi Leo đã có một trải nghiệm gọi món thật hài hước. Bây giờ, hãy cùng Mia bóc tách ba cụm từ giao tiếp tự nhiên nhất mà người bản xứ hay dùng nhé!",
+          "vietsub": "Chào các bạn! Hãy cùng bóc tách 3 cụm từ giao tiếp tự nhiên nhất!",
+          "visual": "Hiển thị bảng phấn hoạt hình. Mia biến hình thành giáo viên cầm thước chỉ.",
+          "pause_after": 1.2
+        },
+        {
+          "speaker": "Mia",
+          "text": "Phrase number one: What can I get for you?",
+          "vietsub": "Cụm từ số một: What can I get for you?",
+          "visual": "Card hoạt hình số 1 hiện ra với hiệu ứng Pop-up.",
+          "pause_after": 0.8
+        },
+        {
+          "speaker": "Narrator_VN",
+          "text": "Đây là cách nhân viên bán hàng hỏi: 'Bạn muốn gọi món gì?' lịch sự và tự nhiên hơn rất nhiều so với câu 'What do you want?'. Khi trả lời, bạn chỉ cần nói: 'Can I get...' kèm tên món đồ bạn muốn.",
+          "vietsub": "Cách hỏi gọi món lịch sự. Trả lời: Can I get + tên món.",
+          "visual": "Hiện công thức: Can I get + [tên món] + please?",
+          "pause_after": 1.2
+        },
+        {
+          "speaker": "Mia",
+          "text": "Phrase number two: For here or to go?",
+          "vietsub": "Cụm từ số hai: For here or to go?",
+          "visual": "Card hoạt hình số 2 hiện ra với 2 biểu tượng: bàn ghế (For here) và túi mang đi (To go).",
+          "pause_after": 0.8
+        },
+        {
+          "speaker": "Narrator_VN",
+          "text": "Dùng ở quán hay mang về? Bạn chỉ cần đáp nhanh: 'For here, please' nếu ngồi lại, hoặc 'To go, please' nếu muốn đem đi nhé!",
+          "vietsub": "Dùng ở quán: For here, please. Mang về: To go, please.",
+          "visual": "Hiển thị so sánh 2 lựa chọn xanh - đỏ vui nhộn.",
+          "pause_after": 1.2
+        },
+        {
+          "speaker": "Mia",
+          "text": "Phrase number three: On second thought...",
+          "vietsub": "Cụm từ số ba: On second thought...",
+          "visual": "Card hoạt hình số 3 hiện ra kèm icon bóng đèn suy nghĩ lại.",
+          "pause_after": 0.8
+        },
+        {
+          "speaker": "Narrator_VN",
+          "text": "Cụm này nghĩa là: 'Nghĩ lại thì...'. Dùng ngay khi bạn vừa nói điều gì đó nhưng muốn đổi ý định. Rất tự nhiên và giống hệt người bản ngữ!",
+          "vietsub": "Nghĩa là: Nghĩ lại thì... (dùng khi muốn đổi ý).",
+          "visual": "Ví dụ hoạt họa: Leo đổi từ cốc to sang cốc vừa.",
+          "pause_after": 1.5
+        }
+      ]
+    },
+    {
+      "section_type": "practice",
+      "title": "Part 3: Roleplay Practice",
+      "lines": [
+        {
+          "speaker": "Narrator_VN",
+          "text": "Bây giờ đến phần quan trọng nhất: Thực hành phản xạ! Bạn sẽ đóng vai Leo để trò chuyện cùng Barista. Hãy đọc to khi đồng hồ đếm ngược nhé!",
+          "vietsub": "Đến lượt bạn đóng vai Leo! Đọc to khi đồng hồ đếm ngược nhé!",
+          "visual": "Màn hình chuyển sang giao diện tương tác Game: 'YOU BE LEO!'.",
+          "pause_after": 1.0
+        },
+        {
+          "speaker": "Barista",
+          "text": "Good morning! What can I get for you today?",
+          "vietsub": "Chào buổi sáng! Bạn muốn gọi món gì hôm nay ạ?",
+          "visual": "Barista hỏi. Bên dưới hiện gợi ý: 'Can I get one iced latte, please?' với đồng hồ 3-2-1.",
+          "pause_after": 3.0
+        },
+        {
+          "speaker": "Barista",
+          "text": "For here or to go?",
+          "vietsub": "Dùng tại quán hay mang về ạ?",
+          "visual": "Barista hỏi. Bên dưới hiện gợi ý: 'To go, please!' với đồng hồ 3-2-1.",
+          "pause_after": 3.0
+        },
+        {
+          "speaker": "Narrator_VN",
+          "text": "Tuyệt vời! Bạn vừa hoàn thành xuất sắc đoạn hội thoại gọi món đầu tiên!",
+          "vietsub": "Tuyệt vời! Bạn vừa hoàn thành bài tập phản xạ!",
+          "visual": "Pháo hoa giấy và huy hiệu sao vàng hiện lên trên màn hình.",
+          "pause_after": 1.2
+        }
+      ]
+    },
+    {
+      "section_type": "quiz_outro",
+      "title": "Part 4: Mini Quiz & Outro",
+      "lines": [
+        {
+          "speaker": "Mia",
+          "text": "Quick quiz time! When you want to change your mind, what do you say?",
+          "vietsub": "Câu hỏi nhanh! Khi muốn đổi ý, bạn sẽ nói cụm từ nào?",
+          "visual": "Hộp câu hỏi Quiz: A. On first thought | B. On second thought.",
+          "pause_after": 0.8
+        },
+        {
+          "speaker": "Narrator_VN",
+          "text": "Đáp án là B: On second thought! Hãy bình luận bên dưới xem bạn làm đúng không nhé. Nhớ bấm đăng ký kênh để đón xem Tập 2: Buổi phỏng vấn xin việc của Leo!",
+          "vietsub": "Đáp án là B! Hãy đăng ký kênh để đón xem Tập 2 nhé!",
+          "visual": "Đáp án B sáng đèn xanh kèm tiếng 'Ting!'. Leo & Mia vẫy tay chào tạm biệt.",
+          "pause_after": 2.0
+        }
+      ]
+    }
+  ]
+}

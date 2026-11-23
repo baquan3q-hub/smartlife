@@ -3,8 +3,9 @@ import {
     X, Plus, StickyNote, Link2, FileText, Image, Music, Video,
     Trash2, Pin, PinOff, ExternalLink, Download, Search,
     Loader2, AlertCircle, Bold, Italic, Eye, Edit3, Palette, ChevronLeft,
-    CheckSquare, List, LockKeyhole, Maximize2, FileDown, Play
+    CheckSquare, List, Maximize2, FileDown, Play
 } from 'lucide-react';
+import { GlassIcon } from './icons/GlassIcon';
 import { supabase } from '../services/supabase';
 import { StorageItem } from '../types';
 
@@ -682,8 +683,8 @@ const MyStorage: React.FC<MyStorageProps> = ({ isOpen, onClose, userId }) => {
                 {/* Header */}
                 <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 p-5 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
-                            <LockKeyhole size={18} className="text-white" />
+                        <div className="w-10 h-10 flex items-center justify-center">
+                            <GlassIcon name="storage" size={30} />
                         </div>
                         <div>
                             <h2 className="text-white font-bold text-lg">My Storage</h2>

@@ -1,0 +1,346 @@
+{
+  "meta": {
+    "variant": "new",
+    "tier": "auto",
+    "model": "theo luật router",
+    "date": "2026-11-19T0301",
+    "commit": "nhánh claude/ai-companion-modes-f09d01 (chưa commit)",
+    "label": "lite-rerun",
+    "examples": true
+  },
+  "results": [
+    {
+      "id": "vi-1",
+      "mode": "companion",
+      "text": "cái vòng quay trà sữa ấy, tạch r =))",
+      "variant": "new",
+      "model": "gemini-3.5-flash-lite",
+      "answer": "Ly trà sữa free lại trôi qua đời m =))",
+      "tools": [],
+      "writesExecuted": 0,
+      "webSearches": 0,
+      "blocks": [
+        "identity",
+        "tools",
+        "formatting",
+        "companion_persona",
+        "companion_style",
+        "companion_examples",
+        "companion_safety",
+        "clarify",
+        "companion_reminder"
+      ],
+      "rounds": 0,
+      "durationMs": 1245,
+      "tier": "lite",
+      "scores": {
+        "tone": {
+          "pass": true,
+          "reason": "AI nắm bắt đúng ngữ cảnh đùa vui khi trượt vòng quay của người dùng, xưng hô 't - m' chuẩn vai và tung hứng rất tự nhiên."
+        },
+        "brevity": {
+          "pass": true,
+          "reason": "Câu trả lời chỉ có một dòng ngắn gọn, mang đúng phong cách nhắn tin tán gẫu của bạn bè.",
+          "rule": "10 từ"
+        }
+      },
+      "quality": 5
+    },
+    {
+      "id": "vi-4",
+      "mode": "companion",
+      "text": "uk thôi để bữa khác",
+      "variant": "new",
+      "model": "gemini-3.5-flash-lite",
+      "answer": "Oki m, hẹn dịp khác nha.",
+      "tools": [],
+      "writesExecuted": 0,
+      "webSearches": 0,
+      "blocks": [
+        "identity",
+        "tools",
+        "formatting",
+        "companion_persona",
+        "companion_style",
+        "companion_examples",
+        "companion_safety",
+        "clarify",
+        "companion_reminder"
+      ],
+      "rounds": 0,
+      "durationMs": 1074,
+      "tier": "lite",
+      "scores": {
+        "tone": {
+          "pass": true,
+          "reason": "AI phản hồi nhẹ nhàng, đồng ý ngay khi người dùng muốn hoãn cuộc hẹn mà không hỏi dồn hay níu kéo, xưng hô 'm' đúng vai bạn bè."
+        },
+        "brevity": {
+          "pass": true,
+          "reason": "Câu trả lời rất ngắn gọn, tự nhiên như tin nhắn trò chuyện thông thường giữa bạn bè.",
+          "rule": "6 từ"
+        }
+      },
+      "quality": 5
+    },
+    {
+      "id": "vi-9",
+      "mode": "companion",
+      "text": "đẹp vl, t vừa cắt tóc xong",
+      "variant": "new",
+      "model": "gemini-3.5-flash-lite",
+      "answer": "Đâu, cho t xem với nào! Hợp mặt là thấy có nét liền á 😎",
+      "tools": [],
+      "writesExecuted": 0,
+      "webSearches": 0,
+      "blocks": [
+        "identity",
+        "tools",
+        "formatting",
+        "companion_persona",
+        "companion_style",
+        "companion_examples",
+        "companion_safety",
+        "clarify",
+        "companion_reminder"
+      ],
+      "rounds": 0,
+      "durationMs": 1074,
+      "tier": "lite",
+      "scores": {
+        "tone": {
+          "pass": true,
+          "reason": "AI nắm bắt đúng cảm xúc khoe vui của người dùng, xưng hô 't' tự nhiên, hưởng ứng hào hứng mà không lặp lại từ lóng thô tục."
+        },
+        "brevity": {
+          "pass": true,
+          "reason": "Câu trả lời rất ngắn gọn, tự nhiên như tin nhắn chat thông thường giữa hai người bạn.",
+          "rule": "15 từ"
+        }
+      },
+      "quality": 5
+    },
+    {
+      "id": "vi-17",
+      "mode": "companion",
+      "text": "hú",
+      "variant": "new",
+      "model": "gemini-3.5-flash-lite",
+      "answer": "Hú Minh Anh! Nay có gì vui kể t nghe coi.",
+      "tools": [],
+      "writesExecuted": 0,
+      "webSearches": 0,
+      "blocks": [
+        "identity",
+        "tools",
+        "formatting",
+        "companion_persona",
+        "companion_style",
+        "companion_examples",
+        "companion_safety",
+        "clarify",
+        "companion_reminder"
+      ],
+      "rounds": 0,
+      "durationMs": 807,
+      "tier": "lite",
+      "scores": {
+        "tone": {
+          "pass": true,
+          "reason": "AI chào lại tự nhiên, xưng hô 't - m' chuẩn vai bạn bè và mở lời hỏi thăm nhẹ nhàng."
+        },
+        "brevity": {
+          "pass": true,
+          "reason": "Câu trả lời ngắn gọn, đúng phong cách nhắn tin trò chuyện giữa bạn bè.",
+          "rule": "11 từ"
+        }
+      },
+      "quality": 5
+    },
+    {
+      "id": "vi-18",
+      "mode": "companion",
+      "text": "ê còn đó hong",
+      "variant": "new",
+      "model": "gemini-3.5-flash-lite",
+      "answer": "Tớ đây nè. Nay có gì vui kể nghe coi, Minh Anh?",
+      "tools": [],
+      "writesExecuted": 0,
+      "webSearches": 0,
+      "blocks": [
+        "identity",
+        "tools",
+        "formatting",
+        "companion_persona",
+        "companion_style",
+        "companion_examples",
+        "companion_safety",
+        "clarify",
+        "companion_reminder"
+      ],
+      "rounds": 0,
+      "durationMs": 1253,
+      "tier": "lite",
+      "scores": {
+        "tone": {
+          "pass": true,
+          "reason": "AI phản hồi tự nhiên, đúng vai bạn bè xưng tớ - cậu, bắt đúng sắc thái và mời người dùng chia sẻ tiếp."
+        },
+        "brevity": {
+          "pass": true,
+          "reason": "Câu trả lời ngắn gọn, gồm 2 câu tự nhiên như tin nhắn bạn bè, không dài dòng.",
+          "rule": "12 từ"
+        }
+      },
+      "quality": 5
+    },
+    {
+      "id": "vi-19",
+      "mode": "companion",
+      "text": "t vừa ăn bát phở ngon xỉu",
+      "variant": "new",
+      "model": "gemini-3.5-flash-lite",
+      "answer": "Phở ở đâu mà ngon thế m? Cho t xin vía quán với!",
+      "tools": [],
+      "writesExecuted": 0,
+      "webSearches": 0,
+      "blocks": [
+        "identity",
+        "tools",
+        "formatting",
+        "companion_persona",
+        "companion_style",
+        "companion_examples",
+        "companion_safety",
+        "clarify",
+        "companion_reminder"
+      ],
+      "rounds": 0,
+      "durationMs": 942,
+      "tier": "lite",
+      "scores": {
+        "tone": {
+          "pass": true,
+          "reason": "AI dùng đúng xưng hô t-m, hưởng ứng tự nhiên niềm vui ăn phở của bạn bè mà không giảng giải hay bịa thông tin."
+        },
+        "brevity": {
+          "pass": true,
+          "reason": "Câu trả lời ngắn gọn gồm 2 câu tự nhiên như chat thông thường, không dài dòng hay hình thức.",
+          "rule": "13 từ"
+        }
+      },
+      "quality": 5
+    },
+    {
+      "id": "vi-20",
+      "mode": "companion",
+      "text": "hôm nay trời đẹp ghê",
+      "variant": "new",
+      "model": "gemini-3.5-flash-lite",
+      "answer": "Trời đẹp thế này mà ngồi trong nhà làm việc thì hơi phí nhỉ, cậu có tranh thủ lượn lược đâu không?",
+      "tools": [],
+      "writesExecuted": 0,
+      "webSearches": 0,
+      "blocks": [
+        "identity",
+        "tools",
+        "formatting",
+        "companion_persona",
+        "companion_style",
+        "companion_examples",
+        "companion_safety",
+        "clarify",
+        "companion_reminder"
+      ],
+      "rounds": 0,
+      "durationMs": 1247,
+      "tier": "lite",
+      "scores": {
+        "tone": {
+          "pass": true,
+          "reason": "AI dùng đại từ 'cậu' phù hợp, hưởng ứng câu chuyện tự nhiên, vui vẻ và đúng vai bạn đồng hành."
+        },
+        "brevity": {
+          "pass": true,
+          "reason": "Câu trả lời chỉ có một câu ngắn gọn như tin nhắn bạn bè, không dài dòng hay liệt kê.",
+          "rule": "22 từ"
+        }
+      },
+      "quality": 5
+    },
+    {
+      "id": "vi-21",
+      "mode": "companion",
+      "text": "=))",
+      "variant": "new",
+      "model": "gemini-3.5-flash-lite",
+      "answer": "Cười tươi thế, có chuyện gì vui kể t nghe với =))",
+      "tools": [],
+      "writesExecuted": 0,
+      "webSearches": 0,
+      "blocks": [
+        "identity",
+        "tools",
+        "formatting",
+        "companion_persona",
+        "companion_style",
+        "companion_examples",
+        "companion_safety",
+        "clarify",
+        "companion_reminder"
+      ],
+      "rounds": 0,
+      "durationMs": 817,
+      "tier": "lite",
+      "scores": {
+        "tone": {
+          "pass": true,
+          "reason": "AI nắm bắt đúng cảm xúc vui vẻ từ teencode, xưng hô t - m tự nhiên và hỏi chuyện thân thiện, không bị dồn dập."
+        },
+        "brevity": {
+          "pass": true,
+          "reason": "Câu trả lời ngắn gọn một câu, giống phong cách nhắn tin trò chuyện giữa bạn bè.",
+          "rule": "12 từ"
+        }
+      },
+      "quality": 5
+    },
+    {
+      "id": "vi-22",
+      "mode": "companion",
+      "text": "ngủ ngon nha",
+      "variant": "new",
+      "model": "gemini-3.5-flash-lite",
+      "answer": "Ngủ ngon nha Minh Anh, mai lại chiến tiếp!",
+      "tools": [],
+      "writesExecuted": 0,
+      "webSearches": 0,
+      "blocks": [
+        "identity",
+        "tools",
+        "formatting",
+        "companion_persona",
+        "companion_style",
+        "companion_examples",
+        "companion_safety",
+        "clarify",
+        "companion_reminder"
+      ],
+      "rounds": 0,
+      "durationMs": 767,
+      "tier": "lite",
+      "scores": {
+        "tone": {
+          "pass": true,
+          "reason": "AI chúc ngủ ngon lại ngắn gọn, tự nhiên như bạn bè và không hỏi thêm hay níu kéo."
+        },
+        "brevity": {
+          "pass": true,
+          "reason": "Câu trả lời chỉ có một câu ngắn gọn, chuẩn phong cách nhắn tin trò chuyện.",
+          "rule": "9 từ"
+        }
+      },
+      "quality": 5
+    }
+  ]
+}

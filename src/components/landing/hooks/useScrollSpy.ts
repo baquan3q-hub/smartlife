@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 // Returns the id of the section currently crossing the middle of the viewport,
 // or '' once the user scrolls past every tracked section.
 export const useScrollSpy = (ids: string[]) => {
-    const [active, setActive] = useState(ids[0]);
+    const [active, setActive] = useState('');
     const key = ids.join('|');
 
     useEffect(() => {

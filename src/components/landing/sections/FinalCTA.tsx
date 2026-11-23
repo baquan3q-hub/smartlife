@@ -8,40 +8,31 @@ interface DarkCTAProps {
     title: string;
     desc: string;
     children: React.ReactNode;
+    // Small mono mark above the title (the landing page uses the night hour).
+    mark?: string;
 }
 
-// The one dark block on each page: dotted glow, logo, headline and the buttons passed in.
-export const DarkCTA: React.FC<DarkCTAProps> = ({ title, desc, children }) => (
+// The one night-coloured block on each page: headline on the left, buttons on the right.
+export const DarkCTA: React.FC<DarkCTAProps> = ({ title, desc, children, mark }) => (
     <section className="px-4 py-20 sm:px-6 sm:py-28">
-        <Reveal className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] bg-zinc-950 px-6 py-20 text-center sm:py-28">
-            <div
-                className="pointer-events-none absolute inset-0 opacity-60"
-                style={{
-                    backgroundImage: 'radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)',
-                    backgroundSize: '22px 22px',
-                    maskImage: 'radial-gradient(ellipse 60% 70% at 50% 100%, #000, transparent 70%)'
-                }}
-                aria-hidden
-            />
-            <div
-                className="pointer-events-none absolute -bottom-40 left-1/2 h-80 w-[700px] -translate-x-1/2 rounded-full blur-3xl"
-                style={{ background: 'radial-gradient(closest-side, rgba(2,132,199,0.35), transparent)' }}
-                aria-hidden
-            />
-            <div className="relative">
-                <img src="/pwa-192x192.png" alt="" className="mx-auto mb-8 h-14 w-14 rounded-2xl border border-white/10" />
-                <h2 className="l-h2 mx-auto max-w-2xl text-white">{title}</h2>
-                <p className="mx-auto mt-5 max-w-md text-[17px] leading-7 text-zinc-400">{desc}</p>
-                <div className="mt-10 flex flex-col items-center justify-center gap-3 xs:flex-row">{children}</div>
+        <Reveal className="relative mx-auto grid max-w-6xl gap-10 overflow-hidden rounded-[28px] bg-[var(--l-night)] px-6 py-14 sm:px-12 sm:py-20 md:grid-cols-12 md:items-end">
+            <div className="md:col-span-8">
+                <div className="mb-8 flex items-center gap-3">
+                    <img src="/pwa-192x192.png" alt="" className="h-11 w-11 rounded-xl border border-white/10" />
+                    {mark && <span className="l-mono text-[var(--l-warm)]">{mark}</span>}
+                </div>
+                <h2 className="l-h2 max-w-2xl text-white">{title}</h2>
+                <p className="mt-5 max-w-md text-[17px] leading-7 text-zinc-400">{desc}</p>
             </div>
+            <div className="flex flex-col gap-3 xs:flex-row md:col-span-4 md:flex-col md:items-stretch">{children}</div>
         </Reveal>
     </section>
 );
 
 export const ctaPrimary =
-    'group flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-6 text-[15px] font-medium text-zinc-950 transition-colors hover:bg-zinc-100 xs:w-auto';
+    'group flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-6 text-[15px] font-medium text-zinc-950 transition-colors hover:bg-zinc-100 xs:w-auto md:w-full';
 export const ctaSecondary =
-    'flex h-12 w-full items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-[15px] font-medium text-white transition-colors hover:bg-white/[0.06] xs:w-auto';
+    'flex h-12 w-full items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-[15px] font-medium text-white transition-colors hover:bg-white/[0.06] xs:w-auto md:w-full';
 
 // Primary white button for DarkCTA with the sliding arrow.
 export const CTAButton: React.FC<{ onClick: () => void; children: React.ReactNode }> = ({ onClick, children }) => (
@@ -58,7 +49,7 @@ interface FinalCTAProps {
 }
 
 export const FinalCTA: React.FC<FinalCTAProps> = ({ c, onLogin, onInstall }) => (
-    <DarkCTA title={c.ctaTitle} desc={c.ctaDesc}>
+    <DarkCTA title={c.ctaTitle} desc={c.ctaDesc} mark="22:30">
         <CTAButton onClick={onLogin}>{c.startNow}</CTAButton>
         <button type="button" onClick={onInstall} className={ctaSecondary}>
             <Download size={17} />

@@ -2,6 +2,8 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import StickyWindowApp, { isStickyWindowRoute } from './components/sticky/StickyWindowApp'
+import { BRIDGE_BROKEN_KEY } from './services/desktopBridge'
 import './index.css' // Quan trọng: Import CSS để có giao diện đẹp (Tailwind)
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null; errorInfo: ErrorInfo | null }> {
@@ -39,6 +41,16 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+// Lưới an toàn cho app Windows: lệnh /__desktop/... lẽ ra phải được app chặn lại. Nếu trang thật sự bị
+// chuyển tới đây (app cũ / lệnh không được nhận) → tắt kênh lệnh cho cửa sổ này và quay lại trang trước,
+// thay vì hiện cả giao diện app trong cửa sổ ghi chú.
+const isStrayDesktopCommand = window.location.pathname.startsWith('/__desktop/');
+if (isStrayDesktopCommand) {
+  try { sessionStorage.setItem(BRIDGE_BROKEN_KEY, '1'); } catch { /* ignore */ }
+  if (window.history.length > 1) window.history.back();
+  else window.location.replace('/');
+}
+
 // Tìm thẻ div có id="root" trong file index.html
 const rootElement = document.getElementById('root');
 
@@ -47,10 +59,11 @@ if (!rootElement) {
 }
 
 // Khởi tạo React App
-ReactDOM.createRoot(rootElement as HTMLElement).render(
+if (!isStrayDesktopCommand) ReactDOM.createRoot(rootElement as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      {/* Cửa sổ note nổi của bản Windows (Tauri) chỉ render phần ghi chú, không tải toàn bộ App */}
+      {isStickyWindowRoute() ? <StickyWindowApp /> : <App />}
     </ErrorBoundary>
   </React.StrictMode>,
 )
