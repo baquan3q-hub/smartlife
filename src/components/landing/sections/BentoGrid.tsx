@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Calculator, Lock, Play, Pause, Check, Sparkles, KeyRound } from 'lucide-react';
+import { ArrowRight, Lock, Play } from 'lucide-react';
 import { LandingCopy } from '../i18n';
 import { bento } from '../data';
 import { GlassIcon } from '../../icons/GlassIcon';
@@ -13,25 +13,9 @@ interface BentoGridProps {
 }
 
 export const BentoGrid: React.FC<BentoGridProps> = ({ c, onLogin }) => {
-    // Interactive state for Finance Math demo
-    const [mathInput, setMathInput] = useState('50k + 1.5tr');
-    const [mathResult, setMathResult] = useState('1.550.000 ₫');
-
-    // Interactive state for Pomodoro mini demo
-    const [isPomoRunning, setIsPomoRunning] = useState(false);
-    const [pomoSecs, setPomoSecs] = useState(1500); // 25:00
-
     // Interactive state for Journal PIN lock
     const [pinCode, setPinCode] = useState(['•', '•', '', '']);
     const [isPinUnlocked, setIsPinUnlocked] = useState(false);
-
-    const handleEvalMath = (expr: string) => {
-        setMathInput(expr);
-        if (expr.includes('50k + 1.5tr')) setMathResult('1.550.000 ₫');
-        else if (expr.includes('2tr - 350k')) setMathResult('1.650.000 ₫');
-        else if (expr.includes('100k * 4')) setMathResult('400.000 ₫');
-        else setMathResult('2.450.000 ₫');
-    };
 
     const handlePinDigit = (digit: string) => {
         const next = [...pinCode];
@@ -50,15 +34,14 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ c, onLogin }) => {
     };
 
     return (
-        <section id="features" className="py-20 sm:py-28 bg-white">
-            <div className="mx-auto max-w-6xl px-4 sm:px-6">
-                <Reveal className="mx-auto mb-14 max-w-2xl text-center">
-                    <p className="l-eyebrow mb-3 flex items-center justify-center gap-2">
-                        <Sparkles size={14} />
-                        {c.bentoEyebrow}
-                    </p>
-                    <h2 className="l-h2 text-zinc-950">{c.bentoTitle}</h2>
-                    <p className="mt-4 text-[17px] leading-relaxed text-zinc-600">{c.bentoDesc}</p>
+        <section id="features" className="bg-[var(--l-dawn)] py-24 sm:py-32">
+            <div className="mx-auto max-w-[1240px] px-4 sm:px-6">
+                <Reveal className="mb-14 grid gap-4 lg:grid-cols-12 lg:items-end">
+                    <div className="lg:col-span-7">
+                        <p className="l-mono mb-5 text-zinc-500">{c.bentoEyebrow}</p>
+                        <h2 className="l-h2 text-zinc-950">{c.bentoTitle}</h2>
+                    </div>
+                    <p className="text-[17px] leading-7 text-zinc-600 lg:col-span-5">{c.bentoDesc}</p>
                 </Reveal>
 
                 <Stagger className="grid grid-cols-1 gap-5 md:grid-cols-6">
@@ -99,48 +82,14 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ c, onLogin }) => {
                                             </div>
                                         </div>
 
-                                        {/* Micro-Interaction 1: Math Calculator on Visual/Finance card */}
-                                        {item.key === 'visual' && (
-                                            <div className="mt-5 rounded-2xl bg-zinc-50 border border-zinc-200/80 p-4">
-                                                <div className="flex items-center justify-between text-xs text-zinc-500 mb-2">
-                                                    <span className="font-semibold text-zinc-700 flex items-center gap-1.5">
-                                                        <Calculator size={13} className="text-sky-600" />
-                                                        Bàn phím toán học tích hợp
-                                                    </span>
-                                                    <span className="font-mono text-emerald-600 font-bold">{mathResult}</span>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={mathInput}
-                                                        onChange={(e) => handleEvalMath(e.target.value)}
-                                                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-mono font-medium text-zinc-800 shadow-xs focus:border-sky-500 focus:outline-hidden"
-                                                    />
-                                                </div>
-                                                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                                                    {['50k + 1.5tr', '2tr - 350k', '100k * 4'].map((preset) => (
-                                                        <button
-                                                            key={preset}
-                                                            type="button"
-                                                            onClick={() => handleEvalMath(preset)}
-                                                            className="rounded-md bg-white border border-zinc-200 px-2 py-0.5 text-[11px] font-mono text-zinc-600 hover:border-sky-400 hover:text-sky-600"
-                                                        >
-                                                            {preset}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
                                         {/* Micro-Interaction 2: Journal PIN Lock */}
                                         {item.key === 'journal' && (
                                             <div className="mt-4 rounded-xl bg-pink-50/60 border border-pink-200/60 p-3.5">
                                                 <div className="flex items-center justify-between text-xs text-pink-900 font-semibold mb-2">
                                                     <span className="flex items-center gap-1">
                                                         <Lock size={12} />
-                                                        {isPinUnlocked ? 'Đã mở khóa nhật ký' : 'Mã PIN bảo mật'}
+                                                        {isPinUnlocked ? c.ui.pinOpen : c.ui.pinLocked}
                                                     </span>
-                                                    <span className="font-mono text-pink-700">PIN Guard</span>
                                                 </div>
                                                 <div className="flex justify-center gap-2 mb-2">
                                                     {[0, 1, 2, 3].map((idx) => (

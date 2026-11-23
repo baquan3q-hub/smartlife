@@ -19,10 +19,10 @@ const google = [
 ];
 
 export const SyncStrip: React.FC<SyncStripProps> = ({ c, scrollTo }) => (
-    <section id="google-ecosystem" className="py-16 sm:py-20 border-t border-zinc-100 bg-white/50">
-        <Reveal className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-4 sm:px-6">
-            <p className="text-[13px] font-medium text-zinc-500">{c.syncWith}</p>
-            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+    <section className="border-y border-zinc-900/[0.06] bg-[var(--l-day)] py-14 sm:py-16">
+        <Reveal className="mx-auto flex max-w-6xl flex-col gap-4 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <p className="l-mono text-zinc-500">{c.syncWith}</p>
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
                 {google.map(({ name, Icon }) => (
                     <div key={name} className="flex items-center gap-2 text-[15px] font-medium text-zinc-700">
                         <Icon size={20} />
@@ -32,7 +32,7 @@ export const SyncStrip: React.FC<SyncStripProps> = ({ c, scrollTo }) => (
             </div>
         </Reveal>
 
-        <div className="l-mask-x mt-12 overflow-hidden">
+        <div className="l-mask-x mt-10 overflow-hidden">
             <div className="animate-marquee gap-2.5 py-1">
                 {[...marquee, ...marquee].map((m, i) => (
                     <button
